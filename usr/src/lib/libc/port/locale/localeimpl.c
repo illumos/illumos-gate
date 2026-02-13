@@ -12,6 +12,7 @@
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Bill Sommerfeld <sommerfeld@hamachi.org>
  */
 
 /*
@@ -312,7 +313,7 @@ locdata_get(int category, const char *locname)
 {
 	char scratch[ENCODING_LEN + 1];
 	char scratch2[ENCODING_LEN + 1];
-	char *slash, *cm;
+	const char *sep, *cm;
 	int cnt;
 	int len;
 	int i;
@@ -325,13 +326,13 @@ locdata_get(int category, const char *locname)
 	 * Extract the locale name for the category if it is a composite
 	 * locale.
 	 */
-	if ((slash = strchr(locname, '/')) != NULL) {
-		for (cnt = category; cnt && slash != NULL; cnt--) {
-			locname = slash + 1;
-			slash = strchr(locname, '/');
+	if ((sep = strchr(locname, '/')) != NULL) {
+		for (cnt = category; cnt && sep != NULL; cnt--) {
+			locname = sep + 1;
+			sep = strchr(locname, '/');
 		}
-		if (slash) {
-			len = slash - locname + 1;
+		if (sep) {
+			len = sep - locname + 1;
 			if (len >= sizeof (scratch)) {
 				len = sizeof (scratch);
 			}
@@ -340,6 +341,66 @@ locdata_get(int category, const char *locname)
 		}
 		(void) strlcpy(scratch, locname, len);
 		locname = scratch;
+	} else if ((sep = strchr(locname, ';')) != NULL) {
+		/*
+		 * Accept glibc-style composite locale as libstdc++ expects.
+		 * glibc names composite locales using a semicolon-
+		 * separated list of <category>=<value> assignments.
+		 *
+		 * Segment the string at semicolons, checking if each segment
+		 * starts with the name of the category we're looking for,
+		 * followed by an equals sign.  Ignore everything else.
+		 */
+		const char *catname = categories[category];
+		size_t catlen = strlen(catname);
+		const char *locnameend = locname + strlen(locname);
+		const char *locp = locname; /* start of this entry */
+		const char *endp = sep;   /* end of this entry */
+		const char *value = NULL; /* start of match */
+		const char *endvalue = NULL; /* end of match */
+		size_t copylen;
+
+		for (;;) {
+			if (((endp - locp) > catlen) &&
+			    (memcmp(locp, catname, catlen) == 0) &&
+			    (locp[catlen] == '=')) {
+				value = &locp[catlen + 1];
+				endvalue = endp;
+			}
+			if (endp >= locnameend)
+				break;
+			locp = endp + 1;
+			endp = strchr(locp, ';');
+			if (endp == NULL)
+				endp = locnameend;
+		}
+
+		/* match glibc errno */
+		if (value == NULL) {
+			errno = EINVAL;
+			return (NULL);
+		}
+		copylen = endvalue - value;
+		/*
+		 * As real locale names are all shorter
+		 * than this, anything longer is
+		 * unparsable garbage.  Return failure.
+		 */
+		if (copylen > ENCODING_LEN) {
+			errno = ENOENT;
+			return (NULL);
+		}
+		if (copylen == 0) {
+			/*
+			 * glibc falls through to the
+			 * environment, so we must too..
+			 */
+			locname = get_locale_env(category);
+		} else {
+			memcpy(scratch, value, copylen);
+			scratch[copylen] = 0;
+			locname = scratch;
+		}
 	}
 
 	if ((strcmp(locname, "C") == 0) || (strcmp(locname, "POSIX") == 0))

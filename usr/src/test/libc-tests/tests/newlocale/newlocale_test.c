@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2026 Bill Sommerfeld <sommerfeld@hamachi.org>
  */
 
 /*
@@ -30,6 +31,8 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <note.h>
+#include <errno.h>
+#include <sys/mman.h>
 #include "test_common.h"
 
 /*
@@ -49,13 +52,58 @@ struct ldata {
 	{ "ja_JP.UTF-8", "日曜日", "￥" },
 };
 
+static uint8_t *guarded_page;
+static size_t page_size;
+
+void
+setup_trap(void)
+{
+	page_size = getpagesize();
+
+	guarded_page = mmap(NULL, 2 * page_size, PROT_READ|PROT_WRITE,
+	    MAP_ANON|MAP_PRIVATE, -1, 0);
+	if (guarded_page == MAP_FAILED) {
+		perror("mmap");
+		guarded_page = NULL;
+		return;
+	}
+
+	if (mprotect(guarded_page + page_size, page_size, PROT_NONE) < 0) {
+		perror("mprotect");
+		guarded_page = NULL;
+	}
+}
+
+const char *
+guarded_str(const char *str)
+{
+	size_t len = strlen(str) + 1;
+	char *loc;
+
+	if (guarded_page == NULL)
+		return (str);
+
+	if (len > page_size) {
+		errx(EXIT_FAILURE,  "%zd byte string exceeds page size %zd",
+		    len, page_size);
+	}
+
+	memset(guarded_page, 0xa5, page_size);
+	loc = (char *)(guarded_page + page_size - len);
+	memcpy(loc, str, len);
+
+	return ((const char *)loc);
+}
+
+#define	G(s) (guarded_str(s))
+
 #define	NUM_LDATA	5
 #define	NUMTHR	20
 #define	NUMITR	200
 
 int extra_debug = 0;
 
-void
+static void
 testlocale_thr_one(test_t t, void *arg)
 {
 	_NOTE(ARGUNUSED(arg));
@@ -123,13 +171,13 @@ testlocale_thr_one(test_t t, void *arg)
 }
 
 
-void
+static void
 test_newlocale_threaded(void)
 {
 	test_run(NUMTHR, testlocale_thr_one, NULL, "newlocale_threaded");
 }
 
-void
+static void
 test_newlocale_negative(void)
 {
 	locale_t loc, bad;
@@ -158,7 +206,7 @@ test_newlocale_negative(void)
 	test_passed(t);
 }
 
-void
+static void
 test_newlocale_categories(void)
 {
 	locale_t loc;
@@ -193,7 +241,7 @@ test_newlocale_categories(void)
 	test_passed(t);
 }
 
-void
+static void
 test_newlocale_composite(void)
 {
 	locale_t loc;
@@ -227,6 +275,260 @@ test_newlocale_composite(void)
 	test_passed(t);
 }
 
+static void
+test_newlocale_composite_glibc(void)
+{
+	locale_t loc;
+	char *day, *cur;
+	const char *name;
+	char *tname = "newlocale_composite_glibc";
+	test_t t;
+
+	/* parse glibc-style composite locale names */
+	t = test_start(tname);
+
+	loc = newlocale(LC_ALL_MASK, "C", NULL);
+
+	if (loc == NULL) {
+		test_failed(t, "failed to set base locale");
+	}
+
+	loc = newlocale(LC_TIME_MASK | LC_MONETARY_MASK,
+	    "LC_FRUIT=banana;LC_TIME=de_DE.UTF-8;LC_MONETARY=en_US.UTF-8",
+	    loc);
+
+	if (loc == NULL) {
+		test_failed(t, "failed to set composite locale");
+	}
+
+	day = nl_langinfo_l(DAY_1, loc);
+	if ((day == NULL) || (strcmp(day, "Sonntag") != 0)) {
+		test_failed(t, "day1 mismatch %s != %s", day, "Sonntag");
+	}
+	cur = nl_langinfo_l(CRNCYSTR, loc);
+	if ((cur == NULL) || (strcmp(cur, "-$") != 0)) {
+		test_failed(t, "currency mismatch [%s] != [%s]", cur, "-$");
+	}
+
+	name = getlocalename_l(LC_ALL, loc);
+	if (name == NULL) {
+		test_failed(t, "empty locale name returned");
+	}
+	if (strcmp(name, "C/C/de_DE.UTF-8/C/en_US.UTF-8/C") != 0) {
+		test_failed(t, "unexpected locale name [%s] returned", name);
+	}
+
+	/*
+	 * Attempt to check that, in a glibc-style composite name,
+	 * LC_ALL does not have special meaning.
+	 */
+	loc = newlocale(LC_TIME_MASK | LC_MONETARY_MASK,
+	    "LC_ALL=C;LC_TIME=de_DE.UTF-8;LC_MONETARY=en_US.UTF-8",
+	    NULL);
+	if (loc == NULL) {
+		test_failed(t, "failed to set composite locale (with LC_ALL)");
+	}
+	day = nl_langinfo_l(DAY_1, loc);
+	if ((day == NULL) || (strcmp(day, "Sonntag") != 0)) {
+		test_failed(t, "day1 mismatch %s != %s", day, "Sonntag");
+	}
+
+	/*
+	 * Check that, in a glibc-style composite name with multiple
+	 * assignments of a category, the last one wins.
+	 */
+	loc = newlocale(LC_TIME_MASK | LC_MONETARY_MASK,
+	    "LC_TIME=C;LC_MONETARY=en_US.UTF-8;LC_TIME=de_DE.UTF-8",
+	    NULL);
+	if (loc == NULL) {
+		test_failed(t, "failed to set composite locale (dup category)");
+	}
+	day = nl_langinfo_l(DAY_1, loc);
+	if ((day == NULL) || (strcmp(day, "Sonntag") != 0)) {
+		test_failed(t, "day1 mismatch %s != %s", day, "Sonntag");
+	}
+
+	test_passed(t);
+}
+
+static void
+test_newlocale_all_categories(void)
+{
+	locale_t loc;
+	char *tname = "newlocale_all_categories";
+	const char *name;
+	test_t t;
+
+	/* Composite locale name obstacle course */
+	t = test_start(tname);
+
+	/* Test all categories */
+	loc = newlocale(LC_ALL_MASK,
+	    "LC_MESSAGES=ru_RU.UTF-8;LC_MONETARY=en_US.UTF-8;LC_COLLATE=C;"
+	    "LC_TIME=ja_JP.UTF-8;LC_NUMERIC=C;LC_CTYPE=C.UTF-8",
+	    NULL);
+
+	name = getlocalename_l(LC_ALL, loc);
+	if (name == NULL) {
+		test_failed(t, "empty locale name returned");
+	}
+	if (strcmp(name,
+	    "C.UTF-8/C/ja_JP.UTF-8/C/en_US.UTF-8/ru_RU.UTF-8") != 0) {
+		test_failed(t, "unexpected locale name [%s] returned", name);
+	}
+
+	/* once again, but with setlocale() */
+	name = setlocale(LC_ALL,
+	    "LC_MESSAGES=en_US.UTF-8;LC_MONETARY=ru_RU.UTF-8;LC_COLLATE=C;"
+	    "LC_TIME=ja_JP.UTF-8;LC_NUMERIC=C;LC_CTYPE=C.UTF-8");
+	if (name == NULL) {
+		test_failed(t, "setlocale returned NULL");
+	}
+	if (strcmp(name,
+	    "C.UTF-8/C/ja_JP.UTF-8/C/ru_RU.UTF-8/en_US.UTF-8") != 0) {
+		test_failed(t,
+		    "unexpected locale name [%s] returned by setlocale",
+		    name);
+	}
+
+	name = getlocalename_l(LC_ALL, LC_GLOBAL_LOCALE);
+	if (name == NULL) {
+		test_failed(t, "empty locale name returned");
+	}
+	if (strcmp(name,
+	    "C.UTF-8/C/ja_JP.UTF-8/C/ru_RU.UTF-8/en_US.UTF-8") != 0) {
+		test_failed(t,
+		    "unexpected locale name [%s] returned by getlocalename_l",
+		    name);
+	}
+
+	test_passed(t);
+}
+
+static void
+test_newlocale_environment(void)
+{
+	locale_t loc;
+	char *day;
+	char *tname = "newlocale_environment";
+	test_t t;
+	static const char *envs[] = {
+		"LC_ALL",
+		"LC_TIME",
+		"LANG",
+		NULL
+	};
+	static const char **envp;
+
+	/* check how glibc composite locales peek into the environment */
+	t = test_start(tname);
+
+	for (envp = envs; *envp != NULL; envp++) {
+		if (unsetenv(*envp) != 0) {
+			errx(EXIT_FAILURE, "Failed to unset %s in environment",
+			    *envp);
+		}
+	}
+
+	for (envp = envs; *envp != NULL; envp++) {
+		if (setenv(*envp, "de_DE.UTF-8", 1) != 0) {
+			errx(EXIT_FAILURE, "Failed to set %s in environment",
+			    *envp);
+		}
+
+		/* empty value falls through to environment */
+		loc = newlocale(LC_TIME_MASK, G(";LC_TIME="), NULL);
+		if (loc == NULL) {
+			test_failed(t, "expected newlocale success with %s",
+			    *envp);
+		}
+		day = nl_langinfo_l(DAY_1, loc);
+		if ((day == NULL) || (strcmp(day, "Sonntag") != 0)) {
+			test_failed(t, "day1 mismatch %s != %s with %s",
+			    day, "Sonntag", *envp);
+		}
+		if (unsetenv(*envp) != 0)
+			errx(EXIT_FAILURE, "Failed to unset %s in environment",
+			    *envp);
+	}
+
+	test_passed(t);
+}
+
+#define	CHECK_ERRNO(e) do {						   \
+		if (errno != e)						   \
+			test_failed(t, "expected " #e " in errno, got %s", \
+					    strerrorname_np(errno));	   \
+		errno = 0;						   \
+	} while (0)
+
+static void
+test_newlocale_parser_coverage(void)
+{
+	locale_t loc;
+	char *tname = "newlocale_parser_coverage";
+	test_t t;
+
+	/* Composite locale name obstacle course */
+	t = test_start(tname);
+
+	setup_trap();
+
+	/* no category names */
+	errno = 0;
+	loc = newlocale(LC_TIME_MASK, G(";"), NULL);
+	if (loc != NULL) {
+		test_failed(t, "expected NULL newlocale return");
+	}
+	CHECK_ERRNO(EINVAL);
+	/* don't get trapped by consecutive semicolons */
+	loc = newlocale(LC_TIME_MASK, G(";;;;"), NULL);
+	if (loc != NULL) {
+		test_failed(t, "expected NULL newlocale return");
+	}
+	CHECK_ERRNO(EINVAL);
+	/* too-short category names */
+	loc = newlocale(LC_TIME_MASK, G("LC;LC_TIM"), NULL);
+	if (loc != NULL) {
+		test_failed(t, "expected NULL newlocale return");
+	}
+	CHECK_ERRNO(EINVAL);
+	/* wrong category names */
+	loc = newlocale(LC_TIME_MASK, G("LC_DATE=C;LC_CTYPE=C"), NULL);
+	if (loc != NULL) {
+		test_failed(t, "expected NULL newlocale return");
+	}
+	CHECK_ERRNO(EINVAL);
+	/* one present, one absent */
+	loc = newlocale(LC_TIME_MASK | LC_MONETARY_MASK,
+	    G("LC_TIME=C;LC_CTYPE=C"), NULL);
+	if (loc != NULL) {
+		test_failed(t, "expected NULL newlocale return");
+	}
+	CHECK_ERRNO(EINVAL);
+	/* '=' not where expected */
+	loc = newlocale(LC_TIME_MASK, G("LC_TIME!=C;"), NULL);
+	if (loc != NULL) {
+		test_failed(t, "expected NULL newlocale return");
+	}
+	CHECK_ERRNO(EINVAL);
+	/* confirm we don't fall back to LANG= here */
+	loc = newlocale(LC_TIME_MASK, G(";LANG=en_US.UTF-8"), NULL);
+	if (loc != NULL) {
+		test_failed(t, "expected NULL newlocale return");
+	}
+	CHECK_ERRNO(EINVAL);
+	/* too-long value */
+	loc = newlocale(LC_TIME_MASK,
+	    G(";LC_TIME=supercalifragilisticexpialadocious"), NULL);
+	if (loc != NULL) {
+		test_failed(t, "expected NULL newlocale return");
+	}
+	CHECK_ERRNO(ENOENT);
+
+	test_passed(t);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -254,6 +556,10 @@ main(int argc, char **argv)
 	test_newlocale_negative();
 	test_newlocale_categories();
 	test_newlocale_composite();
+	test_newlocale_composite_glibc();
+	test_newlocale_all_categories();
+	test_newlocale_environment();
+	test_newlocale_parser_coverage();
 
 	exit(0);
 }
