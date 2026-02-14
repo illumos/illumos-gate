@@ -23,33 +23,59 @@
 #
 
 BEGIN {
-	if (ARGC < 2) {
-		exit
-	}
-	retcode = 0
-	for (i = 1; i < ARGC; i++) {
-		do {
-			e = getline f < ARGV[i]
-		} while ((e == 1) && (f !~ /name=pkg.fmri/))
-		if (e == 1) {
-			l = split(f, a, "=")
-			fmri = a[l]
-			facet = 0
-			do {
-				e = getline f < ARGV[i]
-				if (e == 1 &&
-				    f ~ /org.opensolaris.incorp-facet.*=true/)
-					facet = 1
-			} while ((e == 1) && (f ~ /^set name=/))
-			close(ARGV[i])
-			printf("depend fmri=%s type=$(PKGDEP_TYPE)", fmri)
-			if (facet)
-				printf(" vlfacet=true")
-			print ""
-		} else {
-			print "no fmri in " ARGV[i] >> "/dev/stderr"
-			retcode = 2
-		}
-	}
-	exit retcode
+    if (ARGC < 2) {
+        exit
+    }
+
+    retcode = 0
+    for (i = 1; i < ARGC; i++) {
+        process_file(ARGV[i])
+    }
+    exit retcode
+}
+
+function process_file(filename) {
+    local fmri, facet, line, e
+    facet = 0
+
+    while ((e = getline line < filename) > 0) {
+        if (line ~ /name=pkg.fmri/) {
+            fmri = extract_fmri(line)
+            if (fmri) {
+                facet = check_facet(filename)
+                print_fmri(fmri, facet)
+            } else {
+                print "no fmri in " filename >> "/dev/stderr"
+                retcode = 2
+            }
+            break
+        }
+    }
+    close(filename)
+}
+
+function extract_fmri(line) {
+    split(line, a, "=")
+    return a[length(a)]
+}
+
+function check_facet(filename) {
+    local line, e
+    while ((e = getline line < filename) > 0) {
+        if (line ~ /org.opensolaris.incorp-facet.*=true/) {
+            return 1
+        }
+        if (!(line ~ /^set name=/)) {
+            break
+        }
+    }
+    return 0
+}
+
+function print_fmri(fmri, facet) {
+    printf("depend fmri=%s type=$(PKGDEP_TYPE)", fmri)
+    if (facet) {
+        printf(" vlfacet=true")
+    }
+    print ""
 }
