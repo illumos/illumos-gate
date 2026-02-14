@@ -850,6 +850,8 @@ g0:
 	case 'e':	/* printable version of current eschar */
 		i = PRESC;
 		goto gx;
+	case '~':	/* Heirloom/groff/neatroff: unbreakable space */
+		; /* fall through */
 	case ' ':	/* unpaddable space */
 		i = UNPAD;
 		goto gx;
