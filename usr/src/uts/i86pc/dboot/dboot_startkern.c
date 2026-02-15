@@ -1824,22 +1824,22 @@ process_efi64(EFI_SYSTEM_TABLE64 *efi)
 		(void) memcpy(&VendorGuid, &config[i].VendorGuid,
 		    sizeof (VendorGuid));
 		if (dboot_same_guids(&VendorGuid, &smbios3)) {
-			bi->bi_smbios = (native_ptr_t)(uintptr_t)
+			bi->bi_smbios = (native_ptr_t)
 			    config[i].VendorTable;
 		}
 		if (bi->bi_smbios == 0 &&
 		    dboot_same_guids(&VendorGuid, &smbios)) {
-			bi->bi_smbios = (native_ptr_t)(uintptr_t)
+			bi->bi_smbios = (native_ptr_t)
 			    config[i].VendorTable;
 		}
 		/* Prefer acpi v2+ over v1. */
 		if (dboot_same_guids(&VendorGuid, &acpi2)) {
-			bi->bi_acpi_rsdp = (native_ptr_t)(uintptr_t)
+			bi->bi_acpi_rsdp = (native_ptr_t)
 			    config[i].VendorTable;
 		}
 		if (bi->bi_acpi_rsdp == 0 &&
 		    dboot_same_guids(&VendorGuid, &acpi1)) {
-			bi->bi_acpi_rsdp = (native_ptr_t)(uintptr_t)
+			bi->bi_acpi_rsdp = (native_ptr_t)
 			    config[i].VendorTable;
 		}
 	}
@@ -1953,7 +1953,6 @@ print_efi32(EFI_SYSTEM_TABLE32 *efi)
 static void
 print_efi64(EFI_SYSTEM_TABLE64 *efi)
 {
-	uint16_t *data;
 	EFI_CONFIGURATION_TABLE64 *conf;
 	int i;
 
@@ -1962,9 +1961,13 @@ print_efi64(EFI_SYSTEM_TABLE64 *efi)
 	dboot_printf("EFI system version: ");
 	dboot_print_efi_version(efi->Hdr.Revision);
 	dboot_printf("EFI system vendor: ");
-	data = (uint16_t *)(uintptr_t)efi->FirmwareVendor;
-	for (i = 0; data[i] != 0; i++)
-		dboot_printf("%c", (char)data[i]);
+	if (efi->FirmwareVendor > ~(uintptr_t)0) {
+		dboot_printf("<unreachable>");
+	} else {
+		uint16_t *data = (uint16_t *)(uintptr_t)efi->FirmwareVendor;
+		for (i = 0; data[i] != 0; i++)
+			dboot_printf("%c", (char)data[i]);
+	}
 	dboot_printf("\nEFI firmware revision: ");
 	dboot_print_efi_version(efi->FirmwareRevision);
 	dboot_printf("EFI system table number of entries: %" PRIu64 "\n",
