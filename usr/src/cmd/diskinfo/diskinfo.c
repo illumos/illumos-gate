@@ -15,6 +15,7 @@
  * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2023 Oxide Computer Company
  * Copyright 2024 Sebastian Wiedenroth
+ * Copyright 2026 Jason King
  */
 
 #include <sys/types.h>
@@ -155,7 +156,8 @@ disk_walker(topo_hdl_t *hp, tnode_t *np, void *arg)
 		 * label higher up in the tree will not be appropriate.
 		 */
 		if ((strcmp(pname, BAY) == 0 || strcmp(pname, SLOT) == 0 ||
-		    strcmp(pname, USB_DEVICE) == 0) && consider_label) {
+		    strcmp(pname, USB_DEVICE) == 0 ||
+		    strcmp(pname, NVME) == 0) && consider_label) {
 			consider_label = B_FALSE;
 
 			if (topo_prop_get_string(pnp, TOPO_PGROUP_PROTOCOL,
