@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -183,6 +184,7 @@ exec(int type, ...)
 	char			*printerName;
 	char			*printerNameToShow;
 	static char		nameBuf[100];
+	char			keyBuf[sizeof (BIGGEST_NUMBER_S)];
 	char			*clean_title;
 
 	PSTATUS			*printer;
@@ -356,9 +358,8 @@ exec(int type, ...)
 	addenv (&envp, "LC_MONETARY", getenv("LC_MONETARY"));
 	addenv (&envp, "LC_NUMERIC", getenv("LC_NUMERIC"));
 	addenv (&envp, "LC_TIME", getenv("LC_TIME"));
-
-	sprintf ((cp = BIGGEST_NUMBER_S), "%ld", key);
-	addenv (&envp, "SPOOLER_KEY", cp);
+	sprintf (keyBuf, "%ld", key);
+	addenv (&envp, "SPOOLER_KEY", keyBuf);
 
 #if	defined(DEBUG)
 	addenv (&envp, "LPDEBUG", (debug? "1" : "0"));
@@ -484,7 +485,7 @@ exec(int type, ...)
 
 		else {
 			register int		count	= 0;
-			register char *		num	= BIGGEST_REQID_S;
+			char			num[sizeof (BIGGEST_REQID_S)];
 			register char *		prefix;
 
 			prefix = makestr(

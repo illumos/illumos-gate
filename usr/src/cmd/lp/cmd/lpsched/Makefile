@@ -22,12 +22,15 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+#
 # cmd/lp/cmd/lpsched/lpsched/Makefile
 #
 
 PROG=		lpsched
 
 include		../../Makefile.lp
+include		$(SRC)/cmd/Makefile.ctf
 
 MANIFEST=	server.xml
 SVCMETHOD=	print-svc
