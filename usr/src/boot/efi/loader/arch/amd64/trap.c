@@ -332,7 +332,7 @@ efi_redirect_exceptions(void)
 			free_tables();
 			return (0);
 		}
-		tss_pa = tss_desc->sd_lobase + (tss_desc->sd_hibase << 16);
+		tss_pa = tss_desc->sd_lobase + (tss_desc->sd_hibase << 24);
 		tss = (struct amd64tss *)tss_pa;
 		tss_desc->sd_type = SDT_SYSTSS; /* unbusy */
 	}
@@ -421,7 +421,7 @@ command_grab_faults(int argc __unused, char *argv[] __unused)
 		printf("failed\n");
 	return (CMD_OK);
 }
-COMMAND_SET(grap_faults, "grab_faults", "grab faults", command_grab_faults);
+COMMAND_SET(grab_faults, "grab_faults", "grab faults", command_grab_faults);
 
 static int
 command_ungrab_faults(int argc __unused, char *argv[] __unused)
