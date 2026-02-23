@@ -13,7 +13,7 @@
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -903,30 +903,43 @@ typedef struct {
 /* NVMe Power State Descriptor */
 typedef struct {
 	uint16_t psd_mp;		/* Maximum Power */
-	uint8_t psd_rsvd1;
+	uint8_t psd_rsvd16;
 	uint8_t psd_mps:1;		/* Max Power Scale (1.1) */
 	uint8_t psd_nops:1;		/* Non-Operational State (1.1) */
-	uint8_t psd_rsvd2:6;
+	uint8_t psd_rsvd26:6;
 	uint32_t psd_enlat;		/* Entry Latency */
 	uint32_t psd_exlat;		/* Exit Latency */
 	uint8_t psd_rrt:5;		/* Relative Read Throughput */
-	uint8_t psd_rsvd3:3;
+	uint8_t psd_rsvd101:3;
 	uint8_t psd_rrl:5;		/* Relative Read Latency */
-	uint8_t psd_rsvd4:3;
+	uint8_t psd_rsvd109:3;
 	uint8_t psd_rwt:5;		/* Relative Write Throughput */
-	uint8_t	psd_rsvd5:3;
+	uint8_t	psd_rsvd117:3;
 	uint8_t psd_rwl:5;		/* Relative Write Latency */
-	uint8_t psd_rsvd6:3;
+	uint8_t psd_rsvd125:3;
 	uint16_t psd_idlp;		/* Idle Power (1.2) */
-	uint8_t psd_rsvd7:6;
+	uint8_t psd_rsvd144:6;
 	uint8_t psd_ips:2;		/* Idle Power Scale (1.2) */
-	uint8_t psd_rsvd8;
+	uint8_t psd_rsvd152;
 	uint16_t psd_actp;		/* Active Power (1.2) */
 	uint8_t psd_apw:3;		/* Active Power Workload (1.2) */
-	uint8_t psd_rsvd9:3;
+	uint8_t psd_rsvd179:3;
 	uint8_t psd_aps:2;		/* Active Power Scale */
-	uint8_t psd_rsvd10[9];
+	/* NVMe 2.1 additions  */
+	uint8_t psd_epfrt;		/* Emergency Power Fail Recovery Time */
+	uint8_t psd_fqvt;		/* Forced Quiescence Vault Time */
+	uint8_t psd_epfvt;		/* Emergency Power Fail Vault Time */
+	uint8_t psd_epfrts:4;		/* EPFRT Scale */
+	uint8_t psd_fqvts:4;		/* FQVTS Scale */
+	uint8_t psd_epfvts:4;		/* EPFVTS Scale */
+	uint8_t psd_rsvd216:4;
+	uint8_t psd_mbw;		/* Max Bandwidth (2.3) */
+	uint8_t psd_mbws:3;		/* Max Bandwidth Scale (2.3) */
+	uint8_t psd_rsvd:5;
+	uint8_t psd_rsvd240[2];
 } nvme_idctl_psd_t;
+
+CTASSERT(sizeof (nvme_idctl_psd_t) == 32);
 
 #define	NVME_SERIAL_SZ	20
 #define	NVME_MODEL_SZ	40
@@ -969,7 +982,9 @@ typedef struct {
 		uint32_t oaes_rgcns:1;	/* Reach Group Change Notice (2.1) */
 		uint32_t oaes_rsvd18:1;
 		uint32_t oaes_ansan:1;	/* Allocated Namespace Attr. (2.1) */
-		uint32_t oaes_rsvd20:7;
+		uint32_t oaes_ccrcn:1;	/* X-Ctrl Reset Compl. Notices (2.3) */
+		uint32_t oaes_lhcn:1;	/* Lost Host Comms. Notices (2.3) */
+		uint32_t oaes_rsvd22:5;
 		uint32_t oaes_zdcn:1;	/* Zone Descriptor Change (2.0) */
 		uint32_t oaes_rsvd28:3;
 		uint32_t oaes_dlpcn:1;	/* Disc Log Page Change (2.0) */
@@ -995,7 +1010,9 @@ typedef struct {
 		uint32_t ctrat_hmbr:1;	/* HMB Restrictions (2.1) */
 		uint32_t ctrat_rhii:1;	/* Reservations and Host ID (2.1) */
 		uint32_t ctrat_fdps:1;	/* Flexible Data Placement (2.1) */
-		uint32_t ctrat_rsvd20:12;
+		uint32_t ctrat_pls:1;	/* Power Limit Support (2.3) */
+		uint32_t ctrat_pms:1;	/* Power Measurement Support (2.3) */
+		uint32_t ctrat_rsvd22:10;
 	} id_ctratt;
 	uint16_t id_rrls;		/* Read Recovery Levels (1.4) */
 	struct {
@@ -1021,7 +1038,9 @@ typedef struct {
 		uint8_t crcap_rgidc:1;	/* Group ID Changeable (2.1) */
 		uint8_t crcap_rsvd2:6;
 	} id_crcap;
-	uint8_t id_rsvd2_cc[240 - 135];
+	uint8_t id_ciu;			/* Controller Inst. Uniquifier (2.3) */
+	uint8_t id_cirn[8];		/* Controller Inst. Random Num. (2.3) */
+	uint8_t id_rsvd2_cc[240 - 144];
 	uint8_t id_rsvd_nvmemi[253 - 240];
 	/* NVMe-MI region */
 	struct {			/* NVMe Subsystem Report */
@@ -1154,9 +1173,25 @@ typedef struct {
 		uint8_t tmpthha_tmpthmh:3;	/* Temp Tresh Max Hyst (2.1) */
 		uint8_t tmpthha_rsvd3:5;
 	} ap_tmpthha;
-	uint8_t ap_rsvd385;
+	struct {
+		uint8_t mupa_mups:2;	/* Max. Unlimited Power Scale (2.3) */
+		uint8_t mupa_rsvd2:6;
+	} ap_mupa;			/* Max. Unlimited Power Attrs. (2.3) */
 	uint16_t ap_cqt;		/* Command Quiesce Time (2.1) */
-	uint8_t ap_rsvd_ac[512 - 388];
+	struct {
+		struct {
+			uint8_t cdpalg_hs3:1;	/* HMAC-SHA-384 (2.3) */
+			uint8_t cdpalg_rsvd:7;
+		} cdpa_cdpalg;		/* CDP Authentication Algorithm (2.3) */
+		uint8_t cdpa_rsvd8;
+	} ap_cdpa;			/* Cfg. Device Personality Attr (2.3) */
+	uint16_t ap_mup;		/* Maximum Unlimited Power (2.3) */
+	struct {
+		uint8_t impsr_srv;	/* Sample Rate Value (2.3) */
+		uint8_t impsr_srs;	/* Sample Rate Scale (2.3) */
+	} ap_impsr;			/* Interval Power Sample Rate (2.3) */
+	uint16_t ap_msmt;		/* Maximum Stop Measure. Time (2.3) */
+	uint8_t ap_rsvd_ac[512 - 396];
 
 	/* NVM Command Set Attributes */
 	nvme_idctl_qes_t id_sqes;	/* Submission Queue Entry Size */
@@ -1187,7 +1222,8 @@ typedef struct {
 		uint8_t fn_format:1;	/* Format applies to all NS */
 		uint8_t fn_sec_erase:1;	/* Secure Erase applies to all NS */
 		uint8_t fn_crypt_erase:1; /* Cryptographic Erase supported */
-		uint8_t fn_rsvd:5;
+		uint8_t fn_fnvmbs:1;	/* Format NVM Broadcast (2.0) */
+		uint8_t fn_rsvd:4;
 	} id_fna;
 	struct {			/* Volatile Write Cache */
 		uint8_t vwc_present:1;	/* Volatile Write Cache present */
@@ -1441,12 +1477,14 @@ typedef struct {
 #define	NVME_NSID_DESC_EUI64	1
 #define	NVME_NSID_DESC_NGUID	2
 #define	NVME_NSID_DESC_NUUID	3
+#define	NVME_NSID_DESC_CSI	4	/* 2.1 */
 #define	NVME_NSID_DESC_MIN	NVME_NSID_DESC_EUI64
-#define	NVME_NSID_DESC_MAX	NVME_NSID_DESC_NUUID
+#define	NVME_NSID_DESC_MAX	NVME_NSID_DESC_CSI
 
 #define	NVME_NSID_DESC_LEN_EUI64	8
 #define	NVME_NSID_DESC_LEN_NGUID	16
 #define	NVME_NSID_DESC_LEN_NUUID	UUID_LEN
+#define	NVME_NSID_DESC_LEN_CSI		1
 
 /* NVMe Identify Primary Controller Capabilities */
 typedef struct {
@@ -1502,6 +1540,29 @@ typedef struct {
 #define	NVME_LOGPAGE_PEV	0x0d	/* Persistent Event Log (1.4) */
 #define	NVME_LOGPAGE_LBASTS	0x0e	/* LBA Status Information (1.4) */
 #define	NVME_LOGPAGE_ENDAGG	0x0f	/* Endurance Group Event Agg. (1.4) */
+#define	NVME_LOGPAGE_MEDIA	0x10	/* Media Unit Status (2.0) */
+#define	NVME_LOGPAGE_CAPCFG	0x11	/* Supported Capacity cfg. (2.0) */
+#define	NVME_LOGPAGE_SUPFID	0x12	/* Supported Features (2.0) */
+#define	NVME_LOGPAGE_SUPMI	0x13	/* Supported NVMe-MI Commands (2.0) */
+#define	NVME_LOGPAGE_LOCKDOWN	0x14	/* Command and Feature Lockdown (2.0) */
+#define	NVME_LOGPAGE_BOOTPART	0x15	/* Boot Partition (2.0) */
+#define	NVME_LOGPAGE_ROTMEDIA	0x16	/* Rotational Media (2.0) */
+#define	NVME_LOGPAGE_DISPNS	0x17	/* Dispersed Namespace (2.1) */
+#define	NVME_LOGPAGE_MGMTADDR	0x18	/* Management Address List (2.1) */
+#define	NVME_LOGPAGE_PHYEYE	0x19	/* Physical Interface Eye (PCIe 1.1) */
+#define	NVME_LOGPAGE_REACHGRP	0x1a	/* Reachability Groups (2.1) */
+#define	NVME_LOGPAGE_REACHASC	0x1b	/* Reachability Associations (2.1) */
+#define	NVME_LOGPAGE_NSACHANGE	0x1c	/* Changed allocated namespaces (2.1) */
+#define	NVME_LOGPAGE_DEVPERS	0x1d	/* Device Personalities (2.3) */
+#define	NVME_LOGPAGE_XCTRLRST	0x1e	/* Cross-Controller Reset (2.3) */
+#define	NVME_LOGPAGE_LOSTHOST	0x1f	/* Lost Host Communication (2.3) */
+#define	NVME_LOGPAGE_FDPCFG	0x20	/* FDP Configuration (2.1) */
+#define	NVME_LOGPAGE_RECLAIM	0x21	/* Reclaim Unit Handle Usage (2.1) */
+#define	NVME_LOGPAGE_FDPSTAT	0x22	/* FDP Statistics (2.1) */
+#define	NVME_LOGPAGE_FDPEVENT	0x23	/* FDP Events (2.1) */
+/* 0x24 is not currently defined */
+#define	NVME_LOGPAGE_POWER	0x25	/* Power Measurement (2.3) */
+
 
 #define	NVME_LOGPAGE_VEND_MIN	0xc0
 #define	NVME_LOGPAGE_VEND_MAX	0xff
@@ -1553,8 +1614,16 @@ typedef struct {
 	uint64_t el_lba;		/* Logical Block Address */
 	uint32_t el_nsid;		/* Namespace ID */
 	uint8_t	el_vendor;		/* Vendor Specific Information avail */
-	uint8_t el_rsvd2[64 - 29];
+	uint8_t el_trtype;		/* Transport Type (2.0) */
+	uint8_t el_csi;			/* Command Set Indicator (2.1) */
+	uint8_t el_opc;			/* Opcode (2.1) */
+	uint8_t el_csinfo[8];		/* Command Specific Info (1.2) */
+	uint16_t el_ttsi;		/* Transport Type Specific Info (1.4) */
+	uint8_t el_rsvd2[63 - 42];
+	uint8_t el_lpver;		/* Log Page Version (2.1) */
 } nvme_error_log_entry_t;
+
+CTASSERT(sizeof (nvme_error_log_entry_t) == 64);
 
 typedef struct {
 	struct {			/* Critical Warning */
@@ -1563,13 +1632,22 @@ typedef struct {
 		uint8_t cw_reliab:1;	/* degraded reliability */
 		uint8_t cw_readonly:1;	/* media is read-only */
 		uint8_t cw_volatile:1;	/* volatile memory backup failed */
-		uint8_t cw_rsvd:3;
+		uint8_t cw_pmrro:1;	/* Persistent Memory Region R/O (1.4) */
+		uint8_t cw_ips:1;	/* Indeterminate Pers. State (2.3) */
+		uint8_t cw_rsvd:1;
 	} hl_crit_warn;
 	uint16_t hl_temp;		/* Temperature */
 	uint8_t hl_avail_spare;		/* Available Spare */
 	uint8_t hl_avail_spare_thr;	/* Available Spare Threshold */
 	uint8_t hl_used;		/* Percentage Used */
-	uint8_t hl_rsvd1[32 - 6];
+	struct {
+		uint8_t ecgws_egascbt:1; /* Egrp. Available Spare Low (1.4) */
+		uint8_t ecgws_rsvd1:1;
+		uint8_t ecgws_egdr:1;	/* Egrp. Degraded Reliability (1.4) */
+		uint8_t ecgws_egro:1;	/* Endurance Group Read-Only (1.4) */
+		uint8_t ecgws_rsvd:4;
+	} hl_ecgcws;
+	uint8_t hl_rsvd1[32 - 7];
 	nvme_uint128_t hl_data_read;	/* Data Units Read */
 	nvme_uint128_t hl_data_write;	/* Data Units Written */
 	nvme_uint128_t hl_host_read;	/* Host Read Commands */
@@ -1596,8 +1674,22 @@ typedef struct {
 	uint32_t hl_tmtemp_2_tc;	/* Thermal Mgmt Temp 1 Transition # */
 	uint32_t hl_tmtemp_1_time;	/* Time in Thermal Mgmt Temp 1 */
 	uint32_t hl_tmtemp_2_time;	/* Time in Thermal Mgmt Temp 2 */
-	uint8_t hl_rsvd2[512 - 232];
+	/* Added in NVMe 2.3 */
+	uint64_t hl_olec;		/* Operational Lifetime Energy */
+	struct {
+		uint16_t ipm_ipmv;	/* Interval Power Measurement */
+		uint8_t ipm_ipms:2;	/* Interval Power Measurement Scale */
+		uint8_t ipm_rsvd18:2;
+		uint8_t ipm_pmt:4;	/* Power Measurement Type */
+		uint8_t ipm_rsvd24;
+	} hl_ipm;			/* Interval Power Measurement */
+	uint8_t hl_rsvd2[512 - 244];
 } nvme_health_log_t;
+
+#ifndef	__CHECKER__
+CTASSERT(offsetof(nvme_health_log_t, hl_olec) == 232);
+CTASSERT(sizeof (nvme_health_log_t) == 512);
+#endif
 
 /*
  * The NVMe spec allows for up to seven firmware slots.
@@ -1637,8 +1729,9 @@ typedef struct {
 	uint8_t cmd_ncc:1;	/* Namespace capability change */
 	uint8_t cmd_nic:1;	/* Namespace inventory change */
 	uint8_t cmd_ccc:1;	/* Controller capability change */
-	uint8_t cmd_rsvd0p5:3;
-	uint8_t cmd_rsvd1;
+	uint8_t cmd_rsvd5:3;
+	uint8_t cmd_rsvd8:6;
+	uint8_t cmd_cser:2;	/* Cmd. Submission and Exec Relaxations (2.1) */
 	uint16_t cmd_cse:3;	/* Command submission and execution */
 	uint16_t cmd_uuid:1;	/* UUID select supported, 1.4 */
 	uint16_t cmd_csp:12;	/* Command Scope, 2.0 */
@@ -1723,6 +1816,7 @@ typedef enum {
 	NVME_SEB_TLCES = 12,	/* Telemetry Log Create */
 	NVME_SEB_TEES = 13,	/* Thermal Excursion */
 	NVME_SEB_SMVES = 14,	/* Sanitize Media Verification (2.1) */
+	NVME_SEB_CDPCES = 15,	/* Configurable Device Pers. (2.3) */
 	NVME_SEB_VSES = 222,	/* Vendor Specific */
 	NVME_SEB_TCG = 223	/* TCG */
 } nvme_pev_seb_t;
@@ -1841,10 +1935,16 @@ typedef union {
 #define	NVME_FEAT_IO_CMD_SET	0x19	/* I/O Command Set Profile (2.0) */
 #define	NVME_FEAT_SPINUP	0x1a	/* Spinup Control (2.0) */
 #define	NVME_FEAT_PLS		0x1b	/* Power Loss Signaling (2.1) */
+#define	NVME_FEAT_PERF_CHAR	0x1c	/* Perf. Characteristics (N1.1) */
 #define	NVME_FEAT_FDP		0x1d	/* Flexible Device Placement (2.1) */
 #define	NVME_FEAT_FDP_EVENTS	0x1e	/* ^ Events (2.1) */
 #define	NVME_FEAT_NS_LABEL	0x1f	/* Namespace Admin Label (2.1) */
 #define	NVME_FEAT_CTRL_DQ	0x21	/* Controller Data Queue (2.1) */
+#define	NVME_FEAT_DEV_PERS	0x22	/* Device Personality (2.3) */
+#define	NVME_FEAT_POWER_LIMIT	0x23	/* Power Limit (2.3) */
+#define	NVME_FEAT_POWER_THRESH	0x24	/* Power Threshold (2.3) */
+#define	NVME_FEAT_POWER_MEASURE	0x25	/* Power Measurement (2.3) */
+
 #define	NVME_FEAT_ENH_CTRL_META	0x7d	/* Enhanced Controller Metadata (2.0) */
 #define	NVME_FEAT_CTRL_META	0x7e	/* Controller Metadata (2.0) */
 #define	NVME_FEAT_NS_META	0x7f	/* Namespace Metadata (2.0) */
@@ -2016,7 +2116,9 @@ typedef union {
 		uint32_t aec_rassn:1;	/* Reachability Association (2.1) */
 		uint32_t aec_rgpr0:1;	/* Reachability Group (2.1) */
 		uint32_t aec_ansan:1;	/* Allocated Namespace Attr. (2.1) */
-		uint32_t aec_rsvd20:7;
+		uint32_t aec_ccrun:1;	/* X-Ctrl Reset Compl. Notices (2.3) */
+		uint32_t aec_lhcn:1;	/* Lost Host Comms. Notices (2.3) */
+		uint32_t aec_rsvd20:5;
 		uint32_t aec_zdcn:1;	/* Zone Descriptor Changed (2.0) */
 		/* Fabrics Specific */
 		uint32_t aec_pmdrlpcn:1;	/* Pull Model Change (2.1) */
@@ -2026,6 +2128,8 @@ typedef union {
 	} b;
 	uint32_t r;
 } nvme_async_event_conf_t;
+
+CTASSERT(sizeof (nvme_async_event_conf_t) == 4);
 
 /* Autonomous Power State Transition Feature (1.1) */
 typedef union {
@@ -2166,7 +2270,17 @@ typedef union {
 #define	NVME_CQE_SC_GEN_TRANSIENT	0x22	/* Transient Transport Error */
 /* Added in NVMe 2.0 */
 #define	NVME_CQE_SC_GEN_CMD_LOCK	0x23	/* Command/Feature Lockdown */
-#define	NVME_CQE_SC_ADM_MEDIA_NR	0x24	/* Admin Cmd Media Not Ready */
+#define	NVME_CQE_SC_GEN_ADM_MEDIA_NR	0x24	/* Admin Cmd Media Not Ready */
+/* Added in NVMe 2.1 */
+#define	NVME_CQE_SC_GEN_INV_KEY		0x25	/* Invalid Key Tag */
+#define	NVME_CQE_SC_GEN_HOST_DISPNS_DIS	0x26	/* Host Dispersed NS not en. */
+#define	NVME_CQE_SC_GEN_HOSTID_UNINIT	0x27	/* Host Identifier Not Init. */
+#define	NVME_CQE_SC_GEN_WRONG_KEY	0x28	/* Incorrect Key */
+#define	NVME_CQE_SC_GEN_FDP_DIS		0x29	/* FDP Disabled */
+#define	NVME_CQE_SC_GEN_INV_PHL		0x2a	/* Invalid Placement Handle */
+/* Added in NVMe 2.3 */
+#define	NVME_CQE_SC_GEN_SAN_NS_FAIL	0x2b	/* Sanitize NS failed */
+#define	NVME_CQE_SC_GEN_SAN_NS_PROG	0x2c	/* Sanitize NS in progress */
 
 /* NVMe completion status code (generic NVM commands) */
 #define	NVME_CQE_SC_GEN_NVM_LBA_RANGE	0x80	/* LBA Out Of Range */
@@ -2231,15 +2345,62 @@ typedef union {
 #define	NVME_CQE_SC_SPC_INV_CMD_COMBO	0x2b	/* I/O command set combo rej */
 #define	NVME_CQE_SC_SPC_INV_IO_CMD	0x2c	/* Invalid I/O command set */
 #define	NVME_CQE_SC_SPC_UNAVAIL_ID	0x2d	/* Unavailable ID */
-
+/* Added in NVMe 2.1 */
+#define	NVME_CQE_SC_SPC_DISPERSE_NS	0x2e	/* Namespace is dispersed */
+#define	NVME_CQE_SC_SPC_INV_DISC	0x2f	/* Invalid Discovery */
+#define	NVME_CQE_SC_SPC_ZONE_LOCKED	0x30	/* Zoning Data Struct. Locked */
+#define	NVME_CQE_SC_SPC_ZONE_ENOENT	0x31	/* Zoning DS Not Found */
+#define	NVME_CQE_SC_SPC_DISC_RSRCS	0x32	/* Insufficient Disc. Rsrcs */
+#define	NVME_CQE_SC_SPC_FUNC_DIS	0x33	/* Requested Func. Disabled */
+#define	NVME_CQE_SC_SPC_INV_ZGRP_ORIG	0x34	/* ZoneGroup Originator Inv. */
+#define	NVME_CQE_SC_SPC_INV_HOST	0x35	/* Invalid Host */
+#define	NVME_CQE_SC_SPC_INV_NVM_SYS	0x36	/* Invalid NVM Subsystem */
+#define	NVME_CQE_SC_SPC_INV_CTL_DQ	0x37	/* Invalid Controller Data Q. */
+#define	NVME_CQE_SC_SPC_ERSRC		0x38	/* Not Enough Resources */
+#define	NVME_CQE_SC_SPC_CTL_SUSPEND	0x39	/* Controller Suspended */
+#define	NVME_CQE_SC_SPC_CTL_NOT_SUSPEND	0x3a	/* Controller Not Suspended */
+#define	NVME_CQE_SC_SPC_CTL_DQ_FULL	0x3b	/* Controller Data Queue Full */
+/* Added in NVMe 2.3 */
+#define	NVME_CQE_SC_SPC_MAX_NS_SAN	0x3c	/* Req Exceeds Max NS in San */
+#define	NVME_CQE_SC_SPC_REQ_DEF_PERS	0x3d	/* Default Personality Req. */
+#define	NVME_CQE_SC_SPC_INV_PLIMIT	0x3e	/* Invalid Power Limit */
+#define	NVME_CQE_SC_SPC_XCTL_RST_PROG	0x3f	/* X-Ctrl Reset in Progress */
+#define	NVME_CQE_SC_SPC_XCTL_RST_LPF	0x40	/* X-Ctrl Log Page Full */
+#define	NVME_CQE_SC_SPC_XCTL_RST_LIM	0x41	/* X-Ctrl Reset Limit */
 
 /* NVMe completion status code (I/O command specific) */
 #define	NVME_CQE_SC_SPC_NVM_CNFL_ATTR	0x80	/* Conflicting Attributes */
 #define	NVME_CQE_SC_SPC_NVM_INV_PROT	0x81	/* Invalid Protection */
 #define	NVME_CQE_SC_SPC_NVM_READONLY	0x82	/* Write to Read Only Range */
-/* Added in 2.0 */
+/* Added in NVMe 2.0 */
 #define	NVME_CQE_SC_SPC_IO_LIMIT	0x83	/* Cmd Size Limit Exceeded */
-/* 0x84 to 0xb7 are reserved */
+/* Added in NVMe 2.1 */
+#define	NVME_CQE_SC_SPC_INV_CID		0x84	/* Invalid Command ID */
+#define	NVME_CQE_SC_SPC_INCOMPAT_NS	0x85	/* Incompatible NS or FMT */
+#define	NVME_CQE_SC_SPC_NO_FAST_COPY	0x86	/* Fast Copy Not Possible */
+#define	NVME_CQE_SC_SPC_OVLP_IO		0x87	/* Overlapping I/O Range */
+#define	NVME_CQE_SC_SPC_NS_UNREACH	0x88	/* Namespace Not reachable */
+#define	NVME_CQE_SC_SPC_INSUF_RSRC	0x89	/* Insufficient Resources */
+#define	NVME_CQE_SC_SPC_INSUF_PROG	0x8a	/* Insufficient Prog Rsrcs. */
+#define	NVME_CQE_SC_SPC_INV_MEM_NS	0x8b	/* Invalid Memory NS */
+#define	NVME_CQE_SC_SPC_INV_MEM_RANGE	0x8c	/* Invalid Memory Range Set */
+#define	NVME_CQE_SC_SPC_INV_MEM_SETID	0x8d	/* Invalid Memory Range SetId */
+#define	NVME_CQE_SC_SPC_INV_PROG_DATA	0x8e	/* Invalid Program Data */
+#define	NVME_CQE_SC_SPC_INV_PROG_IDX	0x8f	/* Invalid Program Index */
+#define	NVME_CQE_SC_SPC_INV_PROG_TYPE	0x90	/* Invalid Program Type */
+#define	NVME_CQE_SC_SPC_MAX_MEM_RANGE	0x91	/* Max. Memory Range Exceeded */
+#define	NVME_CQE_SC_SPC_MAX_MEM_SETIDS	0x92	/* Max. Mem Sets Ids Exceeded */
+#define	NVME_CQE_SC_SPC_MAX_PROG_ACT	0x93	/* Maximum Programs Activated */
+#define	NVME_CQE_SC_SPC_MAX_PROG_BYTES	0x94	/* Max. Prog Bytes Exceeded */
+#define	NVME_CQE_SC_SPC_MEM_SET_IN_USE	0x95	/* Memory Range Set In Use */
+#define	NVME_CQE_SC_SPC_NO_PROG		0x96	/* No Program */
+#define	NVME_CQE_SC_SPC_OVLP_MEM_RANGE	0x97	/* Overlap Memory Ranges */
+#define	NVME_CQE_SC_SPC_PROG_NOT_ACT	0x98	/* Program not activated */
+#define	NVME_CQE_SC_SPC_PROG_IN_USE	0x99	/* Program in Use */
+#define	NVME_CQE_SC_SPC_PROG_IDX_NO_DL	0x9a	/* Program index not dl */
+#define	NVME_CQE_SC_SPC_PROG_2BIG	0x9b	/* Program Too Big */
+#define	NVME_CQE_SC_SPC_MEDIA_VERIF	0x9c	/* Success. Media Verif Read */
+/* 0x9d to 0xb7 are reserved */
 #define	NVME_CQE_SC_SPC_ZONE_BDRY_ERR	0xb8	/* Zoned Boundary Error */
 #define	NVME_CQE_SC_SPC_ZONE_FULL	0xb9	/* Zone is Full */
 #define	NVME_CQE_SC_SPC_ZONE_RDONLY	0xba	/* Zone is Read Only */

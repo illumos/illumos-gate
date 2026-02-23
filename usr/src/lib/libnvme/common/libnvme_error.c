@@ -127,8 +127,24 @@ nvme_sctostr_gen_gen(uint32_t sct)
 		return ("transient transport error");
 	case NVME_CQE_SC_GEN_CMD_LOCK:
 		return ("command prohibited by command and feature lockdown");
-	case NVME_CQE_SC_ADM_MEDIA_NR:
+	case NVME_CQE_SC_GEN_ADM_MEDIA_NR:
 		return ("admin command media not ready");
+	case NVME_CQE_SC_GEN_INV_KEY:
+		return ("invalid key tag");
+	case NVME_CQE_SC_GEN_HOST_DISPNS_DIS:
+		return ("host dispersed namespace support not enabled");
+	case NVME_CQE_SC_GEN_HOSTID_UNINIT:
+		return ("host identifier not initialized");
+	case NVME_CQE_SC_GEN_WRONG_KEY:
+		return ("incorrect key");
+	case NVME_CQE_SC_GEN_FDP_DIS:
+		return ("FDP disabled");
+	case NVME_CQE_SC_GEN_INV_PHL:
+		return ("invalid placement handle list");
+	case NVME_CQE_SC_GEN_SAN_NS_FAIL:
+		return ("sanitize namespace failed");
+	case NVME_CQE_SC_GEN_SAN_NS_PROG:
+		return ("sanitize namespace in progress");
 	default:
 		return ("unknown status code");
 	}
@@ -190,9 +206,9 @@ static const char *
 nvme_sctostr_cmd_gen(uint32_t sct)
 {
 	switch (sct) {
-	case NVME_CQE_SC_SPC_INV_CQ	:
+	case NVME_CQE_SC_SPC_INV_CQ:
 		return ("completion queue invalid");
-	case NVME_CQE_SC_SPC_INV_QID	:
+	case NVME_CQE_SC_SPC_INV_QID:
 		return ("invalid queue identifier");
 	case NVME_CQE_SC_SPC_MAX_QSZ_EXC:
 		return ("max queue size exceeded");
@@ -220,11 +236,11 @@ nvme_sctostr_cmd_gen(uint32_t sct)
 		return ("feature not changeable");
 	case NVME_CQE_SC_SPC_FEAT_NS_SPEC:
 		return ("feature not namespace spec");
-	case NVME_CQE_SC_SPC_FW_NSSR	:
+	case NVME_CQE_SC_SPC_FW_NSSR:
 		return ("firmware activation requires nvm subsystem reset");
 	case NVME_CQE_SC_SPC_FW_NEXT_RESET:
 		return ("firmware activation requires controller level reset");
-	case NVME_CQE_SC_SPC_FW_MTFA	:
+	case NVME_CQE_SC_SPC_FW_MTFA:
 		return ("firmware activation requires maximum time violation");
 	case NVME_CQE_SC_SPC_FW_PROHIBITED:
 		return ("firmware activation prohibited");
@@ -279,6 +295,47 @@ nvme_sctostr_cmd_gen(uint32_t sct)
 		return ("Invalid I/O command set");
 	case NVME_CQE_SC_SPC_UNAVAIL_ID:
 		return ("identifier unavailable");
+	case NVME_CQE_SC_SPC_DISPERSE_NS:
+		return ("namespace is dispersed");
+	case NVME_CQE_SC_SPC_INV_DISC:
+		return ("invalid discovery information");
+	case NVME_CQE_SC_SPC_ZONE_LOCKED:
+		return ("zoning data structure locked");
+	case NVME_CQE_SC_SPC_ZONE_ENOENT:
+		return ("zoning data structure not found");
+	case NVME_CQE_SC_SPC_DISC_RSRCS:
+		return ("insufficient discovery resources");
+	case NVME_CQE_SC_SPC_FUNC_DIS:
+		return ("requested function disabled");
+	case NVME_CQE_SC_SPC_INV_ZGRP_ORIG:
+		return ("zonegroup originator invalid");
+	case NVME_CQE_SC_SPC_INV_HOST:
+		return ("invalid host");
+	case NVME_CQE_SC_SPC_INV_NVM_SYS:
+		return ("invalid nvm subsystem");
+	case NVME_CQE_SC_SPC_INV_CTL_DQ:
+		return ("invalid controller data queue");
+	case NVME_CQE_SC_SPC_ERSRC:
+		return ("not enough resources");
+	case NVME_CQE_SC_SPC_CTL_SUSPEND:
+		return ("controller suspended");
+	case NVME_CQE_SC_SPC_CTL_NOT_SUSPEND:
+		return ("controller not suspended");
+	case NVME_CQE_SC_SPC_CTL_DQ_FULL:
+		return ("controller data queue full");
+	case NVME_CQE_SC_SPC_MAX_NS_SAN:
+		return ("request exceeds maximum namespace sanitize operations "
+		    "in progress");
+	case NVME_CQE_SC_SPC_REQ_DEF_PERS:
+		return ("manufacturing default personality required");
+	case NVME_CQE_SC_SPC_INV_PLIMIT:
+		return ("invalid power limit");
+	case NVME_CQE_SC_SPC_XCTL_RST_PROG:
+		return ("cross-controller reset in progress");
+	case NVME_CQE_SC_SPC_XCTL_RST_LPF:
+		return ("cross-controller reset log page full");
+	case NVME_CQE_SC_SPC_XCTL_RST_LIM:
+		return ("cross-controller reset limit exceeded");
 	default:
 		return ("unknown generic command status code");
 	}
@@ -300,6 +357,56 @@ nvme_sctostr_cmd_csi(nvme_csi_t csi, uint32_t sct)
 		return ("invalid protection");
 	case NVME_CQE_SC_SPC_NVM_READONLY:
 		return ("write to read only range");
+	case NVME_CQE_SC_SPC_INV_CID:
+		return ("invalid command id");
+	case NVME_CQE_SC_SPC_INCOMPAT_NS:
+		return ("incompatible namespace or format");
+	case NVME_CQE_SC_SPC_NO_FAST_COPY:
+		return ("fast copy not possible");
+	case NVME_CQE_SC_SPC_OVLP_IO:
+		return ("overlapping i/o range");
+	case NVME_CQE_SC_SPC_NS_UNREACH:
+		return ("namespace not reachable");
+	case NVME_CQE_SC_SPC_INSUF_RSRC:
+		return ("insufficient resources");
+	case NVME_CQE_SC_SPC_INSUF_PROG:
+		return ("insufficient program resources");
+	case NVME_CQE_SC_SPC_INV_MEM_NS:
+		return ("invalid memory namespace");
+	case NVME_CQE_SC_SPC_INV_MEM_RANGE:
+		return ("invalid memory range set");
+	case NVME_CQE_SC_SPC_INV_MEM_SETID:
+		return ("invalid memory range set identifier");
+	case NVME_CQE_SC_SPC_INV_PROG_DATA:
+		return ("invalid program data");
+	case NVME_CQE_SC_SPC_INV_PROG_IDX:
+		return ("invalid program index");
+	case NVME_CQE_SC_SPC_INV_PROG_TYPE:
+		return ("invalid program type");
+	case NVME_CQE_SC_SPC_MAX_MEM_RANGE:
+		return ("maximum memory ranges exceeded");
+	case NVME_CQE_SC_SPC_MAX_MEM_SETIDS:
+		return ("maximum memory range sets exceeded");
+	case NVME_CQE_SC_SPC_MAX_PROG_ACT:
+		return ("maximum programs activated");
+	case NVME_CQE_SC_SPC_MAX_PROG_BYTES:
+		return ("maximum program bytes exceeded");
+	case NVME_CQE_SC_SPC_MEM_SET_IN_USE:
+		return ("memory range set in use");
+	case NVME_CQE_SC_SPC_NO_PROG:
+		return ("no program");
+	case NVME_CQE_SC_SPC_OVLP_MEM_RANGE:
+		return ("overlapping memory ranges");
+	case NVME_CQE_SC_SPC_PROG_NOT_ACT:
+		return ("program not activated");
+	case NVME_CQE_SC_SPC_PROG_IN_USE:
+		return ("program in use");
+	case NVME_CQE_SC_SPC_PROG_IDX_NO_DL:
+		return ("program index not downloadable");
+	case NVME_CQE_SC_SPC_PROG_2BIG:
+		return ("program too big");
+	case NVME_CQE_SC_SPC_MEDIA_VERIF:
+		return ("successful media verification read");
 	case NVME_CQE_SC_SPC_ZONE_BDRY_ERR:
 		return ("zoned boundary error");
 	case NVME_CQE_SC_SPC_ZONE_FULL:

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  */
@@ -1846,6 +1846,10 @@ nvme_print_identify_nsid_desc(void *nsdesc)
 		} else if (desc->nd_nidt == NVME_NSID_DESC_NUUID &&
 		    desc->nd_nidl == NVME_NSID_DESC_LEN_NUUID) {
 			nvme_print_uuid(4, "Namespace UUID", desc->nd_nid);
+		} else if (desc->nd_nidt == NVME_NSID_DESC_CSI &&
+		    desc->nd_nidl == NVME_NSID_DESC_LEN_CSI) {
+			nvme_print_uint64(4, "CSI", desc->nd_nid[0], NULL,
+			    NULL);
 		} else if (desc->nd_nidt < NVME_NSID_DESC_MIN ||
 		    desc->nd_nidt > NVME_NSID_DESC_MAX) {
 			nvme_print_hexbuf(4, "Raw Bytes", desc->nd_nid,
