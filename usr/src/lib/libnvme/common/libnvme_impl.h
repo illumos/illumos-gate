@@ -229,6 +229,8 @@ typedef enum {
 struct nvme_log_disc {
 	const char		*nld_short;
 	const char		*nld_desc;
+	const char *const	*nld_aliases;
+	size_t			nld_naliases;
 	uint32_t		nld_lid;
 	nvme_csi_t		nld_csi;
 	nvme_log_disc_kind_t	nld_kind;

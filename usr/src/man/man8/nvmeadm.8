@@ -900,7 +900,7 @@ A controller may support this log page on a per-namespace basis.
 Firmware Slot Information
 .It changens
 Changed Namespaces.
-.It cmdeff
+.It supcmd
 Commands Supported and Effects.
 An optional log page added in NVMe 1.2 that indicates what commands
 the controller itself actually supports.
@@ -914,6 +914,14 @@ Contains vendor-specific diagnostic information about the controller.
 This log page requires that the
 .Fl O
 option be specified.
+.It supfeat
+Feature Identifiers Supported and Effects.
+A mandatory log page added in NVMe 2.0 that indicates which features are
+supported and their corresponding effects.
+.It supmicmd
+NVMe-MI Commands Supported and Effects.
+A mandatory log page added in NVMe 2.0 that indicates which management
+interface commands are supported and their corresponding effects.
 .It phyeye
 Physical Interface Receiver Eye Opening Measurement.
 An optional log page that provides a way of measuring the eye of the

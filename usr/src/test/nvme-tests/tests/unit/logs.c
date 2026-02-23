@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -610,12 +610,12 @@ static const log_scope_test_t log_scope_tests[] = { {
 	.lst_exp_scope = NVME_LOG_SCOPE_CTRL
 }, {
 	.lst_desc = "commands supported and effects log (1.2)",
-	.lst_short = "cmdeff",
+	.lst_short = "supcmd",
 	.lst_data = &nvme_ctrl_ns_1v2,
 	.lst_exp_scope = NVME_LOG_SCOPE_CTRL
 }, {
 	.lst_desc = "commands supported and effects log (2.0)",
-	.lst_short = "cmdeff",
+	.lst_short = "supcmd",
 	.lst_data = &nvme_ctrl_ns_2v0,
 	.lst_exp_scope = NVME_LOG_SCOPE_CTRL
 } };
@@ -678,13 +678,13 @@ static const log_size_test_t log_size_tests[] = { {
 	.lt_var = false
 }, {
 	.lt_desc = "commands supported and effects log (1.2)",
-	.lt_short = "cmdeff",
+	.lt_short = "supcmd",
 	.lt_data = &nvme_ctrl_ns_1v2,
 	.lt_size = sizeof (nvme_cmdeff_log_t),
 	.lt_var = false
 }, {
 	.lt_desc = "commands supported and effects log (1.4)",
-	.lt_short = "cmdeff",
+	.lt_short = "supcmd",
 	.lt_data = &nvme_ctrl_ns_1v4,
 	.lt_size = sizeof (nvme_cmdeff_log_t),
 	.lt_var = false
@@ -760,17 +760,17 @@ static const log_impl_test_t log_impl_tests[] = { {
 	.lit_impl = false
 }, {
 	.lit_desc = "commands supported and effects (1.0)",
-	.lit_short = "cmdeff",
+	.lit_short = "supcmd",
 	.lit_data = &nvme_ctrl_base_1v0,
 	.lit_impl = false
 }, {
 	.lit_desc = "commands supported and effects (1.4 LPA)",
-	.lit_short = "cmdeff",
+	.lit_short = "supcmd",
 	.lit_data = &nvme_ctrl_ns_1v4,
 	.lit_impl = true
 }, {
 	.lit_desc = "commands supported and effects (2.0 No LPA)",
-	.lit_short = "cmdeff",
+	.lit_short = "supcmd",
 	.lit_data = &nvme_ctrl_base_2v0,
 	.lit_impl = false
 }, {
@@ -788,6 +788,46 @@ static const log_impl_test_t log_impl_tests[] = { {
 	.lit_short = "pev",
 	.lit_data = &nvme_ctrl_base_2v0,
 	.lit_impl = false
+}, {
+	.lit_desc = "supported features (1.0)",
+	.lit_short = "supfeat",
+	.lit_data = &nvme_ctrl_base_1v0,
+	.lit_impl = false
+}, {
+	.lit_desc = "supported features (1.4 LPA)",
+	.lit_short = "supfeat",
+	.lit_data = &nvme_ctrl_ns_1v4,
+	.lit_impl = false
+}, {
+	.lit_desc = "supported features (2.0 No LPA)",
+	.lit_short = "supfeat",
+	.lit_data = &nvme_ctrl_base_2v0,
+	.lit_impl = true
+}, {
+	.lit_desc = "supported features (2.0 LPA)",
+	.lit_short = "supfeat",
+	.lit_data = &nvme_ctrl_ns_2v0,
+	.lit_impl = true
+}, {
+	.lit_desc = "supported NVMe-MI commands (1.0)",
+	.lit_short = "supmicmd",
+	.lit_data = &nvme_ctrl_base_1v0,
+	.lit_impl = false
+}, {
+	.lit_desc = "supported NVMe-MI commands (1.4 LPA)",
+	.lit_short = "supmicmd",
+	.lit_data = &nvme_ctrl_ns_1v4,
+	.lit_impl = false
+}, {
+	.lit_desc = "supported NVMe-MI commands (2.0 No LPA)",
+	.lit_short = "supmicmd",
+	.lit_data = &nvme_ctrl_base_2v0,
+	.lit_impl = true
+}, {
+	.lit_desc = "supported NVMe-MI commands (2.0 LPA)",
+	.lit_short = "supmicmd",
+	.lit_data = &nvme_ctrl_ns_2v0,
+	.lit_impl = true
 } };
 
 static const nvme_log_page_info_t *

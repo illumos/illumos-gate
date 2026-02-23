@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _NVME_COMMON_H
@@ -160,6 +160,8 @@ typedef bool (*nvme_log_page_var_len_f)(uint64_t *, const void *, size_t);
 struct nvme_log_page_info {
 	const char *nlpi_short;
 	const char *nlpi_human;
+	const char *const *nlpi_aliases;
+	size_t nlpi_naliases;
 	uint32_t nlpi_lid;
 	nvme_csi_t nlpi_csi;
 	/*

@@ -919,6 +919,8 @@ extern bool nvme_ns_bd_detach(nvme_ns_t *);
  */
 extern const char *nvme_log_disc_name(const nvme_log_disc_t *);
 extern const char *nvme_log_disc_desc(const nvme_log_disc_t *);
+extern const char *const *nvme_log_disc_aliases(const nvme_log_disc_t *);
+extern size_t nvme_log_disc_naliases(const nvme_log_disc_t *);
 extern nvme_csi_t nvme_log_disc_csi(const nvme_log_disc_t *);
 extern uint32_t nvme_log_disc_lid(const nvme_log_disc_t *);
 extern nvme_log_disc_kind_t nvme_log_disc_kind(const nvme_log_disc_t *);

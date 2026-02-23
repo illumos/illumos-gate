@@ -1542,7 +1542,7 @@ typedef struct {
 #define	NVME_LOGPAGE_ENDAGG	0x0f	/* Endurance Group Event Agg. (1.4) */
 #define	NVME_LOGPAGE_MEDIA	0x10	/* Media Unit Status (2.0) */
 #define	NVME_LOGPAGE_CAPCFG	0x11	/* Supported Capacity cfg. (2.0) */
-#define	NVME_LOGPAGE_SUPFID	0x12	/* Supported Features (2.0) */
+#define	NVME_LOGPAGE_SUPFEAT	0x12	/* Supported Features (2.0) */
 #define	NVME_LOGPAGE_SUPMI	0x13	/* Supported NVMe-MI Commands (2.0) */
 #define	NVME_LOGPAGE_LOCKDOWN	0x14	/* Command and Feature Lockdown (2.0) */
 #define	NVME_LOGPAGE_BOOTPART	0x15	/* Boot Partition (2.0) */
@@ -1721,7 +1721,11 @@ typedef struct {
 
 /*
  * Commands Supported and Effects log page and information structure. This was
- * an optional log page added in NVMe 1.2.
+ * an optional log page added in NVMe 1.2. NVMe 2.0 added variants of this to
+ * cover supported features and supported NVMe-MI commands. While these use
+ * similar structures and information, today we define all three top level items
+ * as their own structure, but leverage similar information. We reuse the
+ * nvme_cmdeff_csp_t for the corresponding scope fields for all of them.
  */
 typedef struct {
 	uint8_t cmd_csupp:1;	/* Command supported */
@@ -1745,7 +1749,9 @@ typedef enum {
 	NVME_CMDEFF_CSP_SET		= 1 << 2,
 	NVME_CMDEFF_CSP_ENDURANCE	= 1 << 3,
 	NVME_CMDEFF_CSP_DOMAIN		= 1 << 4,
-	NVME_CMDEFF_CSP_NVM		= 1 << 5
+	NVME_CMDEFF_CSP_NVM		= 1 << 5,
+	/* This is currently only defined for supported features */
+	NVME_CMDEFF_CSP_CDQSCP		= 1 << 6
 } nvme_cmdeff_csp_t;
 
 typedef enum {
@@ -1762,6 +1768,49 @@ typedef struct {
 
 CTASSERT(sizeof (nvme_cmdeff_log_t) == 4096);
 CTASSERT(offsetof(nvme_cmdeff_log_t, cme_rsvd2048) == 2048);
+
+typedef struct {
+	uint8_t feat_fupp:1;	/* FID supported */
+	uint8_t feat_udcc:1;	/* User data content change */
+	uint8_t feat_ncc:1;	/* Namespace capability change */
+	uint8_t feat_nic:1;	/* Namespace inventory change */
+	uint8_t feat_ccc:1;	/* Controller capability change */
+	uint8_t feat_rsvd0p5:3;
+	uint8_t feat_rsvd1;
+	uint16_t feat_rsvd2:3;
+	uint16_t feat_uuid:1;	/* UUID select supported */
+	uint16_t feat_fsp:12;	/* Command Scope */
+} nvme_supfeat_t;
+
+CTASSERT(sizeof (nvme_supfeat_t) == 4);
+
+typedef struct {
+	nvme_supfeat_t nsl_feats[256];
+} nvme_supfeat_log_t;
+
+CTASSERT(sizeof (nvme_supfeat_log_t) == 1024);
+
+typedef struct {
+	uint8_t smi_csupp:1;	/* Command supported */
+	uint8_t smi_lbcc:1;	/* Logical block content change */
+	uint8_t smi_ncc:1;	/* Namespace capability change */
+	uint8_t smi_nic:1;	/* Namespace inventory change */
+	uint8_t smi_ccc:1;	/* Controller capability change */
+	uint8_t smi_rsvd0p5:3;
+	uint8_t smi_rsvd1;
+	uint16_t smi_cse:3;	/* Command submission and execution */
+	uint16_t smi_uuid:1;	/* UUID select supported, 1.4 */
+	uint16_t smi_csp:12;	/* Command Scope, 2.0 */
+} nvme_supmicmd_t;
+
+CTASSERT(sizeof (nvme_supmicmd_t) == 4);
+
+typedef struct {
+	nvme_supmicmd_t mcl_cmds[256];
+	uint8_t mcl_rsvd1024[4096 - 1024];
+} nvme_supmicmd_log_t;
+
+CTASSERT(sizeof (nvme_supmicmd_log_t) == 4096);
 
 /*
  * Persistent Event Log Header. This log was added in NVMe 1.4. It begins with a

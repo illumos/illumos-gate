@@ -1871,14 +1871,30 @@ do_list_logs_match(const nvme_log_disc_t *disc, nvmeadm_list_logs_t *nll)
 		return (B_TRUE);
 	}
 
+	/*
+	 * Check all filters. If we have multiple specified that would match we
+	 * want that to count.
+	 */
+	boolean_t match = B_FALSE;
 	for (int i = 0; i < nll->nll_nfilts; i++) {
 		if (strcmp(nvme_log_disc_name(disc), nll->nll_filts[i]) == 0) {
 			nll->nll_used[i] = B_TRUE;
-			return (B_TRUE);
+			match = B_TRUE;
+			continue;
+		}
+
+		size_t naliases = nvme_log_disc_naliases(disc);
+		const char *const *aliases = nvme_log_disc_aliases(disc);
+		for (size_t a = 0; a < naliases; a++) {
+			if (strcmp(aliases[a], nll->nll_filts[i]) == 0) {
+				nll->nll_used[i] = B_TRUE;
+				match = B_TRUE;
+				break;
+			}
 		}
 	}
 
-	return (B_FALSE);
+	return (match);
 }
 
 static int

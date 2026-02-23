@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -26,7 +26,7 @@
  *
  * 1) We have a list of fields that exist which include minimum controller
  * versions and related functionality validation routines that operate off of
- * the nvme_t. While tihs list includes things like the CSI and LID, these are
+ * the nvme_t. While this list includes things like the CSI and LID, these are
  * things that may only be specified when we have a non-standard log page.
  *
  * 2) We then have a table of log pages that are supported which list which
@@ -340,6 +340,12 @@ nvme_lpd_eom_len(uint64_t *outp, const void *data, size_t len)
 }
 
 /*
+ * Short names have evolved a bit over time. When they do we put the old name as
+ * an alias record here.
+ */
+static const char *nvme_supcmd_aliases[] = { "cmdeff" };
+
+/*
  * The short names here correspond to the well defined names in nvmeadm(8) and
  * libnvme(3LIB) that users expect to be able to use. Please do not change them
  * without accounting for aliases and backwards compatibility. The index of the
@@ -402,8 +408,10 @@ const nvme_log_page_info_t nvme_std_log_pages[] = { {
 	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
 	.nlpi_len = sizeof (nvme_nschange_list_t)
 }, {
-	.nlpi_short = "cmdeff",
+	.nlpi_short = "supcmd",
 	.nlpi_human = "commands supported and effects",
+	.nlpi_aliases = nvme_supcmd_aliases,
+	.nlpi_naliases = ARRAY_SIZE(nvme_supcmd_aliases),
 	.nlpi_lid = NVME_LOGPAGE_CMDSUP,
 	.nlpi_csi = NVME_CSI_NVM,
 	.nlpi_vers = &nvme_vers_1v2,
@@ -438,6 +446,26 @@ const nvme_log_page_info_t nvme_std_log_pages[] = { {
 	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
 	.nlpi_len = sizeof (nvme_telemetry_log_t),
 	.nlpi_var_func = nvme_lpd_telemetry_len
+}, {
+	.nlpi_short = "supfeat",
+	.nlpi_human = "Feature Identifiers Supported and Effects",
+	.nlpi_lid = NVME_LOGPAGE_SUPFEAT,
+	.nlpi_csi = NVME_CSI_NVM,
+	.nlpi_vers = &nvme_vers_2v0,
+	.nlpi_kind = NVME_LOG_ID_MANDATORY,
+	.nlpi_source = NVME_LOG_DISC_S_SPEC,
+	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
+	.nlpi_len = sizeof (nvme_supfeat_log_t)
+}, {
+	.nlpi_short = "supmicmd",
+	.nlpi_human = "NVMe-MI Commands Supported and Effects",
+	.nlpi_lid = NVME_LOGPAGE_SUPMI,
+	.nlpi_csi = NVME_CSI_NVM,
+	.nlpi_vers = &nvme_vers_2v0,
+	.nlpi_kind = NVME_LOG_ID_MANDATORY,
+	.nlpi_source = NVME_LOG_DISC_S_SPEC,
+	.nlpi_scope = NVME_LOG_SCOPE_CTRL,
+	.nlpi_len = sizeof (nvme_supmicmd_log_t)
 }, {
 	.nlpi_short = "phyeye",
 	.nlpi_human = "Physical Interface Receiver Eye Opening Measurement Log",

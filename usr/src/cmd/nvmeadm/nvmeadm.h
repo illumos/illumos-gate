@@ -548,6 +548,10 @@ typedef struct {
 	bool (*nlfi_drive)(nvmeadm_field_print_t *, const void *, size_t);
 } nvmeadm_log_field_info_t;
 
+extern const nvmeadm_log_field_info_t suplog_field_info;
+extern const nvmeadm_log_field_info_t supcmd_field_info;
+extern const nvmeadm_log_field_info_t supmicmd_field_info;
+extern const nvmeadm_log_field_info_t supfeat_field_info;
 extern const nvmeadm_log_field_info_t phyeye_field_info;
 extern const nvmeadm_log_field_info_t ocp_vul_smart_field_info;
 extern const nvmeadm_log_field_info_t ocp_vul_errrec_field_info;

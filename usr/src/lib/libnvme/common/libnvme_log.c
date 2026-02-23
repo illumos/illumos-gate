@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -65,6 +65,18 @@ const char *
 nvme_log_disc_desc(const nvme_log_disc_t *disc)
 {
 	return (disc->nld_desc);
+}
+
+const char *const *
+nvme_log_disc_aliases(const nvme_log_disc_t *disc)
+{
+	return (disc->nld_aliases);
+}
+
+size_t
+nvme_log_disc_naliases(const nvme_log_disc_t *disc)
+{
+	return (disc->nld_naliases);
 }
 
 nvme_csi_t
@@ -321,6 +333,8 @@ nvme_log_discover_one(nvme_log_iter_t *iter, const nvme_log_page_info_t *info)
 	 */
 	disc->nld_short = info->nlpi_short;
 	disc->nld_desc = info->nlpi_human;
+	disc->nld_aliases = info->nlpi_aliases;
+	disc->nld_naliases = info->nlpi_naliases;
 	disc->nld_lid = info->nlpi_lid;
 	disc->nld_csi = info->nlpi_csi;
 	disc->nld_kind = info->nlpi_kind;
@@ -641,12 +655,28 @@ typedef struct {
 } nvme_log_init_arg_t;
 
 static bool
+nvme_log_req_match_disc(const char *name, const nvme_log_disc_t *disc)
+{
+	if (strcmp(name, disc->nld_short) == 0) {
+		return (true);
+	}
+
+	for (size_t i = 0; i < disc->nld_naliases; i++) {
+		if (strcmp(name, disc->nld_aliases[i]) == 0) {
+			return (true);
+		}
+	}
+
+	return (false);
+}
+
+static bool
 nvme_log_req_init_by_name_cb(nvme_ctrl_t *ctrl, const nvme_log_disc_t *disc,
     void *arg)
 {
 	nvme_log_init_arg_t *init = arg;
 
-	if (strcmp(init->nlia_name, disc->nld_short) != 0) {
+	if (!nvme_log_req_match_disc(init->nlia_name, disc)) {
 		return (true);
 	}
 

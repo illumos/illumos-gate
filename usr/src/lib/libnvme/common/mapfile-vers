@@ -140,6 +140,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 	nvme_id_req_set_nsid;
 	nvme_id_req_set_output;
 	nvme_init;
+	nvme_log_disc_aliases;
 	nvme_log_disc_calc_size;
 	nvme_log_disc_csi;
 	nvme_log_disc_desc;
@@ -149,6 +150,7 @@ SYMBOL_VERSION ILLUMOSprivate {
 	nvme_log_disc_impl;
 	nvme_log_disc_kind;
 	nvme_log_disc_lid;
+	nvme_log_disc_naliases;
 	nvme_log_disc_name;
 	nvme_log_disc_scopes;
 	nvme_log_disc_size;
