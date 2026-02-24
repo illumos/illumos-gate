@@ -546,7 +546,7 @@ lookup_locale(pargs_data_t *datap)
 	} else {
 		/* composite locale */
 		pd_locale = safe_zalloc(len + 1);
-		(void) snprintf(pd_locale, len + 1, "/%s/%s/%s/%s/%s/%s",
+		(void) snprintf(pd_locale, len + 1, "%s/%s/%s/%s/%s/%s",
 		    lcs[0], lcs[1], lcs[2], lcs[3], lcs[4], lcs[5]);
 	}
 	datap->pd_locale = pd_locale;
