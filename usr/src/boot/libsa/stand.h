@@ -465,5 +465,6 @@ extern void *reallocf(void *, size_t);
  * va <-> pa routines. MD code must supply.
  */
 caddr_t ptov(uintptr_t);
+uintptr_t vtop(caddr_t);
 
 #endif	/* STAND_H */

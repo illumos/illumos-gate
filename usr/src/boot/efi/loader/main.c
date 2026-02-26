@@ -593,6 +593,12 @@ ptov(uintptr_t x)
 	return ((caddr_t)x);
 }
 
+uintptr_t
+vtop(caddr_t x)
+{
+	return ((uintptr_t)x);
+}
+
 static int
 efi_serial_get_uid(EFI_DEVICE_PATH *devpath)
 {

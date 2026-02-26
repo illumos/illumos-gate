@@ -150,7 +150,7 @@ biosacpi_detect(void)
 
 	/* export values from the RSDP */
 	sprintf(buf, "0x%08x", (unsigned int)VTOP(rsdp));
-	setenv("acpi.rsdp", buf, 1);
+	env_setenv("acpi-root-tab", EV_VOLATILE, buf, env_noset, env_nounset);
 	revision = rsdp->Revision;
 	if (revision == 0)
 		revision = 1;

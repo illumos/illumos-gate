@@ -82,6 +82,12 @@ ptov(uintptr_t x)
 	return (PTOV(x));
 }
 
+uintptr_t
+vtop(caddr_t x)
+{
+	return (VTOP(x));
+}
+
 int
 main(void)
 {

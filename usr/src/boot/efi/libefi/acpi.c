@@ -144,7 +144,7 @@ acpi_detect(void)
 #else
 	snprintf(buf, sizeof (buf), "0x%08x", (unsigned int)rsdp);
 #endif
-	setenv("acpi.rsdp", buf, 1);
+	env_setenv("acpi-root-tab", EV_VOLATILE, buf, env_noset, env_nounset);
 	revision = rsdp->Revision;
 	if (revision == 0)
 		revision = 1;

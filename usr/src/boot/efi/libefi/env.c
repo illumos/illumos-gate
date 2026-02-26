@@ -726,6 +726,14 @@ efi_init_environment(void)
 	snprintf(var, sizeof (var), "%d.%02d", ST->Hdr.Revision >> 16,
 	    ST->Hdr.Revision & 0xffff);
 	env_setenv("efi-version", EV_VOLATILE, var, env_noset, env_nounset);
+#ifdef  __LP64__
+	env_setenv("efi-systype", EV_VOLATILE, "64", env_noset, env_nounset);
+	snprintf(var, sizeof (var), "0x%016lx", (uintptr_t)ST);
+#else
+	env_setenv("efi-systype", EV_VOLATILE, "32", env_noset, env_nounset);
+	snprintf(var, sizeof (var), "0x%08x", (uintptr_t)ST);
+#endif
+	env_setenv("efi-systab", EV_VOLATILE, var, env_noset, env_nounset);
 }
 
 COMMAND_SET(efishow, "efi-show", "print some or all EFI variables",
