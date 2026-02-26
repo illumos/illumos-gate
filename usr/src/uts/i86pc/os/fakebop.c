@@ -28,6 +28,7 @@
  *
  * Copyright 2020 Joyent, Inc.
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 /*
@@ -1319,7 +1320,7 @@ static struct bop_blacklist {
 	int bl_name_len;
 } bop_prop_blacklist[] = {
 	{ "ISADIR", sizeof ("ISADIR") },
-	{ "acpi", sizeof ("acpi") },
+	{ "acpi.", sizeof ("acpi.") },
 	{ "autoboot_delay", sizeof ("autoboot_delay") },
 	{ "beansi_", sizeof ("beansi_") },
 	{ "beastie", sizeof ("beastie") },
@@ -1344,7 +1345,7 @@ static struct bop_blacklist {
 	{ "optionstoggled_", sizeof ("optionstoggled_") },
 	{ "pcibios", sizeof ("pcibios") },
 	{ "prompt", sizeof ("prompt") },
-	{ "smbios", sizeof ("smbios") },
+	{ "smbios.", sizeof ("smbios.") },
 	{ "tem", sizeof ("tem") },
 	{ "twiddle_divisor", sizeof ("twiddle_divisor") },
 	{ "zfs_be", sizeof ("zfs_be") },
@@ -1450,6 +1451,27 @@ process_boot_environment(struct boot_modules *benv)
 		}
 		if (strcmp(name, "boot.nfsroot.path") == 0) {
 			bsetprops(BP_SERVER_PATH, value);
+			continue;
+		}
+
+		if (strcmp(name, "acpi-root-tab") == 0) {
+			uint64_t i64;
+			if (parse_value(value, &i64) == 0)
+				bsetprop64(name, i64);
+			continue;
+		}
+
+		if (strcmp(name, "smbios-address") == 0) {
+			uint64_t i64;
+			if (parse_value(value, &i64) == 0)
+				bsetprop64(name, i64);
+			continue;
+		}
+
+		if (strcmp(name, "efi-systab") == 0) {
+			uint64_t i64;
+			if (parse_value(value, &i64) == 0)
+				bsetprop64(name, i64);
 			continue;
 		}
 
@@ -2919,20 +2941,25 @@ build_firmware_properties(struct xboot_info *xbp)
 
 #ifndef __xpv
 	if (xbp->bi_uefi_arch == XBI_UEFI_ARCH_64) {
-		bsetprops("efi-systype", "64");
-		bsetprop64("efi-systab",
-		    (uint64_t)(uintptr_t)xbp->bi_uefi_systab);
+		if (do_bsys_getproplen(NULL, "efi-systype") == -1)
+			bsetprops("efi-systype", "64");
+		if (do_bsys_getproplen(NULL, "efi-systab") == -1)
+			bsetprop64("efi-systab",
+			    (uint64_t)(uintptr_t)xbp->bi_uefi_systab);
 		if (kbm_debug)
 			bop_printf(NULL, "64-bit UEFI detected.\n");
 	} else if (xbp->bi_uefi_arch == XBI_UEFI_ARCH_32) {
-		bsetprops("efi-systype", "32");
-		bsetprop64("efi-systab",
-		    (uint64_t)(uintptr_t)xbp->bi_uefi_systab);
+		if (do_bsys_getproplen(NULL, "efi-systype") == -1)
+			bsetprops("efi-systype", "32");
+		if (do_bsys_getproplen(NULL, "efi-systab") == -1)
+			bsetprop64("efi-systab",
+			    (uint64_t)(uintptr_t)xbp->bi_uefi_systab);
 		if (kbm_debug)
 			bop_printf(NULL, "32-bit UEFI detected.\n");
 	}
 
-	if (xbp->bi_smbios != NULL) {
+	if (xbp->bi_smbios != NULL &&
+	    do_bsys_getproplen(NULL, "smbios-address") == -1) {
 		bsetprop64("smbios-address",
 		    (uint64_t)(uintptr_t)xbp->bi_smbios);
 	}
