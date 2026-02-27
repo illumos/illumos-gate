@@ -24,6 +24,7 @@
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 /*
@@ -81,10 +82,14 @@ smbios_open(const char *file, int version, int flags, int *errp)
 		startaddr = SMB_RANGE_START;
 		bioslen = SMB_RANGE_LIMIT - SMB_RANGE_START + 1;
 	} else {
-		/* We have smbios address from boot loader, map one page. */
+		/*
+		 * We have smbios address from boot loader, map a page or two.
+		 */
 		bioslen = MMU_PAGESIZE;
 		startoff = startaddr & MMU_PAGEOFFSET;
 		startaddr &= MMU_PAGEMASK;
+		if (bioslen - startoff <= startoff)
+			bioslen += MMU_PAGESIZE;
 	}
 
 	bios = psm_map_phys(startaddr, bioslen, PSM_PROT_READ);
