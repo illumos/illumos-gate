@@ -598,7 +598,7 @@ main(int argc, char *argv[])
 			 */
 			privileged_pid = getppid();
 			(void) snprintf(pidpath, sizeof (pidpath),
-			    "/proc/%d/psinfo", privileged_pid);
+			    "/proc/%" _PRIdID "/psinfo", privileged_pid);
 			if ((fd = open(pidpath, O_RDONLY)) < 0 ||
 			    getppid() != privileged_pid) {
 				(void) fprintf(stderr,
