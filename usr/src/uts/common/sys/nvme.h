@@ -1881,6 +1881,131 @@ CTASSERT(sizeof (nvme_telemetry_log_t) == 512);
 #define	NVME_TELMCTRL_LSP_CTHID	1
 
 /*
+ * Physical Interface Receiver Eye Opening Measurement Log or in a PCIe eye
+ * diagram. It consists of a header and a variable number of data descriptors.
+ */
+
+/*
+ * Eye Opening Measurement Header
+ */
+typedef struct {
+	uint8_t eom_lid;
+	uint8_t eom_eomip;
+	uint16_t eom_hsize;
+	uint32_t eom_rsz;
+	uint8_t eom_edgn;
+	uint8_t eom_lrev;
+	struct {
+		uint8_t odp_pefp:1;
+		uint8_t odp_edfp:1;
+		uint8_t odp_rsvd2:6;
+	} eom_odp;
+	uint8_t eom_lns;
+	uint8_t eom_epl;
+	struct {
+		uint8_t lspfc_lspfv:7;
+		uint8_t lspfc_rsvd1:1;
+	} eom_lspfc;
+	struct {
+		uint8_t linfo_mls:4;
+		uint8_t linfo_rsvd4:4;
+	} eom_linfo;
+	uint8_t eom_rsvd15[18 - 15];
+	uint16_t eom_lsic;
+	uint32_t eom_ds;
+	uint16_t eom_nd;
+	uint16_t eom_maxtb;
+	uint16_t eom_maxlr;
+	uint16_t eom_etgood;
+	uint16_t eom_etbetter;
+	uint16_t eom_etbest;
+	uint8_t eom_rsvd[64 - 36];
+} nvme_eom_hdr_t;
+
+CTASSERT(sizeof (nvme_eom_hdr_t) == 64);
+
+/*
+ * Eye Opening Lane Descriptor
+ */
+typedef struct {
+	uint8_t eld_rsvd0[1];
+	struct {
+		uint8_t mstat_mcsc:1;
+		uint8_t mstat_rsvd1:7;
+	} eld_mstat;
+	uint8_t eld_ln;
+	uint8_t eld_eye;
+	uint16_t eld_top;
+	uint16_t eld_btm;
+	uint16_t eld_lft;
+	uint16_t eld_rgt;
+	uint16_t eld_nrows;
+	uint16_t eld_ncols;
+	/*
+	 * In revision 2 (NVMe PCIe 1.1) this field is only a uint16_t. It was
+	 * extended to a uint32_t in revision 3 of the log.
+	 */
+	uint32_t eld_edlen;
+	uint8_t eld_rsvd20[32 - 20];
+	/*
+	 * The Lane Descriptor follows this with three different variable data
+	 * regions depending on what bits have been set as present in the
+	 * header:
+	 *
+	 * 1. The first eld_nrows * eld_ncols bytes cover the printable eye.
+	 * 2. The next eld_edlen bytes cover any vendor-specific eye data.
+	 * 3. The final portion of this is padding to ensure this is dword
+	 *    aligned. This is based on the header's eom_ds field.
+	 */
+	uint8_t eld_data[];
+} nvme_eom_lane_desc_t;
+
+typedef enum {
+	NVME_EOM_NOT_STARTED = 0,
+	NVME_EOM_IN_PROGRESS,
+	NVME_EOM_DONE
+} nvme_eom_eomip_t;
+
+CTASSERT(sizeof (nvme_eom_lane_desc_t) == 32);
+
+typedef enum {
+	NVME_EOM_LSP_MQUAL_GOOD	 = 0,
+	NVME_EOM_LSP_MQUAL_BETTER,
+	NVME_EOM_LSP_MQUAL_BEST
+} nvme_eom_lsp_mqual_t;
+
+typedef enum {
+	/*
+	 * Read the current eye opening measurement log. This honors a specific
+	 * offset to start reading at. This assumes that a measurement is
+	 * already in progress.
+	 */
+	NVME_EOM_LSP_READ	= 0,
+	/*
+	 * This causes the controller to abort any in progress measurements,
+	 * start a new eye opening measurement, and return the initial requested
+	 * data.
+	 */
+	NVME_EOM_LSP_START	= 1,
+	/*
+	 * This aborts any in progress measurement and clears the log page.
+	 */
+	NVME_EOM_LSP_ABORT	= 2
+} nvme_eom_lsp_act_t;
+
+typedef union {
+	struct {
+		uint8_t nel_mqual:2;
+		uint8_t nel_act:2;
+	};
+	/*
+	 * The spec has this fixed as a 7-bit value. We round it up to a uint8_t
+	 * here for ABI purposes.
+	 */
+	uint8_t r;
+} nvme_eom_lsp_t;
+
+/*
  * NVMe Format NVM
  */
 #define	NVME_FRMT_SES_NONE	0

@@ -45,6 +45,8 @@
 #include <sys/sunddi.h>
 #include <libdevinfo.h>
 #include <sys/sysmacros.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 
 #include <sys/nvme.h>
 
@@ -79,10 +81,6 @@ CTASSERT(offsetof(nvme_identify_primary_caps_t, nipc_vifrt) == 64);
 
 CTASSERT(sizeof (nvme_nschange_list_t) == 4096);
 
-#define	NVMEADM_F_CTRL	1
-#define	NVMEADM_F_NS	2
-#define	NVMEADM_F_BOTH	(NVMEADM_F_CTRL | NVMEADM_F_NS)
-
 static void usage(const nvmeadm_cmd_t *);
 static bool nvmeadm_ctrl_disc_cb(nvme_t *, const nvme_ctrl_disc_t *, void *);
 
@@ -93,6 +91,7 @@ static int do_identify_ns(const nvme_process_arg_t *);
 static int do_list_logs(const nvme_process_arg_t *);
 static int do_get_logpage_fwslot(const nvme_process_arg_t *);
 static int do_get_logpage(const nvme_process_arg_t *);
+static int do_print_logpage(const nvme_process_arg_t *);
 static int do_list_features(const nvme_process_arg_t *);
 static boolean_t do_get_feat_intr_vect(const nvme_process_arg_t *,
     const nvme_feat_disc_t *, const nvmeadm_feature_t *);
@@ -113,6 +112,7 @@ static void optparse_identify_ctrl(nvme_process_arg_t *);
 static void optparse_identify_ns(nvme_process_arg_t *);
 static void optparse_list_logs(nvme_process_arg_t *);
 static void optparse_get_logpage(nvme_process_arg_t *);
+static void optparse_print_logpage(nvme_process_arg_t *);
 static void optparse_list_features(nvme_process_arg_t *);
 static void optparse_secure_erase(nvme_process_arg_t *);
 
@@ -122,6 +122,7 @@ static void usage_identify_ctrl(const char *);
 static void usage_identify_ns(const char *);
 static void usage_list_logs(const char *);
 static void usage_get_logpage(const char *);
+static void usage_print_logpage(const char *);
 static void usage_list_features(const char *);
 static void usage_get_features(const char *);
 static void usage_format(const char *);
@@ -251,12 +252,50 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		NVMEADM_C_MULTI
 	},
 	{
-		"get-logpage",
-		"get a log page from controllers and/or namespaces",
-		"  -O file\toutput log raw binary data to a file\n",
-		NULL,
-		do_get_logpage, usage_get_logpage, optparse_get_logpage,
-		NVMEADM_C_MULTI
+		.c_name = "get-logpage",
+		.c_desc = "get a log page from controllers and/or namespaces",
+		.c_flagdesc = "  -H\t\tomit column headers\n"
+		    "  -o field\tselect a field for parsable output\n"
+		    "  -O file\toutput log raw binary data to a file\n"
+		    "  -p\t\tprint parsable output\n"
+		    "  -x\t\tforce hex dump output\n",
+		.c_fielddesc = "  short\t\tfield's short name\n"
+		    "  desc\t\tdescription of the field\n"
+		    "  value\t\tthe raw field value\n"
+		    "  human\t\tthe human printable form of the value\n"
+		    "  length\tthe length of the field in bytes\n"
+		    "  bitlen\tthe number of additional bits long the field "
+		    "is\n"
+		    "  offset\tthe offset in bytes to the start of the field\n"
+		    "  bitoff\tthe additional number of bits to the start of "
+		    "the field\n",
+		.c_func = do_get_logpage,
+		.c_usage = usage_get_logpage,
+		.c_optparse = optparse_get_logpage,
+		.c_flags = NVMEADM_C_MULTI
+	},
+	{
+		.c_name = "print-logpage",
+		.c_desc = "print and filter a log page from disk",
+		.c_flagdesc = "  -f file\tfile that contains log data\n"
+		    "  -H\t\tomit column headers\n"
+		    "  -o field\tselect a field for parsable output\n"
+		    "  -p\t\tprint parsable output\n"
+		    "  -x\t\tforce hex dump output\n",
+		.c_fielddesc = "  short\t\tfield's short name\n"
+		    "  desc\t\tdescription of the field\n"
+		    "  value\t\tthe raw field value\n"
+		    "  human\t\tthe human printable form of the value\n"
+		    "  offset\tthe length of the field in bytes\n"
+		    "  bitlen\tthe number of additional bits long the field "
+		    "is\n"
+		    "  offset\tthe offset in bytes to the start of the field\n"
+		    "  bitoff\tthe additional number of bits to the start of "
+		    "the field\n",
+		.c_func = do_print_logpage,
+		.c_usage = usage_print_logpage,
+		.c_optparse = optparse_print_logpage,
+		.c_flags = NVMEADM_C_NOCTRL
 	},
 	{
 		"list-features",
@@ -401,6 +440,30 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		NULL,
 		do_firmware_activate, usage_firmware_activate, NULL,
 		NVMEADM_C_EXCL
+	},
+	{
+		.c_name = "measure-phyeye",
+		.c_desc = "measure the physical interface eye",
+		.c_flagdesc = "  -o output\tthe data output file\n"
+		    "  -Q quality\tthe quality of the eye measurement (good, "
+		    "better, or best)\n",
+		.c_func = do_measure_phyeye_cmd,
+		.c_usage = usage_measure_phyeye_cmd,
+		.c_optparse = optparse_measure_phyeye_cmd,
+		.c_flags = NVMEADM_C_EXCL
+	},
+	{
+		.c_name = "report-phyeye",
+		.c_desc = "report information about the measured eye",
+		.c_flagdesc = "  -e eye\toptional eye index to report\n"
+		    "  -l lane\tprint information only about the specific "
+		    "lane\n"
+		    "  -m mode\tdata report mode, either 'print-eye' or "
+		    "'eye-data'\n",
+		.c_func = do_report_phyeye_cmd,
+		.c_usage = usage_report_phyeye_cmd,
+		.c_optparse = optparse_report_phyeye_cmd,
+		.c_flags = NVMEADM_C_NOCTRL
 	},
 	{
 		.c_name = "vendor-cmd",
@@ -856,7 +919,7 @@ main(int argc, char **argv)
 		err(-1, "failed to initialize libnvme");
 	}
 	npa.npa_cmd = cmd;
-	npa.npa_excl = ((cmd->c_flags & NVMEADM_C_EXCL) != 0);
+	npa.npa_excl = ((npa.npa_cmd->c_flags & NVMEADM_C_EXCL) != 0);
 
 	optind++;
 
@@ -868,11 +931,22 @@ main(int argc, char **argv)
 	npa.npa_argc = argc - optind;
 	npa.npa_argv = &argv[optind];
 
-	if (cmd->c_optparse != NULL) {
+	if (npa.npa_cmd->c_optparse != NULL) {
 		optind = 0;
-		cmd->c_optparse(&npa);
+		npa.npa_cmd->c_optparse(&npa);
 		npa.npa_argc -= optind;
 		npa.npa_argv += optind;
+	}
+
+	/*
+	 * If this command indicates that it does not require a controller, then
+	 * don't bother with the rest and just call it immediately.
+	 */
+	if ((npa.npa_cmd->c_flags & NVMEADM_C_NOCTRL) != 0) {
+		if (npa.npa_cmd->c_func(&npa) != 0) {
+			exitcode = -1;
+		}
+		exit(exitcode);
 	}
 
 	/*
@@ -1781,7 +1855,7 @@ static void
 usage_list_logs(const char *c_name)
 {
 	(void) fprintf(stderr, "%s [-H] [-o field,[...] [-p]] [-s scope,[...]] "
-	    "[-a]\n\t  [<ctl>[/<ns>][,...] [logpage...]\n\n"
+	    "[-a]\n\t  <ctl>[/<ns>][,...] [logpage...]\n\n"
 	    "  List log pages supported by controllers or namespaces.\n",
 	    c_name);
 }
@@ -1869,10 +1943,11 @@ do_list_logs(const nvme_process_arg_t *npa)
 static void
 usage_get_logpage(const char *c_name)
 {
-	(void) fprintf(stderr, "%s [-O file] <ctl>[/<ns>][,...] <logpage>\n\n"
+	(void) fprintf(stderr, "%s [-O file | -x | -p -o field,[...] [-H]]\n"
+	    "\t  <ctl>[/<ns>][,...] <logpage> [filter...]\n\n"
 	    "  Print the specified log page of the specified NVMe "
-	    "controllers and/or name-\n  spaces. Run nvmeadm list-logpages "
-	    "for supported log pages. All devices\n support error, health, "
+	    "controllers and/or name-\n  spaces. Run \"nvmeadm list-logpages\" "
+	    "for supported log pages. All devices\n  support error, health, "
 	    "and firmware.\n", c_name);
 }
 
@@ -2002,8 +2077,34 @@ do_get_logpage_pev_relctx(const nvme_process_arg_t *npa, nvme_log_req_t *req)
 	}
 }
 
+/*
+ * Fill in the baseline context for a phyeye request. In this case we always
+ * perform a normal read command and set the quality to "good" (the
+ * lowest quality). Configurable use of this is driven through the phyeye
+ * commands in nvmeadm_phyeye.c. In addition, we must always set the controller
+ * ID in this request to our own.
+ */
+static void
+do_get_logpage_phyeye_ctx(const nvme_process_arg_t *npa, nvme_log_req_t *req)
+{
+	nvme_eom_lsp_t lsp;
+
+	(void) memset(&lsp, 0, sizeof (lsp));
+	lsp.nel_mqual = NVME_EOM_LSP_MQUAL_GOOD;
+	lsp.nel_act = NVME_EOM_LSP_READ;
+
+	if (!nvme_log_req_set_lsp(req, lsp.r)) {
+		nvmeadm_fatal(npa, "failed to set lsp for host phyeye");
+	}
+
+	if (!nvme_log_req_set_lsi(req, npa->npa_idctl->id_cntlid)) {
+		nvmeadm_fatal(npa, "failed to set lsi for host phyeye");
+	}
+}
+
 static int
-do_get_logpage_common(const nvme_process_arg_t *npa, const char *page)
+do_get_logpage_common(const nvme_process_arg_t *npa, const char *page,
+    nvmeadm_field_filt_t *filts, size_t nfilts)
 {
 	int ret = 0;
 	nvme_log_disc_t *disc;
@@ -2047,6 +2148,9 @@ do_get_logpage_common(const nvme_process_arg_t *npa, const char *page)
 		break;
 	case NVME_LOGPAGE_TELMHOST:
 		return (do_get_logpage_telemetry(npa, disc, req));
+	case NVME_LOGPAGE_PHYEYE:
+		do_get_logpage_phyeye_ctx(npa, req);
+		break;
 	default:
 		break;
 	}
@@ -2076,10 +2180,11 @@ do_get_logpage_common(const nvme_process_arg_t *npa, const char *page)
 		nvmeadm_fatal(npa, "failed to set output parameters");
 	}
 
-
 	/*
 	 * Again, we need to potentially adjust specific LSP values here for the
-	 * various contexts that exist.
+	 * various contexts that exist. Note that we are reusing the existing
+	 * request so if the prior values for the initial request are fine, then
+	 * we can just leave it there.
 	 */
 	switch (nvme_log_disc_lid(disc)) {
 	case NVME_LOGPAGE_PEV:
@@ -2100,19 +2205,48 @@ do_get_logpage_common(const nvme_process_arg_t *npa, const char *page)
 	if (log != NULL && log->ngl_output != NULL) {
 		do_get_logpage_dump(buf, toalloc, log->ngl_output);
 		goto done;
+	} else if (log != NULL && log->ngl_hex) {
+		nvmeadm_dump_hex(buf, toalloc);
+		goto done;
 	}
 
-	(void) printf("%s: ", npa->npa_name);
+	if (npa->npa_ofmt == NULL) {
+		(void) printf("%s: ", npa->npa_name);
+	}
 	if (strcmp(page, "error") == 0) {
 		size_t nlog = toalloc / sizeof (nvme_error_log_entry_t);
+		if (nfilts > 0) {
+			warnx("log filters are not currently supported with "
+			    "the %s log page", page);
+			ret = -1;
+		}
+
 		nvme_print_error_log(nlog, buf, npa->npa_version);
 	} else if (strcmp(page, "health") == 0) {
+		if (nfilts > 0) {
+			warnx("log filters are not currently supported with "
+			    "the %s log page", page);
+			ret = -1;
+		}
+
 		nvme_print_health_log(buf, npa->npa_idctl, npa->npa_version);
 	} else if (strcmp(page, "firmware") == 0) {
+		if (nfilts > 0) {
+			warnx("log filters are not currently supported with "
+			    "the %s log page", page);
+			ret = -1;
+		}
+
 		nvme_print_fwslot_log(buf, npa->npa_idctl);
 	} else {
-		(void) printf("%s (%s)\n", nvme_log_disc_desc(disc), page);
-		nvmeadm_dump_hex(buf, toalloc);
+		if (npa->npa_ofmt == NULL) {
+			(void) printf("%s (%s)\n", nvme_log_disc_desc(disc),
+			    page);
+		}
+		if (!nvmeadm_log_page_fields(npa, page, buf, toalloc, filts,
+		    nfilts, 0)) {
+			ret = -1;
+		}
 	}
 
 done:
@@ -2133,27 +2267,44 @@ do_get_logpage_fwslot(const nvme_process_arg_t *npa)
 		exit(-1);
 	}
 
-	return (do_get_logpage_common(npa, "firmware"));
+	return (do_get_logpage_common(npa, "firmware", NULL, 0));
 }
 
 static void
 optparse_get_logpage(nvme_process_arg_t *npa)
 {
 	int c;
-	const char *output = NULL;
+	const char *fields = NULL;
+	bool parse = false;
+	uint_t oflags = 0;
 	nvmeadm_get_logpage_t *log;
+	uint_t count = 0;
 
 	if ((log = calloc(1, sizeof (nvmeadm_get_logpage_t))) == NULL) {
 		err(-1, "failed to allocate memory to track log page "
 		    "information");
 	}
 
-	npa->npa_cmd_arg = log;
-
-	while ((c = getopt(npa->npa_argc, npa->npa_argv, ":O:")) != -1) {
+	while ((c = getopt(npa->npa_argc, npa->npa_argv, ":Ho:O:px")) != -1) {
 		switch (c) {
+		case 'H':
+			oflags |= OFMT_NOHEADER;
+			break;
+		case 'o':
+			fields = optarg;
+			break;
 		case 'O':
-			output = optarg;
+			log->ngl_output = optarg;
+			count++;
+			break;
+		case 'p':
+			parse = true;
+			oflags |= OFMT_PARSABLE;
+			count++;
+			break;
+		case 'x':
+			log->ngl_hex = true;
+			count++;
 			break;
 		case '?':
 			errx(-1, "unknown option: -%c", optopt);
@@ -2162,12 +2313,70 @@ optparse_get_logpage(nvme_process_arg_t *npa)
 		}
 	}
 
-	log->ngl_output = output;
+	if (parse && fields == NULL) {
+		errx(-1, "parsable mode (-p) requires fields specified with "
+		    "-o");
+	}
+
+	if (!parse && fields != NULL) {
+		errx(-1, "output field selection (-o) only usable in "
+		    "parsable mode (-p)");
+	}
+
+	if (!parse && (oflags & OFMT_NOHEADER) != 0) {
+		errx(-1, "omitting headers (-H) only usable in parsable mode "
+		    "(-p)");
+	}
+
+	if (count > 1) {
+		errx(-1, "only one of parsable output (-p), outputing to a "
+		    "file (-O), and hexadecimal output (-x) may be requested");
+	}
+
+	if (parse) {
+		ofmt_status_t oferr = ofmt_open(fields, nvmeadm_field_ofmt,
+		    oflags, 0, &npa->npa_ofmt);
+		ofmt_check(oferr, B_TRUE, npa->npa_ofmt, nvme_oferr, warnx);
+	}
+
+	npa->npa_cmd_arg = log;
+}
+
+static void
+do_logpage_filts(const nvme_process_arg_t *npa, nvmeadm_field_filt_t **filtsp,
+    size_t *nfiltsp)
+{
+	size_t nfilts;
+	nvmeadm_field_filt_t *filts;
+
+	*filtsp = NULL;
+	*nfiltsp = 0;
+
+	if (npa->npa_argc <= 1)
+		return;
+
+	nfilts = (size_t)npa->npa_argc - 1;
+	filts = calloc(nfilts, sizeof (nvmeadm_field_filt_t));
+	if (filts == NULL) {
+		err(-1, "failed to allocate memory for filter "
+		    "tracking");
+	}
+
+	for (size_t i = 0; i < nfilts; i++) {
+		filts[i].nff_len = strlen(npa->npa_argv[i + 1]);
+		filts[i].nff_str = npa->npa_argv[i + 1];
+	}
+
+	*filtsp = filts;
+	*nfiltsp = nfilts;
 }
 
 static int
 do_get_logpage(const nvme_process_arg_t *npa)
 {
+	size_t nfilts = 0;
+	nvmeadm_field_filt_t *filts = NULL;
+	nvmeadm_get_logpage_t *log = npa->npa_cmd_arg;
 
 	if (npa->npa_argc < 1) {
 		warnx("missing log page name");
@@ -2175,13 +2384,157 @@ do_get_logpage(const nvme_process_arg_t *npa)
 		exit(-1);
 	}
 
-	if (npa->npa_argc > 1) {
-		warnx("only a single log page may be specified at a time");
-		usage(npa->npa_cmd);
-		exit(-1);
+	do_logpage_filts(npa, &filts, &nfilts);
+
+	if (log != NULL && log->ngl_hex && nfilts > 0) {
+		errx(-1, "hexadecimal output (-x) cannot be used with "
+		    "log filter operands");
 	}
 
-	return (do_get_logpage_common(npa, npa->npa_argv[0]));
+	return (do_get_logpage_common(npa, npa->npa_argv[0], filts, nfilts));
+}
+
+static void
+usage_print_logpage(const char *c_name)
+{
+	(void) fprintf(stderr, "%s -f file [-x | -p -o field,[...] [-H]] "
+	    "<logpage>\n\t  [filter...]\n\n"
+	    "  Print the specified log page from a file. Optional filters "
+	    "may be used to\n  restrict the log fields printed. See nvmeadm(8) "
+	    "for a list of all log\n  pages. Run \"nvmeadm list-logpages\" to "
+	    "see log pages a specific controller\n  supports.\n", c_name);
+}
+
+typedef struct {
+	const char *pl_input;
+	bool pl_hex;
+} print_logpages_t;
+
+static void
+optparse_print_logpage(nvme_process_arg_t *npa)
+{
+	int c;
+	const char *fields = NULL;
+	bool parse = false;
+	uint_t oflags = 0;
+	print_logpages_t *pl;
+
+	if ((pl = calloc(1, sizeof (print_logpages_t))) == NULL) {
+		err(-1, "failed to allocate memory for option tracking");
+	}
+
+	while ((c = getopt(npa->npa_argc, npa->npa_argv, ":f:Ho:px")) != -1) {
+		switch (c) {
+		case 'f':
+			pl->pl_input = optarg;
+			break;
+		case 'H':
+			oflags |= OFMT_NOHEADER;
+			break;
+		case 'o':
+			fields = optarg;
+			break;
+		case 'p':
+			parse = true;
+			oflags |= OFMT_PARSABLE;
+			break;
+		case 'x':
+			pl->pl_hex = true;
+			break;
+		case '?':
+			errx(-1, "unknown option: -%c", optopt);
+		case ':':
+			errx(-1, "option -%c requires an argument", optopt);
+		}
+	}
+
+	if (pl->pl_input == NULL) {
+		errx(-1, "missing required input file to process (-f)");
+	}
+
+	if (parse && fields == NULL) {
+		errx(-1, "parsable mode (-p) requires fields specified with "
+		    "-o");
+	}
+
+	if (!parse && fields != NULL) {
+		errx(-1, "output field selection (-o) only usable in "
+		    "parsable mode (-p)");
+	}
+
+	if (!parse && (oflags & OFMT_NOHEADER) != 0) {
+		errx(-1, "omitting headers (-H) only usable in parsable mode "
+		    "(-p)");
+	}
+
+	if (pl->pl_hex && parse) {
+		errx(-1, "only one of parsable output (-p) and heaxdecimal "
+		    "output (-x) may be requested");
+	}
+
+	if (parse) {
+		ofmt_status_t oferr = ofmt_open(fields, nvmeadm_field_ofmt,
+		    oflags, 0, &npa->npa_ofmt);
+		ofmt_check(oferr, B_TRUE, npa->npa_ofmt, nvme_oferr, warnx);
+	}
+
+	npa->npa_cmd_arg = pl;
+}
+
+static int
+do_print_logpage(const nvme_process_arg_t *npa)
+{
+	int fd = -1, ret = 0;
+	struct stat st;
+	void *data;
+	const char *logpage = NULL;
+	size_t nfilts = 0;
+	nvmeadm_field_filt_t *filts = NULL;
+	print_logpages_t *pl = npa->npa_cmd_arg;
+	nvmeadm_log_field_flag_t flag = 0;
+
+	if (pl->pl_hex) {
+		if (npa->npa_argc != 0) {
+			errx(-1, "log page and filters not supported with -x");
+		}
+	} else {
+		if (npa->npa_argc == 0) {
+			errx(-1, "missing required log page");
+		}
+
+		logpage = npa->npa_argv[0];
+		do_logpage_filts(npa, &filts, &nfilts);
+		flag |= NVMEADM_LFF_CHECK_NAME;
+	}
+
+	if ((fd = open(pl->pl_input, O_RDONLY)) < 0) {
+		err(-1, "failed to open input file %s", pl->pl_input);
+	}
+
+	if (fstat(fd, &st) != 0) {
+		err(-1, "failed to stat %s", pl->pl_input);
+	}
+
+	if (st.st_size > NVMEADM_MAX_MMAP) {
+		errx(-1, "%s file size of 0x%lx exceeds maximum allowed size "
+		    "of 0x%llx", pl->pl_input, st.st_size, NVMEADM_MAX_MMAP);
+	}
+
+	data = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
+	if (data == MAP_FAILED) {
+		errx(-1, "failed to mmap %s", pl->pl_input);
+	}
+
+	if (!nvmeadm_log_page_fields(npa, logpage, data, st.st_size,
+	    filts, nfilts, flag)) {
+		ret = -1;
+	}
+
+	VERIFY0(munmap(data, st.st_size));
+	VERIFY0(close(fd));
+	free(filts);
+
+	return (ret);
 }
 
 static void
@@ -2378,7 +2731,7 @@ usage_get_features(const char *c_name)
 	(void) fprintf(stderr, "%s <ctl>[/<ns>][,...] [<feature>[,...]]\n\n"
 	    "  Print the specified features of the specified NVMe controllers "
 	    "and/or\n  namespaces. Feature support varies on the controller.\n"
-	    "Run 'nvmeadm list-features <ctl>' to see supported features.\n",
+	    "Run \"nvmeadm list-features <ctl>\" to see supported features.\n",
 	    c_name);
 }
 

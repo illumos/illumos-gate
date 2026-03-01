@@ -20,13 +20,16 @@ PROG= nvmeadm
 
 OBJS=	nvme_version.o	\
 	nvmeadm.o	\
+	nvmeadm_field.o \
 	nvmeadm_nsmgmt.o \
 	nvmeadm_ofmt.o	\
+	nvmeadm_phyeye.o \
 	nvmeadm_print.o	\
 	nvmeadm_sandisk.o \
 	nvmeadm_telemetry.o \
 	nvmeadm_vuc.o \
 	nvmeadm_wdc.o	\
+	bitext.o \
 	$(HEXDUMP_OBJS)
 
 include ../Makefile.cmd
@@ -58,6 +61,10 @@ $(PROG): $(OBJS)
 	$(POST_PROCESS_O)
 
 %.o: $(SRC)/common/nvme/%.c
+	$(COMPILE.c) $<
+	$(POST_PROCESS_O)
+
+%.o: $(SRC)/common/bitext/%.c
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 

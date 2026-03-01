@@ -12,7 +12,7 @@
 .\" Copyright 2026 Oxide Computer Company
 .\" Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 .\"
-.Dd January 30, 2026
+.Dd March 6, 2026
 .Dt NVMEADM 8
 .Os
 .Sh NAME
@@ -59,9 +59,21 @@
 .Nm
 .Op Fl dv
 .Cm get-logpage
-.Op Fl O Ar output-file
+.Oo
+.Fl O Ar output-file |
+.Fl x |
+.Fl p Fl o Ar field Ns [,...] Op Fl H
+.Oc
 .Ar ctl[/ns] Ns [,...]
 .Ar logpage
+.Op Ar filter Ns ...
+.Nm
+.Op Fl dv
+.Cm print-logpage
+.Fl f Ar file
+.Op Fl x | p Fl o Ar field Ns [,...] Op Fl H
+.Ar logpage
+.Op Ar filter Ns ...
 .Nm
 .Op Fl dv
 .Cm list-features
@@ -134,6 +146,19 @@
 .Cm activate-firmware
 .Ar ctl
 .Ar slot
+.Nm
+.Op Fl dv
+.Cm measure-phyeye
+.Fl o Ar output
+.Op Fl Q Ar good | better | best
+.Ar ctl
+.Nm
+.Op Fl dv
+.Cm report-phyeye
+.Fl f Ar file
+.Op Fl l Ar lane
+.Op Fl e Ar eye
+.Op Fl m Ar mode
 .Nm
 .Op Fl dv
 .Cm vendor-cmd
@@ -237,7 +262,41 @@ command without any arguments.
 .It Ar logpage
 Specifies the log page name for the
 .Cm get-logpage
+and
+.Cm print-logpage
 command.
+Valid names are listed in the discussion of the
+.Cm get-logpage
+command below.
+Log pages both the system and controller support can be determined with
+the
+.Cm list-logpages
+command.
+.It Ar filter
+Various commands take a filter to print out portions of a data structure
+such as a log page.
+A filter is a series of dot delineated
+.Pq Dq \&.
+strings that define which portion of the data structure to list.
+Short names for fields come from the relevant NVMe specifications and
+are treated as a committed interface
+.Pq aliases will be provided in the face of changes in the spec .
+.Pp
+The matching behavior varies between parsable and non-parsable output.
+Consider the filter
+.Dq eom.od.pefp .
+This prints the Printable Eye Field Present member, from the Optional
+Data Present Field, from the EOM Header that is part of the phyeye log
+page.
+In non-parsable mode, the filter
+.Dq eom
+would match the entire contents of the EOM header.
+However, in parsable mode, only an exact match fires to ensure that the
+contents are stable across changes to the specification which add
+members to reserved fields.
+.Pp
+When using filters, the program will exit non-zero if any filter does
+not match.
 .It Ar feature-list
 A comma-separated list of feature names for the
 .Cm get-features
@@ -724,19 +783,110 @@ then the command will generate an error.
 .It Xo
 .Nm
 .Cm get-logpage
-.Op Fl O Ar output-file
+.Fl O Ar output-file |
+.Fl x |
+.Fl p Fl o Ar field Ns [,...] Op Fl H
 .Ar ctl[/ns] Ns [,...]
 .Ar logpage
+.Op Ar filter Ns ...
 .Xc
 Print the specified log page of the specified controllers and/or namespaces.
-If
-.Fl O
-is specified, rather than print the contents of the log, the raw binary payload
-of the log will be written to
+.Pp
+The
+.Nm
+.Cm get-logpage
+command supports the following options:
+.Bl -tag -width Fl
+.It Fl H
+Omit the output header columns when using parsable output.
+.It Fl O Ar output-file
+Write the raw contents of the binary payload to
 .Ar output-file .
+Its contents will not be interpreted or printed out otherwise.
+Filters may not be used when writing raw data out.
+.It Fl o Ar field Ns [,...]
+A comma-separated list of one or more output fields to be used.
+Fields are listed below and the name is case insensitive.
+.It Fl p
+Produce parsable output rather than human-readable output.
+This option requires that output fields be selected with the
+.Fl o
+option.
+.It Fl x
+Print the raw output of
+.Ar logpage
+as a series of human-readable hexadecimal output with the log page
+address and ASCII decoding.
+Filters may not be used with the
+.Fl x
+option.
+.El
+.Pp
+The following fields are supported:
+.Bl -tag -width OFFSET
+.It Sy SHORT
+This is the full dot-delineated short name that refers to a specific
+field in a log page.
+For items from the NVMe specification, this is the field's abbreviation
+found in the specification.
+The short form is used in filters and its value is considered a
+committed interface.
+.It Sy DESC
+This is a description of a field for a log page.
+This value comes from the NVMe specification or vendor specification.
+The description string for a field may change over time.
+.It Sy VALUE
+This is the underlying binary value found inside of a log page's field
+printed in hexadecimal.
+The value is not interpreted or adjusted.
+For example, many values in the NVMe specification are 0s based values,
+meaning to get the actual value one has to add one to it.
+.It Sy HUMAN
+This is a human-readable version of the field's value.
+The human-readable output of a field may change over time due to changes
+in the specification, bugs, or improvements to
+.Nm .
+.It Sy OFFSET
+This is the offset to the start of the field in bytes.
+The additional sub-byte bit offset to the start of the field is
+communicated with the
+.Sy BITOFF
+field.
+.It Sy BITOFF
+This is the additional offset to the start of the field in bits.
+This field will only ever be in the range of 0-7 and must be combined
+with the
+.Sy OFFSET
+field to get the total length.
+.It Sy LENGTH
+This is the length of the field in bytes.
+The additional sub-byte bit length is communicated with the
+.Sy BITOFF
+field.
+.It Sy BITLEN
+This is the additional length of the field in bits.
+This field will only ever be in the range of 0-7 and must be combined
+with the
+.Sy LENGTH
+field to get the total length.
+.El
+.Pp
 Most log pages are only available on a per-controller basis.
+For an explanation of the contents of the log pages refer to the
+description of the
+.Qq GET LOGPAGE
+admin command in the NVMe specification.
+.Pp
+One or more
+.Ar filter
+operands may be supplied to a subset of log pages.
+These filters will limit the fields that are printed in both parsable
+and human-readable mode.
+Log pages the system does not know how to decode are printed in a
+hexadecimal dump and filters are not supported.
+.Pp
 Known log pages are:
-.Bl -tag -width "firmware"
+.Bl -tag -width "telemetry"
 .It suplog
 Supported Log Pages.
 Lists information about log pages that the device supports.
@@ -764,6 +914,15 @@ Contains vendor-specific diagnostic information about the controller.
 This log page requires that the
 .Fl O
 option be specified.
+.It phyeye
+Physical Interface Receiver Eye Opening Measurement.
+An optional log page that provides a way of measuring the eye of the
+controller's PHY, generally meaning all lanes of a PCIe device.
+See the
+.Cm measure-phyeye
+and
+.Cm report-phyeye
+commands for specialized subcommands dedicated to this.
 .El
 .Pp
 The following vendor-specific log pages are supported.
@@ -826,11 +985,66 @@ Western Digital CCDS build information.
 .It wdc/cusmart
 Western Digital customer unique SMART data.
 .El
+.It Xo
+.Nm
+.Cm print-logpage
+.Fl f Ar file
+.Op Fl x | p Fl o Ar field Ns [,...] Op Fl H
+.Ar logpage
+.Op Ar filter Ns ...
+.Xc
+Print and decode the specified log page contents from a file.
+Where the
+.Cm get-logpage
+command retrieves an individual log page from a device, the
+.Cm print-logpage
+instead reads log page data from an input file
+.Ar file ,
+but otherwise provides the same decoding and filtering capabilities.
+This allows a log page to be interpreted multiple times without asking
+for the controller for a fresh copy and allows log pages from remote
+hosts to be processed locally.
+To capture the binary log file use
+.Nm
+.Cm get-logpage
+.Fl O .
 .Pp
-For an explanation of the contents of the log pages refer to the
-description of the
-.Qq GET LOGPAGE
-admin command in the NVMe specification.
+The
+.Nm
+.Cm print-logpage
+command supports the following options:
+.Bl -tag -width Fl
+.It Fl f Ar file
+Read the log page contents from the specified
+.Ar file .
+This option is required.
+.It Fl H
+Omit the output header columns when using parsable output.
+.It Fl o Ar field Ns [,...]
+A comma-separated list of one or more output fields to be used.
+Fields are listed below and the name is case insensitive.
+.It Fl p
+Produce parsable output rather than human-readable output.
+This option requires that output fields be selected with the
+.Fl o
+option.
+.It Fl x
+Print the raw output of
+.Ar logpage
+as a series of human-readable hexadecimal output with the log page
+address and ASCII decoding.
+Filters and parsable output may not be used with the
+.Fl x
+option.
+.El
+.Pp
+The
+.Cm print-logpage
+command supports the same fields, filters, and log page names as the
+.Cm get-logpage
+command.
+See
+.Sx Examples .
 .It Xo
 .Nm
 .Cm list-features
@@ -1356,6 +1570,108 @@ The firmware image in
 is activated at the next NVM controller reset.
 .It Xo
 .Nm
+.Cm measure-phyeye
+.Fl o Ar output
+.Op Fl Q Ar good | better | best
+.Ar ctl
+.Xc
+Perform a measurement of the physical interface's eye opening on the
+specified controller,
+.Ar ctl ,
+and write the resulting measurement to
+.Ar output .
+The output file will be a version of the
+.Dq phyeye
+log page whose contents can be interpreted with the
+.Cm report-phyeye
+and
+.Cm print-logpage
+commands.
+.Pp
+The quality of the log page may be one of
+.Dq good ,
+.Dq better ,
+or
+.Dq best ,
+which are levels described by the NVMe over PCIe Transport
+Specification.
+The higher the quality, the longer the measurement will take, but the
+more accurate it will be.
+.Pp
+When the measurement is initiated, no additional administrative commands
+will be allowed on the device, though any active
+.Xr blkdev 4D
+devices will still be active.
+It is recommended I/O be quiesced during the entire measurement period.
+The command will wait for the device's recommended time, potentially
+5-10 minutes, before it queries the device for completeness.
+.Pp
+The following options are supported:
+.Bl -tag -width Ds
+.It Fl o
+Write the contents of the physical eye measurement to
+.Ar output .
+.It Fl Q
+Specify the quality of the measurement.
+The default quality when none is specified is best.
+The following quality levels are supported:
+.Dq good ,
+.Dq better ,
+and
+.Dq best .
+.El
+.It Xo
+.Nm
+.Cm report-phyeye
+.Fl f Ar file
+.Op Fl l Ar lane
+.Op Fl e Ar eye
+.Op Fl m Ar mode
+.Xc
+Report the printable eye data or the vendor-specific eye data from a
+physical eye measurement contained in
+.Ar file .
+.Pp
+The following options are supported:
+.Bl -tag -width Ds
+.It Fl f Ar file
+Read the physical eye measurement contents from
+.Ar file .
+This should be gathered with the
+.Cm measure-phyeye
+command.
+.It Fl l Ar lane
+Limit information printed to the specified PCIe device lane.
+PCIe lanes are numbered starting at 0.
+Most NVMe devices only have 4 lanes.
+.It Fl e Ar eye
+Limit information printed to the specified device eye.
+The number of eyes present generally depends on the PCIe speed of the
+device.
+There will only be a single eye for PCIe devices running at Gen 5 or below.
+PCIe Gen 6 and higher devices should have 3 eyes due to the use of PAM4
+encoding.
+.It Fl m Ar mode
+Selects the type of data that will be printed, defaulting to print-eye
+if not specified.
+Valid modes are:
+.Bl -tag -width Ds
+.It Sy eye-data
+Print the optional, vendor-specific eye-data.
+This will generally be printed as a hexadecimal dump unless
+vendor-specific knowledge of how to decode it is present.
+.It Sy print-eye
+Print the optional, ASCII printable eye.
+A 0 in the printable eye indicates that the position is on or inside of
+the eye.
+A 1 in the printable eye indicates that the position is outside of the
+eye.
+This cannot be translated into specific values without vendor-specific
+information.
+.El
+.El
+.It Xo
+.Nm
 .Cm vendor-cmd
 .Fl O Ar opcode
 .Op Fl n Ar nsid
@@ -1742,6 +2058,118 @@ nvme8   wdc/ccds      controller    --        CCDS Build Information
 # nvmeadm list-logpages -p -o name,impl nvme8 firmware
 firmware:yes
 .Ed
+.It Sy Example 7: Using Log Page Filters
+This example shows how to use filters to select data from a log page in
+both human readable and parsable outputs.
+.Bd -literal
+# nvmeadm print-logpage -f eye.out phyeye
+EOM Header
+  Log Identifier: 0x19
+  EOM In Progress: completed (0x2)
+  Header Size: 0x40
+  Result Size: 0x1aa40
+  EOM Data Generation Number: 0x7
+  Log Revision: 0x1
+  Optional Data Present: 0x3
+    |--> Printable Eye Field Present: present (0x1)
+    |--> Eye Data Field Present: present (0x1)
+  Lanes: 0x4
+  Eyes Per Lane: 0x1
+  Log Specific Parameter Field Copy: 0x6
+    |--> Printable Eye Field Present: 0x6
+  Link Information: 0x4
+    |--> Measurement Link Speed: 0x4
+  Log Specific Identifier Copy: 0x0
+  Descriptor Size: 0x6a80
+  Number of Descriptors: 0x4
+  Maximum Top Bottom: 0x100
+  Maximum Left Right: 0x1a
+  Estimated Time for Good Quality: 0x96
+  Estimated Time for Better Quality: 0xf0
+  Estimated Time for Best Quality: 0x168
+EOM Lane Descriptor 0
+  Measurement Status: 0x1
+    |--> Measurement Successful: yes (0x1)
+  Lane: 0x0
+  Eye: 0x1
+  Top: 0x38
+  Bottom: 0x38
+  Left: 0xb
+  Right: 0xe
+  Number of Rows: 0x200
+  Number of Columns: 0x35
+EOM Lane Descriptor 1
+  Measurement Status: 0x1
+    |--> Measurement Successful: yes (0x1)
+  Lane: 0x1
+  Eye: 0x1
+  Top: 0x34
+  Bottom: 0x30
+  Left: 0xa
+  Right: 0x10
+  Number of Rows: 0x200
+  Number of Columns: 0x35
+EOM Lane Descriptor 2
+  Measurement Status: 0x1
+    |--> Measurement Successful: yes (0x1)
+  Lane: 0x2
+  Eye: 0x1
+  Top: 0x30
+  Bottom: 0x2c
+  Left: 0xa
+  Right: 0xf
+  Number of Rows: 0x200
+  Number of Columns: 0x35
+EOM Lane Descriptor 3
+  Measurement Status: 0x1
+    |--> Measurement Successful: yes (0x1)
+  Lane: 0x3
+  Eye: 0x1
+  Top: 0x38
+  Bottom: 0x34
+  Left: 0xb
+  Right: 0xe
+  Number of Rows: 0x200
+  Number of Columns: 0x35
+.Ed
+.Pp
+Filters can then be used to limit this output.
+In human readable mode, a filter will include all of its parent headings
+to make it clear where something is.
+Additionally a filter that is not a leaf, matches all of its children.
+.Bd -literal
+# nvmeadm print-logpage -f eye.out phyeye eom.odp eld2.ln
+EOM Header
+  Optional Data Present: 0x3
+    |--> Printable Eye Field Present: present (0x1)
+    |--> Eye Data Field Present: present (0x1)
+EOM Lane Descriptor 2
+  Lane: 0x2
+.Ed
+.Pp
+In machine parsable mode, filters only match their exact value:
+.Bd -literal
+# nvmeadm print-logpage -f eye.out -Hpo short,value phyeye eom.eomip
+eom.eomip:0x2
+.Ed
+.It Sy Example 8: Gathering and Printing Eye Data
+This example shows gathering a physical eye measurement from a device
+and then printing the eye data from a single lane.
+.Bd -literal
+# nvmeadm measure-phyeye -o eye.out -Q best nvme9
+device indicates a minimum 360 second wait for best quality phyeye measurement
+360/360 seconds elapsed
+phyeye successfully written to eye.out
+# nvmeadm report-phyeye -f eye.out -m eye-data -l 3
+Lane 3, Eye 1: Eye Data
+      0  1  2  3  4  5  6  7   8  9  a  b  c  d  e  f   0123456789abcdef
+00:  25 00 00 00 37 25 00 00  ff 00 00 00 38 53 00 00 | %...7%......8S..
+10:  38 53 00 00 48 00 00 00  46 00 00 00 46 00 00 00 | 8S..H...F...F...
+20:  42 00 00 00 42 00 00 00  eb 00 00 00 c7 00 00 00 | B...B...........
+30:  0f 01 00 00 24 01 00 00  38 26 00 00 a0 00 00 00 | ....$...8&......
+40:  e0 00 00 00 20 0d 00 00  20 0d 00 00 40 00 00 00 | .... ... ...@...
+50:  05 11 00 00 5f 08 00 00  41 08 00 00 80 08 00 00 | ...._...A.......
+.Ed
 .El
 .Sh INTERFACE STABILITY
 The command line interface of
@@ -1753,6 +2181,9 @@ The output of
 is
 .Sy Not-an-Interface
 and may change any time.
+.Pp
+The short names used by various filters are
+.Sy Committed .
 .Sh SEE ALSO
 .Xr nvme 4D
 .Pp
