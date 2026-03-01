@@ -127,7 +127,7 @@ nvme_wdc_log_samples_var_len(uint64_t *outp, const void *data, size_t len)
 	}
 
 	(void) memcpy(&nsamp, data, sizeof (uint32_t));
-	*outp = (uint64_t)nsamp * sizeof (uint32_t);
+	*outp = (uint64_t)nsamp * sizeof (uint32_t) + sizeof (wdc_vul_power_t);
 	return (true);
 }
 

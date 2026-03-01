@@ -10,11 +10,11 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
- * WDC vendor-specific commands
+ * WDC vendor-specific commands and log printing.
  */
 
 #include <err.h>
@@ -25,6 +25,7 @@
 #include <sys/sysmacros.h>
 #include <stdbool.h>
 #include <endian.h>
+#include <string.h>
 #include <sys/nvme/wdc.h>
 
 #include "nvmeadm.h"
@@ -365,3 +366,129 @@ usage_wdc_inject_assert(const char *c_name)
 	    "troubleshooting exercise.\n  If in doubt, do not use this!\n",
 	    c_name);
 }
+
+static const nvmeadm_field_t wdc_vul_power_nsamp = {
+	.nf_off = offsetof(wdc_vul_power_t, pow_nsamples),
+	.nf_len = sizeof (((wdc_vul_power_t *)NULL)->pow_nsamples),
+	.nf_short = "nsamp",
+	.nf_desc = "Number of Samples",
+	.nf_type = NVMEADM_FT_HEX
+};
+
+static const nvmeadm_field_t wdc_vul_power_samp_tmpl = {
+	.nf_off = offsetof(wdc_vul_power_t, pow_samples[0]),
+	.nf_len = sizeof (uint32_t),
+	.nf_type = NVMEADM_FT_UNIT,
+	.nf_addend = { .nfa_unit = "mW" }
+};
+
+static bool
+wdc_vul_power_drive(nvmeadm_field_print_t *print, const void *data, size_t len)
+{
+	const wdc_vul_power_t *power = data;
+	const size_t need = power->pow_nsamples * sizeof (uint32_t) +
+	    sizeof (wdc_vul_power_t);
+
+	if (need > len) {
+		warnx("log malformed: need 0x%zx bytes, but have 0x%zx", need,
+		    len);
+		return (false);
+	}
+
+	print->fp_header = NULL;
+	print->fp_fields = &wdc_vul_power_nsamp;
+	print->fp_nfields = 1;
+	print->fp_base = NULL;
+	print->fp_data = data;
+	print->fp_dlen = len;
+	print->fp_off = 0;
+
+	nvmeadm_field_print(print);
+
+	for (size_t i = 0; i < power->pow_nsamples; i++) {
+		nvmeadm_field_t field;
+		char shrt[32];
+		char desc[128];
+
+		(void) snprintf(shrt, sizeof (shrt), "pow%zu", i);
+		(void) snprintf(desc, sizeof (desc), "Power Sample %zu", i);
+		field = wdc_vul_power_samp_tmpl;
+		field.nf_off += i * sizeof (uint32_t);
+		field.nf_short = shrt;
+		field.nf_desc = desc;
+
+		print->fp_fields = &field;
+		print->fp_nfields = 1;
+		nvmeadm_field_print(print);
+	}
+
+	return (true);
+}
+
+const nvmeadm_log_field_info_t wdc_vul_power_field_info = {
+	.nlfi_log = "wdc/power",
+	.nlfi_min = sizeof (wdc_vul_power_t),
+	.nlfi_drive = wdc_vul_power_drive
+};
+
+#define	WDC_F_EOL(f)	.nf_off = offsetof(wdc_vul_sn840_eol_t, eol_##f), \
+	.nf_len = sizeof (((wdc_vul_sn840_eol_t *)NULL)->eol_##f)
+
+static const nvmeadm_field_t wdc_vul_eol_fields[] = { {
+	WDC_F_EOL(rbc),
+	.nf_short = "rbc",
+	.nf_desc = "Reallocated Block Count",
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	WDC_F_EOL(waf),
+	.nf_short = "waf",
+	.nf_desc = "Write Amplification Factor",
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	WDC_F_EOL(plr),
+	.nf_short = "plr",
+	.nf_desc = "Percentage Life Remaining",
+	.nf_type = NVMEADM_FT_PERCENT
+}, {
+	WDC_F_EOL(pfc),
+	.nf_short = "pfc",
+	.nf_desc = "Program Fail Count",
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	WDC_F_EOL(efc),
+	.nf_short = "efc",
+	.nf_desc = "Erase Fail Count",
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	WDC_F_EOL(vendor),
+	.nf_short = "vendor",
+	.nf_desc = "Vendor Data",
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	WDC_F_EOL(cust_sts),
+	.nf_short = "ceolsts",
+	.nf_desc = "Customer EOL Status",
+	.nf_type = NVMEADM_FT_PERCENT
+}, {
+	WDC_F_EOL(sys_sts),
+	.nf_short = "seolsts",
+	.nf_desc = "System Area EOL Status",
+	.nf_type = NVMEADM_FT_PERCENT
+}, {
+	WDC_F_EOL(cust_state),
+	.nf_short = "ceol",
+	.nf_desc = "Customer EOL State",
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	WDC_F_EOL(sys_state),
+	.nf_short = "seol",
+	.nf_desc = "System Area EOL State",
+	.nf_type = NVMEADM_FT_HEX
+} };
+
+const nvmeadm_log_field_info_t wdc_vul_eol_field_info = {
+	.nlfi_log = "wdc/eol",
+	.nlfi_fields = wdc_vul_eol_fields,
+	.nlfi_nfields = ARRAY_SIZE(wdc_vul_eol_fields),
+	.nlfi_min = sizeof (wdc_vul_sn840_eol_t)
+};
