@@ -34,6 +34,7 @@ static const nvmeadm_log_field_info_t *field_log_map[] = {
 	&supmicmd_field_info,
 	&supfeat_field_info,
 	&phyeye_field_info,
+	&micron_vul_extsmart_field_info,
 	&ocp_vul_smart_field_info,
 	&ocp_vul_errrec_field_info,
 	&ocp_vul_devcap_field_info,

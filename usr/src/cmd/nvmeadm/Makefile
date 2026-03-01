@@ -22,6 +22,7 @@ OBJS=	nvme_version.o	\
 	nvmeadm.o	\
 	nvmeadm_field.o \
 	nvmeadm_field_suplog.o \
+	nvmeadm_micron.o \
 	nvmeadm_nsmgmt.o \
 	nvmeadm_ocp.o \
 	nvmeadm_ofmt.o	\
