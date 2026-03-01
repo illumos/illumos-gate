@@ -318,12 +318,12 @@ dump_stringtab(Str_tbl *stp)
 	uint_t	cnt;
 
 	if ((stp->st_flags & FLG_STTAB_COMPRESS) == 0) {
-		(void) printf("string table full size: %ld: uncompressed\n",
+		(void) printf("string table full size: %zu: uncompressed\n",
 		    stp->st_fullstrsize);
 		return;
 	}
 
-	(void) printf("string table full size: %ld compressed down to: %ld\n\n",
+	(void) printf("string table full size: %zu compressed down to: %zu\n\n",
 	    stp->st_fullstrsize, stp->st_strsize);
 	(void) printf("string table compression information [%d buckets]:\n",
 	    stp->st_hbckcnt);
@@ -341,10 +341,10 @@ dump_stringtab(Str_tbl *stp)
 			    sthash->hi_strlen;
 
 			if (stroff == 0) {
-				(void) printf("  [%ld]: '%s'  <master>\n",
+				(void) printf("  [%zu]: '%s'  <master>\n",
 				    sthash->hi_refcnt, sthash->hi_mstr->sm_str);
 			} else {
-				(void) printf("  [%ld]: '%s'  <suffix of: "
+				(void) printf("  [%zu]: '%s'  <suffix of: "
 				    "'%s'>\n", sthash->hi_refcnt,
 				    &sthash->hi_mstr->sm_str[stroff],
 				    sthash->hi_mstr->sm_str);
@@ -574,7 +574,7 @@ output_defs(void)
 			(void) fprintf(stderr, Errmsg_mnfn, msg->ms_message);
 			return (1);
 		}
-		if (fprintf(fddefs, "\n#define\t%s\t%ld\n",
+		if (fprintf(fddefs, "\n#define\t%s\t%zu\n",
 		    msg->ms_defn, stoff) < 0) {
 			(void) fprintf(stderr, Errmsg_wrte,
 			    fldefs, strerror(errno));
@@ -617,7 +617,7 @@ output_data(void)
 	else
 		fmtstr = (const char *)"const";
 
-	if (fprintf(fddata, "\n%s char __%s[%ld] __attribute__((unused)) = { ",
+	if (fprintf(fddata, "\n%s char __%s[%zu] __attribute__((unused)) = { ",
 	    fmtstr, interface, stbufsize) < 0) {
 		(void) fprintf(stderr, Errmsg_wrte, fldata, strerror(errno));
 		return (1);
@@ -626,7 +626,7 @@ output_data(void)
 	for (ndx = 0; ndx < (stbufsize - 1); ndx++) {
 		if (column == 1) {
 			if (fddata && fprintf(fddata,
-			    "\n/* %4ld */ 0x%.2x,", ndx,
+			    "\n/* %4zu */ 0x%.2x,", ndx,
 			    (unsigned char)stbuf[ndx]) < 0) {
 				(void) fprintf(stderr, Errmsg_wrte,
 				    fldata, strerror(errno));
