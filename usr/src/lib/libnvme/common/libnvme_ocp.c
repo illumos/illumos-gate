@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -34,10 +34,10 @@ nvme_ocp_telstr_var_len(uint64_t *outp, const void *data, size_t len)
 	}
 
 	(void) memcpy(&telstr, data, need);
-	if (telstr.ots_sls_ndw / sizeof (uint32_t) >= SIZE_MAX) {
+	if (telstr.ots_sls / sizeof (uint32_t) >= SIZE_MAX) {
 		return (false);
 	}
-	*outp = telstr.ots_sls_ndw * sizeof (uint32_t);
+	*outp = telstr.ots_sls * sizeof (uint32_t);
 	return (true);
 }
 

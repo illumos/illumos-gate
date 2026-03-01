@@ -151,10 +151,14 @@ typedef struct {
 	 * Bad user and system NAND blocks. Both a raw count and normalized
 	 * value (percentage remaining).
 	 */
-	uint8_t osh_bunb_raw[6];
-	uint16_t osh_bunb_norm;
-	uint8_t osh_bsnb_raw[6];
-	uint16_t osh_bsnb_norm;
+	struct {
+		uint8_t bunb_raw[6];
+		uint16_t bunb_norm;
+	} osh_bunb;
+	struct {
+		uint8_t bsnb_raw[6];
+		uint16_t bsnb_norm;
+	} osh_bsnb;
 	/*
 	 * Various error and recovery metrics:
 	 * - XOR
@@ -165,8 +169,10 @@ typedef struct {
 	uint64_t osh_xor_rec;
 	uint64_t osh_read_unrec;
 	uint64_t osh_soft_ecc_err;
-	uint32_t osh_e2e_det;
-	uint32_t osh_e2e_corr;
+	struct {
+		uint32_t e2e_det;
+		uint32_t e2e_corr;
+	} osh_e2e;
 	/*
 	 * Tracks the normalized percent used of the device by estimated erase
 	 * cycles per block.
@@ -180,20 +186,26 @@ typedef struct {
 	 * Tracks the maximum and minimum erase count across NAND reserved for
 	 * the user.
 	 */
-	uint32_t osh_udec_max;
-	uint32_t osh_udec_min;
+	struct {
+		uint32_t udec_max;
+		uint32_t udec_min;
+	} osh_udec;
 	/*
 	 * The number of events and the current level of throttling.
 	 */
-	uint8_t osh_therm_event;
-	uint8_t osh_throt_level;
+	struct {
+		uint8_t therm_event;
+		uint8_t throt_level;
+	} osh_therm;
 	/*
 	 * DSSD versioning for the device. (2.0).
 	 */
-	uint8_t osh_vers_errata;
-	uint16_t osh_vers_point;
-	uint16_t osh_vers_minor;
-	uint8_t osh_vers_major;
+	struct {
+		uint8_t dssd_errata;
+		uint16_t dssd_point;
+		uint16_t dssd_minor;
+		uint8_t dssd_major;
+	} osh_dssd;
 	/*
 	 * PCIe Correctable error count.
 	 */
@@ -239,7 +251,7 @@ typedef struct {
 	/*
 	 * Estimation of total data that can be written to the device in bytes.
 	 */
-	uint8_t osh_endurnace[16];
+	uint8_t osh_endurance[16];
 	/*
 	 * Count of PCIe retraining events (2.0).
 	 */
@@ -626,7 +638,7 @@ typedef struct {
 typedef struct {
 	uint16_t our_nunsup;
 	uint8_t our_rsvd2[14];
-	ocp_req_str_t ors_reqs[253];
+	ocp_req_str_t our_reqs[253];
 	uint8_t our_rsvd4064[14];
 	/*
 	 * V2.0: 1, V2.5: 1
@@ -647,26 +659,27 @@ typedef struct {
 	/*
 	 * v2.5: 1
 	 */
-	uint8_t ots_vers[1];
+	uint8_t ots_vers;
 	uint8_t ots_rsvd1[15];
 	/*
 	 * Log Page GUID: B13A83691A8F408B9EA495940057AA44h
 	 */
 	uint8_t ots_guid[16];
 	/*
-	 * These members generally indicate different parts of the table size.
+	 * These members generally indicate different parts of the table offset
+	 * (ends with 's') and size (ends with 'z').
 	 * Each of them is a number of uint32_t's long (aka dwords).
 	 */
-	uint64_t ots_sls_ndw;
+	uint64_t ots_sls;
 	uint8_t ots_rsvd40[24];
-	uint64_t ots_sit_off_ndw;
-	uint64_t ots_sit_len_ndw;
-	uint64_t ots_est_off_ndw;
-	uint64_t ots_est_len_ndw;
-	uint64_t ots_vuest_off_ndw;
-	uint64_t ots_vuest_len_ndw;
-	uint64_t ots_asct_off_ndw;
-	uint64_t ots_asct_len_ndw;
+	uint64_t ots_sits;
+	uint64_t ots_sitz;
+	uint64_t ots_ests;
+	uint64_t ots_estz;
+	uint64_t ots_vuests;
+	uint64_t ots_vuestz;
+	uint64_t ots_ascts;
+	uint64_t ots_asctz;
 	/*
 	 * These are nominally ASCII strings that are supposed to cover various
 	 * FIFOs.
@@ -733,14 +746,12 @@ typedef struct {
 	uint8_t ocp_vuest_rsvd12[4];
 } ocp_vul_telstr_vuest_t;
 
-
-
 /*
  * Our current version of smatch cannot handle packed structures.
  */
 #ifndef __CHECKER__
 CTASSERT(sizeof (ocp_vul_smart_t) == 512);
-CTASSERT(offsetof(ocp_vul_smart_t, osh_therm_event) == 96);
+CTASSERT(offsetof(ocp_vul_smart_t, osh_therm) == 96);
 CTASSERT(offsetof(ocp_vul_smart_t, osh_vers) == 494);
 CTASSERT(sizeof (ocp_vul_errrec_t) == 512);
 CTASSERT(offsetof(ocp_vul_errrec_t, oer_npanic) == 31);
