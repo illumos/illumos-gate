@@ -27,6 +27,7 @@
  * Copyright 2020 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2022 Oxide Computer Company
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 /*
@@ -103,7 +104,9 @@ typedef enum {
 	SZ_SHORT,		/* format %h? */
 	SZ_INT,			/* format %? */
 	SZ_LONG,		/* format %l? */
-	SZ_LONGLONG		/* format %ll? */
+	SZ_LONGLONG,		/* format %ll? */
+	SZ_SIZE,		/* format %z? */
+	SZ_INTMAX,		/* format %j? */
 } intsize_t;
 
 /*
@@ -239,9 +242,9 @@ iob_read(mdb_iob_t *iob, mdb_io_t *io)
 	return (len);
 }
 
-/*ARGSUSED*/
 static void
-iob_winch(int sig, siginfo_t *sip, ucontext_t *ucp, void *data)
+iob_winch(int sig, siginfo_t *sip __unused, ucontext_t *ucp __unused,
+    void *data)
 {
 	siglongjmp(*((sigjmp_buf *)data), sig);
 }
@@ -636,6 +639,10 @@ iob_size2str(intsize_t size)
 		return ("long");
 	case SZ_LONGLONG:
 		return ("long long");
+	case SZ_SIZE:
+		return ("size");
+	case SZ_INTMAX:
+		return ("int max");
 	}
 	return ("");
 }
@@ -703,6 +710,10 @@ fmt_switch:
 	case 'I':
 		return ("IPv4 address");
 
+	case 'j':
+		size = SZ_INTMAX;
+		goto fmt_switch;
+
 	case 'l':
 		if (size >= SZ_LONG)
 			size = SZ_LONGLONG;
@@ -760,6 +771,10 @@ fmt_switch:
 	case 'Y':
 		return ("time_t");
 
+	case 'z':
+		size = SZ_SIZE;
+		goto fmt_switch;
+
 	case '<':
 		return ("terminal attribute");
 
@@ -784,6 +799,20 @@ iob_int2str(varglist_t *ap, intsize_t size, int base, uint_t flags, int *zero,
 	uintmax_t i;
 
 	switch (size) {
+	case SZ_INTMAX:
+		if (flags & NTOS_UNSIGNED)
+			i = (uintmax_t)VA_ARG(ap, uintmax_t);
+		else
+			i = (intmax_t)VA_ARG(ap, intmax_t);
+		break;
+
+	case SZ_SIZE:
+		if (flags & NTOS_UNSIGNED)
+			i = (size_t)VA_ARG(ap, size_t);
+		else
+			i = (ssize_t)VA_ARG(ap, ssize_t);
+		break;
+
 	case SZ_LONGLONG:
 		if (flags & NTOS_UNSIGNED)
 			i = (u_longlong_t)VA_ARG(ap, u_longlong_t);
@@ -929,6 +958,14 @@ iob_bytes2str(varglist_t *ap, intsize_t size)
 	char u;
 
 	switch (size) {
+	case SZ_INTMAX:
+		n = (uintmax_t)VA_ARG(ap, uintmax_t);
+		break;
+
+	case SZ_SIZE:
+		n = (size_t)VA_ARG(ap, size_t);
+		break;
+
 	case SZ_LONGLONG:
 		n = (u_longlong_t)VA_ARG(ap, u_longlong_t);
 		break;
@@ -1369,6 +1406,10 @@ iob_doprnt(mdb_iob_t *iob, const char *format, varglist_t *ap)
 			u.str = iob_inaddr2str(u.ui32);
 			break;
 
+		case 'j':
+			size = SZ_INTMAX;
+			goto fmt_switch;
+
 		case 'l':
 			if (size >= SZ_LONG)
 				size = SZ_LONGLONG;
@@ -1484,6 +1525,10 @@ iob_doprnt(mdb_iob_t *iob, const char *format, varglist_t *ap)
 			u.tm = VA_ARG(ap, time_t);
 			u.str = iob_time2str(&u.tm);
 			break;
+
+		case 'z':
+			size = SZ_SIZE;
+			goto fmt_switch;
 
 		case '<':
 			/*
