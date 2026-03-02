@@ -38,7 +38,7 @@
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2025 Oxide Computer Company
- * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 
@@ -584,6 +584,13 @@ do_open(const char *vmname)
 	ctx = vm_open(vmname);
 	if (ctx == NULL) {
 		perror("vm_open");
+#ifndef __FreeBSD__
+		if (errno == ENOENT) {
+			fprintf(stderr,
+			    "Does the VM already exist in the global or "
+			    "another zone?\n");
+		}
+#endif
 		exit(4);
 	}
 

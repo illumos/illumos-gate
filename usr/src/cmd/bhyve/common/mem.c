@@ -36,6 +36,7 @@
  * http://www.illumos.org/license/CDDL.
  *
  * Copyright 2020 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -58,6 +59,7 @@
 #include <vmmapi.h>
 
 #include "mem.h"
+#include "debug.h"
 
 struct mmio_rb_range {
 	RB_ENTRY(mmio_rb_range)	mr_link;	/* RB tree links */
@@ -109,29 +111,6 @@ mmio_rb_lookup(struct mmio_rb_tree *rbt, uint64_t addr,
 	return (ENOENT);
 }
 
-static int
-mmio_rb_add(struct mmio_rb_tree *rbt, struct mmio_rb_range *new)
-{
-	struct mmio_rb_range *overlap;
-
-	overlap = RB_INSERT(mmio_rb_tree, rbt, new);
-
-	if (overlap != NULL) {
-#ifdef RB_DEBUG
-		printf("overlap detected: new %lx:%lx, tree %lx:%lx, '%s' "
-		       "claims region already claimed for '%s'\n",
-		       new->mr_base, new->mr_end,
-		       overlap->mr_base, overlap->mr_end,
-		       new->mr_param.name, overlap->mr_param.name);
-#endif
-
-		return (EEXIST);
-	}
-
-	return (0);
-}
-
-#if 0
 static void
 mmio_rb_dump(struct mmio_rb_tree *rbt)
 {
@@ -140,13 +119,32 @@ mmio_rb_dump(struct mmio_rb_tree *rbt)
 
 	pthread_rwlock_rdlock(&mmio_rwlock);
 	RB_FOREACH(np, mmio_rb_tree, rbt) {
-		printf(" %lx:%lx, %s\n", np->mr_base, np->mr_end,
+		PRINTLN(" %lx:%lx, %s", np->mr_base, np->mr_end,
 		       np->mr_param.name);
 	}
 	perror = pthread_rwlock_unlock(&mmio_rwlock);
 	assert(perror == 0);
 }
-#endif
+
+static int
+mmio_rb_add(struct mmio_rb_tree *rbt, struct mmio_rb_range *new)
+{
+	struct mmio_rb_range *overlap;
+
+	overlap = RB_INSERT(mmio_rb_tree, rbt, new);
+
+	if (overlap != NULL) {
+		EPRINTLN("overlap detected: new %lx:%lx, tree %lx:%lx, '%s' "
+		       "claims region already claimed for '%s'",
+		       new->mr_base, new->mr_end,
+		       overlap->mr_base, overlap->mr_end,
+		       new->mr_param.name, overlap->mr_param.name);
+
+		return (EEXIST);
+	}
+
+	return (0);
+}
 
 RB_GENERATE(mmio_rb_tree, mmio_rb_range, mr_link, mmio_rb_range_compare);
 
@@ -321,7 +319,14 @@ register_mem_int(struct mmio_rb_tree *rbt, struct mem_range *memp)
 			free(mrp);
 #endif
 		perror = pthread_rwlock_unlock(&mmio_rwlock);
+#ifdef	__FreeBSD__
 		assert(perror == 0);
+#else
+		if (perror != 0) {
+			mmio_rb_dump(rbt);
+			exit(4);
+		}
+#endif
 		if (err)
 			free(mrp);
 	}
