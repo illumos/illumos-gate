@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SYS_NVME_WDC_SN65X_H
@@ -83,8 +83,8 @@ typedef struct {
 	uint8_t vulp_rsvd0[2];
 	uint8_t vulp_norm;
 	uint8_t vulp_rsvd1[1];
-	uint8_t vulp_data[4];
-	uint8_t vulp_pad[3];
+	uint8_t vulp_data[6];
+	uint8_t vulp_pad[1];
 } wdc_vul_sn65x_smart_ent_t;
 
 /*
@@ -95,7 +95,7 @@ typedef struct {
 	wdc_vul_sn65x_smart_ent_t sm_prog_fail;
 	wdc_vul_sn65x_smart_ent_t sm_erase_fail;
 	wdc_vul_sn65x_smart_ent_t sm_wear_level;
-	wdc_vul_sn65x_smart_ent_t sm_etoe_edet;
+	wdc_vul_sn65x_smart_ent_t sm_e2e_edet;
 	wdc_vul_sn65x_smart_ent_t sm_crc_err;
 	wdc_vul_sn65x_smart_ent_t sm_timed_wear;
 	wdc_vul_sn65x_smart_ent_t sm_timed_read;

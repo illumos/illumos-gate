@@ -20,6 +20,7 @@ PROG= nvmeadm
 
 OBJS=	nvme_version.o	\
 	nvmeadm.o	\
+	nvmeadm_extsmart.o \
 	nvmeadm_field.o \
 	nvmeadm_field_suplog.o \
 	nvmeadm_micron.o \
