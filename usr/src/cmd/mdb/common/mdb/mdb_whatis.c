@@ -400,7 +400,7 @@ mdb_whatis_register(const char *name, mdb_whatis_cb_f *func, void *arg,
 
 	if (strbadid(name)) {
 		mdb_warn("mdb_whatis_register(): whatis name '%s' contains "
-		    "illegal characters\n");
+		    "illegal characters\n", name);
 		return;
 	}
 

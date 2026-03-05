@@ -3939,7 +3939,7 @@ kmalog(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (mdb_readvar(&addr, logname) == -1) {
-		mdb_warn("failed to read %s log header pointer");
+		mdb_warn("failed to read %s log header pointer", logname);
 		return (DCMD_ERR);
 	}
 

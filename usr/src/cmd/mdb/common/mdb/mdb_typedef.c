@@ -374,7 +374,7 @@ typedef_parse(char *defn, const char *name, parse_root_t **prp)
 	len = strlen(defn);
 	if (defn[len-1] != '}') {
 		mdb_printf("Missing closing brace for %s declaration. "
-		    "Expected '}'.\n");
+		    "Expected '}'.\n", kind);
 		return (DCMD_ERR);
 	}
 	defn[len-1] = '\0';

@@ -224,7 +224,7 @@ pr_instance(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (mdb_vread(&ri, sizeof (restarter_inst_t), addr) == -1) {
-		mdb_warn("couldn't read instance at %a\n");
+		mdb_warn("couldn't read instance at %a\n", addr);
 		return (DCMD_ERR);
 	}
 
@@ -275,7 +275,7 @@ pr_vertex(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (mdb_vread(&gv, sizeof (graph_vertex_t), addr) == -1) {
-		mdb_warn("couldn't read vertex at %a\n");
+		mdb_warn("couldn't read vertex at %a\n", addr);
 		return (DCMD_ERR);
 	}
 
