@@ -41,6 +41,8 @@ static const nvmeadm_log_field_info_t *field_log_map[] = {
 	&ocp_vul_devcap_field_info,
 	&ocp_vul_unsup_field_info,
 	&ocp_vul_telstr_field_info,
+	&solidigm_vul_power_field_info,
+	&solidigm_vul_temp_field_info,
 	&wdc_vul_cusmart_field_info,
 	&wdc_vul_eol_field_info,
 	&wdc_vul_power_field_info

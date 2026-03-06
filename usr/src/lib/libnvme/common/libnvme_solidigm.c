@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -44,7 +44,8 @@ nvme_solidigm_outlier_var_len(uint64_t *outp, const void *data, size_t len)
 	}
 
 	(void) memcpy(&hdr, data, sizeof (hdr));
-	*outp = (uint64_t)hdr.lao_nents * sizeof (soligm_vul_lat_ent_t);
+	*outp = (uint64_t)hdr.lao_nents * sizeof (soligm_vul_lat_ent_t) +
+	    sizeof (solidigm_vul_p5xxx_lat_outlier_t);
 	return (true);
 }
 
