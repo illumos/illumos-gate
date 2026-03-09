@@ -97,11 +97,15 @@ struct pci_vtscsi_config {
 
 
 /*
- * I/O request state
+ * I/O request state and I/O request queues
+ *
+ * In addition to the control queue and notification queues, each virtio-scsi
+ * device instance has at least one I/O request queue, the state of which is
+ * is kept in an array of struct pci_vtscsi_queue in the device softc.
  *
  * Each pci_vtscsi_queue has configurable number of pci_vtscsi_request
  * structures pre-allocated on vsq_free_requests. For each I/O request
- * coming in on the I/O virtqueue, the request queue handler takes
+ * coming in on the I/O virtqueue, the request queue handler will take a
  * pci_vtscsi_request off vsq_free_requests, fills in the data from the
  * I/O virtqueue, puts it on vsq_requests, and signals vsq_cv.
  *
@@ -112,6 +116,11 @@ struct pci_vtscsi_config {
  * is re-initialized and put back onto vsq_free_requests.
  *
  * The worker threads exit when vsq_cv is signalled after vsw_exiting was set.
+ *
+ * There are three mutexes to coordinate the accesses to an I/O request queue:
+ * - vsq_rmtx protects vsq_requests and must be held when waiting on vsq_cv
+ * - vsq_fmtx protects vsq_free_requests
+ * - vsq_qmtx must be held when operating on the underlying virtqueue, vsq_vq
  *
  * The I/O vectors for each request are kept in the preallocated iovec array
  * vsr_iov, and pointers to the respective header/data in/out portions are set

@@ -133,10 +133,9 @@ vtscsi_ctl_init(struct pci_vtscsi_softc *sc, struct pci_vtscsi_backend *backend,
 	 * /dev/cam/ctl to remain compatible with previous versions.
 	 */
 	nvl = find_relative_config_node(nvl, "target");
-	if (nvl != NULL)
-		ret = walk_config_nodes("", nvl, &count,
-		    vtscsi_ctl_count_targets);
+	assert(nvl != NULL);
 
+	ret = walk_config_nodes("", nvl, &count, vtscsi_ctl_count_targets);
 	if (ret != 0)
 		return (ret);
 
@@ -169,9 +168,11 @@ vtscsi_ctl_reset(struct pci_vtscsi_softc *sc __unused)
 	sc->vss_config.max_sectors = INT32_MAX;
 }
 
-static void *vtscsi_ctl_req_alloc(struct pci_vtscsi_softc *sc)
+static void *
+vtscsi_ctl_req_alloc(struct pci_vtscsi_softc *sc)
 {
-	struct vtscsi_ctl_backend *ctl = (struct vtscsi_ctl_backend *)sc;
+	struct vtscsi_ctl_backend *ctl =
+	    (struct vtscsi_ctl_backend *)sc->vss_backend;
 	union ctl_io *io = ctl_scsi_alloc_io(ctl->vcb_iid);
 
 	if (io != NULL)
@@ -180,12 +181,14 @@ static void *vtscsi_ctl_req_alloc(struct pci_vtscsi_softc *sc)
 	return (io);
 }
 
-static void vtscsi_ctl_req_clear(void *io)
+static void
+vtscsi_ctl_req_clear(void *io)
 {
 	ctl_scsi_zero_io(io);
 }
 
-static void vtscsi_ctl_req_free(void *io)
+static void
+vtscsi_ctl_req_free(void *io)
 {
 	ctl_scsi_free_io(io);
 }

@@ -129,6 +129,8 @@ static void pci_vtscsi_requestq_notify(void *, struct vqueue_info *);
 static int pci_vtscsi_add_target_config(nvlist_t *, const char *, int);
 static int pci_vtscsi_init_queue(struct pci_vtscsi_softc *,
     struct pci_vtscsi_queue *, int);
+static void pci_vtscsi_destroy_queue(struct pci_vtscsi_softc *,
+    struct pci_vtscsi_queue *);
 static int pci_vtscsi_init(struct pci_devinst *, nvlist_t *);
 
 SET_DECLARE(pci_vtscsi_backend_set, struct pci_vtscsi_backend);
@@ -434,6 +436,24 @@ pci_vtscsi_tmf_handle_lun_reset(struct pci_vtscsi_queue *q,
  * QUERY TASK: Is the specified task present in this LUN?
  *
  * We can stop once we have found the specified task queued for this LUN.
+ *
+ * Note that this function may cause false negatives under the following
+ * rare circumstances:
+ * (1) the specified task is still in the virtqueue, not yet having been
+ *     processed by pci_vtscsi_requestq_notify()
+ * (2) the specified task was actively being processed by a worker thread
+ *     but not yet processed by the backend by the time the QUERY TASK
+ *     request was handled by the backend
+ *
+ * While a false negative may be confusing for a guest OS looking for the
+ * state of an I/O request it sent, it is not considered a fatal error of
+ * any kind and is easy to recover from. Also, in both of the above cases,
+ * the QUERY TASK TMF request would need to overtake the I/O request in
+ * question, which can only happen if the TMF request is sent immediately
+ * after the I/O request. While it is technically perfectly fine for a
+ * guest to do so, any normal use of QUERY TASK would involve a certain
+ * delay before the TMF request is sent, giving the I/O request time to
+ * be processed.
  */
 static pci_vtscsi_walk_t
 pci_vtscsi_tmf_handle_query_task(struct pci_vtscsi_queue *q,
@@ -497,7 +517,7 @@ pci_vtscsi_walk_request_queue(struct pci_vtscsi_queue *q,
 	return (PCI_VTSCSI_WALK_CONTINUE);
 }
 
-static pci_vtscsi_walk_request_queue_cb_t *pci_vtscsi_tmf_handler_cb[] = {
+static pci_vtscsi_walk_request_queue_cb_t *const pci_vtscsi_tmf_handler_cb[] = {
 	pci_vtscsi_tmf_handle_abort_task,
 	pci_vtscsi_tmf_handle_abort_task_set,
 	pci_vtscsi_tmf_handle_clear_aca,
@@ -543,10 +563,13 @@ pci_vtscsi_tmf_handle(struct pci_vtscsi_softc *sc,
 	 * Lock out all the worker threads from processing any waiting requests
 	 * while we're processing the TMF request. This also effectively blocks
 	 * pci_vtscsi_requestq_notify() from adding any new requests to the
-	 * request queue. This does not prevent any requests currently being
-	 * processed by the backend from being completed and returned, which we
-	 * must guarantee to adhere to the ordering requirements for any TMF
-	 * function which aborts tasks.
+	 * request queue. This in turn means we will miss any I/O requests which
+	 * may still be in the virtqueue.
+	 *
+	 * This does not prevent any requests currently being processed by the
+	 * backend from being completed and returned, which we must guarantee to
+	 * adhere to the ordering requirements for any TMF function which aborts
+	 * tasks.
 	 */
 	for (uint32_t i = 0; i < sc->vss_config.num_queues; i++) {
 		struct pci_vtscsi_queue *q = &sc->vss_queues[i];
@@ -563,9 +586,12 @@ pci_vtscsi_tmf_handle(struct pci_vtscsi_softc *sc,
 	 * which will explicitly return FUNCTION SUCCEEDED if the specified
 	 * task or any task was active in the target/LUN, respectively.
 	 *
-	 * Thus, we will call the backend first. Only if the response we get
-	 * is FUNCTION COMPLETE we'll continue processing the TMF function on
-	 * our queues.
+	 * Thus, we will call the backend first. Only if the response we get is
+	 * FUNCTION COMPLETE we'll continue processing the TMF function on our
+	 * queues. Note that there's a slim chance that we're racing against a
+	 * worker thread that is actively processing an I/O request, which may
+	 * lead to our TMF request being processed by the backend before the
+	 * same I/O request, in which case it won't be on any queue either.
 	 */
 	sc->vss_backend->vsb_tmf_hdl(sc, fd, tmf);
 
@@ -674,27 +700,27 @@ pci_vtscsi_alloc_request(struct pci_vtscsi_softc *sc)
 
 	req = calloc(1, sizeof(struct pci_vtscsi_request));
 	if (req == NULL)
-		goto alloc_fail;
+		goto fail;
 
 	req->vsr_iov = calloc(sc->vss_config.seg_max + VIRTIO_SCSI_HDR_SEG +
 	    SPLIT_IOV_ADDL_IOV, sizeof(struct iovec));
 	if (req->vsr_iov == NULL)
-		goto alloc_fail;
+		goto fail;
 
 	req->vsr_cmd_rd = calloc(1, VTSCSI_IN_HEADER_LEN(sc));
 	if (req->vsr_cmd_rd == NULL)
-		goto alloc_fail;
+		goto fail;
 	req->vsr_cmd_wr = calloc(1, VTSCSI_OUT_HEADER_LEN(sc));
 	if (req->vsr_cmd_wr == NULL)
-		goto alloc_fail;
+		goto fail;
 
 	req->vsr_backend = sc->vss_backend->vsb_req_alloc(sc);
 	if (req->vsr_backend == NULL)
-		goto alloc_fail;
+		goto fail;
 
 	return (req);
 
-alloc_fail:
+fail:
 	EPRINTLN("failed to allocate request: %s", strerror(errno));
 
 	if (req != NULL)
@@ -745,6 +771,7 @@ pci_vtscsi_queue_request(struct pci_vtscsi_softc *sc, struct vqueue_info *vq)
 	struct pci_vtscsi_queue *q;
 	struct pci_vtscsi_request *req;
 	struct vi_req vireq;
+	size_t res __maybe_unused;
 	int n, numseg;
 
 	q = &sc->vss_queues[vq->vq_num - VIRTIO_SCSI_ADDL_Q];
@@ -827,8 +854,9 @@ pci_vtscsi_queue_request(struct pci_vtscsi_softc *sc, struct vqueue_info *vq)
 	 * This will have to change if we begin allowing config space writes
 	 * to change sense size.
 	 */
-	assert(iov_to_buf(req->vsr_iov_in, req->vsr_niov_in,
-	    (void **)&req->vsr_cmd_rd) == VTSCSI_IN_HEADER_LEN(q->vsq_sc));
+	res = iov_to_buf(req->vsr_iov_in, req->vsr_niov_in,
+	    (void **)&req->vsr_cmd_rd);
+	assert(res == VTSCSI_IN_HEADER_LEN(q->vsq_sc));
 
 	/* Make sure this request addresses a valid LUN. */
 	if (pci_vtscsi_check_lun(sc, req->vsr_cmd_rd->lun) == false) {
@@ -903,7 +931,7 @@ pci_vtscsi_controlq_notify(void *vsc, struct vqueue_info *vq)
 {
 	struct pci_vtscsi_softc *sc = vsc;
 	int numseg = (int)(sc->vss_config.seg_max + VIRTIO_SCSI_HDR_SEG);
-	struct iovec iov[numseg];
+	struct iovec *iov = calloc(numseg, sizeof (struct iovec));
 	struct vi_req req;
 	void *buf = NULL;
 	size_t bufsize;
@@ -924,6 +952,7 @@ pci_vtscsi_controlq_notify(void *vsc, struct vqueue_info *vq)
 	}
 	vq_endchains(vq, 1);	/* Generate interrupt if appropriate. */
 	free(buf);
+	free(iov);
 }
 
 static void
@@ -944,6 +973,7 @@ static int
 pci_vtscsi_init_queue(struct pci_vtscsi_softc *sc,
     struct pci_vtscsi_queue *queue, int num)
 {
+	struct pci_vtscsi_worker *workers;
 	char tname[MAXCOMLEN + 1];
 	uint32_t i;
 
@@ -963,28 +993,55 @@ pci_vtscsi_init_queue(struct pci_vtscsi_softc *sc,
 
 		req = pci_vtscsi_alloc_request(sc);
 		if (req == NULL)
-			return (-1);
+			goto fail;
 
 		pci_vtscsi_put_request(&queue->vsq_free_requests, req);
 	}
 
+	workers = calloc(sc->vss_thr_per_q, sizeof(struct pci_vtscsi_worker));
+	if (workers == NULL)
+		goto fail;
+
 	for (i = 0; i < sc->vss_thr_per_q; i++) {
-		struct pci_vtscsi_worker *worker;
-		worker = calloc(1, sizeof(struct pci_vtscsi_worker));
-		if (worker == NULL)
-			return (-1);
+		workers[i].vsw_queue = queue;
 
-		worker->vsw_queue = queue;
-
-		pthread_create(&worker->vsw_thread, NULL, &pci_vtscsi_proc,
-		    (void *)worker);
+		pthread_create(&workers[i].vsw_thread, NULL, &pci_vtscsi_proc,
+		    (void *)&workers[i]);
 
 		snprintf(tname, sizeof(tname), "vtscsi:%d-%d", num, i);
-		pthread_set_name_np(worker->vsw_thread, tname);
-		LIST_INSERT_HEAD(&queue->vsq_workers, worker, vsw_link);
+		pthread_set_name_np(workers[i].vsw_thread, tname);
+		LIST_INSERT_HEAD(&queue->vsq_workers, &workers[i], vsw_link);
 	}
 
 	return (0);
+
+fail:
+	pci_vtscsi_destroy_queue(sc, queue);
+
+	return (-1);
+}
+
+static void
+pci_vtscsi_destroy_queue(struct pci_vtscsi_softc *sc,
+    struct pci_vtscsi_queue *queue)
+{
+	if (queue->vsq_sc == NULL)
+		return;
+
+	for (int i =  sc->vss_req_ringsz; i > 0; i--) {
+		struct pci_vtscsi_request *req;
+
+		if (STAILQ_EMPTY(&queue->vsq_free_requests))
+			break;
+
+		req = pci_vtscsi_get_request(&queue->vsq_free_requests);
+		pci_vtscsi_free_request(queue->vsq_sc, req);
+	}
+
+	pthread_cond_destroy(&queue->vsq_cv);
+	pthread_mutex_destroy(&queue->vsq_qmtx);
+	pthread_mutex_destroy(&queue->vsq_fmtx);
+	pthread_mutex_destroy(&queue->vsq_rmtx);
 }
 
 /*
@@ -1226,7 +1283,8 @@ pci_vtscsi_init(struct pci_devinst *pi, nvlist_t *nvl)
 	struct pci_vtscsi_backend *backend, **vbpp;
 	const char *value;
 	uint32_t val;
-	int err;
+	size_t i;
+	int q, err;
 
 	sc = calloc(1, sizeof(struct pci_vtscsi_softc));
 	if (sc == NULL)
@@ -1358,12 +1416,9 @@ pci_vtscsi_init(struct pci_devinst *pi, nvlist_t *nvl)
 	/*
 	 * All targets should be open now and have a valid fd.
 	 */
-	for (size_t i = 0; i < sc->vss_num_target; i++) {
-		if (sc->vss_targets[i].vst_target == i &&
-		    sc->vss_targets[i].vst_fd < 0) {
-			goto fail;
-		}
-	}
+	for (i = 0; i < sc->vss_num_target; i++)
+		if (sc->vss_targets[i].vst_target == i)
+			assert(sc->vss_targets[i].vst_fd >= 0);
 
 	pthread_mutex_init(&sc->vss_mtx, NULL);
 
@@ -1392,36 +1447,53 @@ pci_vtscsi_init(struct pci_devinst *pi, nvlist_t *nvl)
 	sc->vss_vq[1].vq_notify = pci_vtscsi_eventq_notify;
 
 	/* virtqueue 2-n: request queues */
-	for (int i = VIRTIO_SCSI_ADDL_Q; i < sc->vss_vi_consts.vc_nvq; i++) {
-		int rq = i - VIRTIO_SCSI_ADDL_Q;
+	for (q = VIRTIO_SCSI_ADDL_Q; q < sc->vss_vi_consts.vc_nvq; q++) {
+		int rq = q - VIRTIO_SCSI_ADDL_Q;
 
-		sc->vss_vq[i].vq_qsize = sc->vss_req_ringsz;
-		sc->vss_vq[i].vq_notify = pci_vtscsi_requestq_notify;
+		sc->vss_vq[q].vq_qsize = sc->vss_req_ringsz;
+		sc->vss_vq[q].vq_notify = pci_vtscsi_requestq_notify;
 
-		err = pci_vtscsi_init_queue(sc, &sc->vss_queues[rq], i);
-		if (err != 0) {
-			free(sc->vss_targets);
+		err = pci_vtscsi_init_queue(sc, &sc->vss_queues[rq], q);
+		if (err != 0)
 			goto fail;
-		}
 	}
 
 	/* initialize config space */
 	vi_pci_init(pi, VIRTIO_MODE_TRANSITIONAL, VIRTIO_DEV_SCSI,
 	    VIRTIO_ID_SCSI, PCIC_STORAGE);
 
-	if (!vi_intr_init(&sc->vss_vs, fbsdrun_virtio_msix())) {
-		free(sc->vss_targets);
+	if (!vi_intr_init(&sc->vss_vs, fbsdrun_virtio_msix()))
 		goto fail;
-	}
 
-	if (!vi_pcibar_setup(&sc->vss_vs)) {
-		free(sc->vss_targets);
+	if (!vi_pcibar_setup(&sc->vss_vs))
 		goto fail;
-	}
 
 	return (0);
 
 fail:
+	if (sc->vss_queues != NULL) {
+		for (q = VIRTIO_SCSI_ADDL_Q;
+		     q < sc->vss_vi_consts.vc_nvq;
+		     q++) {
+			int rq = q - VIRTIO_SCSI_ADDL_Q;
+
+			pci_vtscsi_destroy_queue(sc, &sc->vss_queues[rq]);
+		}
+	}
+
+	pthread_mutex_destroy(&sc->vss_mtx);
+
+	for (i = 0; i < sc->vss_num_target; i++) {
+		if (sc->vss_targets[i].vst_target == i &&
+		    sc->vss_targets[i].vst_fd >= 0) {
+			close(sc->vss_targets[i].vst_fd);
+		}
+	}
+
+	free(sc->vss_targets);
+	free(sc->vss_backend);
+	free(sc->vss_queues);
+	free(sc->vss_vq);
 	free(sc);
 	return (-1);
 }

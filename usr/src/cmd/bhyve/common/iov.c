@@ -50,6 +50,7 @@
 #include <sys/debug.h>
 #include <sys/sysmacros.h>
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,87 +60,42 @@
 #include "iov.h"
 
 /*
- * Given an array of iovecs iov, the number of valid iovecs niov, and an
- * offset, truncate iov at offset. If necessary, split the final iovec,
- * moving the remaining iovecs up by one in iov. Return a pointer to the
- * iovec beginning at offset, and the total number of remaining iovecs.
+ * Given an iovec and an offset, split the iovec into two at the offset and
+ * return a pointer to the beginning of the second iovec.
  *
- * The caller must take care that iov contains enough space for at least
- * niov+1 iovecs so the remainder of the iovec array may be moved up by one.
+ * The caller is responsible for providing an extra iovec in the array for the
+ * split.  That is, there should be space for *niov1 + 1 iovecs in the array.
  */
 struct iovec *
-split_iov(struct iovec *iov, size_t *niov, size_t offset, size_t *niov_rem)
+split_iov(struct iovec *iov, size_t *niov1, size_t offset, size_t *niov2)
 {
-	size_t remainder = 0;
-	struct iovec *iov_rem;
-	size_t i;
+	size_t count, resid;
 
-	/*
-	 * Handle the special case of offset == 0: Return the whole iovec array
-	 * as the remainder.
-	 */
-	if (offset == 0) {
-		*niov_rem = *niov;
-		*niov = 0;
-		return (iov);
+	/* Find the iovec entry that contains the offset. */
+	resid = offset;
+	for (count = 0; count < *niov1; count++) {
+		if (resid < iov[count].iov_len)
+			break;
+		resid -= iov[count].iov_len;
 	}
 
-	/* Seek to the requested offset and truncate the final iovec. */
-	for (i = 0; i < *niov && offset > iov[i].iov_len; i++) {
-		/*
-		 * We're seeking past this iovec. Adjust the offset and move on.
-		 */
-		offset -= iov[i].iov_len;
+	if (resid == 0 || count == *niov1) {
+		/* Easy case, we don't have to split an iovec entry. */
+		*niov2 = *niov1 - count;
+		*niov1 = count;
+		if (*niov2 == 0)
+			return (NULL);
+		return (&iov[count]);
 	}
 
-	/* We've reached the end of the array without reaching the offset. */
-	if (i == *niov) {
-		*niov_rem = 0;
-		return (NULL);
-	}
-
-	/*
-	 * We found the iovec covering offset. Calculate the remainder and
-	 * truncate at offset.
-	 */
-	remainder = iov[i].iov_len - offset;
-	iov[i].iov_len = offset;
-	*niov_rem = *niov - i - 1;
-	*niov = i + 1;
-	iov_rem = &iov[*niov];
-
-	/*
-	 * If there's no remainder in this iovec, we're done. Return the
-	 * pointer to the next iovec after the offset, or NULL if there
-	 * are no more iovecs beyond offset.
-	 */
-	if (remainder == 0) {
-		if (*niov_rem == 0)
-			iov_rem = NULL;
-
-		return (iov_rem);
-	}
-
-	/*
-	 * In the (unlikely, ideally) case where there is a remainder from the
-	 * final iovec before the split, make room for a new iovec covering the
-	 * remainder by moving all following iovecs up. It is the caller's
-	 * responsibility that there is enough spare space for this extra iovec.
-	 */
-	for (struct iovec *tmp = &iov_rem[*niov_rem];
-	    tmp != iov_rem;
-	    tmp[0] = tmp[-1], tmp--) {
-		;
-	}
-
-	/*
-	 * Fill in the new first iovec, covering the remainder from the split.
-	 */
-	iov_rem[0].iov_len = remainder;
-	iov_rem[0].iov_base = (char *)iov[i].iov_base + offset;
-	(*niov_rem)++;
-
-	return (iov_rem);
+	/* The entry iov[count] needs to be split. */
+	*niov1 = count + 1;
+	*niov2 = *niov1 - count;
+	memmove(&iov[count + 1], &iov[count], sizeof(struct iovec) * (*niov2));
+	iov[count].iov_len = resid;
+	iov[count + 1].iov_base = (char *)iov[count].iov_base + resid;
+	iov[count + 1].iov_len -= resid;
+	return (&iov[count + 1]);
 }
 
 size_t
@@ -148,8 +104,10 @@ count_iov(const struct iovec *iov, size_t niov)
 	size_t total = 0;
 	size_t i;
 
-	for (i = 0; i < niov; i++)
+	for (i = 0; i < niov; i++) {
+		assert(total <= SIZE_MAX - iov[i].iov_len);
 		total += iov[i].iov_len;
+	}
 
 	return (total);
 }
@@ -161,6 +119,7 @@ check_iov_len(const struct iovec *iov, size_t niov, size_t len)
 	size_t i;
 
 	for (i = 0; i < niov; i++) {
+		assert(total <= SIZE_MAX - iov[i].iov_len);
 		total += iov[i].iov_len;
 		if (total >= len)
 			return (true);
@@ -169,7 +128,7 @@ check_iov_len(const struct iovec *iov, size_t niov, size_t len)
 	return (false);
 }
 
-ssize_t
+size_t
 iov_to_buf(const struct iovec *iov, size_t niov, void **buf)
 {
 	size_t ptr, total;
@@ -178,7 +137,7 @@ iov_to_buf(const struct iovec *iov, size_t niov, void **buf)
 	total = count_iov(iov, niov);
 	*buf = reallocf(*buf, total);
 	if (*buf == NULL)
-		return (-1);
+		return (0);
 
 	for (i = 0, ptr = 0; i < niov; i++) {
 		memcpy((uint8_t *)*buf + ptr, iov[i].iov_base, iov[i].iov_len);
@@ -188,7 +147,7 @@ iov_to_buf(const struct iovec *iov, size_t niov, void **buf)
 	return (total);
 }
 
-ssize_t
+size_t
 buf_to_iov(const void *buf, size_t buflen, const struct iovec *iov, size_t niov)
 {
 	size_t off = 0, len;
@@ -200,7 +159,7 @@ buf_to_iov(const void *buf, size_t buflen, const struct iovec *iov, size_t niov)
 		off += len;
 	}
 
-	return ((ssize_t)off);
+	return (off);
 }
 
 size_t

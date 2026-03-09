@@ -55,8 +55,8 @@
 struct iovec *split_iov(struct iovec *, size_t *, size_t, size_t *);
 size_t count_iov(const struct iovec *, size_t);
 bool check_iov_len(const struct iovec *, size_t, size_t);
-ssize_t iov_to_buf(const struct iovec *, size_t, void **);
-ssize_t buf_to_iov(const void *, size_t, const struct iovec *, size_t);
+size_t iov_to_buf(const struct iovec *, size_t, void **);
+size_t buf_to_iov(const void *, size_t, const struct iovec *, size_t);
 
 /*
  * Helpers for performing operations on an array of iovec entries.
