@@ -35,7 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2022 Michael Zeller
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
  */
@@ -730,31 +730,26 @@ pad_drop:
 }
 
 static inline viona_vring_t *
-viona_rx_pick_ring(viona_link_t *link, mblk_t *mp)
+viona_rx_get_ring(viona_link_t *link, const uint8_t idx)
 {
-	viona_vring_t *ring;
-	uint8_t r = 0;
-
-	if (link->l_usepairs > 1) {
-		r = (uint8_t)mac_pkt_hash(DL_ETHER, mp,
-		    MAC_PKT_HASH_L3 | MAC_PKT_HASH_L4, B_TRUE);
-		r %= link->l_usepairs;
-	}
-
-	ring = &link->l_vrings[r * 2];
-
+	viona_vring_t *ring = &link->l_vrings[idx * 2];
 	ASSERT(VIONA_RING_ISRX(ring));
-
 	return (ring);
 }
 
-static void
-viona_rx_classified(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
-    boolean_t is_loopback)
+static inline viona_vring_t *
+viona_rx_pick_ring(viona_link_t *link, mblk_t *mp)
 {
-	viona_link_t *link = (viona_link_t *)arg;
-	viona_vring_t *ring = viona_rx_pick_ring(link, mp);
+	const uint8_t r = (uint8_t)mac_pkt_hash(DL_ETHER, mp,
+	    MAC_PKT_HASH_L3 | MAC_PKT_HASH_L4, B_TRUE) % link->l_usepairs;
 
+	return (viona_rx_get_ring(link, r));
+}
+
+static inline void
+viona_rx_ring_deliver(viona_vring_t *ring, mblk_t *mp,
+    const boolean_t is_loopback)
+{
 	/* Drop traffic if ring is inactive or renewing its lease */
 	if (ring->vr_state != VRS_RUN ||
 	    (ring->vr_state_flags & VRSF_RENEW) != 0) {
@@ -765,22 +760,70 @@ viona_rx_classified(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 	viona_rx_common(ring, mp, is_loopback);
 }
 
+/*
+ * Split a packet chain over one or more rings for delivery.
+ */
+static inline void
+viona_rx_split_deliver(viona_link_t *link, mblk_t *head,
+    const boolean_t is_loopback)
+{
+	/*
+	 * We have no internal fanout. Deliver in one shot without hashing.
+	 */
+	if (link->l_usepairs == 1) {
+		viona_rx_ring_deliver(viona_rx_get_ring(link, 0), head,
+		    is_loopback);
+		return;
+	}
+
+	mblk_t *curr = head;
+	mblk_t *sub_tail = head;
+	viona_vring_t *ring = NULL;
+	while (curr != NULL) {
+		viona_vring_t *my_ring = viona_rx_pick_ring(link, curr);
+		/*
+		 * The target ring of this packet differs from head..sub_tail.
+		 * Break the chain, send it up, and then set curr as the new
+		 * head.
+		 */
+		if (ring != NULL && ring != my_ring) {
+			sub_tail->b_next = NULL;
+			viona_rx_ring_deliver(ring, head, is_loopback);
+			head = curr;
+		}
+
+		ring = my_ring;
+		sub_tail = curr;
+		curr = curr->b_next;
+	}
+
+	/*
+	 * This is either the last subchain, or all packets hashed to the same
+	 * ring.
+	 */
+	ASSERT3P(head, !=, NULL);
+	ASSERT3P(sub_tail, !=, NULL);
+	ASSERT3P(sub_tail->b_next, ==, NULL);
+	ASSERT3P(ring, !=, NULL);
+	viona_rx_ring_deliver(ring, head, is_loopback);
+}
+
+static void
+viona_rx_classified(void *arg, mac_resource_handle_t mrh __unused, mblk_t *mp,
+    boolean_t is_loopback)
+{
+	viona_link_t *link = (viona_link_t *)arg;
+	viona_rx_split_deliver(link, mp, is_loopback);
+}
+
 static void
 viona_rx_mcast(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
     boolean_t is_loopback)
 {
 	viona_link_t *link = (viona_link_t *)arg;
-	viona_vring_t *ring = viona_rx_pick_ring(link, mp);
-	mac_handle_t mh = ring->vr_link->l_mh;
+	mac_handle_t mh = link->l_mh;
 	mblk_t *mp_mcast_only = NULL;
 	mblk_t **mpp = &mp_mcast_only;
-
-	/* Drop traffic if ring is inactive or renewing its lease */
-	if (ring->vr_state != VRS_RUN ||
-	    (ring->vr_state_flags & VRSF_RENEW) != 0) {
-		freemsgchain(mp);
-		return;
-	}
 
 	/*
 	 * In addition to multicast traffic, broadcast packets will also arrive
@@ -818,7 +861,9 @@ viona_rx_mcast(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 			}
 
 			if (err != 0) {
-				VIONA_RING_STAT_INCR(ring, rx_mcast_check);
+				viona_vring_t *my_ring =
+				    viona_rx_pick_ring(link, mp);
+				VIONA_RING_STAT_INCR(my_ring, rx_mcast_check);
 			}
 		}
 
@@ -834,7 +879,7 @@ viona_rx_mcast(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
 	}
 
 	if (mp_mcast_only != NULL) {
-		viona_rx_common(ring, mp_mcast_only, is_loopback);
+		viona_rx_split_deliver(link, mp_mcast_only, is_loopback);
 	}
 }
 
