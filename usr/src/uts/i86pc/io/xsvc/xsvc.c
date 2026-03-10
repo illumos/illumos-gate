@@ -51,9 +51,6 @@
 /* total max memory which can be alloced with ioctl interface */
 uint64_t xsvc_max_memory = 10 * 1024 * 1024;
 
-extern void i86_va_map(caddr_t vaddr, struct as *asp, caddr_t kaddr);
-
-
 static int xsvc_open(dev_t *devp, int flag, int otyp, cred_t *cred);
 static int xsvc_close(dev_t devp, int flag, int otyp, cred_t *cred);
 static int xsvc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred,

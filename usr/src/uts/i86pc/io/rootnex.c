@@ -343,8 +343,6 @@ extern int ignore_hardware_nodes;	/* force flag from ddi_impl.c */
 extern int ddi_map_debug_flag;
 #define	ddi_map_debug	if (ddi_map_debug_flag) prom_printf
 #endif
-extern void i86_pp_map(page_t *pp, caddr_t kaddr);
-extern void i86_va_map(caddr_t vaddr, struct as *asp, caddr_t kaddr);
 extern int (*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
     psm_intr_op_t, int *);
 extern int impl_ddi_sunbus_initchild(dev_info_t *dip);
