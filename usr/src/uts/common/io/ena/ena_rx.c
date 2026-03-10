@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "ena.h"
@@ -208,7 +208,7 @@ ena_alloc_rxq(ena_rxq_t *rxq)
 	ASSERT3U(rxq->er_sq_num_descs, ==, rxq->er_cq_num_descs);
 	ret = ena_create_sq(ena, rxq->er_sq_num_descs,
 	    rxq->er_sq_dma.edb_cookie->dmac_laddress, false, cq_hw_idx,
-	    &sq_hw_idx, &sq_db_addr);
+	    &sq_hw_idx, &sq_db_addr, NULL);
 
 	if (ret != 0) {
 		ena_err(ena, "failed to create Rx SQ %u: %d", rxq->er_rxqs_idx,

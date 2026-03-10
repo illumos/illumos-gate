@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "ena_hw.h"
@@ -42,7 +42,6 @@
  *    o Rx DMA bind (loaned buffers)
  *    o TSO
  *    o RSS
- *    o Low Latency Queues (LLQ)
  *    o Support for different Tx completion policies
  *    o More controlled Tx recycling and Rx refill
  *
@@ -178,6 +177,113 @@
  * describing said TCB buffer. If and when we add more advanced
  * features like DMA binding of mblks and TSO, this 1:1 guarantee will
  * no longer hold.
+ *
+ * Low Latency Queues (LLQ)
+ * ------------------------
+ *
+ * The ENA device supports two placement policies for Tx submission
+ * queue descriptors: host memory (PLACEMENT_POLICY_HOST) and device
+ * memory (PLACEMENT_POLICY_DEV). With host placement, the driver
+ * writes descriptors to host memory and the device reads them via
+ * DMA. With device placement, the driver writes descriptors directly
+ * to a region of device memory mapped through PCI BAR 2. This is
+ * known as LLQ mode and reduces latency by eliminating the DMA read.
+ *
+ * Some device generations require LLQ. In particular, Nitro v5 and
+ * later instances will not attach without it. When the device
+ * supports LLQ, the driver negotiates LLQ parameters during attach
+ * via the ENA_ADMIN_LLQ feature. If the device does not support LLQ,
+ * the driver uses host placement. If the device supports LLQ but
+ * negotiation fails, the driver fails to attach.
+ *
+ * The following LLQ parameters are negotiated with the device
+ * during attach:
+ *
+ *    o Entry size: we honour the device's recommended entry size
+ *      if it is supported. If the device has no recommendation we
+ *      fall back to the lowest supported size. Each SQ entry is this
+ *      size, comprising descriptors followed by inline packet header
+ *      data. Larger entries allow more header to be inlined but
+ *      reduce the maximum queue depth since the LLQ memory is
+ *      fixed-size.
+ *
+ *    o Headers inline in the first entry: the packet header is
+ *      placed in the first SQ entry immediately after the
+ *      descriptors, using the remaining space in the entry.
+ *
+ *    o Descriptors before header: the number of descriptors that
+ *      precede the inline header in the first entry is negotiated
+ *      with the device, preferring 2, then 1, then 4, then 8. This
+ *      is the same order as other ena driver common code, with 2
+ *      being preferred over 1 as it maximises inline header space
+ *      while still allowing a meta + data descriptor pair.
+ *
+ *    o Stride control: prefers multiple descriptors per entry,
+ *      falling back to single descriptor per entry.
+ *
+ * The header location is fixed as inline, which is the only mode
+ * current ENA hardware supports. The negotiation fails attach if
+ * the device does not support any of the driver's choices for a
+ * given parameter.
+ *
+ * Accelerated LLQ
+ * ---------------
+ *
+ * Newer devices (Nitro v5/v6) additionally require accelerated LLQ
+ * mode, which the driver enables by setting two flags in the
+ * SET_FEATURE command:
+ *
+ *    o DISABLE_META_CACHING: the device will not cache Tx meta
+ *      descriptors, so the driver must include a meta descriptor
+ *      with every packet. This simplifies device state tracking
+ *      at the cost of additional descriptor space per packet.
+ *
+ *    o LIMIT_TX_BURST: the device specifies a maximum number of
+ *      LLQ entries that may be written between doorbells. The
+ *      driver tracks this per-queue and rings the doorbell when
+ *      the limit is reached, even if more packets are ready.
+ *
+ * LLQ Tx Path
+ * -----------
+ *
+ * In LLQ mode, the Tx path differs from the host placement path
+ * described above. Each queue has a bounce buffer -- a single
+ * staging area the size of one LLQ entry. For each packet the
+ * driver composes the complete LLQ entry in the bounce buffer:
+ *
+ *    +--------+------//------+---------------------------+
+ *    | meta   | data descs   | inline packet header      |
+ *    | 16B    | N x 16B      | remaining bytes           |
+ *    +--------+------//------+---------------------------+
+ *    |<------------- entry_size bytes ------------------>|
+ *
+ * The meta descriptor carries per-packet metadata (L3 header
+ * offset, MSS, etc.). The data descriptor(s) are the same as in
+ * host mode; N is the negotiated descs_before_header value. The
+ * inline header is copied from the packet's mblk chain and allows
+ * the device to begin processing before the full DMA payload
+ * arrives.
+ *
+ * Once the bounce buffer is complete, it is written to device
+ * memory using 64-bit stores. The bounce buffer approach ensures
+ * that the device sees a complete, consistent entry rather than
+ * a partial one that could result from writing fields individually.
+ *
+ * The LLQ BAR is mapped write-combining (DDI_STORECACHING_OK_ACC)
+ * so the CPU may merge and reorder stores within an entry. This
+ * is safe because the device does not poll its local memory for
+ * phase bit transitions the way a traditional NIC scans a
+ * host-memory descriptor ring; it only inspects LLQ entries
+ * after receiving a doorbell write. A membar_producer() before
+ * the doorbell guarantees that all prior stores to the LLQ entry
+ * are ordered before the doorbell, so there is no need to write
+ * phase bits in reverse order or otherwise arrange for the phase
+ * to be the last thing written.
+ *
+ * There is no DMA involved for the descriptors themselves; they
+ * reach the device via MMIO writes through the BAR. The packet
+ * payload beyond the inline header is still transferred by DMA
+ * and is synced separately (see ena_tcb_pull()).
  *
  * Rx Queue Workings
  * -----------------
@@ -333,18 +439,6 @@ CTASSERT(sizeof (enahw_tx_meta_desc_t) == sizeof (enahw_tx_desc_t));
 #error "ENA driver is little-endian only"
 #endif
 
-/*
- * These values are used to communicate the driver version to the AWS
- * hypervisor via the ena_set_host_info() function. We don't know what
- * exactly AWS does with this info, but it's fairly safe to assume
- * it's used solely for debug/informational purposes. The Linux driver
- * updates these values frequently as bugs are fixed and features are
- * added.
- */
-#define	ENA_DRV_VER_MAJOR	1
-#define	ENA_DRV_VER_MINOR	0
-#define	ENA_DRV_VER_SUBMINOR	0
-
 uint64_t ena_admin_cmd_timeout_ns = ENA_ADMIN_CMD_DEF_TIMEOUT_NS;
 
 /*
@@ -428,10 +522,14 @@ ena_is_feat_avail(ena_t *ena, const enahw_feature_id_t feat_id)
 
 	/*
 	 * The device attributes feature is always supported, as
-	 * indicated by the common code.
+	 * indicated by the common code. Host attributes must be sent
+	 * before querying device attributes, so the supported features
+	 * bitmask is not yet populated at that point.
 	 */
-	if (feat_id == ENAHW_FEAT_DEVICE_ATTRIBUTES)
+	if (feat_id == ENAHW_FEAT_DEVICE_ATTRIBUTES ||
+	    feat_id == ENAHW_FEAT_HOST_ATTR_CONFIG) {
 		return (true);
+	}
 
 	return ((ena->ena_supported_features & mask) != 0);
 }
@@ -579,41 +677,87 @@ ena_cleanup_regs_map(ena_t *ena, bool resetting)
 	ddi_regs_map_free(&ena->ena_reg_hdl);
 }
 
+/*
+ * Map a PCI BAR number (0-5) to a DDI register set number.
+ */
+static int
+ena_bar_to_rnumber(ena_t *ena, uint8_t bar)
+{
+	pci_regspec_t *regs;
+	uint_t bar_offset, regs_length, rcount;
+	int rnumber = -1;
+
+	if (bar > 5)
+		return (-1);
+
+	/*
+	 * PCI_CONF_BASE0 is 0x10; each BAR is 4 bytes apart.
+	 */
+	bar_offset = PCI_CONF_BASE0 + sizeof (uint32_t) * bar;
+
+	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, ena->ena_dip,
+	    DDI_PROP_DONTPASS, "reg", (int **)&regs, &regs_length) !=
+	    DDI_PROP_SUCCESS) {
+		return (-1);
+	}
+
+	rcount = regs_length * sizeof (int) / sizeof (pci_regspec_t);
+
+	for (int i = 0; i < rcount; i++) {
+		if (PCI_REG_REG_G(regs[i].pci_phys_hi) == bar_offset) {
+			rnumber = i;
+			break;
+		}
+	}
+
+	ddi_prop_free(regs);
+
+	return (rnumber);
+}
+
 static bool
 ena_attach_regs_map(ena_t *ena)
 {
+	ddi_device_acc_attr_t attr;
+	int rnumber;
 	int ret = 0;
 
-	if (ddi_dev_regsize(ena->ena_dip, ENA_REG_NUMBER, &ena->ena_reg_size) !=
+	rnumber = ena_bar_to_rnumber(ena, ENA_REG_BAR);
+	if (rnumber == -1) {
+		ena_err(ena, "failed to find rnumber for BAR %d", ENA_REG_BAR);
+		return (false);
+	}
+
+	if (ddi_dev_regsize(ena->ena_dip, rnumber, &ena->ena_reg_size) !=
 	    DDI_SUCCESS) {
-		ena_err(ena, "failed to get register set %d size",
-		    ENA_REG_NUMBER);
+		ena_err(ena, "failed to get register set %d size", rnumber);
 		return (false);
 	}
 
 	ena_dbg(ena, "register size: %ld", ena->ena_reg_size);
-	bzero(&ena->ena_reg_attr, sizeof (ena->ena_reg_attr));
-	ena->ena_reg_attr.devacc_attr_version = DDI_DEVICE_ATTR_V1;
-	ena->ena_reg_attr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
-	ena->ena_reg_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+	bzero(&attr, sizeof (attr));
+	attr.devacc_attr_version = DDI_DEVICE_ATTR_V1;
+	attr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
+	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+	attr.devacc_attr_access = DDI_DEFAULT_ACC;
 
 	/*
 	 * This function can return several different failure values,
 	 * so we make sure to capture its return value for the purpose
 	 * of logging.
 	 */
-	ret = ddi_regs_map_setup(ena->ena_dip, ENA_REG_NUMBER,
-	    &ena->ena_reg_base, 0, ena->ena_reg_size, &ena->ena_reg_attr,
+	ret = ddi_regs_map_setup(ena->ena_dip, rnumber,
+	    &ena->ena_reg_base, 0, ena->ena_reg_size, &attr,
 	    &ena->ena_reg_hdl);
 
 	if (ret != DDI_SUCCESS) {
-		ena_err(ena, "failed to map register set %d: %d",
-		    ENA_REG_NUMBER, ret);
+		ena_err(ena, "failed to map BAR %d (reg %d): %d",
+		    ENA_REG_BAR, rnumber, ret);
 		return (false);
 	}
 
-	ena_dbg(ena, "registers mapped to base: 0x%p",
-	    (void *)ena->ena_reg_base);
+	ena_dbg(ena, "registers BAR %d mapped to base: 0x%p size: %ld",
+	    ENA_REG_BAR, (void *)ena->ena_reg_base, ena->ena_reg_size);
 
 	return (true);
 }
@@ -950,7 +1094,7 @@ ena_get_link_config(ena_t *ena)
 	if (ena_get_feature(ena, &resp, ENAHW_FEAT_LINK_CONFIG,
 	    ENAHW_FEAT_LINK_CONFIG_VER) != 0) {
 		/*
-		 * Some ENA devices do no support this feature. In
+		 * Some ENA devices do not support this feature. In
 		 * those cases we report a 1Gbps link, full duplex.
 		 * For the most accurate information on bandwidth
 		 * limits see the official AWS documentation.
@@ -994,7 +1138,7 @@ ena_attach_read_conf(ena_t *ena)
 	 * CQ and SQ, but technically the device could return
 	 * different lengths. For now the driver locks them together.
 	 */
-	gcv = min(ena->ena_rx_max_sq_num_descs, ena->ena_rx_max_cq_num_descs);
+	gcv = MIN(ena->ena_rx_max_sq_num_descs, ena->ena_rx_max_cq_num_descs);
 	ASSERT3U(gcv, <=, INT_MAX);
 	ena->ena_rxq_num_descs = ena_get_prop(ena, ENA_PROP_RXQ_NUM_DESCS,
 	    ENA_PROP_RXQ_NUM_DESCS_MIN, gcv, gcv);
@@ -1003,7 +1147,7 @@ ena_attach_read_conf(ena_t *ena)
 	    ENA_PROP_RXQ_INTR_LIMIT_MIN, ENA_PROP_RXQ_INTR_LIMIT_MAX,
 	    ENA_PROP_RXQ_INTR_LIMIT_DEF);
 
-	gcv = min(ena->ena_tx_max_sq_num_descs, ena->ena_tx_max_cq_num_descs);
+	gcv = MIN(ena->ena_tx_max_sq_num_descs, ena->ena_tx_max_cq_num_descs);
 	ASSERT3U(gcv, <=, INT_MAX);
 	ena->ena_txq_num_descs = ena_get_prop(ena, ENA_PROP_TXQ_NUM_DESCS,
 	    ENA_PROP_TXQ_NUM_DESCS_MIN, gcv, gcv);
@@ -1113,6 +1257,11 @@ ena_cleanup_device_init(ena_t *ena, bool resetting)
 
 	VERIFY0(resetting);
 
+	if (ena->ena_llq_bar_mapped) {
+		ddi_regs_map_free(&ena->ena_llq_bar_hdl);
+		ena->ena_llq_bar_mapped = false;
+	}
+
 	ena_free_host_info(ena);
 	mutex_destroy(&aq->ea_sq_lock);
 	mutex_destroy(&aq->ea_cq_lock);
@@ -1127,6 +1276,280 @@ ena_cleanup_device_init(ena_t *ena, bool resetting)
 	ena_stat_device_basic_cleanup(ena);
 	ena_stat_device_extended_cleanup(ena);
 	ena_stat_aenq_cleanup(ena);
+}
+
+/*
+ * We explicitly disable hardware timestamping as a precaution.
+ * When enabled, the device uses (larger) extended completion descriptors to
+ * incorporate timestamp fields. Our completion processing assumes the base
+ * descriptor sizes.
+ */
+static bool
+ena_disable_hw_timestamp(ena_t *ena)
+{
+	enahw_cmd_desc_t cmd;
+	enahw_resp_desc_t resp;
+	enahw_feat_hw_timestamp_t *ts =
+	    &cmd.ecd_cmd.ecd_set_feat.ecsf_feat.ecsf_hw_timestamp;
+	int ret;
+
+	if (!ena_is_feat_avail(ena, ENAHW_FEAT_HW_TIMESTAMP))
+		return (true);
+
+	ena_dbg(ena, "Disabling HW timestamping");
+
+	bzero(&cmd, sizeof (cmd));
+	ts->efhwts_tx = ENAHW_HW_TIMESTAMP_NONE;
+	ts->efhwts_rx = ENAHW_HW_TIMESTAMP_NONE;
+
+	ret = ena_set_feature(ena, &cmd, &resp, ENAHW_FEAT_HW_TIMESTAMP,
+	    ENAHW_FEAT_HW_TIMESTAMP_VER);
+	if (ret != 0) {
+		ena_err(ena, "failed to disable HW timestamping: %d", ret);
+		return (false);
+	}
+
+	return (true);
+}
+
+/*
+ * Map the device memory BAR used for LLQ. This must be called before creating
+ * any LLQ submission queues.
+ */
+static bool
+ena_map_llq_mem_bar(ena_t *ena)
+{
+	ddi_device_acc_attr_t attr;
+	int rnumber, ret;
+
+	rnumber = ena_bar_to_rnumber(ena, ENA_LLQ_BAR);
+	if (rnumber == -1) {
+		ena_err(ena, "failed to find rnumber for BAR %d", ENA_LLQ_BAR);
+		return (false);
+	}
+
+	if (ddi_dev_regsize(ena->ena_dip, rnumber, &ena->ena_llq_bar_size) !=
+	    DDI_SUCCESS) {
+		ena_err(ena, "failed to get mem BAR %d size", ENA_LLQ_BAR);
+		return (false);
+	}
+
+	bzero(&attr, sizeof (attr));
+	attr.devacc_attr_version = DDI_DEVICE_ATTR_V1;
+	attr.devacc_attr_endian_flags = DDI_NEVERSWAP_ACC;
+	/*
+	 * See the "LLQ Tx Path" section of the big theory statement for why
+	 * it is safe to map the LLQ BAR with DDI_STORECACHING_OK_ACC.
+	 */
+	attr.devacc_attr_dataorder = DDI_STORECACHING_OK_ACC;
+	attr.devacc_attr_access = DDI_DEFAULT_ACC;
+
+	ret = ddi_regs_map_setup(ena->ena_dip, rnumber,
+	    &ena->ena_llq_bar_base, 0, ena->ena_llq_bar_size, &attr,
+	    &ena->ena_llq_bar_hdl);
+
+	if (ret != DDI_SUCCESS) {
+		ena_err(ena, "failed to map mem BAR %d (reg %d): %d",
+		    ENA_LLQ_BAR, rnumber, ret);
+		return (false);
+	}
+
+	ena->ena_llq_bar_mapped = true;
+	ena_dbg(ena, "LLQ BAR %d mapped to base: 0x%p size: %ld", ENA_LLQ_BAR,
+	    (void *)ena->ena_llq_bar_base, ena->ena_llq_bar_size);
+
+	return (true);
+}
+
+/*
+ * Negotiate LLQ parameters with the device and send SET_FEATURE to
+ * configure it. If the device does not advertise LLQ support we
+ * silently fall back to host placement. If the device does advertise
+ * LLQ but negotiation fails, we treat that as a fatal error rather
+ * than falling back. For newer instance types (Nitro v5 and later)
+ * it really is fatal, they require LLQ and do not support host
+ * placement at all.
+ */
+static bool
+ena_configure_llq(ena_t *ena)
+{
+	enahw_resp_desc_t resp;
+	enahw_feat_llq_t *llq_feat;
+	enahw_cmd_desc_t cmd;
+	enahw_feat_llq_t *llq_cmd;
+	enahw_llq_accel_mode_get_t accel_get;
+	uint16_t supported;
+	int ret;
+
+	/* Query the device's LLQ capabilities */
+	bzero(&resp, sizeof (resp));
+	ret = ena_get_feature(ena, &resp, ENAHW_FEAT_LLQ, ENAHW_FEAT_LLQ_VER);
+	if (ret == ENOTSUP) {
+		ena_dbg(ena, "LLQ not supported, using host placement");
+		return (true);
+	} else if (ret != 0) {
+		ena_err(ena, "failed to query LLQ feature: %d", ret);
+		return (false);
+	}
+
+	llq_feat = &resp.erd_resp.erd_get_feat.ergf_llq;
+
+	ena_dbg(ena, "LLQ max_num=%u max_depth=%u",
+	    llq_feat->efllq_max_llq_num, llq_feat->efllq_max_llq_depth);
+	ena_dbg(ena, "LLQ header_location supported=0x%x "
+	    "entry_size supported=0x%x recommended=%u",
+	    llq_feat->efllq_header_location_ctrl_supported,
+	    llq_feat->efllq_entry_size_ctrl_supported,
+	    llq_feat->efllq_entry_size_recommended);
+	ena_dbg(ena, "LLQ descs_before_header supported=0x%x "
+	    "stride supported=0x%x",
+	    llq_feat->efllq_desc_num_before_header_supported,
+	    llq_feat->efllq_descs_stride_ctrl_supported);
+	ena_dbg(ena, "LLQ accel_mode supported_flags=0x%x "
+	    "max_tx_burst_size=%u",
+	    llq_feat->efllq_accel_mode.eam_get.eamg_supported_flags,
+	    llq_feat->efllq_accel_mode.eam_get.eamg_max_tx_burst_size);
+
+	/*
+	 * Negotiate header location - we currently only support inline header,
+	 * which is advertised by all current devices.
+	 */
+	supported = llq_feat->efllq_header_location_ctrl_supported;
+	if (!(supported & ENAHW_LLQ_HEADER_INLINE)) {
+		ena_err(ena, "device does not support inline header "
+		    "LLQ (supported: 0x%x)", supported);
+		return (false);
+	}
+	ena->ena_llq_header_location = ENAHW_LLQ_HEADER_INLINE;
+
+	/* Negotiate stride control for inline header mode */
+	supported = llq_feat->efllq_descs_stride_ctrl_supported;
+	if (supported & ENAHW_LLQ_MULTIPLE_DESCS_PER_ENTRY) {
+		ena->ena_llq_stride_ctrl = ENAHW_LLQ_MULTIPLE_DESCS_PER_ENTRY;
+	} else if (supported & ENAHW_LLQ_SINGLE_DESC_PER_ENTRY) {
+		ena->ena_llq_stride_ctrl = ENAHW_LLQ_SINGLE_DESC_PER_ENTRY;
+	} else {
+		ena_err(ena, "no supported LLQ stride control (0x%x)",
+		    supported);
+		return (false);
+	}
+
+	/* Negotiate entry size */
+	supported = llq_feat->efllq_entry_size_ctrl_supported;
+	if (llq_feat->efllq_entry_size_recommended != 0 &&
+	    (supported & llq_feat->efllq_entry_size_recommended)) {
+		ena->ena_llq_entry_size =
+		    llq_feat->efllq_entry_size_recommended;
+	} else if (supported & ENAHW_LLQ_ENTRY_SIZE_128B) {
+		ena->ena_llq_entry_size = ENAHW_LLQ_ENTRY_SIZE_128B;
+	} else if (supported & ENAHW_LLQ_ENTRY_SIZE_192B) {
+		ena->ena_llq_entry_size = ENAHW_LLQ_ENTRY_SIZE_192B;
+	} else if (supported & ENAHW_LLQ_ENTRY_SIZE_256B) {
+		ena->ena_llq_entry_size = ENAHW_LLQ_ENTRY_SIZE_256B;
+	} else {
+		ena_err(ena, "no supported LLQ entry size (0x%x)", supported);
+		return (false);
+	}
+
+	switch (ena->ena_llq_entry_size) {
+	case ENAHW_LLQ_ENTRY_SIZE_128B:
+		ena->ena_llq_entry_size_bytes = 128;
+		break;
+	case ENAHW_LLQ_ENTRY_SIZE_192B:
+		ena->ena_llq_entry_size_bytes = 192;
+		break;
+	case ENAHW_LLQ_ENTRY_SIZE_256B:
+		ena->ena_llq_entry_size_bytes = 256;
+		break;
+	}
+
+	/*
+	 * Negotiate number of descriptors before header. Since we always
+	 * send both a meta and data descriptor in each LLQ entry we cannot
+	 * support ENAHW_LLQ_NUM_DESCS_BEFORE_HEADER_1.
+	 */
+	supported = llq_feat->efllq_desc_num_before_header_supported;
+	if (supported & ENAHW_LLQ_NUM_DESCS_BEFORE_HEADER_2) {
+		ena->ena_llq_num_descs_before_header =
+		    ENAHW_LLQ_NUM_DESCS_BEFORE_HEADER_2;
+	} else if (supported & ENAHW_LLQ_NUM_DESCS_BEFORE_HEADER_4) {
+		ena->ena_llq_num_descs_before_header =
+		    ENAHW_LLQ_NUM_DESCS_BEFORE_HEADER_4;
+	} else if (supported & ENAHW_LLQ_NUM_DESCS_BEFORE_HEADER_8) {
+		ena->ena_llq_num_descs_before_header =
+		    ENAHW_LLQ_NUM_DESCS_BEFORE_HEADER_8;
+	} else {
+		ena_err(ena, "no supported descs_before_header (0x%x)",
+		    supported);
+		return (false);
+	}
+
+	/* Check for accelerated LLQ mode support */
+	accel_get = llq_feat->efllq_accel_mode.eam_get;
+	const bool limit_tx_burst = (accel_get.eamg_supported_flags &
+	    ENAHW_LLQ_ACCEL_MODE_LIMIT_TX_BURST);
+
+	if (limit_tx_burst) {
+		ena->ena_llq_max_tx_burst_size =
+		    accel_get.eamg_max_tx_burst_size;
+	}
+
+	ena_dbg(ena, "LLQ negotiated: header_location=%u entry_size=%uB "
+	    "descs_before_header=%u stride=%u max_tx_burst=%u",
+	    ena->ena_llq_header_location,
+	    ena->ena_llq_entry_size_bytes,
+	    ena->ena_llq_num_descs_before_header,
+	    ena->ena_llq_stride_ctrl,
+	    ena->ena_llq_max_tx_burst_size);
+
+	/*
+	 * When LLQ is active the SQ lives in device memory rather
+	 * than host memory so max_tx_sq_depth does not apply;
+	 * replace it with max_llq_depth. For 256B entries the depth
+	 * is further reduced; the device may report a specific wide
+	 * depth, otherwise we halve the standard LLQ depth.
+	 */
+	ena->ena_tx_max_sq_num_descs = llq_feat->efllq_max_llq_depth;
+
+	if (ena->ena_llq_entry_size == ENAHW_LLQ_ENTRY_SIZE_256B) {
+		if (llq_feat->efllq_max_wide_llq_depth != 0) {
+			ena->ena_tx_max_sq_num_descs = MIN(
+			    ena->ena_tx_max_sq_num_descs,
+			    llq_feat->efllq_max_wide_llq_depth);
+		} else {
+			ena->ena_tx_max_sq_num_descs /= 2;
+		}
+	}
+
+	/* Send the LLQ configuration request */
+	bzero(&cmd, sizeof (cmd));
+	llq_cmd = &cmd.ecd_cmd.ecd_set_feat.ecsf_feat.ecsf_llq;
+
+	llq_cmd->efllq_header_location_ctrl_enabled =
+	    ena->ena_llq_header_location;
+	llq_cmd->efllq_entry_size_ctrl_enabled = ena->ena_llq_entry_size;
+	llq_cmd->efllq_desc_num_before_header_enabled =
+	    ena->ena_llq_num_descs_before_header;
+	llq_cmd->efllq_descs_stride_ctrl_enabled = ena->ena_llq_stride_ctrl;
+	llq_cmd->efllq_accel_mode.eam_set.eams_enabled_flags =
+	    ENAHW_LLQ_ACCEL_MODE_DISABLE_META_CACHING |
+	    (limit_tx_burst ? ENAHW_LLQ_ACCEL_MODE_LIMIT_TX_BURST : 0);
+
+	bzero(&resp, sizeof (resp));
+	ret = ena_set_feature(ena, &cmd, &resp, ENAHW_FEAT_LLQ,
+	    ENAHW_FEAT_LLQ_VER);
+	if (ret != 0) {
+		ena_err(ena, "failed to set LLQ feature: %d", ret);
+		return (false);
+	}
+
+	if (!ena_map_llq_mem_bar(ena))
+		return (false);
+
+	ena->ena_llq_enabled = true;
+	ena_dbg(ena, "LLQ enabled");
+
+	return (true);
 }
 
 static bool
@@ -1176,6 +1599,14 @@ ena_attach_device_init(ena_t *ena)
 		return (false);
 
 	if (!ena_aenq_init(ena))
+		return (false);
+
+	/*
+	 * The device will change the set of advertised features based on the
+	 * host info that we provide. We therefore need to send this here
+	 * before querying the features.
+	 */
+	if (!ena_init_host_info(ena))
 		return (false);
 
 	bzero(&resp, sizeof (resp));
@@ -1278,7 +1709,10 @@ ena_attach_device_init(ena_t *ena)
 	if (ena->ena_device_hints.eh_max_rx_sgl != 0)
 		ena->ena_rx_sgl_max_sz = ena->ena_device_hints.eh_max_rx_sgl;
 
-	if (!ena_init_host_info(ena))
+	if (!ena_disable_hw_timestamp(ena))
+		return (false);
+
+	if (!ena_configure_llq(ena))
 		return (false);
 
 	if (!ena_aenq_configure(ena))

@@ -10,9 +10,10 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
+#include <sys/atomic.h>
 #include "ena.h"
 
 void
@@ -173,7 +174,7 @@ ena_alloc_txq(ena_txq_t *txq)
 
 	ret = ena_create_sq(ena, txq->et_sq_num_descs,
 	    txq->et_sq_dma.edb_cookie->dmac_laddress, true, cq_hw_idx,
-	    &sq_hw_idx, &sq_db_addr);
+	    &sq_hw_idx, &sq_db_addr, &txq->et_sq_llq_addr);
 
 	if (ret != 0) {
 		ena_err(ena, "failed to create Tx SQ %u: %d", txq->et_txqs_idx,
@@ -189,6 +190,17 @@ ena_alloc_txq(ena_txq_t *txq)
 	txq->et_blocked = false;
 	txq->et_stall_watchdog = 0;
 	txq->et_state |= ENA_TXQ_STATE_SQ_CREATED;
+
+	/*
+	 * Allocate the LLQ bounce buffer, used to stage a complete
+	 * LLQ entry before writing it to device memory.
+	 */
+	if (ena->ena_llq_enabled) {
+		txq->et_sq_llq_buf = kmem_zalloc(ena->ena_llq_entry_size_bytes,
+		    KM_SLEEP);
+		txq->et_sq_llq_entries_left = ena->ena_llq_max_tx_burst_size /
+		    ena->ena_llq_entry_size_bytes;
+	}
 
 	return (true);
 }
@@ -209,8 +221,15 @@ ena_cleanup_txq(ena_txq_t *txq, bool resetting)
 			}
 		}
 
+		if (txq->et_sq_llq_buf != NULL) {
+			kmem_free(txq->et_sq_llq_buf,
+			    ena->ena_llq_entry_size_bytes);
+			txq->et_sq_llq_buf = NULL;
+		}
+
 		txq->et_sq_hw_idx = 0;
 		txq->et_sq_db_addr = NULL;
+		txq->et_sq_llq_addr = NULL;
 		txq->et_sq_tail_idx = 0;
 		txq->et_sq_phase = 0;
 		txq->et_state &= ~ENA_TXQ_STATE_SQ_CREATED;
@@ -393,10 +412,70 @@ ena_fill_tx_data_desc(ena_txq_t *txq, ena_tx_control_block_t *tcb,
 	ENAHW_TX_DESC_L4_CSUM_PARTIAL_ON(desc);
 }
 
+/*
+ * Fill in a TX meta descriptor. With DISABLE_META_CACHING the device
+ * requires a meta descriptor for every packet. We don't use TSO so
+ * MSS is always zero; the meta descriptor carries header offset
+ * information.
+ */
+static void
+ena_fill_tx_meta_desc(enahw_tx_meta_desc_t *meta, uint8_t phase,
+    mac_ether_offload_info_t *meo)
+{
+	bzero(meta, sizeof (*meta));
+	ENAHW_TX_META_DESC_META_DESC_ON(meta);
+	ENAHW_TX_META_DESC_EXT_VALID_ON(meta);
+	ENAHW_TX_META_DESC_ETH_META_TYPE_ON(meta);
+	ENAHW_TX_META_DESC_META_STORE_ON(meta);
+	ENAHW_TX_META_DESC_PHASE(meta, phase);
+	ENAHW_TX_META_DESC_FIRST_ON(meta);
+	ENAHW_TX_META_DESC_COMP_REQ_ON(meta);
+	ENAHW_TX_META_DESC_L3_HDR_OFF(meta, meo->meoi_l2hlen);
+}
+
+/*
+ * Write a bounce buffer to LLQ device memory using 64-bit stores.
+ * See the "LLQ Tx Path" section of the big theory statement for
+ * discussion of write-combining safety and ordering.
+ */
+static void
+ena_llq_write_to_dev(ena_txq_t *txq, uint8_t *buf, uint16_t entry_size)
+{
+	const uint16_t modulo_mask = txq->et_sq_num_descs - 1;
+	uint32_t dst_offset;
+	volatile uint64_t *dst;
+	const uint64_t *src;
+	uint16_t count, i;
+
+	/*
+	 * The reference drivers place a write barrier here between
+	 * filling the bounce buffer and writing it to device memory.
+	 * The bounce buffer is only read back by this CPU so it is
+	 * not clear why this is needed, but we retain it for parity.
+	 */
+	membar_producer();
+
+	dst_offset = (txq->et_sq_tail_idx & modulo_mask) * entry_size;
+	dst = (volatile uint64_t *)((caddr_t)txq->et_sq_llq_addr + dst_offset);
+	src = (const uint64_t *)buf;
+	count = entry_size / sizeof (uint64_t);
+
+	for (i = 0; i < count; i++)
+		dst[i] = src[i];
+}
+
 static void
 ena_submit_tx(ena_txq_t *txq, uint16_t desc_idx)
 {
-	ena_hw_abs_write32(txq->et_ena, txq->et_sq_db_addr, desc_idx);
+	ena_t *ena = txq->et_ena;
+
+	ena_hw_abs_write32(ena, txq->et_sq_db_addr, desc_idx);
+
+	/* Reset the burst counter after each doorbell for LIMIT_TX_BURST */
+	if (ena->ena_llq_enabled) {
+		txq->et_sq_llq_entries_left = ena->ena_llq_max_tx_burst_size /
+		    ena->ena_llq_entry_size_bytes;
+	}
 }
 
 /*
@@ -467,11 +546,86 @@ ena_ring_tx(void *arg, mblk_t *mp)
 	ASSERT3P(tcb, !=, NULL);
 	ena_tcb_pull(txq, tcb, mp);
 
-	/* Fill in the Tx descriptor. */
-	tail_mod = txq->et_sq_tail_idx & modulo_mask;
-	desc = &txq->et_sq_descs[tail_mod].etd_data;
-	ena_fill_tx_data_desc(txq, tcb, tcb->etcb_id, txq->et_sq_phase, desc,
-	    &meo, meo.meoi_len);
+	if (ena->ena_llq_enabled) {
+		/*
+		 * LLQ: build the bounce buffer with a meta descriptor, data
+		 * descriptor, and inline packet header, then write the entire
+		 * entry to device memory.
+		 *
+		 * Layout in the bounce buffer (for 128B entry with
+		 * descs_before_header=2):
+		 *   [0..15]   meta descriptor
+		 *   [16..31]  data descriptor
+		 *   [32..127] inline packet header
+		 *
+		 * The data descriptor still references the DMA buffer for the
+		 * remaining packet payload; the inline header is an
+		 * optimisation that lets the device begin processing the
+		 * header immediately.
+		 */
+		uint8_t *buf = txq->et_sq_llq_buf;
+		enahw_tx_meta_desc_t *meta;
+		uint16_t hdr_off;
+		size_t hdr_space, hdr_copy;
+
+		bzero(buf, ena->ena_llq_entry_size_bytes);
+
+		/* Slot 0: meta descriptor */
+		meta = (enahw_tx_meta_desc_t *)buf;
+		ena_fill_tx_meta_desc(meta, txq->et_sq_phase, &meo);
+
+		/* Slot 1: data descriptor */
+		desc = (enahw_tx_data_desc_t *)(buf + sizeof (enahw_tx_desc_t));
+
+		/*
+		 * Copy the packet header into the bounce buffer after the
+		 * descriptor slots.
+		 */
+		hdr_off = ena->ena_llq_num_descs_before_header *
+		    sizeof (enahw_tx_desc_t);
+		hdr_space = ena->ena_llq_entry_size_bytes - hdr_off;
+		hdr_copy = MIN(meo.meoi_len, hdr_space);
+		bcopy(tcb->etcb_dma.edb_va, buf + hdr_off, hdr_copy);
+
+		/*
+		 * The data descriptor's address and length must skip past
+		 * the inline header bytes that are already in the LLQ
+		 * entry.
+		 */
+		ena_fill_tx_data_desc(txq, tcb, tcb->etcb_id,
+		    txq->et_sq_phase, desc, &meo,
+		    meo.meoi_len - hdr_copy);
+		ENAHW_TX_DESC_FIRST_OFF(desc);
+		ENAHW_TX_DESC_HEADER_LENGTH(desc, hdr_copy);
+		ENAHW_TX_DESC_ADDR_LO(desc,
+		    tcb->etcb_dma.edb_cookie->dmac_laddress + hdr_copy);
+		ENAHW_TX_DESC_ADDR_HI(desc,
+		    tcb->etcb_dma.edb_cookie->dmac_laddress + hdr_copy);
+
+		ena_llq_write_to_dev(txq, buf, ena->ena_llq_entry_size_bytes);
+		/*
+		 * Ensure the write-combining stores to the LLQ BAR are
+		 * ordered before the upcoming doorbell write.
+		 */
+		membar_producer();
+		/*
+		 * Since mac calls us with one packet at a time, we don't
+		 * actually do any batching and we never expect to run out
+		 * of llq entries.
+		 */
+		if (ena->ena_llq_max_tx_burst_size > 0) {
+			ASSERT3U(txq->et_sq_llq_entries_left, >, 0);
+			txq->et_sq_llq_entries_left--;
+		}
+	} else {
+		/* Host placement */
+		tail_mod = txq->et_sq_tail_idx & modulo_mask;
+		desc = &txq->et_sq_descs[tail_mod].etd_data;
+		ena_fill_tx_data_desc(txq, tcb, tcb->etcb_id,
+		    txq->et_sq_phase, desc, &meo, meo.meoi_len);
+		ENA_DMA_SYNC(txq->et_sq_dma, DDI_DMA_SYNC_FORDEV);
+	}
+
 	DTRACE_PROBE3(tx__submit, ena_tx_control_block_t *, tcb, uint16_t,
 	    tcb->etcb_id, enahw_tx_data_desc_t *, desc);
 

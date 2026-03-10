@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -469,6 +469,214 @@ typedef struct enahw_feat_aenq {
 	uint32_t efa_enabled_groups;
 } enahw_feat_aenq_t;
 
+/*
+ * ENAHW_FEAT_HW_TIMESTAMP
+ *
+ * common: ena_admin_feature_hw_ts_desc
+ */
+typedef struct enahw_feat_hw_timestamp {
+	uint8_t efhwts_version;
+	uint8_t efhwts_tx;
+	uint8_t efhwts_rx;
+} enahw_feat_hw_timestamp_t;
+
+/*
+ * Values for efhwts_tx and efhwts_rx in the above struct.
+ *
+ * common: ena_admin_hw_timestamp_tx_support / ena_admin_hw_timestamp_rx_support
+ */
+#define	ENAHW_HW_TIMESTAMP_NONE		0
+#define	ENAHW_HW_TIMESTAMP_ALL_QUEUES	1
+
+/*
+ * LLQ Header Location.
+ *
+ * Describes where the packet header resides relative to the
+ * descriptor list entries in the Low Latency Queue.
+ *
+ * common: ena_admin_llq_header_location
+ */
+typedef enum enahw_llq_header_location {
+	/* Header is in-line within the descriptor list entry */
+	ENAHW_LLQ_HEADER_INLINE		= BIT(0),
+
+	/* Header is in a separate ring (implies 16B descriptor entries) */
+	ENAHW_LLQ_HEADER_SEPARATE_RING	= BIT(1),
+} enahw_llq_header_location_t;
+
+/*
+ * LLQ Ring Entry Size.
+ *
+ * The size of each entry in the LLQ descriptor list in device memory.
+ *
+ * common: ena_admin_llq_ring_entry_size
+ */
+typedef enum enahw_llq_ring_entry_size {
+	ENAHW_LLQ_ENTRY_SIZE_128B	= BIT(0),
+	ENAHW_LLQ_ENTRY_SIZE_192B	= BIT(1),
+	ENAHW_LLQ_ENTRY_SIZE_256B	= BIT(2),
+} enahw_llq_ring_entry_size_t;
+
+/*
+ * LLQ Number of Descriptors Before Header.
+ *
+ * When using inline header mode, the first entry contains some number
+ * of descriptors followed by the packet header. This enum specifies
+ * how many descriptors precede the header.
+ *
+ * common: ena_admin_llq_num_descs_before_header
+ */
+typedef enum enahw_llq_num_descs_before_header {
+	ENAHW_LLQ_NUM_DESCS_BEFORE_HEADER_0	= 0,
+	ENAHW_LLQ_NUM_DESCS_BEFORE_HEADER_1	= BIT(0),
+	ENAHW_LLQ_NUM_DESCS_BEFORE_HEADER_2	= BIT(1),
+	ENAHW_LLQ_NUM_DESCS_BEFORE_HEADER_4	= BIT(2),
+	ENAHW_LLQ_NUM_DESCS_BEFORE_HEADER_8	= BIT(3),
+} enahw_llq_num_descs_before_header_t;
+
+/*
+ * LLQ Descriptor Stride Control.
+ *
+ * Controls how descriptors beyond the first entry are laid out. With
+ * SINGLE_DESC_PER_ENTRY each subsequent entry holds one descriptor;
+ * with MULTIPLE_DESCS_PER_ENTRY they are packed contiguously.
+ * Only relevant for inline header mode.
+ *
+ * common: ena_admin_llq_stride_ctrl
+ */
+typedef enum enahw_llq_stride_ctrl {
+	ENAHW_LLQ_SINGLE_DESC_PER_ENTRY		= BIT(0),
+	ENAHW_LLQ_MULTIPLE_DESCS_PER_ENTRY	= BIT(1),
+} enahw_llq_stride_ctrl_t;
+
+/*
+ * LLQ Accelerated Mode Feature Flags.
+ *
+ * DISABLE_META_CACHING: The driver must send a meta descriptor with
+ * every packet rather than relying on the device caching meta
+ * information.
+ *
+ * LIMIT_TX_BURST: The device specifies a maximum burst size (in
+ * bytes) between doorbell writes. The driver must track how many
+ * bytes it has written and ring the doorbell before exceeding this
+ * limit.
+ *
+ * common: ena_admin_accel_mode_feat
+ */
+typedef enum enahw_llq_accel_mode_feat {
+	ENAHW_LLQ_ACCEL_MODE_DISABLE_META_CACHING	= BIT(0),
+	ENAHW_LLQ_ACCEL_MODE_LIMIT_TX_BURST		= BIT(1),
+} enahw_llq_accel_mode_feat_t;
+
+/*
+ * Accelerated LLQ mode - GET response.
+ *
+ * Returned by the device when querying the LLQ feature, indicating
+ * which accelerated mode features are supported and the maximum TX
+ * burst size.
+ *
+ * common: ena_admin_accel_mode_get
+ */
+typedef struct enahw_llq_accel_mode_get {
+	/* Bit field of enahw_llq_accel_mode_feat_t */
+	uint16_t eamg_supported_flags;
+
+	/* Max bytes the driver may write to device memory before a doorbell */
+	uint16_t eamg_max_tx_burst_size;
+} enahw_llq_accel_mode_get_t;
+
+/*
+ * Accelerated LLQ mode - SET request.
+ *
+ * Sent by the driver when configuring the LLQ feature, indicating
+ * which accelerated mode features to enable.
+ *
+ * common: ena_admin_accel_mode_set
+ */
+typedef struct enahw_llq_accel_mode_set {
+	/* Bit field of enahw_llq_accel_mode_feat_t */
+	uint16_t eams_enabled_flags;
+	uint16_t eams_rsvd;
+} enahw_llq_accel_mode_set_t;
+
+/*
+ * Accelerated LLQ mode request/response union.
+ *
+ * Used in both GET_FEATURE and SET_FEATURE for LLQ. The 'get' variant
+ * is populated in responses; the 'set' variant is populated in
+ * requests.
+ *
+ * common: ena_admin_accel_mode_req
+ */
+typedef union enahw_llq_accel_mode {
+	uint32_t			eam_raw[2];
+	enahw_llq_accel_mode_get_t	eam_get;
+	enahw_llq_accel_mode_set_t	eam_set;
+} enahw_llq_accel_mode_t;
+
+/*
+ * Response to ENAHW_FEAT_LLQ.
+ *
+ * Describes the Low Latency Queue capabilities of the device. The
+ * _supported fields are populated on GET responses; the _enabled
+ * fields are populated by the driver on SET requests.
+ *
+ * common: ena_admin_feature_llq_desc
+ */
+typedef struct enahw_feat_llq {
+	uint32_t efllq_max_llq_num;
+	uint32_t efllq_max_llq_depth;
+
+	/*
+	 * Bit field of enahw_llq_header_location_t. The locations the
+	 * device supports (GET) or the driver has selected (SET).
+	 */
+	uint16_t efllq_header_location_ctrl_supported;
+	uint16_t efllq_header_location_ctrl_enabled;
+
+	/*
+	 * Bit field of enahw_llq_ring_entry_size_t. The entry sizes
+	 * the device supports (GET) or the driver has selected (SET).
+	 */
+	uint16_t efllq_entry_size_ctrl_supported;
+	uint16_t efllq_entry_size_ctrl_enabled;
+
+	/*
+	 * Bit field of enahw_llq_num_descs_before_header_t. Valid
+	 * only for inline header mode. The number of descriptors
+	 * before the header the device supports (GET) or the driver
+	 * has selected (SET).
+	 */
+	uint16_t efllq_desc_num_before_header_supported;
+	uint16_t efllq_desc_num_before_header_enabled;
+
+	/*
+	 * Bit field of enahw_llq_stride_ctrl_t. Valid only for inline
+	 * header mode. The stride control the device supports (GET) or
+	 * the driver has selected (SET).
+	 */
+	uint16_t efllq_descs_stride_ctrl_supported;
+	uint16_t efllq_descs_stride_ctrl_enabled;
+
+	/* Feature version as reported by the device. */
+	uint8_t	 efllq_feature_version;
+
+	/*
+	 * The entry size recommended by the device, one of
+	 * enahw_llq_ring_entry_size_t. Only valid on GET.
+	 */
+	uint8_t	 efllq_entry_size_recommended;
+
+	/* Max depth of wide LLQ, or 0 if not applicable. */
+	uint16_t efllq_max_wide_llq_depth;
+
+	/*
+	 * Accelerated LLQ mode capabilities (GET) or requested
+	 * feature flags (SET). See enahw_llq_accel_mode_feat_t.
+	 */
+	enahw_llq_accel_mode_t efllq_accel_mode;
+} enahw_feat_llq_t;
+
 /* common: ena_admin_set_feat_cmd */
 typedef struct enahw_cmd_set_feat {
 	struct enahw_ctrl_buff		ecsf_ctrl_buf;
@@ -479,6 +687,8 @@ typedef struct enahw_cmd_set_feat {
 		enahw_feat_host_attr_t		ecsf_host_attr;
 		enahw_feat_mtu_t		ecsf_mtu;
 		enahw_feat_aenq_t		ecsf_aenq;
+		enahw_feat_hw_timestamp_t	ecsf_hw_timestamp;
+		enahw_feat_llq_t		ecsf_llq;
 	} ecsf_feat;
 } enahw_cmd_set_feat_t;
 
@@ -860,6 +1070,8 @@ typedef enum enahw_feature_id {
 	ENAHW_FEAT_LINK_CONFIG			= 27,
 	ENAHW_FEAT_HOST_ATTR_CONFIG		= 28,
 	ENAHW_FEAT_PHC_CONFIG			= 29,
+	ENAHW_FEAT_FLOW_STEERING_CONFIG		= 30,
+	ENAHW_FEAT_HW_TIMESTAMP			= 31,
 	ENAHW_FEAT_NUM				= 32,
 } enahw_feature_id_t;
 
@@ -887,7 +1099,7 @@ typedef enum enahw_capability_id {
 #define	ENAHW_FEAT_DEVICE_ATTRIBUTES_VER		0
 #define	ENAHW_FEAT_MAX_QUEUES_NUM_VER			0
 #define	ENAHW_FEAT_HW_HINTS_VER				0
-#define	ENAHW_FEAT_LLQ_VER				0
+#define	ENAHW_FEAT_LLQ_VER				1
 #define	ENAHW_FEAT_EXTRA_PROPERTIES_STRINGS_VER		0
 #define	ENAHW_FEAT_EXTRA_PROPERTIES_FLAGS_VER		0
 #define	ENAHW_FEAT_MAX_QUEUES_EXT_VER			1
@@ -900,6 +1112,7 @@ typedef enum enahw_capability_id {
 #define	ENAHW_FEAT_AENQ_CONFIG_VER			0
 #define	ENAHW_FEAT_LINK_CONFIG_VER			0
 #define	ENAHW_FEAT_HOST_ATTR_CONFIG_VER			0
+#define	ENAHW_FEAT_HW_TIMESTAMP_VER			0
 
 /* common: ena_admin_link_types */
 typedef enum enahw_link_speeds {
@@ -1208,6 +1421,7 @@ typedef union enahw_resp_get_feat {
 	enahw_feat_link_conf_t		ergf_link_conf;
 	enahw_feat_offload_t		ergf_offload;
 	enahw_device_hints_t		ergf_hints;
+	enahw_feat_llq_t		ergf_llq;
 } enahw_resp_get_feat_u;
 
 /*
@@ -1719,6 +1933,60 @@ typedef struct enahw_tx_meta_desc {
 	uint32_t etmd_word2;
 	uint32_t etmd_reserved;
 } enahw_tx_meta_desc_t;
+
+#define	ENAHW_TX_META_DESC_REQ_ID_LO_MASK	GENMASK(9, 0)
+#define	ENAHW_TX_META_DESC_EXT_VALID_SHIFT	14
+#define	ENAHW_TX_META_DESC_EXT_VALID_MASK	BIT(14)
+#define	ENAHW_TX_META_DESC_MSS_HI_SHIFT		16
+#define	ENAHW_TX_META_DESC_MSS_HI_MASK		GENMASK(19, 16)
+#define	ENAHW_TX_META_DESC_ETH_META_TYPE_SHIFT	20
+#define	ENAHW_TX_META_DESC_ETH_META_TYPE_MASK	BIT(20)
+#define	ENAHW_TX_META_DESC_META_STORE_SHIFT	21
+#define	ENAHW_TX_META_DESC_META_STORE_MASK	BIT(21)
+/* Bits 23-28 share positions with the data descriptor. */
+#define	ENAHW_TX_META_DESC_META_DESC_MASK	BIT(23)
+#define	ENAHW_TX_META_DESC_PHASE_SHIFT		24
+#define	ENAHW_TX_META_DESC_PHASE_MASK		BIT(24)
+#define	ENAHW_TX_META_DESC_FIRST_MASK		BIT(26)
+#define	ENAHW_TX_META_DESC_LAST_MASK		BIT(27)
+#define	ENAHW_TX_META_DESC_COMP_REQ_MASK	BIT(28)
+#define	ENAHW_TX_META_DESC_REQ_ID_HI_MASK	GENMASK(5, 0)
+
+#define	ENAHW_TX_META_DESC_L3_HDR_LEN_MASK	GENMASK(7, 0)
+#define	ENAHW_TX_META_DESC_L3_HDR_OFF_SHIFT	8
+#define	ENAHW_TX_META_DESC_L3_HDR_OFF_MASK	GENMASK(15, 8)
+#define	ENAHW_TX_META_DESC_L4_HDR_LEN_SHIFT	16
+#define	ENAHW_TX_META_DESC_L4_HDR_LEN_MASK	GENMASK(21, 16)
+#define	ENAHW_TX_META_DESC_MSS_LO_SHIFT		22
+#define	ENAHW_TX_META_DESC_MSS_LO_MASK		GENMASK(31, 22)
+
+#define	ENAHW_TX_META_DESC_META_DESC_ON(desc)			\
+	((desc)->etmd_len_ctrl |= ENAHW_TX_META_DESC_META_DESC_MASK)
+
+#define	ENAHW_TX_META_DESC_EXT_VALID_ON(desc)			\
+	((desc)->etmd_len_ctrl |= ENAHW_TX_META_DESC_EXT_VALID_MASK)
+
+#define	ENAHW_TX_META_DESC_ETH_META_TYPE_ON(desc)		\
+	((desc)->etmd_len_ctrl |= ENAHW_TX_META_DESC_ETH_META_TYPE_MASK)
+
+#define	ENAHW_TX_META_DESC_META_STORE_ON(desc)			\
+	((desc)->etmd_len_ctrl |= ENAHW_TX_META_DESC_META_STORE_MASK)
+
+#define	ENAHW_TX_META_DESC_PHASE(desc, phase)			\
+	((desc)->etmd_len_ctrl |=				\
+	    (((phase) << ENAHW_TX_META_DESC_PHASE_SHIFT) &	\
+	    ENAHW_TX_META_DESC_PHASE_MASK))
+
+#define	ENAHW_TX_META_DESC_FIRST_ON(desc)			\
+	((desc)->etmd_len_ctrl |= ENAHW_TX_META_DESC_FIRST_MASK)
+
+#define	ENAHW_TX_META_DESC_COMP_REQ_ON(desc)			\
+	((desc)->etmd_len_ctrl |= ENAHW_TX_META_DESC_COMP_REQ_MASK)
+
+#define	ENAHW_TX_META_DESC_L3_HDR_OFF(desc, off)		\
+	((desc)->etmd_word2 |=					\
+	    (((off) << ENAHW_TX_META_DESC_L3_HDR_OFF_SHIFT) &	\
+	    ENAHW_TX_META_DESC_L3_HDR_OFF_MASK))
 
 /* common: N/A */
 typedef union enahw_tx_desc {

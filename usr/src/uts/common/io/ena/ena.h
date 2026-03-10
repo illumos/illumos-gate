@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_ENA_H
@@ -55,8 +55,17 @@ extern "C" {
 #define	ENA_CTRL_MINOR_VSN_MIN		0
 #define	ENA_CTRL_SUBMINOR_VSN_MIN	1
 
+/*
+ * These values are used to communicate the driver version to the AWS
+ * hypervisor via the HOST_ATTR_CONFIG feature. We don't know what
+ * exactly AWS does with this info, but it's fairly safe to assume
+ * it's used solely for debug/informational purposes. The Linux driver
+ * updates these values frequently as bugs are fixed and features are
+ * added. Some instance types have minimum driver version requirements
+ * but they do not appear to check the version we pass.
+ */
 #define	ENA_MODULE_VER_MAJOR	1
-#define	ENA_MODULE_VER_MINOR	0
+#define	ENA_MODULE_VER_MINOR	1
 #define	ENA_MODULE_VER_SUBMINOR	0
 
 /*
@@ -71,8 +80,10 @@ extern "C" {
 #define	ENA_SPEC_VERSION_MINOR	0
 
 
-/* This represents BAR 0. */
-#define	ENA_REG_NUMBER	1
+/* PCI BAR index for the register BAR */
+#define	ENA_REG_BAR	0
+/* PCI BAR index for the LLQ memory BAR */
+#define	ENA_LLQ_BAR	2
 
 /*
  * A sentinel value passed as argument to ena_ring_rx() to indicate
@@ -441,6 +452,22 @@ typedef struct ena_txq {
 	uint32_t		*et_sq_db_addr; /* WO */
 
 	/*
+	 * LLQ state for this queue. When LLQ is active descriptors
+	 * are written to device memory at et_sq_llq_addr rather than
+	 * to host memory at et_sq_descs.
+	 *
+	 * The bounce buffer (et_sq_llq_buf) is used to stage a
+	 * complete LLQ entry before copying it to device memory.
+	 *
+	 * The burst counter (et_sq_llq_entries_left) tracks the
+	 * number of LLQ entries that may be written before the next
+	 * doorbell, for the LIMIT_TX_BURST acceleration feature.
+	 */
+	void			*et_sq_llq_addr; /* WO */
+	uint8_t			*et_sq_llq_buf; /* TM */
+	uint32_t		et_sq_llq_entries_left; /* TM */
+
+	/*
 	 * The TCBs track host Tx information, like a pointer to the
 	 * mblk being submitted. The TCBs currently available for use are
 	 * maintained in a free list.
@@ -694,13 +721,24 @@ typedef struct ena {
 	uint64_t		ena_watchdog_last_keepalive;
 
 	/*
-	 * PCI config space and BAR handle.
+	 * PCI config space handle
 	 */
 	ddi_acc_handle_t	ena_pci_hdl;
+
+	/*
+	 * Memory BAR for registers
+	 */
 	off_t			ena_reg_size;
 	caddr_t			ena_reg_base;
-	ddi_device_acc_attr_t	ena_reg_attr;
 	ddi_acc_handle_t	ena_reg_hdl;
+
+	/*
+	 * Memory BAR for LLQ device memory
+	 */
+	bool			ena_llq_bar_mapped;
+	off_t			ena_llq_bar_size;
+	caddr_t			ena_llq_bar_base;
+	ddi_acc_handle_t	ena_llq_bar_hdl;
 
 	/*
 	 * Vendor information.
@@ -806,6 +844,18 @@ typedef struct ena {
 	link_state_t		ena_link_state;
 	uint32_t		ena_aenq_supported_groups;
 	uint32_t		ena_aenq_enabled_groups;
+
+	/*
+	 * LLQ (Low Latency Queue) state. When ena_llq_enabled is true,
+	 * TX descriptors are written to device, rather than host, memory.
+	 */
+	bool					ena_llq_enabled;
+	enahw_llq_header_location_t		ena_llq_header_location;
+	enahw_llq_ring_entry_size_t		ena_llq_entry_size;
+	uint16_t				ena_llq_entry_size_bytes;
+	enahw_llq_num_descs_before_header_t	ena_llq_num_descs_before_header;
+	enahw_llq_stride_ctrl_t			ena_llq_stride_ctrl;
+	uint16_t				ena_llq_max_tx_burst_size;
 
 	uint32_t		ena_tx_max_sq_num;
 	uint32_t		ena_tx_max_sq_num_descs;
@@ -952,7 +1002,7 @@ extern int ena_create_cq(ena_t *, uint16_t, uint64_t, bool, uint32_t,
     uint16_t *, uint32_t **, uint32_t **);
 extern int ena_destroy_cq(ena_t *, uint16_t);
 extern int ena_create_sq(ena_t *, uint16_t, uint64_t, bool, uint16_t,
-    uint16_t *, uint32_t **);
+    uint16_t *, uint32_t **, void **);
 extern int ena_destroy_sq(ena_t *, uint16_t, bool);
 extern int ena_set_feature(ena_t *, enahw_cmd_desc_t *,
     enahw_resp_desc_t *, const enahw_feature_id_t, const uint8_t);

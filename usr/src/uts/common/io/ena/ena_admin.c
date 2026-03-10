@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -475,7 +475,9 @@ ena_create_cq(ena_t *ena, uint16_t num_descs, uint64_t phys_addr,
 	}
 
 	if ((ret = ena_admin_poll_for_resp(ena, ctx)) != 0) {
-		ena_err(ena, "failed to Create CQ: %d", ret);
+		ena_err(ena,
+		    "failed to Create CQ: %d (status %u ext_status %u)",
+		    ret, resp.erd_status, resp.erd_ext_status);
 		return (ret);
 	}
 
@@ -527,7 +529,8 @@ ena_destroy_cq(ena_t *ena, uint16_t hw_idx)
 
 int
 ena_create_sq(ena_t *ena, uint16_t num_descs, uint64_t phys_addr,
-    bool is_tx, uint16_t cq_index, uint16_t *hw_index, uint32_t **db_addr)
+    bool is_tx, uint16_t cq_index, uint16_t *hw_index, uint32_t **db_addr,
+    void **llq_descs_addrp)
 {
 	int ret;
 	enahw_cmd_desc_t cmd;
@@ -536,6 +539,7 @@ ena_create_sq(ena_t *ena, uint16_t num_descs, uint64_t phys_addr,
 	enahw_resp_create_sq_t *resp_sq = &resp.erd_resp.erd_create_sq;
 	enahw_sq_direction_t dir =
 	    is_tx ? ENAHW_SQ_DIRECTION_TX : ENAHW_SQ_DIRECTION_RX;
+	enahw_placement_policy_t placement = ENAHW_PLACEMENT_POLICY_HOST;
 	ena_cmd_ctx_t *ctx = NULL;
 
 	if (!ISP2(num_descs)) {
@@ -544,12 +548,18 @@ ena_create_sq(ena_t *ena, uint16_t num_descs, uint64_t phys_addr,
 		return (false);
 	}
 
+	/*
+	 * For Tx queues, use device placement (LLQ) when LLQ is
+	 * enabled. Rx queues always use host placement.
+	 */
+	if (is_tx && ena->ena_llq_enabled)
+		placement = ENAHW_PLACEMENT_POLICY_DEV;
+
 	bzero(&cmd, sizeof (cmd));
 	bzero(&resp, sizeof (resp));
 	cmd.ecd_opcode = ENAHW_CMD_CREATE_SQ;
 	ENAHW_CMD_CREATE_SQ_DIR(cmd_sq, dir);
-	ENAHW_CMD_CREATE_SQ_PLACEMENT_POLICY(cmd_sq,
-	    ENAHW_PLACEMENT_POLICY_HOST);
+	ENAHW_CMD_CREATE_SQ_PLACEMENT_POLICY(cmd_sq, placement);
 	ENAHW_CMD_CREATE_SQ_COMPLETION_POLICY(cmd_sq,
 	    ENAHW_COMPLETION_POLICY_DESC);
 	/*
@@ -561,11 +571,12 @@ ena_create_sq(ena_t *ena, uint16_t num_descs, uint64_t phys_addr,
 	cmd_sq->ecsq_num_descs = num_descs;
 
 	/*
-	 * If we ever use a non-host placement policy, then guard this
-	 * code against placement type (this value should not be set
-	 * for device placement).
+	 * For host placement, set the physical base address of the
+	 * descriptor ring. For device placement (LLQ), the base
+	 * address is not set as descriptors live in device memory.
 	 */
-	ena_set_dma_addr(ena, phys_addr, &cmd_sq->ecsq_base);
+	if (placement == ENAHW_PLACEMENT_POLICY_HOST)
+		ena_set_dma_addr(ena, phys_addr, &cmd_sq->ecsq_base);
 
 	if ((ret = ena_admin_submit_cmd(ena, &cmd, &resp, &ctx)) != 0) {
 		ena_err(ena, "failed to submit Create SQ command: %d", ret);
@@ -573,13 +584,27 @@ ena_create_sq(ena_t *ena, uint16_t num_descs, uint64_t phys_addr,
 	}
 
 	if ((ret = ena_admin_poll_for_resp(ena, ctx)) != 0) {
-		ena_err(ena, "failed to Create SQ: %d", ret);
+		ena_err(ena,
+		    "failed to Create SQ: %d (status %u ext_status %u)",
+		    ret, resp.erd_status, resp.erd_ext_status);
 		return (ret);
 	}
 
 	*hw_index = resp_sq->ersq_idx;
 	*db_addr = (uint32_t *)(ena->ena_reg_base +
 	    resp_sq->ersq_db_reg_offset);
+
+	/*
+	 * For device placement, the response contains the offset into
+	 * the memory BAR where this queue's descriptors should be
+	 * written.
+	 */
+	if (placement == ENAHW_PLACEMENT_POLICY_DEV &&
+	    llq_descs_addrp != NULL) {
+		*llq_descs_addrp = (void *)(ena->ena_llq_bar_base +
+		    resp_sq->ersq_llq_descs_reg_offset);
+	}
+
 	return (0);
 }
 
@@ -606,7 +631,9 @@ ena_destroy_sq(ena_t *ena, uint16_t hw_idx, bool is_tx)
 	}
 
 	if ((ret = ena_admin_poll_for_resp(ena, ctx)) != 0) {
-		ena_err(ena, "failed Destroy SQ: %d", ret);
+		ena_err(ena,
+		    "failed to Destroy SQ: %d (status %u ext_status %u)",
+		    ret, resp.erd_status, resp.erd_ext_status);
 		return (ret);
 	}
 
