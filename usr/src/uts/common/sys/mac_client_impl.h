@@ -58,11 +58,6 @@ typedef struct mac_unicast_impl_s {			/* Protected by */
 	uint16_t			mui_vid;	/* SL */
 } mac_unicast_impl_t;
 
-#define	MAC_CLIENT_FLAGS_PRIMARY		0x0001
-#define	MAC_CLIENT_FLAGS_VNIC_PRIMARY		0x0002
-#define	MAC_CLIENT_FLAGS_MULTI_PRIMARY		0x0004
-#define	MAC_CLIENT_FLAGS_PASSIVE_PRIMARY	0x0008
-
 /*
  * One of these is instantiated per MAC client promiscuous callback.
  *
@@ -100,6 +95,86 @@ typedef union mac_tx_percpu_s {
 #define	pcpu_tx_refcnt	pcpu_lr._pcpu_tx_refcnt
 
 /*
+ * MAC Client type
+ */
+typedef enum {
+	MAC_CLIENT_FLAGS_PRIMARY		= 1 << 0,
+	MAC_CLIENT_FLAGS_VNIC_PRIMARY		= 1 << 1,
+	MAC_CLIENT_FLAGS_MULTI_PRIMARY		= 1 << 2,
+	MAC_CLIENT_FLAGS_PASSIVE_PRIMARY	= 1 << 3,
+} mac_client_flags_t;
+
+/*
+ * MAC Client Implementation State
+ */
+typedef enum {
+	/*
+	 * The client is a VNIC.
+	 */
+	MCIS_IS_VNIC			= 1 << 0,
+	/*
+	 * The client has exclusive control over the MAC, such that it is
+	 * the sole client of the MAC.
+	 */
+	MCIS_EXCLUSIVE			= 1 << 1,
+	/*
+	 * MAC will not add VLAN tags to outgoing traffic. If this flag
+	 * is set it is up to the client to add the correct VLAN tag.
+	 */
+	MCIS_TAG_DISABLE		= 1 << 2,
+	/*
+	 * MAC will not strip the VLAN tags on incoming traffic before
+	 * passing it to mci_rx_fn. This only applies to non-bypass
+	 * traffic.
+	 */
+	MCIS_STRIP_DISABLE		= 1 << 3,
+	/*
+	 * The client represents a port on an aggr.
+	 */
+	MCIS_IS_AGGR_PORT		= 1 << 4,
+	/*
+	 * The client is capable of polling the Rx TCP softrings.
+	 */
+	MCIS_CLIENT_POLL_CAPABLE	= 1 << 5,
+	/*
+	 * This flag is set when the client's link info has been logged
+	 * by the mac_log_linkinfo() timer. This ensures that the
+	 * client's link info is only logged once.
+	 */
+	MCIS_DESC_LOGGED		= 1 << 6,
+	/*
+	 * This client has an HIO share bound to it.
+	 */
+	MCIS_SHARE_BOUND		= 1 << 7,
+	/*
+	 * MAC will not check the VID of the client's Tx traffic.
+	 */
+	MCIS_DISABLE_TX_VID_CHECK	= 1 << 8,
+	/*
+	 * The client is using the same name as its underlying MAC. This
+	 * happens when dlmgmtd is unreachable during client creation.
+	 */
+	MCIS_USE_DATALINK_NAME		= 1 << 9,
+	/*
+	 * The client requires MAC address hardware classification. This
+	 * is only used by sun4v vsw.
+	 */
+	MCIS_UNICAST_HW			= 1 << 10,
+	/*
+	 * The client sits atop an aggr.
+	 */
+	MCIS_IS_AGGR_CLIENT		= 1 << 11,
+	/*
+	 * Do not allow the client to enable DLS bypass.
+	 */
+	MCIS_RX_BYPASS_DISABLE		= 1 << 12,
+	/*
+	 * This client has no MAC unicast addresss associated with it.
+	 */
+	MCIS_NO_UNICAST_ADDR		= 1 << 13,
+} mac_client_state_t;
+
+/*
  * One of these is instantiated for each MAC client.
  */
 struct mac_client_impl_s {			/* Protected by */
@@ -119,7 +194,7 @@ struct mac_client_impl_s {			/* Protected by */
 	 */
 	struct mac_impl_s	*mci_upper_mip;		/* WO */
 
-	uint32_t		mci_state_flags;	/* WO */
+	mac_client_state_t	mci_state_flags;	/* WO */
 	mac_rx_t		mci_rx_fn;		/* Rx Quiescence */
 	void			*mci_rx_arg;		/* Rx Quiescence */
 	mac_direct_rxs_t	mci_direct_rx;		/* SL */
@@ -130,7 +205,7 @@ struct mac_client_impl_s {			/* Protected by */
 	mac_cb_t		*mci_promisc_list;	/* mi_promisc_lock */
 
 	mac_address_t		*mci_unicast;
-	uint32_t		mci_flags;		/* SL */
+	mac_client_flags_t	mci_flags;		/* SL */
 	krwlock_t		mci_rw_lock;
 	mac_unicast_impl_t	*mci_unicast_list;	/* mci_rw_lock */
 
@@ -323,90 +398,6 @@ extern	int	mac_tx_percpu_cnt;
 #define	MAC_TAG_NEEDED(mcip)						\
 	(((mcip)->mci_state_flags & MCIS_TAG_DISABLE) == 0 &&		\
 	(mcip)->mci_nvids == 1)						\
-
-/*
- * MAC Client Implementation State (mci_state_flags)
- *
- * MCIS_IS_VNIC
- *
- *	The client is a VNIC.
- *
- * MCIS_EXCLUSIVE
- *
- *	The client has exclusive control over the MAC, such that it is
- *	the sole client of the MAC.
- *
- * MCIS_TAG_DISABLE
- *
- *	MAC will not add VLAN tags to outgoing traffic. If this flag
- *	is set it is up to the client to add the correct VLAN tag.
- *
- * MCIS_STRIP_DISABLE
- *
- *	MAC will not strip the VLAN tags on incoming traffic before
- *	passing it to mci_rx_fn. This only applies to non-bypass
- *	traffic.
- *
- * MCIS_IS_AGGR_PORT
- *
- *	The client represents a port on an aggr.
- *
- * MCIS_CLIENT_POLL_CAPABLE
- *
- *	The client is capable of polling the Rx TCP/UDP softrings.
- *
- * MCIS_DESC_LOGGED
- *
- *	This flag is set when the client's link info has been logged
- *	by the mac_log_linkinfo() timer. This ensures that the
- *	client's link info is only logged once.
- *
- * MCIS_SHARE_BOUND
- *
- *	This client has an HIO share bound to it.
- *
- * MCIS_DISABLE_TX_VID_CHECK
- *
- *	MAC will not check the VID of the client's Tx traffic.
- *
- * MCIS_USE_DATALINK_NAME
- *
- *	The client is using the same name as its underlying MAC. This
- *	happens when dlmgmtd is unreachable during client creation.
- *
- * MCIS_UNICAST_HW
- *
- *	The client requires MAC address hardware classification. This
- *	is only used by sun4v vsw.
- *
- * MCIS_IS_AGGR_CLIENT
- *
- *	The client sits atop an aggr.
- *
- * MCIS_RX_BYPASS_DISABLE
- *
- *	Do not allow the client to enable DLS bypass.
- *
- * MCIS_NO_UNICAST_ADDR
- *
- *	This client has no MAC unicast addresss associated with it.
- *
- */
-/* MCI state flags */
-#define	MCIS_IS_VNIC			0x0001
-#define	MCIS_EXCLUSIVE			0x0002
-#define	MCIS_TAG_DISABLE		0x0004
-#define	MCIS_STRIP_DISABLE		0x0008
-#define	MCIS_IS_AGGR_PORT		0x0010
-#define	MCIS_CLIENT_POLL_CAPABLE	0x0020
-#define	MCIS_DESC_LOGGED		0x0040
-#define	MCIS_SHARE_BOUND		0x0080
-#define	MCIS_DISABLE_TX_VID_CHECK	0x0100
-#define	MCIS_USE_DATALINK_NAME		0x0200
-#define	MCIS_UNICAST_HW			0x0400
-#define	MCIS_IS_AGGR_CLIENT		0x0800
-#define	MCIS_RX_BYPASS_DISABLE		0x1000
-#define	MCIS_NO_UNICAST_ADDR		0x2000
 
 /* Mac protection flags */
 #define	MPT_FLAG_V6_LOCAL_ADDR_SET	0x0001

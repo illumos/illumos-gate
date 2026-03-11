@@ -3637,8 +3637,8 @@ mac_tx(mac_client_handle_t mch, mblk_t *mp_chain, uintptr_t hint,
 		obytes = (mp_chain->b_cont == NULL ? MBLKL(mp_chain) :
 		    msgdsize(mp_chain));
 
-		mp_chain = mac_provider_tx(mip, srs_tx->st_arg2, mp_chain,
-		    mcip);
+		mp_chain = mac_provider_tx(mip,
+		    (mac_ring_handle_t)srs_tx->st_arg2, mp_chain, mcip);
 
 		if (mp_chain == NULL) {
 			cookie = 0;

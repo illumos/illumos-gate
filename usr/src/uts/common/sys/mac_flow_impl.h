@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_MAC_FLOW_IMPL_H
@@ -155,9 +156,12 @@ extern "C" {
 
 typedef struct flow_entry_s		flow_entry_t;
 typedef struct flow_tab_s		flow_tab_t;
-typedef struct flow_state_s 		flow_state_t;
+typedef struct flow_state_s		flow_state_t;
 struct mac_impl_s;
 struct mac_client_impl_s;
+struct mac_soft_ring_set_s;
+struct mac_group_s;
+struct mac_bcast_grp_s;
 
 /*
  * Classification flags used to lookup the flow.
@@ -180,24 +184,41 @@ typedef enum {
 typedef boolean_t	(*flow_match_fn_t)(flow_tab_t *, flow_entry_t *,
 			    flow_state_t *);
 
-/* fe_flags */
-#define	FE_QUIESCE		0x01	/* Quiesce the flow */
-#define	FE_WAITER		0x02	/* Flow has a waiter */
-#define	FE_FLOW_TAB		0x04	/* Flow is in the flow tab list */
-#define	FE_G_FLOW_HASH		0x08	/* Flow is in the global flow hash */
-#define	FE_INCIPIENT		0x10	/* Being setup */
-#define	FE_CONDEMNED		0x20	/* Being deleted */
-#define	FE_UF_NO_DATAPATH	0x40	/* No datapath setup for User flow */
-#define	FE_MC_NO_DATAPATH	0x80	/* No datapath setup for mac client */
+typedef enum {
+	/* Quiesce the flow */
+	FE_QUIESCE		= 0x01,
+	/* Flow has a waiter */
+	FE_WAITER		= 0x02,
+	/* Flow is in the flow tab list */
+	FE_FLOW_TAB		= 0x04,
+	/* Flow is in the global flow hash */
+	FE_G_FLOW_HASH		= 0x08,
+	/* Being setup */
+	FE_INCIPIENT		= 0x10,
+	/* Being deleted */
+	FE_CONDEMNED		= 0x20,
+	/* No datapath setup for User flow */
+	FE_UF_NO_DATAPATH	= 0x40,
+	/* No datapath setup for mac client */
+	FE_MC_NO_DATAPATH	= 0x80,
+} flow_entry_flags_t;
 
-/* fe_type */
-#define	FLOW_PRIMARY_MAC	0x01 	/* NIC primary MAC address */
-#define	FLOW_VNIC_MAC		0x02	/* VNIC flow */
-#define	FLOW_MCAST		0x04	/* Multicast (and broadcast) */
-#define	FLOW_OTHER		0x08	/* Other flows configured */
-#define	FLOW_USER		0x10	/* User defined flow */
+typedef enum {
+	/* NIC primary MAC address */
+	FLOW_PRIMARY_MAC	= 0x01,
+	/* VNIC flow */
+	FLOW_VNIC_MAC		= 0x02,
+	/* Multicast (and broadcast) */
+	FLOW_MCAST		= 0x04,
+	/* Other flows configured */
+	FLOW_OTHER		= 0x08,
+	/* User defined flow */
+	FLOW_USER		= 0x10,
+	/* Don't create stats for the flow */
+	FLOW_NO_STATS		= 0x20,
+} flow_entry_type_t;
+
 #define	FLOW_VNIC		FLOW_VNIC_MAC
-#define	FLOW_NO_STATS		0x20	/* Don't create stats for the flow */
 
 /*
  * Shared Bandwidth control counters between the soft ring set and its
@@ -228,7 +249,7 @@ typedef struct mac_bw_ctl_s {
 } mac_bw_ctl_t;
 
 struct flow_entry_s {					/* Protected by */
-	struct flow_entry_s	*fe_next;		/* ft_lock */
+	flow_entry_t		*fe_next;		/* ft_lock */
 
 	datalink_id_t		fe_link_id;		/* WO */
 
@@ -264,7 +285,7 @@ struct flow_entry_s {					/* Protected by */
 	 * has refs.
 	 */
 	uint32_t		fe_user_refcnt;		/* fe_lock */
-	uint_t			fe_flags;		/* fe_lock */
+	flow_entry_flags_t	fe_flags;		/* fe_lock */
 
 	/*
 	 * Function/args to invoke for delivering matching packets
@@ -273,33 +294,34 @@ struct flow_entry_s {					/* Protected by */
 	 * be changed.
 	 */
 	flow_fn_t		fe_cb_fn;		/* fe_lock */
-	void 			*fe_cb_arg1;		/* fe_lock */
+	void			*fe_cb_arg1;		/* fe_lock */
 	void			*fe_cb_arg2;		/* fe_lock */
 
 	void			*fe_client_cookie;	/* WO */
-	void			*fe_rx_ring_group;	/* SL */
-	void			*fe_rx_srs[MAX_RINGS_PER_GROUP]; /* fe_lock */
-	int			fe_rx_srs_cnt;		/* fe_lock */
-	void			*fe_tx_ring_group;
-	void			*fe_tx_srs;		/* WO */
-	int			fe_tx_ring_cnt;
+	struct mac_group_s	*fe_rx_ring_group;	/* SL */
+
+							/* fe_lock */
+	struct mac_soft_ring_set_s	*fe_rx_srs[MAX_RINGS_PER_GROUP];
+	uint32_t			fe_rx_srs_cnt;		/* fe_lock */
+	struct mac_group_s		*fe_tx_ring_group;
+	struct mac_soft_ring_set_s	*fe_tx_srs;		/* WO */
 
 	/*
 	 * This is a unicast flow, and is a mac_client_impl_t
 	 */
-	void			*fe_mcip; 		/* WO */
+	struct mac_client_impl_s	*fe_mcip;		/* WO */
 
 	/*
 	 * Used by mci_flent_list of mac_client_impl_t to track flows sharing
 	 * the same mac_client_impl_t.
 	 */
-	struct flow_entry_s	*fe_client_next;
+	flow_entry_t		*fe_client_next;
 
 	/*
 	 * This is a broadcast or multicast flow and is a mac_bcast_grp_t
 	 */
-	void			*fe_mbg;		/* WO */
-	uint_t			fe_type;		/* WO */
+	struct mac_bcast_grp_s	*fe_mbg;		/* WO */
+	flow_entry_type_t	fe_type;		/* WO */
 
 	/*
 	 * BW control info.
@@ -526,15 +548,12 @@ extern void	*mac_flow_get_client_cookie(flow_entry_t *);
 
 extern uint32_t	mac_flow_modify_props(flow_entry_t *, mac_resource_props_t *);
 
-extern int	mac_flow_update(flow_tab_t *, flow_entry_t *, flow_desc_t *);
 extern void	mac_flow_get_desc(flow_entry_t *, flow_desc_t *);
 extern void	mac_flow_set_desc(flow_entry_t *, flow_desc_t *);
 
 extern void	mac_flow_remove(flow_tab_t *, flow_entry_t *, boolean_t);
 extern void	mac_flow_hash_remove(flow_entry_t *);
 extern void	mac_flow_wait(flow_entry_t *, mac_flow_state_t);
-extern void	mac_flow_quiesce(flow_entry_t *);
-extern void	mac_flow_restart(flow_entry_t *);
 extern void	mac_flow_cleanup(flow_entry_t *);
 extern void	mac_flow_destroy(flow_entry_t *);
 
@@ -542,7 +561,6 @@ extern void	mac_flow_tab_create(flow_ops_t *, flow_mask_t, uint_t,
 		    struct mac_impl_s *, flow_tab_t **);
 extern void	mac_flow_l2tab_create(struct mac_impl_s *, flow_tab_t **);
 extern void	mac_flow_tab_destroy(flow_tab_t *);
-extern void	mac_flow_drop(void *, void *, mblk_t *);
 extern void	flow_stat_destroy(flow_entry_t *);
 
 #ifdef	__cplusplus

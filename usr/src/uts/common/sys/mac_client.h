@@ -23,7 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -156,7 +156,7 @@ extern mac_notify_handle_t mac_notify_add(mac_handle_t, mac_notify_t, void *);
 extern int mac_notify_remove(mac_notify_handle_t, boolean_t);
 extern void mac_notify_remove_wait(mac_handle_t);
 extern int mac_rename_primary(mac_handle_t, const char *);
-extern	char *mac_client_name(mac_client_handle_t);
+extern char *mac_client_name(mac_client_handle_t);
 
 extern int mac_open(const char *, mac_handle_t *);
 extern void mac_close(mac_handle_t);
@@ -185,8 +185,6 @@ extern mac_tx_notify_handle_t mac_client_tx_notify(mac_client_handle_t,
 extern int mac_client_set_resources(mac_client_handle_t,
     mac_resource_props_t *);
 extern void mac_client_get_resources(mac_client_handle_t,
-    mac_resource_props_t *);
-extern void mac_client_get_eff_resources(mac_client_handle_t,
     mac_resource_props_t *);
 
 /* bridging-related interfaces */

@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -64,30 +65,6 @@
  * hanging off the mac_impl_t. The broadcast group id's are
  * unique globally (tracked by mac_bcast_id).
  */
-
-/*
- * The same MAC client may be added for different <addr,vid> tuple,
- * we maintain a ref count for the number of times it has been added
- * to account for deleting the MAC client from the group.
- */
-typedef struct mac_bcast_grp_mcip_s {
-	mac_client_impl_t	*mgb_client;
-	int			mgb_client_ref;
-} mac_bcast_grp_mcip_t;
-
-typedef struct mac_bcast_grp_s {			/* Protected by */
-	struct mac_bcast_grp_s	*mbg_next;		/* SL */
-	void			*mbg_addr;		/* SL */
-	uint16_t		mbg_vid;		/* SL */
-	mac_impl_t		*mbg_mac_impl;		/* WO */
-	mac_addrtype_t		mbg_addrtype;		/* WO */
-	flow_entry_t		*mbg_flow_ent;		/* WO */
-	mac_bcast_grp_mcip_t	*mbg_clients;		/* mi_rw_lock */
-	uint_t			mbg_nclients;		/* mi_rw_lock */
-	uint_t			mbg_nclients_alloc;	/* SL */
-	uint64_t		mbg_clients_gen;	/* mi_rw_lock */
-	uint32_t		mbg_id;			/* atomic */
-} mac_bcast_grp_t;
 
 static kmem_cache_t *mac_bcast_grp_cache;
 static uint32_t mac_bcast_id = 0;
@@ -258,7 +235,7 @@ int
 mac_bcast_add(mac_client_impl_t *mcip, const uint8_t *addr, uint16_t vid,
     mac_addrtype_t addrtype)
 {
-	mac_impl_t 		*mip = mcip->mci_mip;
+	mac_impl_t		*mip = mcip->mci_mip;
 	mac_bcast_grp_t		*grp = NULL, **last_grp;
 	size_t			addr_len = mip->mi_type->mt_addr_length;
 	int			rc = 0;

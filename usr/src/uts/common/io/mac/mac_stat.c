@@ -1104,7 +1104,7 @@ mac_soft_ring_stat_create(mac_soft_ring_t *ringp)
 {
 	mac_soft_ring_set_t	*mac_srs = ringp->s_ring_set;
 	flow_entry_t		*flent = ringp->s_ring_mcip->mci_flent;
-	mac_ring_t		*ring = (mac_ring_t *)ringp->s_ring_tx_arg2;
+	mac_ring_t		*ring = ringp->s_ring_tx_arg2;
 	boolean_t		is_tx_srs;
 	char			statname[MAXNAMELEN];
 
@@ -1125,7 +1125,7 @@ mac_soft_ring_stat_create(mac_soft_ring_t *ringp)
 		 * protocol softrings. That is, each set of (TCP/TCP6, UDP/UDP6,
 		 * OTH) softrings counts as a single lane.
 		 */
-		if (ringp->s_ring_type & ST_RING_TCP) {
+		if (ringp->s_ring_state & ST_RING_TCP) {
 			int			index;
 			int			fanout_lane;
 			mac_soft_ring_t		*softring;

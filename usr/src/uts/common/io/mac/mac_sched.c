@@ -1262,7 +1262,7 @@ int mac_srs_worker_wakeup_ticks = 0;
 	ASSERT(MUTEX_HELD(&(mac_srs)->srs_lock));			\
 	if (!((mac_srs)->srs_state & SRS_PROC) &&			\
 		(mac_srs)->srs_tid == NULL) {				\
-		if (((mac_srs)->srs_state & SRS_LATENCY_OPT) ||		\
+		if (((mac_srs)->srs_type & SRST_LATENCY_OPT) ||		\
 			(mac_srs_worker_wakeup_ticks == 0))		\
 			cv_signal(&(mac_srs)->srs_async);		\
 		else							\
@@ -2435,7 +2435,7 @@ check_again:
 			 * is not running. Check to see if poll thread is
 			 * allowed to process.
 			 */
-			if (mac_srs->srs_state & SRS_LATENCY_OPT) {
+			if (mac_srs->srs_type & SRST_LATENCY_OPT) {
 				mac_srs->srs_drain_func(mac_srs, SRS_POLL_PROC);
 				if (!(mac_srs->srs_state & SRS_PAUSE) &&
 				    srs_rx->sr_poll_pkt_cnt <=
@@ -2640,7 +2640,8 @@ mac_srs_pick_chain(mac_soft_ring_set_t *mac_srs, mblk_t **chain_tail,
  * also apply to mac_rx_srs_drain_bw as well.
  */
 void
-mac_rx_srs_drain(mac_soft_ring_set_t *mac_srs, uint_t proc_type)
+mac_rx_srs_drain(mac_soft_ring_set_t *mac_srs,
+    const mac_soft_ring_set_state_t proc_type)
 {
 	mblk_t			*head;
 	mblk_t			*tail;
@@ -2652,17 +2653,12 @@ mac_rx_srs_drain(mac_soft_ring_set_t *mac_srs, uint_t proc_type)
 	ASSERT(MUTEX_HELD(&mac_srs->srs_lock));
 	ASSERT(!(mac_srs->srs_type & SRST_BW_CONTROL));
 
-	/* If we are blanked i.e. can't do upcalls, then we are done */
-	if (mac_srs->srs_state & (SRS_BLANK | SRS_PAUSE)) {
-		ASSERT((mac_srs->srs_type & SRST_NO_SOFT_RINGS) ||
-		    (mac_srs->srs_state & SRS_PAUSE));
+	if ((mac_srs->srs_state & SRS_PAUSE) != 0 ||
+	    mac_srs->srs_first == NULL) {
 		goto out;
 	}
 
-	if (mac_srs->srs_first == NULL)
-		goto out;
-
-	if (!(mac_srs->srs_state & SRS_LATENCY_OPT) &&
+	if (!(mac_srs->srs_type & SRST_LATENCY_OPT) &&
 	    (srs_rx->sr_poll_pkt_cnt <= srs_rx->sr_lowat)) {
 		/*
 		 * In the normal case, the SRS worker thread does no
@@ -2722,7 +2718,6 @@ again:
 	if (mac_srs->srs_type & SRST_NO_SOFT_RINGS) {
 		mac_direct_rx_t		proc;
 		void			*arg1;
-		mac_resource_handle_t	arg2;
 
 		/*
 		 * This is the case when a Rx is directly
@@ -2732,7 +2727,6 @@ again:
 		 */
 		proc = srs_rx->sr_func;
 		arg1 = srs_rx->sr_arg1;
-		arg2 = srs_rx->sr_arg2;
 
 		mac_srs->srs_state |= SRS_CLIENT_PROC;
 		mutex_exit(&mac_srs->srs_lock);
@@ -2741,15 +2735,14 @@ again:
 			tid = NULL;
 		}
 
-		proc(arg1, arg2, head, NULL);
+		proc(arg1, NULL, head, NULL);
 		/*
 		 * Decrement the size and count here itelf
 		 * since the packet has been processed.
 		 */
 		mutex_enter(&mac_srs->srs_lock);
 		MAC_UPDATE_SRS_COUNT_LOCKED(mac_srs, cnt);
-		if (mac_srs->srs_state & SRS_CLIENT_WAIT)
-			cv_signal(&mac_srs->srs_client_cv);
+
 		mac_srs->srs_state &= ~SRS_CLIENT_PROC;
 	} else {
 		/* Some kind of softrings based fanout is required */
@@ -2770,7 +2763,7 @@ again:
 		mutex_enter(&mac_srs->srs_lock);
 	}
 
-	if (!(mac_srs->srs_state & (SRS_BLANK|SRS_PAUSE)) &&
+	if (((mac_srs->srs_state & SRS_PAUSE) == 0) &&
 	    (mac_srs->srs_first != NULL)) {
 		/*
 		 * More packets arrived while we were clearing the
@@ -2877,7 +2870,8 @@ out:
  * also apply to mac_rx_srs_drain as well.
  */
 void
-mac_rx_srs_drain_bw(mac_soft_ring_set_t *mac_srs, uint_t proc_type)
+mac_rx_srs_drain_bw(mac_soft_ring_set_t *mac_srs,
+    const mac_soft_ring_set_state_t proc_type)
 {
 	mblk_t			*head;
 	mblk_t			*tail;
@@ -2910,10 +2904,7 @@ again:
 	}
 	mutex_exit(&mac_srs->srs_bw->mac_bw_lock);
 
-	/* If we are blanked i.e. can't do upcalls, then we are done */
-	if (mac_srs->srs_state & (SRS_BLANK | SRS_PAUSE)) {
-		ASSERT((mac_srs->srs_type & SRST_NO_SOFT_RINGS) ||
-		    (mac_srs->srs_state & SRS_PAUSE));
+	if ((mac_srs->srs_state & SRS_PAUSE) != 0) {
 		goto done;
 	}
 
@@ -3000,7 +2991,6 @@ again:
 	if (mac_srs->srs_type & SRST_NO_SOFT_RINGS) {
 		mac_direct_rx_t		proc;
 		void			*arg1;
-		mac_resource_handle_t	arg2;
 
 		/*
 		 * This is the case when a Rx is directly
@@ -3010,7 +3000,6 @@ again:
 		 */
 		proc = srs_rx->sr_func;
 		arg1 = srs_rx->sr_arg1;
-		arg2 = srs_rx->sr_arg2;
 
 		mac_srs->srs_state |= SRS_CLIENT_PROC;
 		mutex_exit(&mac_srs->srs_lock);
@@ -3019,7 +3008,7 @@ again:
 			tid = NULL;
 		}
 
-		proc(arg1, arg2, head, NULL);
+		proc(arg1, NULL, head, NULL);
 		/*
 		 * Decrement the size and count here itelf
 		 * since the packet has been processed.
@@ -3028,8 +3017,6 @@ again:
 		MAC_UPDATE_SRS_COUNT_LOCKED(mac_srs, cnt);
 		MAC_UPDATE_SRS_SIZE_LOCKED(mac_srs, sz);
 
-		if (mac_srs->srs_state & SRS_CLIENT_WAIT)
-			cv_signal(&mac_srs->srs_client_cv);
 		mac_srs->srs_state &= ~SRS_CLIENT_PROC;
 	} else {
 		/* Some kind of softrings based fanout is required */
@@ -3483,7 +3470,7 @@ mac_rx_srs_process(void *arg, mac_resource_handle_t srs, mblk_t *mp_chain,
 		 * latency, or if our stack is running deep, we should signal
 		 * the worker thread.
 		 */
-		if (loopback || !(mac_srs->srs_state & SRS_LATENCY_OPT)) {
+		if (loopback || !(mac_srs->srs_type & SRST_LATENCY_OPT)) {
 			/*
 			 * For loopback, We need to let the worker take
 			 * over as we don't want to continue in the same
@@ -4104,9 +4091,9 @@ mac_tx_invoke_callbacks(mac_client_impl_t *mcip, mac_tx_cookie_t cookie)
 	    &mcip->mci_tx_notify_cb_list);
 }
 
-/* ARGSUSED */
 void
-mac_tx_srs_drain(mac_soft_ring_set_t *mac_srs, uint_t proc_type)
+mac_tx_srs_drain(mac_soft_ring_set_t *mac_srs,
+    const mac_soft_ring_set_state_t proc_type __unused)
 {
 	mblk_t			*head, *tail;
 	size_t			sz;
@@ -4381,10 +4368,9 @@ mac_tx_classify(mac_impl_t *mip, mblk_t *mp)
 }
 
 mblk_t *
-mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
+mac_tx_send(mac_client_impl_t *src_mcip, mac_ring_t *ring, mblk_t *mp_chain,
     mac_tx_stats_t *stats)
 {
-	mac_client_impl_t *src_mcip = (mac_client_impl_t *)mch;
 	mac_impl_t *mip = src_mcip->mci_mip;
 	uint_t obytes = 0, opackets = 0, oerrors = 0;
 	mblk_t *mp = NULL, *next;
@@ -4395,7 +4381,7 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 		vid_check = MAC_VID_CHECK_NEEDED(src_mcip);
 		add_tag = MAC_TAG_NEEDED(src_mcip);
 		if (add_tag)
-			vid = mac_client_vid(mch);
+			vid = mac_client_vid((mac_client_handle_t)src_mcip);
 	} else {
 		ASSERT(mip->mi_nclients == 1);
 		vid_check = add_tag = B_FALSE;
@@ -4418,7 +4404,8 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 			    msgdsize(mp));
 
 			CHECK_VID_AND_ADD_TAG(mp);
-			mp = mac_provider_tx(mip, ring, mp, src_mcip);
+			mp = mac_provider_tx(mip, (mac_ring_handle_t)ring, mp,
+			    src_mcip);
 
 			/*
 			 * If the driver is out of descriptors and does a
@@ -4526,7 +4513,8 @@ mac_tx_send(mac_client_handle_t mch, mac_ring_handle_t ring, mblk_t *mp_chain,
 			 * Unknown destination, send via the underlying
 			 * NIC.
 			 */
-			mp = mac_provider_tx(mip, ring, mp, src_mcip);
+			mp = mac_provider_tx(mip, (mac_ring_handle_t)ring,
+			    mp, src_mcip);
 			if (mp != NULL) {
 				/*
 				 * Adjust for the last packet that
@@ -4602,8 +4590,9 @@ mac_tx_srs_get_soft_ring(mac_soft_ring_set_t *srs, mac_ring_t *tx_ring)
  * state field.
  */
 void
-mac_tx_srs_wakeup(mac_soft_ring_set_t *mac_srs, mac_ring_handle_t ring)
+mac_tx_srs_wakeup(mac_soft_ring_set_t *mac_srs, mac_ring_handle_t ring_h)
 {
+	mac_ring_t *ring = (mac_ring_t *)ring_h;
 	int i;
 	mac_soft_ring_t *sringp;
 	mac_srs_tx_t *srs_tx = &mac_srs->srs_tx;
@@ -4746,7 +4735,7 @@ mac_rx_soft_ring_process(mac_client_impl_t *mcip, mac_soft_ring_t *ringp,
 	ringp->s_ring_total_inpkt += cnt;
 	ringp->s_ring_total_rbytes += sz;
 	if ((mac_srs->srs_rx.sr_poll_pkt_cnt <= 1) &&
-	    !(ringp->s_ring_type & ST_RING_WORKER_ONLY)) {
+	    !(ringp->s_ring_state & ST_RING_WORKER_ONLY)) {
 		/* If on processor or blanking on, then enqueue and return */
 		if (ringp->s_ring_state & S_RING_BLANK ||
 		    ringp->s_ring_state & S_RING_PROC) {
@@ -4966,7 +4955,7 @@ mac_tx_soft_ring_process(mac_soft_ring_t *ringp, mblk_t *mp_chain,
 	    mac_srs->srs_tx.st_mode == SRS_TX_AGGR ||
 	    mac_srs->srs_tx.st_mode == SRS_TX_BW_AGGR);
 
-	if (ringp->s_ring_type & ST_RING_WORKER_ONLY) {
+	if (ringp->s_ring_state & ST_RING_WORKER_ONLY) {
 		/* Serialization mode */
 
 		mutex_enter(&ringp->s_ring_lock);
