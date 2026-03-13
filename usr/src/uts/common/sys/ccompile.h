@@ -26,6 +26,7 @@
 /*
  * Copyright 2015 EveryCity Ltd. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 #ifndef	_SYS_CCOMPILE_H
@@ -59,6 +60,8 @@ extern "C" {
 		__attribute__((__format__(printf, __n, (__n)+1)))
 #define	__sun_attr___VPRINTFLIKE__(__n)	\
 		__attribute__((__format__(printf, __n, 0)))
+
+#define	__FORMAT_ARG(__n)	__attribute__((format_arg(__n)))
 
 /*
  * Handle the kernel printf routines that can take '%b' too
@@ -133,6 +136,7 @@ extern "C" {
 #define	__aligned(x)
 #define	__sun_attr__(__a)
 #define	__sun_attr___unused__
+#define	__FORMAT_ARG(__n)
 
 #endif	/* __ATTRIBUTE_IMPLEMENTED || __GNUC__ */
 

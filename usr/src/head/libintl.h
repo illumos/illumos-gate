@@ -19,6 +19,7 @@
  * CDDL HEADER END
  */
 /*
+ * Copyright 2026 Edgecast Cloud LLC.
  * Copyright 2014 Garrett D'Amore <garrett@damore.org>
  *
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
@@ -29,7 +30,7 @@
 #ifndef	_LIBINTL_H
 #define	_LIBINTL_H
 
-#include <sys/isa_defs.h>
+#include <sys/feature_tests.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -64,9 +65,9 @@ typedef long	wchar_t;
 #define	__GNU_GETTEXT_SUPPORTED_REVISION(m)	\
 	((((m) == 0) || ((m) == 1)) ? 1 : -1)
 
-extern char *dcgettext(const char *, const char *, const int);
-extern char *dgettext(const char *, const char *);
-extern char *gettext(const char *);
+extern char *dcgettext(const char *, const char *, const int) __FORMAT_ARG(2);
+extern char *dgettext(const char *, const char *) __FORMAT_ARG(2);
+extern char *gettext(const char *) __FORMAT_ARG(1);
 extern char *textdomain(const char *);
 extern char *bindtextdomain(const char *, const char *);
 
@@ -75,10 +76,11 @@ extern char *bindtextdomain(const char *, const char *);
  * with Amendment 2
  */
 extern char *dcngettext(const char *, const char *,
-	const char *, unsigned long int, int);
+	const char *, unsigned long int, int) __FORMAT_ARG(2) __FORMAT_ARG(3);
 extern char *dngettext(const char *, const char *,
-	const char *, unsigned long int);
-extern char *ngettext(const char *, const char *, unsigned long int);
+	const char *, unsigned long int) __FORMAT_ARG(2) __FORMAT_ARG(3);
+extern char *ngettext(const char *, const char *, unsigned long int)
+	__FORMAT_ARG(1) __FORMAT_ARG(2);
 extern char *bind_textdomain_codeset(const char *, const char *);
 
 /* Word handling functions --- requires dynamic linking */

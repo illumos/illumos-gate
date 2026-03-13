@@ -26,6 +26,7 @@
  * Copyright 2018 Joyent, Inc.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 #include <unistd.h>
@@ -759,7 +760,7 @@ once_again:
 		if (line != NULL) {
 			if (strlcpy(ibuf, line, ibuf_size) >= ibuf_size)
 				warnx(dgettext(TEXT_DOMAIN,
-				    "Line too long (max=%d chars)"),
+				    "Line too long (max=%zu chars)"),
 				    ibuf_size);
 			line = ibuf;
 		}
@@ -3435,7 +3436,7 @@ opensavefile(char *filename)
 		    ((buf.st_mode & S_IAMB) != S_IRUSR)) {
 			warnx(dgettext(TEXT_DOMAIN,
 			    "WARNING: Save file already exists with "
-			    "permission %o."), buf.st_mode & S_IAMB);
+			    "permission %o."), (uint_t)(buf.st_mode & S_IAMB));
 			warnx(dgettext(TEXT_DOMAIN,
 			    "Normal users may be able to read IPsec "
 			    "keying material."));
