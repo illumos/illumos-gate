@@ -26,6 +26,7 @@
  */
 
 /*
+ * Copyright 2026 Edgecast Cloud LLC.
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2012 by Delphix. All rights reserved.
  */
@@ -1226,6 +1227,8 @@ nlm_host_destroy(struct nlm_host *hostp)
 	strfree(hostp->nh_name);
 	strfree(hostp->nh_netid);
 	kmem_free(hostp->nh_addr.buf, hostp->nh_addr.maxlen);
+	if (hostp->nh_laddr.buf != NULL)
+		kmem_free(hostp->nh_laddr.buf, hostp->nh_laddr.maxlen);
 
 	if (hostp->nh_sysid != LM_NOSYSID)
 		nlm_sysid_free(hostp->nh_sysid);
