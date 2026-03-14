@@ -1398,7 +1398,11 @@ nlm_host_create(char *name, const char *netid,
 	host->nh_netid = strdup(netid);
 	host->nh_knc = *knc;
 	nlm_copy_netbuf(&host->nh_addr, naddr);
-	nlm_copy_netbuf(&host->nh_laddr, laddr);
+	if (laddr != NULL) {
+		nlm_copy_netbuf(&host->nh_laddr, laddr);
+	} else {
+		bzero(&host->nh_laddr, sizeof (host->nh_laddr));
+	}
 
 	host->nh_state = 0;
 	host->nh_rpcb_state = NRPCB_NEED_UPDATE;
