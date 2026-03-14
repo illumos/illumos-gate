@@ -153,6 +153,37 @@ update_host_rpcbinding(struct nlm_host *hostp, int vers)
 }
 
 /*
+ * If we have a local (src) binding, use it.
+ * See similar in update_host_rpcbinding().
+ */
+static void
+set_bindsrcaddr(struct nlm_host *hostp, nlm_rpc_t *rpcp)
+{
+	struct netbuf *laddr_copy = (struct netbuf *)
+	    kmem_zalloc(sizeof (struct netbuf), KM_SLEEP);
+
+	clnt_dup_netbuf(&hostp->nh_laddr, laddr_copy);
+	struct sockaddr *saddr = (struct sockaddr *)
+	    laddr_copy->buf;
+	if (saddr->sa_family == AF_INET) {
+		struct sockaddr_in *in_addr;
+		in_addr = (struct sockaddr_in *)saddr;
+		in_addr->sin_port = 0;
+	} else if (saddr->sa_family == AF_INET6) {
+		struct sockaddr_in6 *in6_addr;
+		in6_addr = (struct sockaddr_in6 *)saddr;
+		in6_addr->sin6_port = 0;
+	}
+	if (!clnt_control(rpcp->nr_handle, CLSET_BINDSRCADDR,
+	    (char *)laddr_copy)) {
+		cmn_err(CE_WARN, "Unable to set "
+		    "CLSET_BINDSRCADDR\n");
+	}
+	clnt_free_netbuf(laddr_copy);
+	kmem_free(laddr_copy, sizeof (struct netbuf));
+}
+
+/*
  * Refresh RPC handle taken from host handles cache.
  * This function is called when an RPC handle is either
  * uninitialized or was initialized using a binding that's
@@ -185,38 +216,18 @@ refresh_nlm_rpc(struct nlm_host *hostp, nlm_rpc_t *rpcp)
 		    (char *)&clset) == FALSE) {
 			NLM_ERR("Unable to set CLSET_NODELAYONERR\n");
 		}
-		/*
-		 * If we have a local (src) binding, use it.
-		 * See similar in update_host_rpcbinding().
-		 */
-		if ((&hostp->nh_laddr)->buf != NULL) {
-			struct netbuf *laddr_copy = (struct netbuf *)
-			    kmem_zalloc(sizeof (struct netbuf), KM_SLEEP);
-			clnt_dup_netbuf(&hostp->nh_laddr, laddr_copy);
-			struct sockaddr *saddr = (struct sockaddr *)
-			    laddr_copy->buf;
-			if (saddr->sa_family == AF_INET) {
-				struct sockaddr_in *in_addr;
-				in_addr = (struct sockaddr_in *)saddr;
-				in_addr->sin_port = 0;
-			} else if (saddr->sa_family == AF_INET6) {
-				struct sockaddr_in6 *in6_addr;
-				in6_addr = (struct sockaddr_in6 *)saddr;
-				in6_addr->sin6_port = 0;
-			}
-			if (!clnt_control(rpcp->nr_handle, CLSET_BINDSRCADDR,
-			    (char *)laddr_copy)) {
-				cmn_err(CE_WARN, "Unable to set "
-				    "CLSET_BINDSRCADDR\n");
-			}
-			clnt_free_netbuf(laddr_copy);
-			kmem_free(laddr_copy, sizeof (struct netbuf));
+		if (hostp->nh_laddr.buf != NULL) {
+			set_bindsrcaddr(hostp, rpcp);
 		}
 	} else {
 		ret = clnt_tli_kinit(rpcp->nr_handle, &hostp->nh_knc,
 		    &hostp->nh_addr, 0, NLM_RPC_RETRIES, CRED());
 		if (ret == 0) {
 			enum clnt_stat stat;
+
+			if (hostp->nh_laddr.buf != NULL) {
+				set_bindsrcaddr(hostp, rpcp);
+			}
 
 			/*
 			 * Check whether host's RPC binding is still
