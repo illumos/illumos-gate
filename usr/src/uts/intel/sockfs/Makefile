@@ -62,14 +62,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 LDFLAGS         += -Ndrv/ip
 
 #
-#	Derived file "nl7ctokgen.h" defines.
-#
-SRCDIR		 = $(UTSBASE)/common/fs/sockfs
-TOKGEN		 = $(SRCDIR)/nl7ctokgen
-DERIVED_FILES	 = nl7ctokgen.h
-CFLAGS		+= -I.
-
-#
 #	Default build targets.
 #
 .KEEP_STATE:
@@ -90,11 +82,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-#
-#	Derived file gen.
-#
-$(SRCDIR)/nl7chttp.c: nl7ctokgen.h
-
-nl7ctokgen.h: $(TOKGEN) $(SRCDIR)/nl7ctokreq.txt $(SRCDIR)/nl7ctokres.txt
-	/bin/ksh $(TOKGEN) $(SRCDIR)/nl7ctokreq.txt $(SRCDIR)/nl7ctokres.txt >$@

@@ -282,22 +282,6 @@ sotpi_create(struct sockparams *sp, int family, int type, int protocol,
 
 	ASSERT(sp->sp_sdev_info.sd_vnode != NULL);
 
-	if (family == AF_NCA) {
-		/*
-		 * The request is for an NCA socket so for NL7C use the
-		 * INET domain instead and mark NL7C_AF_NCA below.
-		 */
-		family = AF_INET;
-		/*
-		 * NL7C is not supported in the non-global zone,
-		 * we enforce this restriction here.
-		 */
-		if (getzoneid() != GLOBAL_ZONEID) {
-			*errorp = ENOTSUP;
-			return (NULL);
-		}
-	}
-
 	/*
 	 * to be compatible with old tpi socket implementation ignore
 	 * sleep flag (sflags) passed in

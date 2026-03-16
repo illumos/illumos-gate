@@ -116,9 +116,6 @@ static void
 kidmap_purge_pid2sid_cache(idmap_pid2sid_cache_t *cache, size_t limit);
 
 
-/*
- * kidmap_strdup() copied from uts/common/fs/sockfs/nl7c.c
- */
 static char *
 kidmap_strdup(const char *s)
 {
