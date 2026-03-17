@@ -1724,7 +1724,7 @@ vi_pci_notify_cfg_write(struct virtio_softc *vs, uint64_t offset, int size,
 	unsigned int qid = value;
 	struct vqueue_info *vq;
 
-	DPRINTF(vs, "VIRTIO %s notify queue 0x%x offset 0x%x",
+	DPRINTF(vs, "VIRTIO %s notify VQ 0x%x offset 0x%x",
 	    name, qid, offset);
 
 	if (size != 2) {
@@ -1733,21 +1733,27 @@ vi_pci_notify_cfg_write(struct virtio_softc *vs, uint64_t offset, int size,
 		return;
 	}
 
-	if ((vs->vs_status & VIRTIO_CONFIG_STATUS_DRIVER_OK) == 0)
+	if ((vs->vs_status & VIRTIO_CONFIG_STATUS_DRIVER_OK) == 0) {
+		EPRINTLN("%s: attempt to use VQ 0x%x before DRIVER_OK, "
+		    "driver confused?", name, qid);
 		return;
+	}
 
-	if ((vs->vs_flags & VIRTIO_BROKEN) != 0)
+	if ((vs->vs_flags & VIRTIO_BROKEN) != 0) {
+		EPRINTLN("%s: attempt to use VQ 0x%x while VIRTIO device is "
+		    "flagged as broken", name, qid);
 		return;
+	}
 
 	if (offset != qid * VQ_NOTIFY_OFF_MULTIPLIER) {
 		EPRINTLN(
-		    "%s: queue %u notify does not have matching offset at 0x%"
+		    "%s: VQ 0x%x notify does not have matching offset at 0x%"
 		    PRIx64, name, qid, offset);
 		return;
 	}
 
 	if (qid >= vc->vc_nvq) {
-		EPRINTLN("%s: queue %u notify out of range", name, qid);
+		EPRINTLN("%s: VQ 0x%x notify out of range", name, qid);
 		return;
 	}
 
@@ -1759,7 +1765,7 @@ vi_pci_notify_cfg_write(struct virtio_softc *vs, uint64_t offset, int size,
 	else if (vc->vc_qnotify != NULL)
 		(*vc->vc_qnotify)(DEV_SOFTC(vs), vq);
 	else
-		EPRINTLN("%s: qnotify queue %u: no vq/vc notify", name, qid);
+		EPRINTLN("%s: qnotify VQ 0x%x: no vq/vc notify", name, qid);
 }
 
 /*
