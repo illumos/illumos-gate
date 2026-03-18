@@ -24,6 +24,7 @@
  * Copyright 2017 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright 2017 Jason King
  * Copyright 2025 Edgecast Cloud LLC
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -31,7 +32,6 @@
 
 /*
  * du -- summarize disk usage
- *	du [-Adorx] [-a|-s] [-h|-k|-m] [-H|-L] [file...]
  */
 
 #include <sys/types.h>
@@ -39,6 +39,7 @@
 #include <sys/stat.h>
 #include <sys/avl.h>
 #include <sys/sysmacros.h>
+#include <assert.h>
 #include <fcntl.h>
 #include <dirent.h>
 #include <limits.h>
@@ -51,6 +52,7 @@
 
 
 static int		aflg = 0;
+static int		bflg = 0;
 static int		rflg = 0;
 static int		sflg = 0;
 static int		kflg = 0;
@@ -115,11 +117,21 @@ main(int argc, char **argv)
 	rflg++;		/* "-r" is not an option but ON always */
 #endif
 
-	while ((c = getopt(argc, argv, "aAdhHkLmorsx")) != EOF)
+	while ((c = getopt(argc, argv, "aAbdhHkLmorsx")) != EOF)
 		switch (c) {
 
 		case 'a':
 			aflg++;
+			continue;
+
+		case 'b':
+			bflg++;
+			/*
+			 * -b implies -A since reporting in bytes
+			 * requires the apparent file size rather than
+			 * the allocated block count.
+			 */
+			Aflg++;
 			continue;
 
 		case 'h':
@@ -179,7 +191,7 @@ main(int argc, char **argv)
 			continue;
 		case '?':
 			(void) fprintf(stderr, gettext(
-			    "usage: du [-Adorx] [-a|-s] [-h|-k|-m] [-H|-L] "
+			    "usage: du [-Adorx] [-a|-s] [-b|-h|-k|-m] [-H|-L] "
 			    "[file...]\n"));
 			exit(2);
 		}
@@ -192,6 +204,12 @@ main(int argc, char **argv)
 	/* "-o" and "-s" don't make any sense together. */
 	if (oflg && sflg)
 		oflg = 0;
+
+	if (bflg && (hflg || kflg || mflg)) {
+		(void) fprintf(stderr, gettext("usage: -b cannot be used in "
+		    "conjunction with -h, -k or -m\n"));
+		exit(2);
+	}
 
 	if ((base = (char *)calloc(base_len, sizeof (char))) == NULL) {
 		perror("du");
@@ -537,6 +555,7 @@ mkb(blkcnt_t n, size_t shift)
 	 * If hflg was not used, we need to output number of blocks
 	 * rounded up. Block sizes can be 1M, 1K or 512 bytes.
 	 * First, convert blocks to 1 byte units and then round up.
+	 * If Aflg was used, the value is already in bytes.
 	 */
 	if (!Aflg)
 		v <<= DEV_BSHIFT;
@@ -557,7 +576,10 @@ printsize(blkcnt_t blocks, char *path)
 		return;
 	}
 
-	if (kflg) {
+	if (bflg) {
+		assert(Aflg);
+		(void) printf(FORMAT2, (u_longlong_t)blocks, path);
+	} else if (kflg) {
 		(void) printf(FORMAT2, mkb(blocks, DEV_KSHIFT), path);
 	} else if (mflg) {
 		(void) printf(FORMAT2, mkb(blocks, DEV_MSHIFT), path);
