@@ -25,12 +25,8 @@
 .Nm
 .Op Fl dv
 .Cm list
-.Oo
-.Fl c
-.Oc
-.Oo
-.Fl p o Ar field Ns [,...]
-.Oc
+.Op Fl c | L
+.Op Fl p o Ar field Ns [,...]
 .Op Ar ctl[/ns] Ns [,...]
 .Nm
 .Op Fl dv
@@ -397,12 +393,8 @@ command.
 .It Xo
 .Nm
 .Cm list
-.Oo
-.Fl c
-.Oc
-.Oo
-.Fl p o Ar field Ns [,...]
-.Oc
+.Op Fl c | L
+.Op Fl p o Ar field Ns [,...]
 .Op Ar ctl[/ns] Ns [,...]
 .Xc
 Lists the NVMe controllers and by default also their active
@@ -425,6 +417,9 @@ command supports the following options:
 .Bl -tag -width Fl
 .It Fl c
 List controllers only and not their namespaces.
+.It Fl L
+List information about controller location and controlling attachment
+points.
 .It Fl p
 Produce parsable output rather than human-readable output.
 This option requires that output fields be selected with the
@@ -521,12 +516,28 @@ The metadata size, in bytes, of the namespace's LBA format.
 .Pp
 When using the
 .Fl c
+or
+.Fl L
 option to list controllers, the following additional fields are supported:
 .Bl -tag -width UNALLOCATED
 .It Sy CAPACITY
 The total raw capacity of the NVMe controller in bytes.
 .It Sy UNALLOCATED
 The number of bytes not currently assigned to any namespace in the controller.
+.El
+.Pp
+When using the
+.Fl L
+option, the following additional fields are supported:
+.Bl -tag -width LOCATION
+.It Sy LOCATION
+A string that indicates its physical location, derived from system
+topology.
+.It Sy CTLAP
+The name of the parent attachment point, if any, that controls this
+device.
+Usable with
+.Xr cfgadm 8 .
 .El
 .It Xo
 .Nm

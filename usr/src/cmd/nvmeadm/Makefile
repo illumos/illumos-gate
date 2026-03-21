@@ -46,6 +46,7 @@ include $(SRC)/common/hexdump/Makefile.com
 
 CPPFLAGS +=	-I$(SRC)/uts/common/io/nvme -I$(SRC)/common/nvme
 LDLIBS +=	-ldevinfo -lofmt -lcmdutils -lnvme
+LDLIBS +=	-L$(ROOT)/usr/lib/fm/64 -R/usr/lib/fm/64 -ltopo
 CSTD=	$(CSTD_GNU99)
 CTF_MODE= link
 

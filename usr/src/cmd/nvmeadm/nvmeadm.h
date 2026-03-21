@@ -23,6 +23,7 @@
 #include <nvme_common.h>
 #include <nvme_reg.h>
 #include <ofmt.h>
+#include <fm/libtopo.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -100,6 +101,17 @@ struct nvme_process_arg {
 /*
  * Command-specific arguments
  */
+typedef enum {
+	NVMEADM_LIST_DEFAULT,
+	NVMEADM_LIST_CTRL,
+	NVMEADM_LIST_LOC
+} nvmeadm_list_mode_t;
+
+typedef struct {
+	nvmeadm_list_mode_t list_mode;
+	topo_hdl_t *list_topo;
+} nvmeadm_list_t;
+
 typedef struct {
 	boolean_t nll_unimpl;
 	nvme_log_disc_scope_t nll_scope;
@@ -201,9 +213,12 @@ typedef struct {
 	nvme_ns_info_t *nloa_ns;
 	const char *nloa_disk;
 	const char *nloa_state;
+	char *nloa_loc;
+	char *nloa_ap;
 } nvmeadm_list_ofmt_arg_t;
 
 extern const ofmt_field_t nvmeadm_list_ctrl_ofmt[];
+extern const ofmt_field_t nvmeadm_list_loc_ofmt[];
 extern const ofmt_field_t nvmeadm_list_nsid_ofmt[];
 
 typedef struct {

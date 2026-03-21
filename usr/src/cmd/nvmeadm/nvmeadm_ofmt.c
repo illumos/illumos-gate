@@ -71,7 +71,9 @@ typedef enum nvme_list_ofmt_field {
 	NVME_LIST_NS_FORMAT,
 	NVME_LIST_NS_FMTID,
 	NVME_LIST_NS_FMTDS,
-	NVME_LIST_NS_FMTMS
+	NVME_LIST_NS_FMTMS,
+	NVME_LIST_LOC_LOC,
+	NVME_LIST_LOC_CTLAP
 } nvme_list_ofmt_field_t;
 
 static boolean_t
@@ -145,6 +147,20 @@ nvmeadm_list_ctrl_ofmt_cb(ofmt_arg_t *ofmt_arg, char *buf, uint_t buflen)
 			ret = nvme_snprint_uint128(buf, buflen, u128, 0, 0);
 		} else {
 			return (B_FALSE);
+		}
+		break;
+	case NVME_LIST_LOC_LOC:
+		if (list->nloa_loc != NULL) {
+			ret = strlcpy(buf, list->nloa_loc, buflen);
+		} else {
+			ret = strlcpy(buf, "-", buflen);
+		}
+		break;
+	case NVME_LIST_LOC_CTLAP:
+		if (list->nloa_ap != NULL) {
+			ret = strlcpy(buf, list->nloa_ap, buflen);
+		} else {
+			ret = strlcpy(buf, "-", buflen);
 		}
 		break;
 	default:
@@ -271,6 +287,20 @@ const ofmt_field_t nvmeadm_list_ctrl_ofmt[] = {
 	{ "INSTANCE", 10, NVME_LIST_INSTANCE, nvmeadm_list_common_ofmt_cb },
 	{ "UNALLOCATED", 15, NVME_LIST_UNALLOC, nvmeadm_list_ctrl_ofmt_cb },
 	{ "CTRLPATH", 30, NVME_LIST_CTRLPATH, nvmeadm_list_common_ofmt_cb },
+	{ NULL, 0, 0, NULL }
+};
+
+const ofmt_field_t nvmeadm_list_loc_ofmt[] = {
+	{ "MODEL", 30, NVME_LIST_MODEL, nvmeadm_list_common_ofmt_cb },
+	{ "SERIAL", 20, NVME_LIST_SERIAL, nvmeadm_list_common_ofmt_cb },
+	{ "FWREV", 10, NVME_LIST_FWREV, nvmeadm_list_common_ofmt_cb },
+	{ "VERSION", 10, NVME_LIST_VERSION, nvmeadm_list_common_ofmt_cb },
+	{ "CAPACITY", 15, NVME_LIST_CAPACITY, nvmeadm_list_ctrl_ofmt_cb },
+	{ "INSTANCE", 10, NVME_LIST_INSTANCE, nvmeadm_list_common_ofmt_cb },
+	{ "UNALLOCATED", 15, NVME_LIST_UNALLOC, nvmeadm_list_ctrl_ofmt_cb },
+	{ "CTRLPATH", 30, NVME_LIST_CTRLPATH, nvmeadm_list_common_ofmt_cb },
+	{ "LOCATION", 15, NVME_LIST_LOC_LOC, nvmeadm_list_ctrl_ofmt_cb },
+	{ "CTLAP", 10, NVME_LIST_LOC_CTLAP, nvmeadm_list_ctrl_ofmt_cb },
 	{ NULL, 0, 0, NULL }
 };
 

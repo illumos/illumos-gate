@@ -47,6 +47,8 @@
 #include <sys/sysmacros.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <sys/fm/protocol.h>
+#include <fm/topo_hc.h>
 
 #include <sys/nvme.h>
 
@@ -150,11 +152,6 @@ int debug;
 #define	NVMEADM_O_ID_DESC_LIST	0x00000040
 #define	NVMEADM_O_ID_ALLOC_NS	0x00000080
 
-/*
- * nvmeadm List specific options
- */
-#define	NVMEADM_O_LS_CTRL	0x00000100
-
 static int exitcode;
 
 /*
@@ -169,6 +166,7 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		"list",
 		"list controllers and namespaces",
 		"  -c\t\tlist only controllers\n"
+		"  -L\t\tlist controller location\n"
 		"  -p\t\tprint parsable output\n"
 		"  -o field\tselect a field for parsable output\n",
 		"  model\t\tthe controller's model name\n"
@@ -187,7 +185,9 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		"  format\ta description of the namespace's format\n"
 		"  fmtid\t\tthe numerical id of the namespace's format\n"
 		"  fmtds\t\tthe data size of the namespace's format\n"
-		"  fmtms\t\tthe metadata size of the namespace's format\n",
+		"  fmtms\t\tthe metadata size of the namespace's format\n"
+		"  location\tcontroller location (-L)\n"
+		"  ctlap\t\tcontrolling attachment point (-L)\n",
 		do_list, usage_list, optparse_list,
 		NVMEADM_C_MULTI
 	},
@@ -1133,7 +1133,7 @@ static void
 usage_list(const char *c_name)
 {
 	(void) fprintf(stderr, "%s "
-	    "[-c] [-p -o field[,...]] [<ctl>[/<ns>][,...]\n\n"
+	    "[-c | -L] [-p -o field[,...]] [<ctl>[/<ns>][,...]\n\n"
 	    "  List NVMe controllers and their namespaces. If no "
 	    "controllers and/or name-\n  spaces are specified, all "
 	    "controllers and namespaces in the system will be\n  "
@@ -1145,15 +1145,27 @@ optparse_list(nvme_process_arg_t *npa)
 {
 	int c;
 	uint_t oflags = 0;
-	boolean_t parse = B_FALSE;
+	boolean_t parse = B_FALSE, cflag = B_FALSE, Lflag = B_FALSE;
 	const char *fields = NULL;
 	const ofmt_field_t *ofmt = nvmeadm_list_nsid_ofmt;
+	nvmeadm_list_t *list = NULL;
 
-	while ((c = getopt(npa->npa_argc, npa->npa_argv, ":co:p")) != -1) {
+	if ((list = calloc(1, sizeof (nvmeadm_list_t))) == NULL) {
+		err(-1, "failed to allocate memory for argument tracking");
+	}
+	list->list_mode = NVMEADM_LIST_DEFAULT;
+
+	while ((c = getopt(npa->npa_argc, npa->npa_argv, ":cLo:p")) != -1) {
 		switch (c) {
 		case 'c':
-			npa->npa_cmdflags |= NVMEADM_O_LS_CTRL;
+			cflag = B_TRUE;
+			list->list_mode = NVMEADM_LIST_CTRL;
 			ofmt = nvmeadm_list_ctrl_ofmt;
+			break;
+		case 'L':
+			Lflag = B_TRUE;
+			list->list_mode = NVMEADM_LIST_LOC;
+			ofmt = nvmeadm_list_loc_ofmt;
 			break;
 		case 'o':
 			fields = optarg;
@@ -1172,8 +1184,19 @@ optparse_list(nvme_process_arg_t *npa)
 		}
 	}
 
+	if (cflag && Lflag) {
+		errx(-1, "only one of -c and -L may be selected");
+	}
+
 	if (fields != NULL && !parse) {
 		errx(-1, "-o can only be used when in parsable mode (-p)");
+	}
+
+	/*
+	 * We use ofmt by default with -L.
+	 */
+	if (fields == NULL && Lflag) {
+		fields = "instance,model,location,ctlap";
 	}
 
 	if (parse && fields == NULL) {
@@ -1181,13 +1204,31 @@ optparse_list(nvme_process_arg_t *npa)
 		    "fields with -o");
 	}
 
-	if (parse) {
+	if (parse || Lflag) {
 		ofmt_status_t oferr;
 
 		oferr = ofmt_open(fields, ofmt, oflags, 0,
 		    &npa->npa_ofmt);
 		ofmt_check(oferr, B_TRUE, npa->npa_ofmt, nvme_oferr, warnx);
 	}
+
+	if (Lflag) {
+		int e;
+
+		list->list_topo = topo_open(TOPO_VERSION, NULL, &e);
+		if (list->list_topo == NULL) {
+			errx(-1, "location information unavailable: unable to "
+			    "obtain topo handle: %s", topo_strerror(e));
+		}
+
+		(void) topo_snap_hold(list->list_topo, NULL, &e);
+		if (e != 0) {
+			errx(-1, "location information unavailable: unable to "
+			    "obtain topo snapshot: %s", topo_strerror(e));
+		}
+	}
+
+	npa->npa_cmd_arg = list;
 }
 
 static void
@@ -1252,6 +1293,133 @@ do_list_nsid(const nvme_process_arg_t *npa, nvme_ctrl_info_t *ctrl,
 	free(disk_path);
 }
 
+/*
+ * Determine a device's controlling AP. As most NVMe devices are PCIe devices
+ * (except when virtualized) we look at the parent pcieb instance and look for
+ * its ap-names and slot-names properties.
+ */
+static void
+do_list_phys_map_ctlap(nvmeadm_list_ofmt_arg_t *oarg)
+{
+	di_node_t pdip;
+	int *ap_names, *slot_names;
+
+	pdip = di_parent_node(oarg->nloa_dip);
+	if (pdip == DI_NODE_NIL) {
+		return;
+	}
+
+	/*
+	 * This probably will need to change a bit when we understand the exact
+	 * shape AP's take when ACPI-based PCI hotplug is supported for virtual
+	 * machines. In that world, it's not clear where the AP will live.
+	 */
+	const char *drv = di_driver_name(pdip);
+	if (drv == NULL || strcmp(drv, "pcieb") != 0) {
+		return;
+	}
+
+	/*
+	 * The AP names property is a bitfield that indicates which entry in the
+	 * slot-names. A given device can in theory support multiple slots, but
+	 * PCIe is always going to be a value of 1.
+	 */
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, pdip, "ap-names", &ap_names) !=
+	    1 || *ap_names != 1) {
+		return;
+	}
+
+	/*
+	 * The slot-names property is structured with the first word as a
+	 * bitfield mask and then a series of names which are guaranteed to be
+	 * NULL terminated.
+	 */
+	int nu32 = di_prop_lookup_ints(DDI_DEV_T_ANY, pdip, "slot-names",
+	    &slot_names);
+	if (nu32 <= 1 || slot_names[0] != 1) {
+		return;
+	}
+
+	oarg->nloa_ap = calloc(nu32 - 1, sizeof (uint32_t));
+	if (oarg->nloa_ap == NULL) {
+		err(-1, "failed to allocate memory for attachment point name");
+	}
+
+	(void) memcpy(oarg->nloa_ap, &slot_names[1], sizeof (uint32_t) *
+	    (nu32 - 1));
+}
+
+/*
+ * NVMe devices are always enumerated with an 'nvme' node. See if we can find
+ * that.
+ */
+static int
+do_list_phys_map_loc_cb(topo_hdl_t *hp, tnode_t *tn, void *arg)
+{
+	nvmeadm_list_ofmt_arg_t *oarg = arg;
+	char *label = NULL;
+	uint32_t tinst;
+	int err;
+
+	if (strcmp(topo_node_name(tn), NVME) != 0) {
+		return (TOPO_WALK_NEXT);
+	}
+
+	if (topo_prop_get_uint32(tn, TOPO_PGROUP_IO, TOPO_IO_INSTANCE, &tinst,
+	    &err) != 0) {
+		return (TOPO_WALK_NEXT);
+	}
+
+	if (tinst != (uint32_t)di_instance(oarg->nloa_dip)) {
+		return (TOPO_WALK_NEXT);
+	}
+
+	/*
+	 * Walk the node hierarchy looking for something that has a label. We
+	 * basically only consider ourselves and our immediate parent if that
+	 * parent is a bay or slot. If we go too far then we may end up finding
+	 * a label for a device that has no relationship to us.
+	 */
+	if (topo_prop_get_string(tn, TOPO_PGROUP_PROTOCOL, TOPO_PROP_LABEL,
+	    &label, &err) != 0) {
+		tnode_t *pn = topo_node_parent(tn);
+		const char *pname = topo_node_name(pn);
+		if (strcmp(pname, BAY) == 0 || strcmp(pname, SLOT) == 0) {
+			if (topo_prop_get_string(pn, TOPO_PGROUP_PROTOCOL,
+			    TOPO_PROP_LABEL, &label, &err) != 0) {
+				label = NULL;
+			}
+		}
+	}
+
+	oarg->nloa_loc = label;
+	return (TOPO_WALK_TERMINATE);
+}
+
+static void
+do_list_phys_map_loc(nvmeadm_list_t *list, nvmeadm_list_ofmt_arg_t *oarg)
+{
+	topo_walk_t *wp;
+	int err;
+
+	wp = topo_walk_init(list->list_topo, FM_FMRI_SCHEME_HC,
+	    do_list_phys_map_loc_cb, oarg, &err);
+	if (wp == NULL) {
+		warnx("location information not available: failed to "
+		    "initialize topo walk: %s", topo_strerror(err));
+		exitcode = -1;
+		return;
+	}
+
+	err = topo_walk_step(wp, TOPO_WALK_SIBLING);
+	if (err == TOPO_WALK_ERR) {
+		warnx("location information not available: topo walk failed");
+		exitcode = -1;
+	}
+
+	topo_walk_fini(wp);
+}
+
 static int
 do_list(const nvme_process_arg_t *npa)
 {
@@ -1261,6 +1429,7 @@ do_list(const nvme_process_arg_t *npa)
 	const nvme_ns_disc_t *disc;
 	nvme_ns_disc_level_t level;
 	int rv = -1;
+	nvmeadm_list_t *list = npa->npa_cmd_arg;
 
 	if (npa->npa_argc > 0) {
 		errx(-1, "%s passed extraneous arguments starting with %s",
@@ -1276,17 +1445,26 @@ do_list(const nvme_process_arg_t *npa)
 	if (npa->npa_ofmt == NULL) {
 		(void) printf("%s: ", npa->npa_ctrl_name);
 		nvme_print_ctrl_summary(info);
-	} else if ((npa->npa_cmdflags & NVMEADM_O_LS_CTRL) != 0) {
+	} else if (list->list_mode != NVMEADM_LIST_DEFAULT) {
 		nvmeadm_list_ofmt_arg_t oarg = { 0 };
 		oarg.nloa_name = npa->npa_ctrl_name;
 		oarg.nloa_ctrl = info;
 		if (!nvme_ctrl_devi(npa->npa_ctrl, &oarg.nloa_dip))
 			oarg.nloa_dip = DI_NODE_NIL;
 
+		if (list->list_mode == NVMEADM_LIST_LOC) {
+			do_list_phys_map_ctlap(&oarg);
+			do_list_phys_map_loc(list, &oarg);
+		}
+
 		ofmt_print(npa->npa_ofmt, &oarg);
+		free(oarg.nloa_ap);
+		if (list->list_topo != NULL) {
+			topo_hdl_strfree(list->list_topo, oarg.nloa_loc);
+		}
 	}
 
-	if ((npa->npa_cmdflags & NVMEADM_O_LS_CTRL) != 0) {
+	if (list->list_mode != NVMEADM_LIST_DEFAULT) {
 		rv = 0;
 		goto out;
 	}
