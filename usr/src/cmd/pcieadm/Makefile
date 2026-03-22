@@ -22,6 +22,7 @@ include ../Makefile.ctf
 CFLAGS += $(CCVERBOSE)
 CSTD = $(CSTD_GNU17)
 LDLIBS += -ldevinfo -lpcidb -lofmt
+LDLIBS += -L$(ROOT)/usr/lib/fm/64 -R/usr/lib/fm/64 -ltopo
 OBJS = \
 	pcieadm.o \
 	pcieadm_bar.o \

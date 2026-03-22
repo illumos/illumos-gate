@@ -19,6 +19,9 @@
 #include <ofmt.h>
 #include <strings.h>
 #include <sys/pci.h>
+#include <fm/libtopo.h>
+#include <sys/fm/protocol.h>
+#include <fm/topo_pcie.h>
 
 #include "pcieadm.h"
 
@@ -30,6 +33,7 @@ typedef struct pcieadm_show_devs {
 	char **psd_filts;
 	boolean_t *psd_used;
 	uint_t psd_nprint;
+	topo_hdl_t *psd_topo;
 } pcieadm_show_devs_t;
 
 typedef enum pcieadm_show_devs_otype {
@@ -55,7 +59,11 @@ typedef enum pcieadm_show_devs_otype {
 	PCIEADM_SDO_MAXWIDTH,
 	PCIEADM_SDO_CURSPEED,
 	PCIEADM_SDO_CURWIDTH,
-	PCIEADM_SDO_SUPSPEEDS
+	PCIEADM_SDO_SUPSPEEDS,
+	PCIEADM_SDO_SLOTNO,
+	PCIEADM_SDO_AP,
+	PCIEADM_SDO_CTLAP,
+	PCIEADM_SDO_LOC
 } pcieadm_show_devs_otype_t;
 
 typedef struct pcieadm_show_devs_ofmt {
@@ -80,6 +88,10 @@ typedef struct pcieadm_show_devs_ofmt {
 	int64_t psdo_cspeed;
 	int psdo_nspeeds;
 	int64_t *psdo_sspeeds;
+	int32_t psdo_slotno;
+	char *psdo_ap;
+	char *psdo_ctlap;
+	char *psdo_loc;
 } pcieadm_show_devs_ofmt_t;
 
 static uint_t
@@ -124,151 +136,127 @@ pcieadm_show_devs_ofmt_cb(ofmt_arg_t *ofarg, char *buf, uint_t buflen)
 	const char *str;
 	pcieadm_show_devs_ofmt_t *psdo = ofarg->ofmt_cbarg;
 	boolean_t first = B_TRUE;
+	size_t ret;
 
 	switch (ofarg->ofmt_id) {
 	case PCIEADM_SDO_BDF:
-		if (snprintf(buf, buflen, "%x/%x/%x", psdo->psdo_bus,
-		    psdo->psdo_dev, psdo->psdo_func) >= buflen) {
-			return (B_FALSE);
-		}
+		ret = snprintf(buf, buflen, "%x/%x/%x", psdo->psdo_bus,
+		    psdo->psdo_dev, psdo->psdo_func);
 		break;
 	case PCIEADM_SDO_BDF_BUS:
-		if (snprintf(buf, buflen, "%x", psdo->psdo_bus) >= buflen) {
-			return (B_FALSE);
-		}
+		ret = snprintf(buf, buflen, "%x", psdo->psdo_bus);
 		break;
 	case PCIEADM_SDO_BDF_DEV:
-		if (snprintf(buf, buflen, "%x", psdo->psdo_dev) >= buflen) {
-			return (B_FALSE);
-		}
+		ret = snprintf(buf, buflen, "%x", psdo->psdo_dev);
 		break;
 	case PCIEADM_SDO_BDF_FUNC:
-		if (snprintf(buf, buflen, "%x", psdo->psdo_func) >= buflen) {
-			return (B_FALSE);
-		}
+		ret = snprintf(buf, buflen, "%x", psdo->psdo_func);
 		break;
 	case PCIEADM_SDO_INSTANCE:
 		if (psdo->psdo_driver == NULL || psdo->psdo_instance == -1) {
-			(void) snprintf(buf, buflen, "--");
-		} else if (snprintf(buf, buflen, "%s%d", psdo->psdo_driver,
-		    psdo->psdo_instance) >= buflen) {
-			return (B_FALSE);
+			ret = snprintf(buf, buflen, "--");
+		} else {
+			ret = snprintf(buf, buflen, "%s%d", psdo->psdo_driver,
+			    psdo->psdo_instance);
 		}
 		break;
 	case PCIEADM_SDO_DRIVER:
 		if (psdo->psdo_driver == NULL) {
-			(void) snprintf(buf, buflen, "--");
-		} else if (strlcpy(buf, psdo->psdo_driver, buflen) >= buflen) {
-			return (B_FALSE);
+			ret = snprintf(buf, buflen, "--");
+		} else {
+			ret = strlcpy(buf, psdo->psdo_driver, buflen);
 		}
 		break;
 	case PCIEADM_SDO_INSTNUM:
 		if (psdo->psdo_instance == -1) {
-			(void) snprintf(buf, buflen, "--");
-		} else if (snprintf(buf, buflen, "%d", psdo->psdo_instance) >=
-		    buflen) {
-			return (B_FALSE);
+			ret = snprintf(buf, buflen, "--");
+		} else {
+			ret = snprintf(buf, buflen, "%d", psdo->psdo_instance);
 		}
 		break;
 	case PCIEADM_SDO_PATH:
-		if (strlcat(buf, psdo->psdo_path, buflen) >= buflen) {
-			return (B_FALSE);
-		}
+		ret = strlcat(buf, psdo->psdo_path, buflen);
 		break;
 	case PCIEADM_SDO_VID:
 		if (psdo->psdo_vid == -1) {
-			(void) strlcat(buf, "--", buflen);
-		} else if (snprintf(buf, buflen, "%x", psdo->psdo_vid) >=
-		    buflen) {
-			return (B_FALSE);
+			ret = strlcat(buf, "--", buflen);
+		} else {
+			ret = snprintf(buf, buflen, "%x", psdo->psdo_vid);
 		}
 		break;
 	case PCIEADM_SDO_DID:
 		if (psdo->psdo_did == -1) {
-			(void) strlcat(buf, "--", buflen);
-		} else if (snprintf(buf, buflen, "%x", psdo->psdo_did) >=
-		    buflen) {
-			return (B_FALSE);
+			ret = strlcat(buf, "--", buflen);
+		} else {
+			ret = snprintf(buf, buflen, "%x", psdo->psdo_did);
 		}
 		break;
 	case PCIEADM_SDO_REV:
 		if (psdo->psdo_rev == -1) {
-			(void) strlcat(buf, "--", buflen);
-		} else if (snprintf(buf, buflen, "%x", psdo->psdo_rev) >=
-		    buflen) {
-			return (B_FALSE);
+			ret = strlcat(buf, "--", buflen);
+		} else {
+			ret = snprintf(buf, buflen, "%x", psdo->psdo_rev);
 		}
 		break;
 	case PCIEADM_SDO_SUBVID:
 		if (psdo->psdo_subvid == -1) {
-			(void) strlcat(buf, "--", buflen);
-		} else if (snprintf(buf, buflen, "%x", psdo->psdo_subvid) >=
-		    buflen) {
-			return (B_FALSE);
+			ret = strlcat(buf, "--", buflen);
+		} else {
+			ret = snprintf(buf, buflen, "%x", psdo->psdo_subvid);
 		}
 		break;
 	case PCIEADM_SDO_SUBSYS:
 		if (psdo->psdo_subsys == -1) {
-			(void) strlcat(buf, "--", buflen);
-		} else if (snprintf(buf, buflen, "%x", psdo->psdo_subsys) >=
-		    buflen) {
-			return (B_FALSE);
+			ret = strlcat(buf, "--", buflen);
+		} else {
+			ret = snprintf(buf, buflen, "%x", psdo->psdo_subsys);
 		}
 		break;
 	case PCIEADM_SDO_VENDOR:
-		if (strlcat(buf, psdo->psdo_vendor, buflen) >= buflen) {
-			return (B_FALSE);
-		}
+		ret = strlcat(buf, psdo->psdo_vendor, buflen);
 		break;
 	case PCIEADM_SDO_DEVICE:
-		if (strlcat(buf, psdo->psdo_device, buflen) >= buflen) {
-			return (B_FALSE);
-		}
+		ret = strlcat(buf, psdo->psdo_device, buflen);
 		break;
 	case PCIEADM_SDO_SUBVENDOR:
-		if (strlcat(buf, psdo->psdo_subvendor, buflen) >= buflen) {
-			return (B_FALSE);
-		}
+		ret = strlcat(buf, psdo->psdo_subvendor, buflen);
 		break;
 	case PCIEADM_SDO_SUBSYSTEM:
-		if (strlcat(buf, psdo->psdo_subsystem, buflen) >= buflen) {
-			return (B_FALSE);
-		}
+		ret = strlcat(buf, psdo->psdo_subsystem, buflen);
 		break;
 	case PCIEADM_SDO_MAXWIDTH:
 		if (psdo->psdo_mwidth <= 0) {
-			(void) strlcat(buf, "--", buflen);
-		} else if (snprintf(buf, buflen, "x%d", psdo->psdo_mwidth) >=
-		    buflen) {
-			return (B_FALSE);
+			ret = strlcat(buf, "--", buflen);
+		} else {
+			ret = snprintf(buf, buflen, "x%d", psdo->psdo_mwidth);
 		}
 		break;
 	case PCIEADM_SDO_CURWIDTH:
 		if (psdo->psdo_cwidth <= 0) {
-			(void) strlcat(buf, "--", buflen);
-		} else if (snprintf(buf, buflen, "x%d", psdo->psdo_cwidth) >=
-		    buflen) {
-			return (B_FALSE);
+			ret = strlcat(buf, "--", buflen);
+		} else {
+			ret = snprintf(buf, buflen, "x%d", psdo->psdo_cwidth);
 		}
 		break;
 	case PCIEADM_SDO_MAXSPEED:
 		str = pcieadm_speed2str(psdo->psdo_mspeed);
 		if (str == NULL) {
-			(void) strlcat(buf, "--", buflen);
-		} else if (snprintf(buf, buflen, "%s GT/s", str) >= buflen) {
-			return (B_FALSE);
+			ret = strlcat(buf, "--", buflen);
+		} else {
+			ret = snprintf(buf, buflen, "%s GT/s", str);
 		}
 		break;
 	case PCIEADM_SDO_CURSPEED:
 		str = pcieadm_speed2str(psdo->psdo_cspeed);
 		if (str == NULL) {
-			(void) strlcat(buf, "--", buflen);
-		} else if (snprintf(buf, buflen, "%s GT/s", str) >= buflen) {
-			return (B_FALSE);
+			ret = strlcat(buf, "--", buflen);
+		} else {
+			ret = snprintf(buf, buflen, "%s GT/s", str);
 		}
 		break;
 	case PCIEADM_SDO_SUPSPEEDS:
 		buf[0] = 0;
+		ret = 0;
 		for (int i = 0; i < psdo->psdo_nspeeds; i++) {
 			const char *str;
 
@@ -278,15 +266,11 @@ pcieadm_show_devs_ofmt_cb(ofmt_arg_t *ofarg, char *buf, uint_t buflen)
 			}
 
 			if (!first) {
-				if (strlcat(buf, ",", buflen) >= buflen) {
-					return (B_FALSE);
-				}
+				ret = strlcat(buf, ",", buflen);
 			}
-			first = B_FALSE;
 
-			if (strlcat(buf, str, buflen) >= buflen) {
-				return (B_FALSE);
-			}
+			first = B_FALSE;
+			ret = strlcat(buf, str, buflen);
 		}
 		break;
 	case PCIEADM_SDO_TYPE:
@@ -303,9 +287,7 @@ pcieadm_show_devs_ofmt_cb(ofmt_arg_t *ofarg, char *buf, uint_t buflen)
 		 * or not we have a PCIe device.
 		 */
 		if (psdo->psdo_mwidth == -1) {
-			if (strlcat(buf, "PCI", buflen) >= buflen) {
-				return (B_FALSE);
-			}
+			ret = strlcat(buf, "PCI", buflen);
 			break;
 		}
 
@@ -315,22 +297,42 @@ pcieadm_show_devs_ofmt_cb(ofmt_arg_t *ofarg, char *buf, uint_t buflen)
 		 * guarantee right now.
 		 */
 		if (psdo->psdo_cspeed == -1 || psdo->psdo_cwidth == -1) {
-			if (strlcat(buf, "PCIe unknown", buflen) >= buflen) {
-				return (B_FALSE);
-			}
+			ret = strlcat(buf, "PCIe unknown", buflen);
 			break;
 		}
 
-		if (snprintf(buf, buflen, "PCIe Gen %ux%d",
-		    pcieadm_speed2gen(psdo->psdo_cspeed),
-		    psdo->psdo_cwidth) >= buflen) {
-			return (B_FALSE);
+		ret = snprintf(buf, buflen, "PCIe Gen %ux%d",
+		    pcieadm_speed2gen(psdo->psdo_cspeed), psdo->psdo_cwidth);
+		break;
+	case PCIEADM_SDO_SLOTNO:
+		if (psdo->psdo_slotno < 0) {
+			ret = strlcat(buf, "--", buflen);
+		} else {
+			ret = snprintf(buf, buflen, "0x%x", psdo->psdo_slotno);
 		}
+		break;
+	case PCIEADM_SDO_AP:
+		ret = strlcat(buf, psdo->psdo_ap != NULL ? psdo->psdo_ap : "--",
+		    buflen);
+		break;
+	case PCIEADM_SDO_CTLAP:
+		ret = strlcat(buf, psdo->psdo_ctlap != NULL ? psdo->psdo_ctlap :
+		    "--", buflen);
+		break;
+	case PCIEADM_SDO_LOC:
+		ret = strlcat(buf, psdo->psdo_loc != NULL ? psdo->psdo_loc :
+		    "--", buflen);
 		break;
 	default:
 		abort();
 	}
-	return (B_TRUE);
+
+	/*
+	 * While the str* functions can't really fail, snprintf() returns an
+	 * int. If it fails, that negative value will be cast up to UINT64_MAX
+	 * (e.g. (size_t)-1), which will cause the check to always fail.
+	 */
+	return (ret < buflen);
 }
 
 static const char *pcieadm_show_dev_fields = "bdf,type,instance,device";
@@ -360,6 +362,47 @@ static const ofmt_field_t pcieadm_show_dev_ofmt[] = {
 	{ "CURSPEED", 10, PCIEADM_SDO_CURSPEED, pcieadm_show_devs_ofmt_cb },
 	{ "CURWIDTH", 10, PCIEADM_SDO_CURWIDTH, pcieadm_show_devs_ofmt_cb },
 	{ "SUPSPEEDS", 20, PCIEADM_SDO_SUPSPEEDS, pcieadm_show_devs_ofmt_cb },
+	{ "SLOTNO", 8, PCIEADM_SDO_SLOTNO, pcieadm_show_devs_ofmt_cb },
+	{ "AP", 10, PCIEADM_SDO_AP, pcieadm_show_devs_ofmt_cb },
+	{ "CTLAP", 10, PCIEADM_SDO_CTLAP, pcieadm_show_devs_ofmt_cb },
+	{ NULL, 0, 0, NULL }
+};
+
+/*
+ * This is a variant of the above fields when -L is in use. We don't always want
+ * to take a topo snapshot to show devices so these fields are only available
+ * when requested.
+ */
+static const char *pcieadm_show_dev_loc =
+	"bdf,instance,location,slotno,ap,ctlap";
+static const ofmt_field_t pcieadm_show_dev_loc_ofmt[] = {
+	{ "VID", 6, PCIEADM_SDO_VID, pcieadm_show_devs_ofmt_cb },
+	{ "DID", 6, PCIEADM_SDO_DID, pcieadm_show_devs_ofmt_cb },
+	{ "REV", 6, PCIEADM_SDO_REV, pcieadm_show_devs_ofmt_cb },
+	{ "SUBVID", 6, PCIEADM_SDO_SUBVID, pcieadm_show_devs_ofmt_cb },
+	{ "SUBSYS", 6, PCIEADM_SDO_SUBSYS, pcieadm_show_devs_ofmt_cb },
+	{ "BDF", 8, PCIEADM_SDO_BDF, pcieadm_show_devs_ofmt_cb },
+	{ "DRIVER", 15, PCIEADM_SDO_DRIVER, pcieadm_show_devs_ofmt_cb },
+	{ "INSTANCE", 15, PCIEADM_SDO_INSTANCE, pcieadm_show_devs_ofmt_cb },
+	{ "INSTNUM", 8, PCIEADM_SDO_INSTNUM, pcieadm_show_devs_ofmt_cb },
+	{ "TYPE", 15, PCIEADM_SDO_TYPE, pcieadm_show_devs_ofmt_cb },
+	{ "VENDOR", 30, PCIEADM_SDO_VENDOR, pcieadm_show_devs_ofmt_cb },
+	{ "DEVICE", 30, PCIEADM_SDO_DEVICE, pcieadm_show_devs_ofmt_cb },
+	{ "SUBVENDOR", 30, PCIEADM_SDO_SUBVENDOR, pcieadm_show_devs_ofmt_cb },
+	{ "SUBSYSTEM", 30, PCIEADM_SDO_SUBSYSTEM, pcieadm_show_devs_ofmt_cb },
+	{ "PATH", 30, PCIEADM_SDO_PATH, pcieadm_show_devs_ofmt_cb },
+	{ "BUS", 4, PCIEADM_SDO_BDF_BUS, pcieadm_show_devs_ofmt_cb },
+	{ "DEV", 4, PCIEADM_SDO_BDF_DEV, pcieadm_show_devs_ofmt_cb },
+	{ "FUNC", 4, PCIEADM_SDO_BDF_FUNC, pcieadm_show_devs_ofmt_cb },
+	{ "MAXSPEED", 10, PCIEADM_SDO_MAXSPEED, pcieadm_show_devs_ofmt_cb },
+	{ "MAXWIDTH", 10, PCIEADM_SDO_MAXWIDTH, pcieadm_show_devs_ofmt_cb },
+	{ "CURSPEED", 10, PCIEADM_SDO_CURSPEED, pcieadm_show_devs_ofmt_cb },
+	{ "CURWIDTH", 10, PCIEADM_SDO_CURWIDTH, pcieadm_show_devs_ofmt_cb },
+	{ "SUPSPEEDS", 20, PCIEADM_SDO_SUPSPEEDS, pcieadm_show_devs_ofmt_cb },
+	{ "SLOTNO", 8, PCIEADM_SDO_SLOTNO, pcieadm_show_devs_ofmt_cb },
+	{ "AP", 10, PCIEADM_SDO_AP, pcieadm_show_devs_ofmt_cb },
+	{ "CTLAP", 10, PCIEADM_SDO_CTLAP, pcieadm_show_devs_ofmt_cb },
+	{ "LOCATION", 15, PCIEADM_SDO_LOC, pcieadm_show_devs_ofmt_cb },
 	{ NULL, 0, 0, NULL }
 };
 
@@ -368,6 +411,7 @@ pcieadm_show_devs_match(pcieadm_show_devs_t *psd,
     pcieadm_show_devs_ofmt_t *psdo)
 {
 	char dinst[128], bdf[128];
+	boolean_t match = B_FALSE;
 
 	if (psd->psd_nfilts == 0) {
 		return (B_TRUE);
@@ -385,24 +429,28 @@ pcieadm_show_devs_match(pcieadm_show_devs_t *psd,
 
 		if (strcmp(filt, psdo->psdo_path) == 0) {
 			psd->psd_used[i] = B_TRUE;
-			return (B_TRUE);
+			match = B_TRUE;
+			continue;
 		}
 
 		if (strcmp(filt, bdf) == 0) {
 			psd->psd_used[i] = B_TRUE;
-			return (B_TRUE);
+			match = B_TRUE;
+			continue;
 		}
 
 		if (psdo->psdo_driver != NULL &&
 		    strcmp(filt, psdo->psdo_driver) == 0) {
 			psd->psd_used[i] = B_TRUE;
-			return (B_TRUE);
+			match = B_TRUE;
+			continue;
 		}
 
 		if (psdo->psdo_driver != NULL && psdo->psdo_instance != -1 &&
 		    strcmp(filt, dinst) == 0) {
 			psd->psd_used[i] = B_TRUE;
-			return (B_TRUE);
+			match = B_TRUE;
+			continue;
 		}
 
 		if (strncmp("/devices", filt, strlen("/devices")) == 0) {
@@ -411,17 +459,204 @@ pcieadm_show_devs_match(pcieadm_show_devs_t *psd,
 
 		if (strcmp(filt, psdo->psdo_path) == 0) {
 			psd->psd_used[i] = B_TRUE;
-			return (B_TRUE);
+			match = B_TRUE;
+			continue;
+		}
+
+		if (psdo->psdo_loc != NULL && strcmp(filt, psdo->psdo_loc) ==
+		    0) {
+			psd->psd_used[i] = B_TRUE;
+			match = B_TRUE;
+			continue;
 		}
 	}
-	return (B_FALSE);
+
+	return (match);
+}
+
+/*
+ * Check if there is an attachment point on this node that we know how to
+ * display, which today is generally in the PCIe style where there is only a
+ * single entry in the bitfield.
+ */
+static void
+pcieadm_show_devs_ap(di_node_t node, char **outp)
+{
+	int *ap_names, *slot_names;
+
+	/*
+	 * The AP names property is a bitfield that indicates which entry in the
+	 * slot-names. A given device can in theory support multiples lots, but
+	 * PCIe is always going to be a value of 1.
+	 */
+	if (di_prop_lookup_ints(DDI_DEV_T_ANY, node, "ap-names", &ap_names) !=
+	    1 || *ap_names != 1) {
+		return;
+	}
+
+	/*
+	 * The slot-names property is structured with the first word as a
+	 * bitfield mask and then a series of names which are guaranteed to be
+	 * NULL terminated.
+	 */
+	int nu32 = di_prop_lookup_ints(DDI_DEV_T_ANY, node, "slot-names",
+	    &slot_names);
+	if (nu32 <= 1 || slot_names[0] != 1) {
+		return;
+	}
+
+	*outp = calloc(nu32 - 1, sizeof (uint32_t));
+	if (*outp == NULL) {
+		err(EXIT_FAILURE, "failed to allocate memory for AP name");
+	}
+
+	(void) memcpy(*outp, &slot_names[1], sizeof (uint32_t) * (nu32 - 1));
+}
+
+/*
+ * Walk through the 'pcie' schema tree to try to find a matching entry. There is
+ * not a header file with node names, so we hard code these here for now. We
+ * start this by walking function nodes and matching them with our device via
+ * the b/d/f.
+ */
+static int
+pcieadm_show_devs_loc_pcie(topo_hdl_t *hp, tnode_t *tn, void *arg)
+{
+	pcieadm_show_devs_ofmt_t *oarg = arg;
+	uint32_t bus, dev, func;
+	char *label, *type;
+	int err;
+
+	if (strcmp(topo_node_name(tn), "function") != 0) {
+		return (TOPO_WALK_NEXT);
+	}
+
+	if (topo_prop_get_uint32(tn, TOPO_PCIE_PGROUP_PCI_CFG,
+	    TOPO_PCIE_PCI_BUS, &bus, &err) != 0 ||
+	    topo_prop_get_uint32(tn, TOPO_PCIE_PGROUP_PCI_CFG,
+	    TOPO_PCIE_PCI_DEVICE, &dev, &err) != 0 ||
+	    topo_prop_get_uint32(tn, TOPO_PCIE_PGROUP_PCI_CFG,
+	    TOPO_PCIE_PCI_FUNCTION, &func, &err) != 0 ||
+	    bus != oarg->psdo_bus || dev != oarg->psdo_dev ||
+	    func != oarg->psdo_func) {
+		return (TOPO_WALK_NEXT);
+	}
+
+	/*
+	 * Now that we know that we have a matching device, we have the trickier
+	 * part of finding a matching label. In general, ports are labeled. From
+	 * a function, we know that our parent is going to either be a
+	 * root-complex or a device. If it's a device, we'll look for a
+	 * port/link/port pair and see if we can find a label on the upstream
+	 * port. If our parent is a root-complex, then we will see if the parent
+	 * CPU has a label.
+	 *
+	 * However, if we're a root-port, then we need to look at our port child
+	 * to see what the most useful label is. Technically a root-port is
+	 * really part of the root-complex/CPU and that's the more accurate
+	 * label; however, most folks are looking at this so they can figure out
+	 * what this corresponds to.
+	 *
+	 * We'll look for labels at the different hops along the way in case
+	 * things change in this regard in the future.
+	 */
+	if (topo_prop_get_string(tn, TOPO_PGROUP_PROTOCOL, TOPO_PROP_LABEL,
+	    &label, &err) == 0) {
+		oarg->psdo_loc = label;
+		return (TOPO_WALK_TERMINATE);
+	}
+
+	if (topo_prop_get_string(tn, TOPO_PCIE_PGROUP_PCI, TOPO_PCIE_PCI_TYPE,
+	    &type, &err) != 0) {
+		return (TOPO_WALK_TERMINATE);
+	}
+
+	if (strcmp(type, "root-port") == 0) {
+		tnode_t *port = topo_node_lookup(tn, "port", 0);
+		if (port != NULL) {
+			if (topo_prop_get_string(port, TOPO_PGROUP_PROTOCOL,
+			    TOPO_PROP_LABEL, &label, &err) == 0) {
+				topo_hdl_strfree(hp, type);
+				oarg->psdo_loc = label;
+				return (TOPO_WALK_TERMINATE);
+			}
+		}
+	}
+	topo_hdl_strfree(hp, type);
+
+	const char *pname = topo_node_name(topo_node_parent(tn));
+	const char *final;
+	uint32_t fcount, count = 0;
+	if (strcmp(pname, "device") == 0) {
+		final = "port";
+		fcount = 2;
+	} else if (strcmp(pname, "root-complex") == 0) {
+		final = "cpu";
+		fcount = 1;
+	} else {
+		/*
+		 * We don't know where we are so we're done.
+		 */
+		return (TOPO_WALK_TERMINATE);
+	}
+
+	for (tnode_t *pn = topo_node_parent(tn); pn != NULL;
+	    pn = topo_node_parent(pn)) {
+		if (topo_prop_get_string(pn, TOPO_PGROUP_PROTOCOL,
+		    TOPO_PROP_LABEL, &label, &err) == 0) {
+			oarg->psdo_loc = label;
+			return (TOPO_WALK_TERMINATE);
+		}
+
+		if (strcmp(topo_node_name(pn), final) == 0) {
+			count++;
+			if (fcount == count) {
+				break;
+			}
+		}
+	}
+
+	return (TOPO_WALK_TERMINATE);
+}
+
+/*
+ * Walk the 'pcie' tree to find a matching function.  From there, we walk up a
+ * bit of the tree to find the relevant label to use.  We prefer the pcie tree
+ * to the 'hc' tree as some versions of the 'hc' tree don't call out every
+ * single device.
+ */
+static void
+pcieadm_show_devs_loc(topo_hdl_t *thp, di_node_t node,
+    pcieadm_show_devs_ofmt_t *oarg)
+{
+	topo_walk_t *wp;
+	int err;
+
+	wp = topo_walk_init(thp, FM_FMRI_SCHEME_PCIE,
+	    pcieadm_show_devs_loc_pcie, oarg, &err);
+	if (wp == NULL) {
+		/*
+		 * It might be nice to at some point swallow this and attempt to
+		 * fall back to 'hc', but we would need to get error values into
+		 * a header that makes it into the proto area.
+		 */
+		errx(EXIT_FAILURE, "failed to initialize topology walk: %s",
+		    topo_strerror(err));
+	}
+
+	err = topo_walk_step(wp, TOPO_WALK_SIBLING);
+	if (err == TOPO_WALK_ERR) {
+		errx(EXIT_FAILURE, "failed to perform topology walk");
+	}
+
+	topo_walk_fini(wp);
 }
 
 static int
 pcieadm_show_devs_walk_cb(di_node_t node, void *arg)
 {
 	int nprop, *regs = NULL, *did, *vid, *mwidth, *cwidth, *rev;
-	int *subvid, *subsys;
+	int *subvid, *subsys, *slotno;
 	int64_t *mspeed, *cspeed, *sspeeds;
 	char *path = NULL;
 	pcieadm_show_devs_t *psd = arg;
@@ -595,12 +830,44 @@ pcieadm_show_devs_walk_cb(di_node_t node, void *arg)
 		oarg.psdo_sspeeds = NULL;
 	}
 
+	nprop = di_prop_lookup_ints(DDI_DEV_T_ANY, node,
+	    "physical-slot#", &slotno);
+	if (nprop != 1) {
+		oarg.psdo_slotno = -1;
+	} else {
+		oarg.psdo_slotno = *slotno;
+	}
+
+	/*
+	 * Look for the AP and if the parent is an instance of pcieb, check it
+	 * for the controlling AP.
+	 */
+	pcieadm_show_devs_ap(node, &oarg.psdo_ap);
+	di_node_t pdip = di_parent_node(node);
+	const char *pdrv = di_driver_name(pdip);
+	if (pdrv != NULL && strcmp(pdrv, "pcieb") == 0) {
+		pcieadm_show_devs_ap(pdip, &oarg.psdo_ctlap);
+	}
+
+	/*
+	 * If we have a topo handle, e.g. -L was passed, look to see if we can
+	 * cons up a label for this.
+	 */
+	if (psd->psd_topo != NULL) {
+		pcieadm_show_devs_loc(psd->psd_topo, node, &oarg);
+	}
+
 	if (pcieadm_show_devs_match(psd, &oarg)) {
 		ofmt_print(psd->psd_ofmt, &oarg);
 		psd->psd_nprint++;
 	}
 
 done:
+	if (psd->psd_topo != NULL) {
+		topo_hdl_strfree(psd->psd_topo, oarg.psdo_loc);
+	}
+	free(oarg.psdo_ctlap);
+	free(oarg.psdo_ap);
 	if (path != NULL) {
 		di_devfs_path_free(path);
 	}
@@ -627,12 +894,13 @@ pcieadm_show_devs_help(const char *fmt, ...)
 		(void) fprintf(stderr, "\n");
 	}
 
-	(void) fprintf(stderr, "Usage:  %s show-devs [-F] [-H] [-s | -o "
+	(void) fprintf(stderr, "Usage:  %s show-devs [-F] [-H] [-L | -s ] [-o "
 	    "field[,...] [-p]] [filter...]\n", pcieadm_progname);
 
 	(void) fprintf(stderr, "\nList PCI devices and functions in the "
 	    "system. Each <filter> selects a set\nof devices to show and "
-	    "can be a driver name, instance, /devices path, or\nb/d/f.\n\n"
+	    "can be a driver name, instance, /devices path,\nb/d/f, or "
+	    "location string (-L only).\n\n"
 	    "\t-F\t\tdo not display PCI functions\n"
 	    "\t-H\t\tomit the column header\n"
 	    "\t-o field\toutput fields to print\n"
@@ -661,7 +929,12 @@ pcieadm_show_devs_help(const char *fmt, ...)
 	    "\tcurspeed\tthe current PCIe speed of the device\n"
 	    "\tmaxwidth\tthe maximum supported PCIe lane count of the device\n"
 	    "\tcurwidth\tthe current lane count of the PCIe device\n"
-	    "\tsupspeeds\tthe list of speeds the device supports\n");
+	    "\tsupspeeds\tthe list of speeds the device supports\n"
+	    "\tslotno\t\tthe device's slot number\n"
+	    "\tap\t\tthe attachment point provided by device\n"
+	    "\tctlap\t\tthe controlling attachment point\n\n"
+	    "The following fields are additionally available with -L:\n"
+	    "\tlocation\tthe device's topology location string\n");
 }
 
 int
@@ -673,36 +946,35 @@ pcieadm_show_devs(pcieadm_t *pcip, int argc, char *argv[])
 	pcieadm_show_devs_t psd;
 	pcieadm_di_walk_t walk;
 	ofmt_status_t oferr;
+	const ofmt_field_t *ofmt;
 	boolean_t parse = B_FALSE;
 	boolean_t speeds = B_FALSE;
-
-	/*
-	 * show-devs relies solely on the devinfo snapshot we already took.
-	 * Formalize our privs immediately.
-	 */
-	pcieadm_init_privs(pcip);
+	boolean_t loc = B_FALSE;
 
 	bzero(&psd, sizeof (psd));
 	psd.psd_pia = pcip;
 	psd.psd_funcs = B_TRUE;
 
-	while ((c = getopt(argc, argv, ":FHo:ps")) != -1) {
+	while ((c = getopt(argc, argv, ":FHLo:ps")) != -1) {
 		switch (c) {
 		case 'F':
 			psd.psd_funcs = B_FALSE;
+			break;
+		case 'H':
+			flags |= OFMT_NOHEADER;
+			break;
+		case 'L':
+			loc = B_TRUE;
+			break;
+		case 'o':
+			fields = optarg;
 			break;
 		case 'p':
 			parse = B_TRUE;
 			flags |= OFMT_PARSABLE;
 			break;
-		case 'H':
-			flags |= OFMT_NOHEADER;
-			break;
 		case 's':
 			speeds = B_TRUE;
-			break;
-		case 'o':
-			fields = optarg;
 			break;
 		case ':':
 			pcieadm_show_devs_help("option -%c requires an "
@@ -712,6 +984,10 @@ pcieadm_show_devs(pcieadm_t *pcip, int argc, char *argv[])
 			pcieadm_show_devs_help("unknown option: -%c", optopt);
 			exit(EXIT_USAGE);
 		}
+	}
+
+	if (speeds && loc) {
+		errx(EXIT_USAGE, "-L and -s cannot both be used");
 	}
 
 	if (parse && fields == NULL) {
@@ -725,9 +1001,17 @@ pcieadm_show_devs(pcieadm_t *pcip, int argc, char *argv[])
 	if (fields == NULL) {
 		if (speeds) {
 			fields = pcieadm_show_dev_speeds;
+		} else if (loc) {
+			fields = pcieadm_show_dev_loc;
 		} else {
 			fields = pcieadm_show_dev_fields;
 		}
+	}
+
+	if (loc) {
+		ofmt = pcieadm_show_dev_loc_ofmt;
+	} else {
+		ofmt = pcieadm_show_dev_ofmt;
 	}
 
 	argc -= optind;
@@ -743,9 +1027,46 @@ pcieadm_show_devs(pcieadm_t *pcip, int argc, char *argv[])
 		}
 	}
 
-	oferr = ofmt_open(fields, pcieadm_show_dev_ofmt, flags, 0,
-	    &psd.psd_ofmt);
+	oferr = ofmt_open(fields, ofmt, flags, 0, &psd.psd_ofmt);
 	ofmt_check(oferr, parse, psd.psd_ofmt, pcieadm_ofmt_errx, warnx);
+
+	if (loc) {
+		/*
+		 * This helps with taking a topo snapshot reliably.
+		 */
+		priv_fillset(pcip->pia_priv_eff);
+	}
+	pcieadm_init_privs(pcip);
+
+	/*
+	 * Before we perform our walk, if we have requested location information
+	 * raise privileges to take the snapshot.
+	 */
+	if (loc) {
+		int terr;
+
+		if (setppriv(PRIV_SET, PRIV_EFFECTIVE, pcip->pia_priv_eff) !=
+		    0) {
+			err(EXIT_FAILURE, "failed to raise privileges");
+		}
+
+		psd.psd_topo = topo_open(TOPO_VERSION, NULL, &terr);
+		if (psd.psd_topo == NULL) {
+			errx(EXIT_FAILURE, "failed to obtain topo handle: %s",
+			    topo_strerror(terr));
+		}
+
+		(void) topo_snap_hold(psd.psd_topo, NULL, &terr);
+		if (terr != 0) {
+			errx(EXIT_FAILURE, "failed to obtain topology "
+			    "snapshot: %s", topo_strerror(terr));
+		}
+
+		if (setppriv(PRIV_SET, PRIV_EFFECTIVE, pcip->pia_priv_min) !=
+		    0) {
+			err(EXIT_FAILURE, "failed to reduce privileges");
+		}
+	}
 
 	walk.pdw_arg = &psd;
 	walk.pdw_func = pcieadm_show_devs_walk_cb;
@@ -763,6 +1084,11 @@ pcieadm_show_devs(pcieadm_t *pcip, int argc, char *argv[])
 
 	if (psd.psd_nprint == 0) {
 		ret = EXIT_FAILURE;
+	}
+
+	if (psd.psd_topo != NULL) {
+		topo_snap_release(psd.psd_topo);
+		topo_close(psd.psd_topo);
 	}
 
 	return (ret);
