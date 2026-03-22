@@ -16,7 +16,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2017 Jason King.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/test/utiltest@$(PKGVERS)
@@ -1077,6 +1077,7 @@ file path=opt/util-tests/tests/cpio/files/zero.bar mode=0444
 dir  path=opt/util-tests/tests/cpmvln
 file path=opt/util-tests/tests/cpmvln/checker mode=0555
 file path=opt/util-tests/tests/cpmvln/mkobj mode=0555
+file path=opt/util-tests/tests/cpmvln/no-targ mode=0555
 file path=opt/util-tests/tests/cpmvln/overwrite mode=0555
 dir  path=opt/util-tests/tests/ctf
 file path=opt/util-tests/tests/ctf/Makefile.ctftest.com mode=0555

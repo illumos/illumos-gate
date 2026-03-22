@@ -127,3 +127,5 @@ user = root
 #
 [/opt/util-tests/tests/cpmvln/overwrite]
 user = nobody
+[/opt/util-tests/tests/cpmvln/no-targ]
+user = nobody

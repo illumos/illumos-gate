@@ -33,7 +33,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -47,11 +47,36 @@
  */
 
 /*
- * Combined mv/cp/ln command:
- *	mv file1 file2
- *	mv dir1 dir2
- *	mv file1 ... filen dir1
+ * This command implements all three of mv(1), cp(1), and ln(1) which all have
+ * similar operating modes. In particular, some invocations of mv must fall back
+ * to acting like cp when crossing file systems for example.
+ *
+ * These commands have the following high level synopsis:
+ *
+ * <command> [options] source target
+ * <command> [options] source source... directory
+ * <command> [options] source [target]
+ *
+ * By default, whenever one has a target that is a directory, these commands
+ * will place the resulting object inside of directory. So say you had a file
+ * 'a' and a directory 'b' and ran 'mv a b' that would result in moving 'a' to
+ * 'b/a', that is putting it inside b. The same would happen if there were
+ * multiple files.
+ *
+ * To avoid this behavior the -T flag exists which causes the various commands
+ * to not check whether or not the target is a directory for the effect of
+ * trying to see if it should move something inside.
+ *
+ * The final form of an optional target is present only for ln.
+ *
+ * Overwriting Behavior
+ * --------------------
+ *
+ * These commands have different defaults that control what happens when they
+ * encounter things that already exist. See the discussion on the definition of
+ * the target_action_t enum and the logic in chkfiles() for an overview.
  */
+
 #include <sys/time.h>
 #include <signal.h>
 #include <locale.h>
@@ -133,6 +158,7 @@ static int		Hflg = 0;	/* follow cmd line arg symlink to dir */
 static int		Lflg = 0;	/* follow symlinks */
 static int		Pflg = 0;	/* do not follow symlinks */
 static int		atflg = 0;
+static int		Tflg = 0;	/* Treat target as a normal file */
 static int		attrsilent = 0;
 static int		targetexists = 0;
 static int		cmdarg;		/* command line argument */
@@ -265,16 +291,20 @@ main(int argc, char *argv[])
 
 	/*
 	 * Check for options:
-	 *	cp [ -r|-R [-H|-L|-P]] [-afinp@/] file1 [file2 ...] target
-	 *	cp [-afinprR@/] file1 [file2 ...] target
-	 *	ln [-fi] [-n] [-s] file1 [file2 ...] target
-	 *	ln [-fi] [-n] [-s] file1 [file2 ...]
-	 *	mv [-f|i] [-n] file1 [file2 ...] target
-	 *	mv [-f|i] [-n] dir1 target
+	 *	cp [-afinpT@/] source_file target_file
+	 *	cp [-afinp@/] source_file... target
+	 *	cp [-afinp@/] -T source_file target
+	 *	cp [-r|-R [-H|-L|-P]] [-afinp@/] source_dir... target
+	 *	ln [-fins] source_file [target]
+	 *	ln [-fins] source_file... target
+	 *	ln [-fins] -T source_file target
+	 *	mv [-fin] source target_file
+	 *	mv [-fin] source... target_dir
+	 *	mv [-fin] -T source target
 	 */
 
 	if (cpy) {
-		while ((c = getopt(argc, argv, "afHinLpPrR@/")) != EOF)
+		while ((c = getopt(argc, argv, "afHinLpPrRT@/")) != EOF)
 			switch (c) {
 			case 'f':
 				fflg++;
@@ -331,6 +361,9 @@ main(int argc, char *argv[])
 				Rflg++;
 				rflg++;
 				break;
+			case 'T':
+				Tflg = 1;
+				break;
 			case '@':
 				atflg++;
 				attrsilent = 0;
@@ -355,7 +388,7 @@ main(int argc, char *argv[])
 		}
 
 	} else if (mve) {
-		while ((c = getopt(argc, argv, "fins")) != EOF)
+		while ((c = getopt(argc, argv, "finsT")) != EOF)
 			switch (c) {
 			case 'f':
 				targact = TA_OVERWRITE;
@@ -372,11 +405,14 @@ main(int argc, char *argv[])
 			case 'n':
 				targact = TA_SKIP;
 				break;
+			case 'T':
+				Tflg = 1;
+				break;
 			default:
 				errflg++;
 			}
 	} else { /* ln */
-		while ((c = getopt(argc, argv, "fins")) != EOF)
+		while ((c = getopt(argc, argv, "finsT")) != EOF)
 			switch (c) {
 			case 'f':
 				targact = TA_OVERWRITE;
@@ -389,6 +425,9 @@ main(int argc, char *argv[])
 				break;
 			case 's':
 				sflg++;
+				break;
+			case 'T':
+				Tflg = 1;
 				break;
 			default:
 				errflg++;
@@ -427,6 +466,12 @@ main(int argc, char *argv[])
 	 */
 
 	if (argc > 2) {
+		if (Tflg) {
+			(void) fprintf(stderr, gettext("%s: only a single "
+			    "source and target can be used with -T\n"), cmd);
+			exit(2);
+		}
+
 		if (stat(argv[argc-1], &s2) < 0) {
 			(void) fprintf(stderr,
 			    gettext("%s: %s not found\n"),
@@ -452,6 +497,11 @@ main(int argc, char *argv[])
 	if (argc == 1) {
 		if (!lnk)
 			usage();
+		if (Tflg) {
+			(void) fprintf(stderr, gettext("%s: -T requires "
+			    "specifying a target argument\n"), cmd);
+			exit(2);
+		}
 		(void) strcpy(target, ".");
 	} else {
 		(void) strcpy(target, argv[--argc]);
@@ -492,7 +542,7 @@ lnkfil(const char *source, char *target)
 		 * directory.
 		 */
 
-		if ((stat(target, &s2) >= 0) && ISDIR(s2)) {
+		if ((stat(target, &s2) >= 0) && ISDIR(s2) && !Tflg) {
 			size_t len;
 
 			len = strlen(target) + strlen(dname(source)) + 4;
@@ -1159,12 +1209,12 @@ chkfiles(const char *source, char **to)
 	if ((*statf)(target, &s2) >= 0) {
 		if (ISLNK(s2))
 			(void) stat(target, &s2);
+
 		/*
-		 * If target is a directory,
-		 * make complete name of new file
-		 * within that directory.
+		 * If target is a directory, make complete name of new file
+		 * within that directory unless -T is set.
 		 */
-		if (ISDIR(s2)) {
+		if (ISDIR(s2) && !Tflg) {
 			size_t len;
 
 			len = strlen(target) + strlen(dname(source)) + 4;
@@ -1483,27 +1533,28 @@ usage(void)
 
 	if (mve) {
 		(void) fprintf(stderr, gettext(
-		    "Usage: mv [-fin] f1 f2\n"
-		    "       mv [-fin] f1 ... fn d1\n"
-		    "       mv [-fin] d1 d2\n"));
+		    "Usage: mv [-fin] source target_file\n"
+		    "       mv [-fin] source... target_dir\n"
+		    "       mv [-fin] -T source target\n"));
 	} else if (lnk) {
 #ifdef XPG4
 		(void) fprintf(stderr, gettext(
-		    "Usage: ln [-fi] [-s] f1 [f2]\n"
-		    "       ln [-fi] [-s] f1 ... fn d1\n"
-		    "       ln [-fi] -s d1 d2\n"));
+		    "Usage: ln [-fis] source_file [target]\n"
+		    "       ln [-fis] source_file... target\n"
+		    "       ln [-fis] -T source_file target\n"));
 #else
 		(void) fprintf(stderr, gettext(
-		    "Usage: ln [-fi] [-n] [-s] f1 [f2]\n"
-		    "       ln [-fi] [-n] [-s] f1 ... fn d1\n"
-		    "       ln [-fi] [-n] -s d1 d2\n"));
+		    "Usage: ln [-fins] source_file [target]\n"
+		    "       ln [-fins] source_file... target\n"
+		    "       ln [-fins] -T source_file target\n"));
 #endif
 	} else if (cpy) {
 		(void) fprintf(stderr, gettext(
-		    "Usage: cp [-afinp@/] f1 f2\n"
-		    "       cp [-afinp@/] f1 ... fn d1\n"
+		    "Usage: cp [-afinpT@/] source_file target_file\n"
+		    "       cp [-afinp@/] source_file... target\n"
+		    "       cp [-afinp@/] -T source_file target\n"
 		    "       cp [-r|-R [-H|-L|-P]] [-afinp@/] "
-		    "d1 ... dn-1 dn\n"));
+		    "source_dir... target\n"));
 	}
 	exit(2);
 }

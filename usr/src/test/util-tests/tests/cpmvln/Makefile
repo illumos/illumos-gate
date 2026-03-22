@@ -10,11 +10,11 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 PROGS = mkobj checker
-SCRIPTS = overwrite
+SCRIPTS = overwrite no-targ
 
 ROOTOPTDIR = $(ROOT)/opt/util-tests/tests
 ROOTOPTCML = $(ROOTOPTDIR)/cpmvln

@@ -62,6 +62,11 @@
 .Ar source_file Ns ...
 .Ar target
 .Nm /usr/bin/cp
+.Op Fl afinp@/
+.Fl T
+.Ar source_file
+.Ar target
+.Nm /usr/bin/cp
 .Oo
 .Fl r | R
 .Op Fl H | L | P
@@ -77,6 +82,11 @@
 .Nm /usr/xpg4/bin/cp
 .Op Fl afinp@/
 .Ar source_file Ns ...
+.Ar target
+.Nm /usr/xpg4/bin/cp
+.Op Fl afinp@/
+.Fl T
+.Ar source_file
 .Ar target
 .Nm /usr/xpg4/bin/cp
 .Oo
@@ -146,7 +156,18 @@ is a file of type directory, if
 .Ar target
 either does not exist or is not a directory.
 .Pp
-In the third synopsis form, one or more directories specified by
+In the third synopsis form,
+.Ar target
+is always treated logically as a file regardless if it is one or not.
+Unlike the second synopsis form which creates
+.Ar source_file
+inside of the directory
+.Ar target ,
+the path of
+.Ar target
+itself would be used.
+.Pp
+In the fourth synopsis form, one or more directories specified by
 .Ar source_dir
 are copied to the directory specified by
 .Ar target .
@@ -289,6 +310,18 @@ option is used as the default mode.
 Same as
 .Fl r ,
 except pipes are replicated, not read from.
+.It Fl T
+Treat
+.Ar target
+as a file and do not attempt to place
+.Ar source_file
+inside of
+.Ar target
+if it is a directory.
+This is only usable with exactly one
+.Ar source_file
+and
+.Ar target .
 .It Fl @
 Preserves extended attributes.
 .Nm

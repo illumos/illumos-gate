@@ -60,6 +60,11 @@
 .Op Fl fin
 .Ar source Ns ...
 .Ar target_dir
+.Nm /usr/bin/mv
+.Op Fl fin
+.Fl T
+.Ar source
+.Ar target
 .Pp
 .Nm /usr/xpg4/bin/mv
 .Op Fl fin
@@ -69,6 +74,11 @@
 .Op Fl fin
 .Ar source Ns ...
 .Ar target_dir
+.Nm /usr/xpg4/bin/mv
+.Op Fl fin
+.Fl T
+.Ar source
+.Ar target
 .Sh DESCRIPTION
 In the first synopsis form, the
 .Nm
@@ -106,6 +116,19 @@ is the concatenation of the target directory, a single slash character
 and the last path name component of the
 .Ar source .
 This second form is assumed when the final operand names an existing directory.
+.Pp
+The third synopsis form allows
+.Ar target
+to either be a file or directory, but treats it as though a file was always
+specified.
+Specifically, it does not perform the synopsis two behavior of putting the file
+inside
+.Ar target_dir
+and instead would replace
+.Ar target_dir
+if the source is also a directory and
+.Ar target_dir
+is empty.
 .Pp
 If
 .Nm
@@ -224,6 +247,20 @@ This overrides any
 or
 .Fl f
 options already specified on the command line.
+.It Fl T
+Treat
+.Ar target
+as a file.
+Normally when
+.Ar target
+is a directory
+.Ar source_file
+is moved into
+.Ar target .
+This is only usable with exactly one
+.Ar source_file
+and
+.Ar target .
 .El
 .Ss "/usr/bin/mv"
 Specifying the

@@ -60,6 +60,11 @@
 .Op Fl fins
 .Ar source_file Ns ...
 .Ar target
+.Nm /usr/bin/ln
+.Op Fl fins
+.Fl T
+.Ar source_file
+.Ar target
 .Pp
 .Nm /usr/xpg4/bin/ln
 .Op Fl fis
@@ -68,6 +73,11 @@
 .Nm /usr/xpg4/bin/ln
 .Op Fl fis
 .Ar source_file Ns ...
+.Ar target
+.Nm /usr/xpg4/bin/ln
+.Op Fl fis
+.Fl T
+.Ar source_file
 .Ar target
 .Sh DESCRIPTION
 In the first synopsis form, the
@@ -114,6 +124,14 @@ is created in
 .Ar target
 and linked to the original
 .Ar source_file .
+If
+.Fl T
+is specified then a file is not created in
+.Ar target .
+Rather,
+.Ar target
+is treated as though a file has been specified with respect to path
+construction.
 .Pp
 If
 .Ar target
@@ -243,6 +261,36 @@ is a symbolic link to the original
 The files and
 .Ar target
 may reside on different file systems.
+.It Fl T
+Treat
+.Ar target
+as a file.
+Normally when the
+.Ar target
+is a directory then the resulting link is created inside of
+.Ar target .
+The
+.Fl T
+option instructs
+.Nm
+to always treat the target as though it is a file and so the resulting
+link would never be treated as something inside of
+.Ar target
+if it is a directory.
+It is only ever usable with exactly one
+.Ar source_file
+and one
+.Ar target .
+.Pp
+For example, consider a directory which contains a directory named amd64 and a
+symlink named 64 which points to the directory amd64.
+Invoking as
+.Nm -sT amd64 64
+ensures that one never descends into the directories in question and allows one
+to target the top-level 64 symlink.
+Without
+.Fl T
+this would result in the creation of a symlink amd64/amd64.
 .El
 .Ss "/usr/bin/ln"
 The following option is supported for
