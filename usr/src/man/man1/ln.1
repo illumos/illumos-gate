@@ -54,28 +54,34 @@
 .Sh SYNOPSIS
 .Nm /usr/bin/ln
 .Op Fl fins
+.Op Fl L | P
 .Ar source_file
 .Op Ar target
 .Nm /usr/bin/ln
 .Op Fl fins
+.Op Fl L | P
 .Ar source_file Ns ...
 .Ar target
 .Nm /usr/bin/ln
 .Op Fl fins
+.Op Fl L | P
 .Fl T
 .Ar source_file
 .Ar target
 .Pp
 .Nm /usr/xpg4/bin/ln
 .Op Fl fis
+.Op Fl L | P
 .Ar source_file
 .Op Ar target
 .Nm /usr/xpg4/bin/ln
 .Op Fl fis
+.Op Fl L | P
 .Ar source_file Ns ...
 .Ar target
 .Nm /usr/xpg4/bin/ln
 .Op Fl fis
+.Op Fl L | P
 .Fl T
 .Ar source_file
 .Ar target
@@ -177,11 +183,32 @@ see
 asks for a response, and reads the standard input for one line.
 If the response is affirmative, the link occurs, if permissible.
 Otherwise, the command exits.
+.Pp
+When creating a hard link and the source file is itself a symbolic link, the
+target will be a hard link to the symbolic link itself, not the referenced file.
+In other words, when neither
+.Fl L
+or
+.Fl P
+are specified
+.Pa /usr/bin/ln
+acts as though
+.Fl P
+was specified.
 .Ss "/usr/xpg4/bin/ln"
 When creating a hard link, and the source file is itself a symbolic link, the
 target will be a hard link to the file referenced by the symbolic link, not to
 the symbolic link object itself
 .Pq Ar source_file .
+In other words, when neither
+.Fl L
+or
+.Fl P
+are specified,
+.Pa /usr/xpg4/bin/ln
+acts as though
+.Fl L
+was specified.
 .Sh OPTIONS
 The following options are supported for both
 .Pa /usr/bin/ln
@@ -210,6 +237,32 @@ If both the
 and
 .Fl i
 options are specified, only the last one on the command line is honored.
+.It Fl L
+Create hardlinks to the item a symbolic link points to.
+If a symbolic link pointed to a file, the resulting hardlink would be a hardlink
+to that same file.
+This option may be specified multiple times.
+The last instance of
+.Fl L
+and
+.Fl P
+determines which behavior is used.
+.Pp
+This option is ignored when creating a symbolic link with
+.Fl s .
+.It Fl P
+Create hardlinks to a symbolic link itself.
+If a symbolic link pointed to a file, the resulting hardlink would be to the
+symbolic link and not the file.
+This option may be specified multiple times.
+The last instance of
+.Fl L
+and
+.Fl P
+determines which behavior is used.
+.Pp
+This option is ignored when creating a symbolic link with
+.Fl s .
 .It Fl s
 Creates a symbolic link.
 .Pp

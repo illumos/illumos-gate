@@ -1076,6 +1076,8 @@ file path=opt/util-tests/tests/cpio/files/freebsd.ustar.cpio mode=0444
 file path=opt/util-tests/tests/cpio/files/zero.bar mode=0444
 dir  path=opt/util-tests/tests/cpmvln
 file path=opt/util-tests/tests/cpmvln/checker mode=0555
+file path=opt/util-tests/tests/cpmvln/equiv mode=0555
+file path=opt/util-tests/tests/cpmvln/ln-LP mode=0555
 file path=opt/util-tests/tests/cpmvln/mkobj mode=0555
 file path=opt/util-tests/tests/cpmvln/no-targ mode=0555
 file path=opt/util-tests/tests/cpmvln/overwrite mode=0555

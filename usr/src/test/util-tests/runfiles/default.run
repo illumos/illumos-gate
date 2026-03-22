@@ -123,9 +123,13 @@ user = root
 
 #
 # This test ndeds to run as an explicitly unprivileged user to ensure that the
-# mv checks around permissions don't fire due to super-user privileges.
+# mv checks around permissions don't fire due to super-user privileges. We use
+# nobody here as well for ln-LP to ensure no hardlinks to directories are
+# created.
 #
 [/opt/util-tests/tests/cpmvln/overwrite]
 user = nobody
 [/opt/util-tests/tests/cpmvln/no-targ]
+user = nobody
+[/opt/util-tests/tests/cpmvln/ln-LP]
 user = nobody
