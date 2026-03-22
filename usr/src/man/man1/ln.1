@@ -43,273 +43,338 @@
 .\" Copyright 1989 AT&T
 .\" Portions Copyright (c) 1992, X/Open Company Limited  All Rights Reserved
 .\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved
-.\" Copyright 2024 Oxide Computer Company
+.\" Copyright 2026 Oxide Computer Company
 .\"
-.TH LN 1 "September 14, 2024"
-.SH NAME
-ln \- make hard or symbolic links to files
-.SH SYNOPSIS
-.nf
-\fB/usr/bin/ln\fR [\fB-fins\fR] \fIsource_file\fR [\fItarget\fR]
-.fi
-
-.LP
-.nf
-\fB/usr/bin/ln\fR [\fB-fins\fR] \fIsource_file\fR... \fItarget\fR
-.fi
-
-.LP
-.nf
-\fB/usr/xpg4/bin/ln\fR [\fB-fis\fR] \fIsource_file\fR [\fItarget\fR]
-.fi
-
-.LP
-.nf
-\fB/usr/xpg4/bin/ln\fR [\fB-fis\fR] \fIsource_file\fR... \fItarget\fR
-.fi
-
-.SH DESCRIPTION
-In the first synopsis form, the \fBln\fR utility creates a new directory entry
-(link) for the file specified by \fIsource_file\fR, at the destination path
-specified by \fItarget\fR. If \fItarget\fR is not specified, the link is made
-in the current directory. This first synopsis form is assumed when the final
-operand does not name an existing directory; if more than two operands are
-specified and the final is not an existing directory, an error will result.
-.sp
-.LP
-In the second synopsis form, the \fBln\fR utility creates a new directory entry
-for each file specified by a \fIsource_file\fR operand, at a destination path
-in the existing directory named by \fItarget\fR.
-.sp
-.LP
-The \fBln\fR utility may be used to create both hard links and symbolic links.
+.Dd "March 22, 2026"
+.Dt LN 1
+.Os
+.Sh NAME
+.Nm ln
+.Nd make hard or symbolic links to files
+.Sh SYNOPSIS
+.Nm /usr/bin/ln
+.Op Fl fins
+.Ar source_file
+.Op Ar target
+.Nm /usr/bin/ln
+.Op Fl fins
+.Ar source_file Ns ...
+.Ar target
+.Pp
+.Nm /usr/xpg4/bin/ln
+.Op Fl fis
+.Ar source_file
+.Op Ar target
+.Nm /usr/xpg4/bin/ln
+.Op Fl fis
+.Ar source_file Ns ...
+.Ar target
+.Sh DESCRIPTION
+In the first synopsis form, the
+.Nm
+utility creates a new directory entry
+.Pq link
+for the file specified by
+.Ar source_file ,
+at the destination path specified by
+.Ar target .
+If
+.Ar target
+is not specified, the link is made in the current directory.
+This first synopsis form is assumed when the final operand does not name an
+existing directory; if more than two operands are specified and the final one is
+not an existing directory, an error will result.
+.Pp
+In the second synopsis form, the
+.Nm
+utility creates a new directory entry for each file specified by a
+.Ar source_file
+operand, at a destination path in the existing directory named by
+.Ar target .
+.Pp
+The
+.Nm
+utility may be used to create both hard links and symbolic links.
 A hard link is a pointer to a file and is indistinguishable from the original
-directory entry. Any changes to a file are effective independent of the name
-used to reference the file. Hard links may not span file systems and may not
-refer to directories.
-.sp
-.LP
-\fBln\fR by default creates hard links. \fIsource_file\fR is linked to
-\fItarget\fR. If \fItarget\fR is a directory, another file named
-\fIsource_file\fR is created in \fItarget\fR and linked to the original
-\fIsource_file\fR.
-.sp
-.LP
-If \fItarget\fR is an existing file and the \fB-f\fR option is not specified,
-\fBln\fR will write a diagnostic message to standard error, do nothing more
-with the current \fIsource_file\fR, and go on to any remaining
-\fIsource_file\fRs.
-.sp
-.LP
-A symbolic link is an indirect pointer to a file; its directory entry  contains
-the name of the file to which it is linked. Symbolic links may span file
-systems and may refer to directories.
-.sp
-.LP
-File permissions for \fItarget\fR may be different from those displayed with an
-\fB-l\fR listing of the \fBls\fR(1) command. To display the permissions of
-\fItarget\fR, use \fBls\fR \fB-lL\fR. See \fBstat\fR(2) for more information.
-.SS "/usr/bin/ln"
-If \fB/usr/bin/ln\fR determines that the mode of \fItarget\fR forbids writing,
-it prints the mode (see \fBchmod\fR(1)), asks for a response, and reads the
-standard input for one line. If the response is affirmative, the link occurs,
-if permissible. Otherwise, the command exits.
-.SS "/usr/xpg4/bin/ln"
+directory entry.
+Any changes to a file are effective independent of the name used to reference
+the file.
+Hard links may not span file systems and may not refer to directories.
+.Pp
+.Nm
+by default creates hard links.
+.Ar source_file
+is linked to
+.Ar target .
+If
+.Ar target
+is a directory, another file named
+.Ar source_file
+is created in
+.Ar target
+and linked to the original
+.Ar source_file .
+.Pp
+If
+.Ar target
+is an existing file and the
+.Fl f
+option is not specified,
+.Nm
+will write a diagnostic message to standard error, do nothing more with the
+current
+.Ar source_file ,
+and go on to any remaining
+.Ar source_file Ns s.
+.Pp
+A symbolic link is an indirect pointer to a file; its directory entry contains
+the name of the file to which it is linked.
+Symbolic links may span file systems and may refer to directories.
+.Pp
+File permissions for
+.Ar target
+may be different from those displayed with an
+.Fl l
+listing of the
+.Xr ls 1
+command.
+To display the permissions of
+.Ar target ,
+use
+.Nm ls
+.Fl lL .
+See
+.Xr stat 2
+for more information.
+.Ss "/usr/bin/ln"
+If
+.Pa /usr/bin/ln
+determines that the mode of
+.Ar target
+forbids writing, it prints the mode
+.Po
+see
+.Xr chmod 1
+.Pc ,
+asks for a response, and reads the standard input for one line.
+If the response is affirmative, the link occurs, if permissible.
+Otherwise, the command exits.
+.Ss "/usr/xpg4/bin/ln"
 When creating a hard link, and the source file is itself a symbolic link, the
 target will be a hard link to the file referenced by the symbolic link, not to
-the symbolic link object itself (\fIsource_file\fR).
-.SH OPTIONS
-The following options are supported for both \fB/usr/bin/ln\fR and
-\fB/usr/xpg4/bin/ln\fR:
-.sp
-.ne 2
-.na
-\fB\fB-f\fR\fR
-.ad
-.RS 6n
-Links files without questioning the user, even if the mode of \fItarget\fR
-forbids writing. If both the \fB-f\fR and \fB-i\fR options are specified, only
-the last one on the command line is honored.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-i\fR\fR
-.ad
-.RS 6n
-Interactively prompt the user about how to proceed when \fItarget\fR already
-exists. An affirmative response means that \fItarget\fR should be removed so
-that a link can be created. Any other answer will prevent the overwriting.
-If both the \fB-f\fR and \fB-i\fR options are specified, only the last one on
-the command line is honored.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB-s\fR\fR
-.ad
-.RS 6n
+the symbolic link object itself
+.Pq Ar source_file .
+.Sh OPTIONS
+The following options are supported for both
+.Pa /usr/bin/ln
+and
+.Pa /usr/xpg4/bin/ln :
+.Bl -tag -width Ds
+.It Fl f
+Links files without questioning the user, even if the mode of
+.Ar target
+forbids writing.
+If both the
+.Fl f
+and
+.Fl i
+options are specified, only the last one on the command line is honored.
+.It Fl i
+Interactively prompt the user about how to proceed when
+.Ar target
+already exists.
+An affirmative response means that
+.Ar target
+should be removed so that a link can be created.
+Any other answer will prevent the overwriting.
+If both the
+.Fl f
+and
+.Fl i
+options are specified, only the last one on the command line is honored.
+.It Fl s
 Creates a symbolic link.
-.sp
-If the \fB-s\fR option is used with two arguments, \fItarget\fR may be an
-existing directory or a non-existent file. If \fItarget\fR already exists and
-is not a directory, an error is returned. \fIsource_file\fR may be any path
-name and need not exist. If it exists, it may be a file or directory and may
-reside on a different file system from \fItarget\fR. If \fItarget\fR is an
-existing directory, a file is created in directory \fItarget\fR whose name is
-\fIsource_file\fR or the last component of \fIsource_file\fR. This file is a
-symbolic link that references \fIsource_file\fR. If \fItarget\fR does not
-exist, a file with name \fItarget\fR is created and it is a symbolic link that
-references \fIsource_file\fR.
-.sp
-If the \fB-s\fR option is used with more than two arguments, \fItarget\fR must
-be an existing directory or an error will be returned. For each
-\fIsource_file\fR, a link is created in \fItarget\fR whose name is the last
-component of \fIsource_file\fR. Each new \fIsource_file\fR is a symbolic link
-to the original \fIsource_file\fR. The files and \fItarget\fR may reside on
-different file systems.
-.RE
-
-.SS "/usr/bin/ln"
-The following option is supported for \fB/usr/bin/ln\fR only:
-.sp
-.ne 2
-.na
-\fB\fB-n\fR\fR
-.ad
-.RS 6n
-If \fItarget\fR is an existing file, writes a diagnostic message to stderr and
-goes on to any remaining \fIsource_file\fRs. The \fB-f\fR and \fB-i\fR options
-override this option. This is the default behavior for \fB/usr/bin/ln\fR and
-\fB/usr/xpg4/bin/ln\fR, and is silently ignored.
-.RE
-
-.SH OPERANDS
+.Pp
+If the
+.Fl s
+option is used with two arguments,
+.Ar target
+may be an existing directory or a non-existent file.
+If
+.Ar target
+already exists and is not a directory, an error is returned.
+.Ar source_file
+may be any path name and need not exist.
+If it exists, it may be a file or directory and may reside on a different file
+system from
+.Ar target .
+If
+.Ar target
+is an existing directory, a file is created in directory
+.Ar target
+whose name is
+.Ar source_file
+or the last component of
+.Ar source_file .
+This file is a symbolic link that references
+.Ar source_file .
+If
+.Ar target
+does not exist, a file with name
+.Ar target
+is created and it is a symbolic link that references
+.Ar source_file .
+.Pp
+If the
+.Fl s
+option is used with more than two arguments,
+.Ar target
+must be an existing directory or an error will be returned.
+For each
+.Ar source_file ,
+a link is created in
+.Ar target
+whose name is the last component of
+.Ar source_file .
+Each new
+.Ar source_file
+is a symbolic link to the original
+.Ar source_file .
+The files and
+.Ar target
+may reside on different file systems.
+.El
+.Ss "/usr/bin/ln"
+The following option is supported for
+.Pa /usr/bin/ln
+only:
+.Bl -tag -width Ds
+.It Fl n
+If
+.Ar target
+is an existing file, writes a diagnostic message to stderr and goes on to any
+remaining
+.Ar source_file Ns s.
+The
+.Fl f
+and
+.Fl i
+options override this option.
+This is the default behavior for
+.Pa /usr/bin/ln
+and
+.Pa /usr/xpg4/bin/ln
+and is silently ignored.
+.El
+.Sh OPERANDS
 The following operands are supported:
-.sp
-.ne 2
-.na
-\fB\fIsource_file\fR\fR
-.ad
-.RS 15n
-A path name of a file to be linked. This can be either a regular or special
-file. If the \fB-s\fR option is specified, \fIsource_file\fR can also be a
-directory.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fItarget\fR\fR
-.ad
-.RS 15n
+.Bl -tag -width Ar
+.It Ar source_file
+A path name of a file to be linked.
+This can be either a regular or special file.
+If the
+.Fl s
+option is specified,
+.Ar source_file
+can also be a directory.
+.It Ar target
 The path name of the new directory entry to be created, or of an existing
 directory in which the new directory entries are to be created.
-.RE
-
-.SH USAGE
-See \fBlargefile\fR(7) for the description of the behavior of \fBln\fR when
-encountering files greater than or equal to 2 Gbyte ( 2^31 bytes).
-.SH ENVIRONMENT VARIABLES
-See \fBenviron\fR(7) for descriptions of the following environment variables
-that affect the execution of \fBln\fR: \fBLANG\fR, \fBLC_ALL\fR,
-\fBLC_CTYPE\fR, \fBLC_MESSAGES\fR, and \fBNLSPATH\fR.
-.SH EXIT STATUS
+.El
+.Sh USAGE
+See
+.Xr largefile 7
+for the description of the behavior of
+.Nm
+when encountering files greater than or equal to 2 Gbyte
+.Pq 2^31 bytes .
+.Sh ENVIRONMENT VARIABLES
+See
+.Xr environ 7
+for descriptions of the following environment variables that affect the
+execution of
+.Nm :
+.Ev LANG ,
+.Ev LC_ALL ,
+.Ev LC_CTYPE ,
+.Ev LC_MESSAGES ,
+and
+.Ev NLSPATH .
+.Sh EXIT STATUS
 The following exit values are returned:
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.RS 6n
+.Bl -tag -width Ds
+.It Sy 0
 All the specified files were linked successfully
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB>0\fR\fR
-.ad
-.RS 6n
+.It Sy >0
 An error occurred.
-.RE
-
-.SH ATTRIBUTES
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.SS "/usr/bin/ln"
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-CSI	Enabled
-.TE
-
-.SS "/usr/xpg4/bin/ln"
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-CSI	Enabled
-_
-Interface Stability	Standard
-.TE
-
-.SH SEE ALSO
-.BR chmod (1),
-.BR ls (1),
-.BR stat (2),
-.BR attributes (7),
-.BR environ (7),
-.BR largefile (7),
-.BR standards (7)
-.SH NOTES
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh CODE SET INDEPENDENCE
+.Sy Enabled
+.Sh SEE ALSO
+.Xr chmod 1 ,
+.Xr ls 1 ,
+.Xr stat 2 ,
+.Xr attributes 7 ,
+.Xr environ 7 ,
+.Xr largefile 7 ,
+.Xr standards 7
+.Sh NOTES
 A symbolic link to a directory behaves differently than you might expect in
-certain cases. While an \fBls\fR(1) command on such a link displays the files
-in the pointed-to directory, entering \fBls\fR \fB-l\fR displays information
-about the link itself:
-.sp
-.in +2
-.nf
-example% \fBln -s dir link\fR
-example% \fBls link\fR
+certain cases.
+While an
+.Xr ls 1
+command on such a link displays the files in the pointed-to directory, entering
+.Nm ls
+.Fl l
+displays information about the link itself:
+.Bd -literal -offset indent
+example% ln -s dir link
+example% ls link
 file1 file2 file3 file4
-example% \fBls -l link\fR
+example% ls -l link
 lrwxrwxrwx  1 user            7 Jan 11 23:27 link -> dir
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-When you change to a directory (see \fBcd\fR(1)) through a symbolic link, using
-\fB/usr/bin/sh\fR or \fB/usr/bin/csh\fR, you wind up in the pointed-to location
-within the file system. This means that the parent of the new working directory
-is not the parent of the symbolic link, but rather, the parent of the
-pointed-to directory. This will also happen when using \fBcd\fR with the
-\fB-P\fR option from \fB/usr/bin/ksh\fR or \fB/usr/xpg4/bin/sh\fR. For
-instance, in the following case, the final working directory is \fB/usr\fR and
-not \fB/home/user/linktest\fR.
-.sp
-.in +2
-.nf
-example% \fBpwd\fR
+.Ed
+.Pp
+When you change to a directory
+.Po
+see
+.Xr cd 1
+.Pc
+through a symbolic link, using
+.Pa /usr/bin/sh
+or
+.Pa /usr/bin/csh ,
+you wind up in the pointed-to location within the file system.
+This means that the parent of the new working directory is not the parent of the
+symbolic link, but rather, the parent of the pointed-to directory.
+This will also happen when using
+.Ic cd
+with the
+.Fl P
+option from
+.Pa /usr/bin/ksh
+or
+.Pa /usr/xpg4/bin/sh .
+For instance, in the following case, the final working directory is
+.Pa /usr
+and
+not
+.Pa /home/user/linktest .
+.Bd -literal -offset indent
+example% pwd
 /home/user/linktest
-example% \fBln -s /usr/tmp symlink\fR
-example% \fBcd symlink\fR
-example% \fBcd .\|.\fR
-example% \fBpwd\fR
+example% ln -s /usr/tmp symlink
+example% cd symlink
+example% cd ..
+example% pwd
 /usr
-.fi
-.in -2
-.sp
-
-.sp
-.LP
+.Ed
+.Pp
 C shell users can avoid any resulting navigation problems by using the
-\fBpushd\fR and \fBpopd\fR built-in commands instead of \fBcd\fR.
+.Ic pushd
+and
+.Ic popd
+built-in commands instead of
+.Ic cd .
