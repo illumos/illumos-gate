@@ -230,7 +230,7 @@ main(int argc, char *argv[])
 	 * Determine command invoked (mv, cp, or ln)
 	 */
 
-	if (cmd = strrchr(argv[0], '/'))
+	if ((cmd = strrchr(argv[0], '/')) != NULL)
 		++cmd;
 	else
 		cmd = argv[0];
@@ -637,7 +637,6 @@ cpymve(const char *source, char *target)
 	int ret = 0;
 	int attret = 0;
 	int sattret = 0;
-	int errno_save;
 	int error = 0;
 
 	switch (chkfiles(source, &target)) {
@@ -749,7 +748,7 @@ cpymve(const char *source, char *target)
 			if (targetexists && ISDIR(s2)) {
 				/* existing target dir must be empty */
 				if (rmdir(target) < 0) {
-					errno_save = errno;
+					int errno_save = errno;
 					(void) fprintf(stderr,
 					    gettext("%s: cannot rmdir %s: "),
 					    cmd, target);
