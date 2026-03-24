@@ -29,6 +29,7 @@
 #include <efidevp.h>
 #include <stand.h>
 #include <Protocol/LoadedImage.h>
+#include <bootstrap.h>
 
 static EFI_PHYSICAL_ADDRESS heap;
 static UINTN heapsize;
@@ -185,3 +186,15 @@ efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
 	efi_exit(status);
 	return (status);
 }
+
+static int
+command_heap(int argc __unused, char *argv[] __unused)
+{
+	mallocstats();
+	printf("heap base at %p, top at %p, upper limit at %p\n",
+	    (void *)(uintptr_t)heap, sbrk(0),
+	    (void *)(uintptr_t)heap + heapsize);
+	return (CMD_OK);
+}
+
+COMMAND_SET(heap, "heap", "show heap usage", command_heap);
