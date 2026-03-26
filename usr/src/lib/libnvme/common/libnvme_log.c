@@ -127,9 +127,20 @@ nvme_log_disc_calc_size(const nvme_log_disc_t *disc, uint64_t *act,
 {
 	if (disc->nld_var_func == NULL) {
 		*act = disc->nld_alloc_len;
+	} else if (!disc->nld_var_func(act, buf, buflen)) {
+		return (false);
 	}
 
-	return (disc->nld_var_func(act, buf, buflen));
+	uint64_t orig = *act;
+
+	/*
+	 * See nvme_log_page_info_size() in common/nvme/nvme_log.c for
+	 * more context. Effectively NVMe log pages are required to be
+	 * 4-byte aligned and we choose to round up.
+	 */
+	*act = P2ROUNDUP(orig, NVME_DWORD_SIZE);
+	VERIFY3U(*act, >=, orig);
+	return (true);
 }
 
 bool
