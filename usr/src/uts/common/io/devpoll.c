@@ -27,6 +27,7 @@
  * Copyright (c) 2012 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/types.h>
@@ -1320,11 +1321,22 @@ dpioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 			return (error == 0 ? EINTR : 0);
 		}
 
-		if (is_epoll) {
-			size = nfds * (fdsize = sizeof (epoll_event_t));
-		} else {
-			size = nfds * (fdsize = sizeof (pollfd_t));
+		fdsize = is_epoll ?
+		    sizeof (epoll_event_t) : sizeof (pollfd_t);
+
+		/*
+		 * Guard against integer overflow in the nfds * fdsize
+		 * calculation below. Without this check, a sufficiently
+		 * large nfds could overflow to a small size, bypassing the
+		 * buffer reallocation and allowing a heap overflow.
+		 */
+		if (nfds > SIZE_MAX / fdsize) {
+			DP_REFRELE(dpep);
+			DP_SIGMASK_RESTORE(ksetp);
+			return (EINVAL);
 		}
+
+		size = nfds * fdsize;
 
 		/*
 		 * XXX It would be nice not to have to alloc each time, but it
