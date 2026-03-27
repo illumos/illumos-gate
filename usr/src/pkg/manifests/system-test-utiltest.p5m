@@ -1795,6 +1795,8 @@ file path=opt/util-tests/tests/pcidbtest mode=0555
 file path=opt/util-tests/tests/pcieadm-priv mode=0555
 file path=opt/util-tests/tests/pcieadmtest mode=0555
 file path=opt/util-tests/tests/printf_test mode=0555
+dir  path=opt/util-tests/tests/rm
+file path=opt/util-tests/tests/rm/rm-test mode=0555
 dir  path=opt/util-tests/tests/sed
 file path=opt/util-tests/tests/sed/multi_test mode=0555
 file path=opt/util-tests/tests/sed/multi_words mode=0444

@@ -45,6 +45,7 @@ SUBDIRS =		\
 	pcidb		\
 	pcieadm		\
 	printf		\
+	rm		\
 	sed		\
 	sleep		\
 	smbios		\

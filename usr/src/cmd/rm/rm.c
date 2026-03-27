@@ -28,7 +28,11 @@
 /*	All Rights Reserved   */
 
 /*
- * rm [-fiRr] file ...
+ * Copyright 2026 Oxide Computer Company
+ */
+
+/*
+ * rm [-dfiRrv] file ...
  */
 
 #include <sys/param.h>
@@ -75,7 +79,7 @@ static int confirm(FILE *, const char *, ...);
 static void memerror(void);
 static int checkdir(struct dlist *, struct dlist *);
 static int errcnt;
-static boolean_t silent, interactive, recursive, ontty;
+static boolean_t silent, interactive, recursive, ontty, dirok, verbose;
 
 static char *pathbuf;
 static size_t pathbuflen = MAXPATHLEN;
@@ -95,8 +99,11 @@ main(int argc, char **argv)
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "frRi")) != EOF)
+	while ((c = getopt(argc, argv, "dfrRiv")) != EOF)
 		switch (c) {
+		case 'd':
+			dirok = B_TRUE;
+			break;
 		case 'f':
 			silent = B_TRUE;
 #ifdef XPG4
@@ -112,6 +119,9 @@ main(int argc, char **argv)
 		case 'r':
 		case 'R':
 			recursive = B_TRUE;
+			break;
+		case 'v':
+			verbose = B_TRUE;
 			break;
 		case '?':
 			errflg = 1;
@@ -133,7 +143,8 @@ main(int argc, char **argv)
 	argv = &argv[optind];
 
 	if ((argc < 1 && !silent) || errflg) {
-		(void) fprintf(stderr, gettext("usage: rm [-fiRr] file ...\n"));
+		(void) fprintf(stderr,
+		    gettext("usage: rm [-dfiRrv] file ...\n"));
 		exit(2);
 	}
 
@@ -338,10 +349,19 @@ rm(const char *entry, struct dlist *caller)
 
 	if (S_ISDIR(temp.st_mode)) {
 		/*
-		 * If "-r" wasn't specified, trying to remove directories
-		 * is an error.
+		 * By default removing directories is an error. There are two
+		 * exceptions to this:
+		 *
+		 * 1. -d is specified which says it's okay to try to remove the
+		 *    directory.
+		 * 2. -r is specified, which means we can work recursively.
 		 */
 		if (!recursive) {
+			if (dirok) {
+				flag = AT_REMOVEDIR;
+				goto unlinkit;
+			}
+
 			(void) fprintf(stderr,
 			    gettext("rm: %s is a directory\n"), pathbuf);
 			errcnt++;
@@ -425,8 +445,12 @@ rm(const char *entry, struct dlist *caller)
 				}
 			}
 			/* If it's empty we may still be able to rm it */
-			if (unlinkat(caller->fd, entry, flag) == 0)
+			if (unlinkat(caller->fd, entry, flag) == 0) {
+				if (verbose) {
+					(void) printf("%s\n", pathbuf);
+				}
 				return (0);
+			}
 			if (interactive)
 				err = errno;
 			(void) fprintf(stderr,
@@ -554,6 +578,10 @@ unlinkit:
 #endif
 		}
 		errcnt++;
+	} else {
+		if (verbose) {
+			(void) printf("%s\n", pathbuf);
+		}
 	}
 	return (0);
 }

@@ -133,3 +133,10 @@ user = nobody
 user = nobody
 [/opt/util-tests/tests/cpmvln/ln-LP]
 user = nobody
+
+#
+# Ensure nothing in the rm tests can succeed because of privileges. The test
+# also enforces that it's not running with a uid of 0.
+#
+[/opt/util-tests/tests/rm/rm-test]
+user = nobody

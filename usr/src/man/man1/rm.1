@@ -53,48 +53,60 @@
 .Nd remove directory entries
 .Sh SYNOPSIS
 .Nm /usr/bin/rm
-.Op Fl f
-.Op Fl i
-.Ar
+.Op Fl dfiv
+.Ar target ...
 .Nm /usr/bin/rm
 .Fl rR
-.Op Fl f
-.Op Fl i
-.Ar dirname ...
-.Op Ar file ...
+.Op Fl dfiv
+.Ar target ...
 .Pp
 .Nm /usr/xpg4/bin/rm
 .Op Fl fiRr
-.Ar
+.Ar target ...
 .Sh DESCRIPTION
 The
 .Nm rm
 utility removes the directory entry specified by each
-.Ar file
+.Ar target
 argument.
 If a file has no write permission and the standard input is a terminal, the
 full set of permissions (in octal) for the file are printed followed by a
 question mark.
 This is a prompt for confirmation.
 If the answer is affirmative, the file is deleted, otherwise the file remains.
+If standard input is not a terminal, then the file is removed regardless.
 .Pp
 If
-.Ar file
+.Ar target
 is a symbolic link, the link is removed, but the file or directory to which it
 refers is not deleted.
 Users do not need write permission to remove a symbolic link, provided they
 have write permissions in the directory.
 .Pp
+If
+.Ar target
+is a directory, then it is not removed by default.
+There are two exceptions here.
+If the
+.Fl r
+or
+.Fl R
+option is specified, then directories will be recursively descended into and
+removed.
+If
+.Fl d
+is specified and the directory is empty, then the directory will be removed.
+.Pp
 If multiple
-.Ar file Ns s
+.Ar target Ns s
 are specified and removal of a
-.Ar file
+.Ar target
 fails for any reason,
 .Nm rm
 writes a diagnostic message to standard error, do nothing more to the current
-.Ar file ,
+.Ar target ,
 and go on to any remaining
-.Ar file Ns s .
+.Ar target Ns s .
 .Pp
 If the standard input is not a terminal, the utility operates as if the
 .Fl f
@@ -105,6 +117,8 @@ The following options are supported for both
 and
 .Nm /usr/xpg4/bin/rm :
 .Bl -tag -width Fl
+.It Fl d
+Allow empty directories to be removed.
 .It Fl r
 Recursively removes directories and subdirectories in the argument list.
 The directory is emptied of files and removed.
@@ -126,6 +140,9 @@ option is used), resulting in an error message.
 Same as
 .Fl r
 option.
+.It Fl v
+Print the path of each file or directory successfully removed to
+standard output.
 .El
 .Ss "/usr/bin/rm"
 The following options are supported for
@@ -170,10 +187,9 @@ option is ignored.
 .Sh OPERANDS
 The following operands are supported:
 .Bl -tag -width Ar
-.It Ar file
+.It Ar target
 Specifies the pathname of a directory entry to be removed.
-.It Ar dirname
-Specifies the pathname of an empty directory to be removed.
+This may be a file of any kind or a directory.
 .El
 .Sh USAGE
 See
@@ -211,6 +227,28 @@ The following command removes the directory
 and all its contents, without prompting:
 .Pp
 .Dl example% rm -rf junk
+.Pp
+.Sy Example 3
+Removing Empty Directories
+.Pp
+The following command removes an empty directory.
+.Bd -literal -offset indent
+example% mkdir foo
+example% rm -d foo
+.Ed
+.Pp
+.Sy Example 4
+Printing Removed Contents
+.Pp
+The following command prints the names of all files successfully removed to
+standard out.
+.Bd -literal -offset indent
+example% rm -rv out/ test
+out/amd64/dtrace
+out/amd64
+out
+test
+.Ed
 .Sh DIAGNOSTICS
 All messages are generally self-explanatory.
 .Pp
