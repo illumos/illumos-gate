@@ -265,7 +265,7 @@ static __inline int tolower(int c)
 
 /* sbrk emulation */
 extern void	setheap(void *base, void *top);
-extern char	*sbrk(int incr);
+extern void	*sbrk(intptr_t incr);
 
 extern void	mallocstats(void);
 

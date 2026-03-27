@@ -46,10 +46,10 @@ setheap(void *base, void *top)
 	maxheap = (char *)top - (char *)heapbase;
 }
 
-char *
-sbrk(int incr)
+void *
+sbrk(intptr_t incr)
 {
-	char	*ret;
+	void	*ret;
 
 	if (heapbase == NULL)
 		panic("No heap setup");
@@ -61,5 +61,5 @@ sbrk(int incr)
 		return (ret);
 	}
 	errno = ENOMEM;
-	return ((char *)-1);
+	return ((void *)-1);
 }
