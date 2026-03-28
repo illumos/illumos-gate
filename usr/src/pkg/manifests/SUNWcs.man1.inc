@@ -223,7 +223,7 @@ link path=usr/share/man/man1/repeat.1 target=shell_builtins.1
 link path=usr/share/man/man1/return.1 target=exit.1
 file path=usr/share/man/man1/rm.1
 link path=usr/share/man/man1/rmail.1 target=mail.1
-link path=usr/share/man/man1/rmdir.1 target=rm.1
+file path=usr/share/man/man1/rmdir.1
 file path=usr/share/man/man1/roles.1
 file path=usr/share/man/man1/runat.1
 file path=usr/share/man/man1/script.1

@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 ../../../has/man/man1has/csh.1has
@@ -159,8 +159,6 @@ proc.1
 	ptime.1
 	pwait.1
 	pwdx.1
-rm.1
-	rmdir.1
 rmmount.1
 	rmumount.1
 rsh.1

@@ -311,6 +311,7 @@ MANFILES=	acctcom.1			\
 		rev.1				\
 		rlogin.1			\
 		rm.1				\
+		rmdir.1				\
 		rmformat.1			\
 		rmmount.1			\
 		roffbib.1			\

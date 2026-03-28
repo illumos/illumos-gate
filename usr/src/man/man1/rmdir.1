@@ -1,0 +1,176 @@
+.\"
+.\" Sun Microsystems, Inc. gratefully acknowledges The Open Group for
+.\" permission to reproduce portions of its copyrighted documentation.
+.\" Original documentation from The Open Group can be obtained online at
+.\" http://www.opengroup.org/bookstore/.
+.\"
+.\" The Institute of Electrical and Electronics Engineers and The Open
+.\" Group, have given us permission to reprint portions of their
+.\" documentation.
+.\"
+.\" In the following statement, the phrase ``this text'' refers to portions
+.\" of the system documentation.
+.\"
+.\" Portions of this text are reprinted and reproduced in electronic form
+.\" in the SunOS Reference Manual, from IEEE Std 1003.1, 2004 Edition,
+.\" Standard for Information Technology -- Portable Operating System
+.\" Interface (POSIX), The Open Group Base Specifications Issue 6,
+.\" Copyright (C) 2001-2004 by the Institute of Electrical and Electronics
+.\" Engineers, Inc and The Open Group.  In the event of any discrepancy
+.\" between these versions and the original IEEE and The Open Group
+.\" Standard, the original IEEE and The Open Group Standard is the referee
+.\" document.  The original Standard can be obtained online at
+.\" http://www.opengroup.org/unix/online.html.
+.\"
+.\" This notice shall appear on any product containing this material.
+.\"
+.\" The contents of this file are subject to the terms of the
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+.\" or http://www.opensolaris.org/os/licensing.
+.\" See the License for the specific language governing permissions
+.\" and limitations under the License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each
+.\" file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+.\" If applicable, add the following below this CDDL HEADER, with the
+.\" fields enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\"
+.\" Copyright 1989 AT&T
+.\" Portions Copyright (c) 1992, X/Open Company Limited All Rights Reserved
+.\" Portions Copyright (c) 1982-2007 AT&T Knowledge Ventures
+.\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved
+.\"
+.Dd March 28, 2026
+.Dt RMDIR 1
+.Os
+.Sh NAME
+.Nm rmdir
+.Nd remove directories
+.Sh SYNOPSIS
+.Nm /usr/bin/rmdir
+.Op Fl ps
+.Ar dirname
+.Ss "ksh93"
+.Nm /usr/bin/rmdir
+.Op Fl eps
+.Ar dirname ...
+.Sh DESCRIPTION
+The
+.Nm
+utility removes the directory entry specified by each
+.Ar dirname
+operand, which must refer to an empty directory.
+.Pp
+Directories are processed in the order specified.
+If a directory and a subdirectory of that directory are specified in a single
+invocation of
+.Nm rmdir ,
+the subdirectory must be specified before the parent directory so that the
+parent directory is empty when
+.Nm rmdir
+tries to remove it.
+.Ss "ksh93"
+The
+.Nm rmdir
+built-in in
+.Nm ksh93
+is associated with the
+.Pa /bin
+and
+.Pa /usr/bin
+paths.
+It is invoked when
+.Nm rmdir
+is executed without a pathname prefix and the pathname search finds a
+.Pa /bin/rmdir
+or
+.Pa /usr/bin/rmdir
+executable.
+.Sh OPTIONS
+The following options are supported for both
+.Nm /usr/bin/rmdir
+and
+.Nm ksh93 rmdir :
+.Bl -tag -width Fl
+.It Fl p
+Allows users to remove the directory
+.Ar dirname
+and its parent directories which become empty.
+A message is printed to standard error if all or part of the path could not be
+removed.
+.It Fl s
+Suppresses the message printed on the standard error when
+.Fl p
+is in effect.
+.El
+.Ss "ksh93"
+The following options are supported for the
+.Nm rmdir
+built-in for
+.Nm ksh93 :
+.Bl -tag -width Fl
+.It Fl e , Fl -ignore-fail-on-non-empty
+Ignore each non-empty directory failure.
+.It Fl -parents
+Long option for
+.Fl p .
+.It Fl -suppress
+Long option for
+.Fl s .
+.El
+.Sh OPERANDS
+The following operands are supported:
+.Bl -tag -width Ar
+.It Ar dirname
+Specifies the pathname of an empty directory to be removed.
+.El
+.Sh USAGE
+See
+.Xr largefile 7
+for the description of the behavior of
+.Nm rmdir
+when encountering files greater than or equal to 2 Gbyte (2^31 bytes).
+.Sh EXIT STATUS
+The following exit values are returned:
+.Bl -tag -width Sy
+.It Sy 0
+All the existing named directory entries were removed.
+.It Sy >0
+An error occurred.
+.El
+.Sh EXAMPLES
+.Sy Example 1 No Removing Empty Directories
+.Pp
+If a directory
+.Pa a
+in the current directory is empty, except that it contains a directory
+.Pa b ,
+and
+.Pa a/b
+is empty except that it contains a directory
+.Pa c ,
+the following command removes all three directories:
+.Pp
+.Dl example% rmdir -p a/b/c
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Pp
+.Nm ksh93
+built-in binding to
+.Pa /bin
+and
+.Pa /usr/bin
+is Volatile.
+The built-in interfaces are Uncommitted.
+.Sh SEE ALSO
+.Xr ksh93 1 ,
+.Xr rm 1 ,
+.Xr unlink 2 ,
+.Xr attributes 7 ,
+.Xr largefile 7 ,
+.Xr standards 7
