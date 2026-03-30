@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright (c) 1989 by Sun Microsystems, Inc.
 #
@@ -30,6 +30,8 @@ PROG= pwd
 include ../Makefile.cmd
 
 .KEEP_STATE:
+
+CSTD = $(CSTD_GNU17)
 
 all: $(PROG)
 

@@ -120,6 +120,7 @@ user = root
 
 [/opt/util-tests/tests/ar/artest]
 [/opt/util-tests/tests/cpio/cpio_test]
+[/opt/util-tests/tests/pwd-test]
 
 #
 # This test ndeds to run as an explicitly unprivileged user to ensure that the
