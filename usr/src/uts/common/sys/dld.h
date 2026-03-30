@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2017, Joyent, Inc.
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 #ifndef	_SYS_DLD_H
@@ -292,9 +293,17 @@ typedef struct dld_ioc_macprop_s {
 	mac_prop_id_t	pr_num;
 	uint_t		pr_perm_flags;
 	char		pr_name[MAXLINKPROPNAME];
-	uint_t		pr_valsize;		/* sizeof pr_val */
-	char		pr_val[1];
+	uint_t		pr_valsize;	/* sizeof pr_val */
+	char		pr_val[];	/* Might have padding, be cautious. */
 } dld_ioc_macprop_t;
+
+#define	DLD_MACPROP_VALPAD \
+	(sizeof (dld_ioc_macprop_t) - offsetof(dld_ioc_macprop_t, pr_val))
+/* WARNING: We evaluate (v) twice! */
+#define	DLD_MACPROP_BUFSIZE(v) \
+	sizeof (dld_ioc_macprop_t) + (((v) <= DLD_MACPROP_VALPAD) ? 0 :	\
+	    ((v) - DLD_MACPROP_VALPAD))
+
 
 #define	DLDIOC_GETHWGRP		DLDIOC(0x1d)
 

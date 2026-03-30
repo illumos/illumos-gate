@@ -24,6 +24,7 @@
  * Copyright (c) 2017, Joyent, Inc.
  * Copyright 2025 MNX Cloud, Inc.
  * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 /*
@@ -686,12 +687,12 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 	uint_t			dsize;
 
 	/*
-	 * We only use pr_valsize from prop, as the caller only did a
-	 * copyin() for sizeof (dld_ioc_prop_t), which doesn't cover
-	 * the property data.  We copyin the full dld_ioc_prop_t
-	 * including the data into kprop down below.
+	 * We only use pr_valsize from prop. The caller only did a copyin()
+	 * for sizeof (dld_ioc_prop_t), which will not cover any property
+	 * data.  We copyin the bits starting at pr_val to guard against a
+	 * changing dld_ioc_prop_t header.
 	 */
-	dsize = sizeof (dld_ioc_macprop_t) + prop->pr_valsize - 1;
+	dsize = DLD_MACPROP_BUFSIZE(prop->pr_valsize);
 	if (dsize < prop->pr_valsize)
 		return (EINVAL);
 
@@ -700,10 +701,15 @@ drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
 	 * a buffer for kernel use as this data was not part of the
 	 * prop allocation and copyin() done by the framework.
 	 */
-	if ((kprop = kmem_alloc(dsize, KM_NOSLEEP)) == NULL)
+	if ((kprop = kmem_alloc(dsize, KM_NOSLEEP_LAZY)) == NULL)
 		return (ENOMEM);
 
-	if (ddi_copyin((void *)arg, kprop, dsize, mode) != 0) {
+	/* Just assign the previously copied-in header. */
+	*kprop = *prop;
+
+	/* copyin() ONLY the `pr_val` data here. */
+	if (ddi_copyin((void *)(arg + offsetof(dld_ioc_macprop_t, pr_val)),
+	    &(kprop->pr_val), prop->pr_valsize, mode) != 0) {
 		err = EFAULT;
 		goto done;
 	}
