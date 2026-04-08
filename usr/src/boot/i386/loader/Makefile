@@ -42,7 +42,10 @@ install: all $(ROOTBOOTLOADER)
 PROG=		$(LOADER).sym
 
 # architecture-specific loader code
-SRCS=		main.c conf.c vers.c chain.c
+SRCS=		main.c conf.c vers.c chain.c panic_action.c
+
+panic_action.o := CFLAGS += -_gcc14=--param=min-pagesize=0
+panic_action.o := CFLAGS += -_gcc15=--param=min-pagesize=0
 
 # Enable BootForth
 CPPFLAGS +=	-DBOOT_FORTH -I$(SRC)/common/ficl -I../../libficl
