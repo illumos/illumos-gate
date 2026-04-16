@@ -57,7 +57,7 @@ function cleanup
 	[[ -n "$EVTPID" ]] && kill "$EVTPID"
 }
 
-# count resilver events in zpool and number of deferred rsilvers on vdevs
+# count resilver events in zpool and number of deferred resilvers on vdevs
 function verify_restarts # <msg> <cnt> <defer>
 {
 	msg=$1
@@ -111,7 +111,7 @@ log_must test -n "$EVTPID"
 log_must truncate -s $VDEV_FILE_SIZE ${VDEV_FILES[@]} $SPARE_VDEV_FILE
 
 log_must zpool create -f -o feature@resilver_defer=disabled $TESTPOOL \
-    raidz ${VDEV_FILES[@]}
+    raidz2 ${VDEV_FILES[@]}
 
 # create 4 filesystems
 for fs in fs{0..3}
@@ -148,8 +148,8 @@ do
 	log_must set_tunable32 zfs_resilver_min_time_ms 50
 
 	# initiate a resilver and suspend the scan as soon as possible
-	log_must zpool replace $TESTPOOL $VDEV_REPLACE
 	log_must set_tunable32 zfs_scan_suspend_progress 1
+	log_must zpool replace $TESTPOOL $VDEV_REPLACE
 
 	# there should only be 1 resilver start
 	verify_restarts '' "${RESTARTS[0]}" "${VDEVS[0]}"
@@ -157,9 +157,12 @@ do
 	# offline then online a vdev to introduce a new DTL range after current
 	# scan, which should restart (or defer) the resilver
 	log_must zpool offline $TESTPOOL ${VDEV_FILES[2]}
-	log_must zpool sync $TESTPOOL
+	log_must wait_vdev_state $TESTPOOL ${VDEV_FILES[2]} "OFFLINE"
+	sync_pool $TESTPOOL true
+
 	log_must zpool online $TESTPOOL ${VDEV_FILES[2]}
-	log_must zpool sync $TESTPOOL
+	log_must wait_vdev_state $TESTPOOL ${VDEV_FILES[2]} "ONLINE"
+	sync_pool $TESTPOOL true
 
 	# there should now be 2 resilver starts w/o defer, 1 with defer
 	verify_restarts ' after offline/online' "${RESTARTS[1]}" "${VDEVS[1]}"
@@ -186,8 +189,8 @@ do
 	    log_fail "resilver timed out"
 
 	# wait for a few txg's to see if a resilver happens
-	log_must zpool sync $TESTPOOL
-	log_must zpool sync $TESTPOOL
+	sync_pool $TESTPOOL true
+	sync_pool $TESTPOOL true
 
 	# there should now be 2 resilver starts
 	verify_restarts ' after resilver' "${RESTARTS[3]}" "${VDEVS[3]}"
