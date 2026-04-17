@@ -675,7 +675,7 @@ ena_tx_intr_work(ena_txq_t *txq)
 
 		/* Get the corresponding TCB. */
 		req_id = cdesc->etc_req_id;
-		if (req_id > txq->et_sq_num_descs) {
+		if (req_id >= txq->et_sq_num_descs) {
 			ena_err(ena, "invalid Tx request ID: 0x%x", req_id);
 			ena_trigger_reset(ena, ENAHW_RESET_INV_TX_REQ_ID);
 			break;

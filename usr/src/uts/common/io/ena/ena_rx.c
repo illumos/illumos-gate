@@ -393,7 +393,7 @@ ena_ring_rx(ena_rxq_t *rxq, int poll_bytes)
 		rcb = &rxq->er_rcbs[req_id];
 		rcb->ercb_offset = cdesc->erc_offset;
 		rcb->ercb_length = cdesc->erc_length;
-		ASSERT3U(rcb->ercb_length, <=, ena->ena_max_frame_total);
+		VERIFY3U(rcb->ercb_length, <=, ena->ena_max_frame_total);
 		mp = allocb(rcb->ercb_length + ENA_RX_BUF_IPHDR_ALIGNMENT, 0);
 
 		/*
