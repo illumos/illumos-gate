@@ -25,7 +25,7 @@
  * Copyright 2016 RackTop Systems.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2017 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -70,7 +70,8 @@ static const char *default_door_path = REPOSITORY_DOOR_NAME;
 #define	RESULT_TOO_BIG		-2
 #define	NOT_BOUND		-3
 
-static pthread_mutex_t	lowlevel_init_lock;
+static pthread_mutex_t	lowlevel_init_lock =
+	PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
 static int32_t		lowlevel_inited;
 
 static uu_list_pool_t	*tran_entry_pool;
@@ -125,7 +126,7 @@ handle_hold_subhandles(scf_handle_t *h, int mask)
 {
 	assert(mask != 0 && (mask & ~RH_HOLD_ALL) == 0);
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	while (h->rh_hold_flags != 0 && h->rh_holder != pthread_self()) {
 		int cancel_state;
 
@@ -138,7 +139,7 @@ handle_hold_subhandles(scf_handle_t *h, int mask)
 		h->rh_holder = pthread_self();
 	assert(!(h->rh_hold_flags & mask));
 	h->rh_hold_flags |= mask;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 }
 
 static void
@@ -146,14 +147,14 @@ handle_rele_subhandles(scf_handle_t *h, int mask)
 {
 	assert(mask != 0 && (mask & ~RH_HOLD_ALL) == 0);
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	assert(h->rh_holder == pthread_self());
 	assert((h->rh_hold_flags & mask));
 
 	h->rh_hold_flags &= ~mask;
 	if (h->rh_hold_flags == 0)
 		(void) pthread_cond_signal(&h->rh_cv);
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 }
 
 #define	HOLD_HANDLE(h, flag, field) \
@@ -239,7 +240,7 @@ lowlevel_init(void)
 	const char *debug;
 	const char *door_path;
 
-	(void) pthread_mutex_lock(&lowlevel_init_lock);
+	pthread_mutex_enter_np(&lowlevel_init_lock);
 	if (lowlevel_inited == 0) {
 		if (!issetugid() &&
 		    (debug = getenv(ENV_SCF_DEBUG)) != NULL && debug[0] != 0 &&
@@ -287,7 +288,7 @@ lowlevel_init(void)
 		lowlevel_inited = 1;
 	}
 end:
-	(void) pthread_mutex_unlock(&lowlevel_init_lock);
+	pthread_mutex_exit_np(&lowlevel_init_lock);
 	if (lowlevel_inited > 0)
 		return (1);
 	return (0);
@@ -584,9 +585,9 @@ handle_has_server(scf_handle_t *h)
 {
 	int ret;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	ret = handle_has_server_locked(h);
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	return (ret);
 }
@@ -745,6 +746,7 @@ make_door_call_retfd(int fd, const void *req, size_t req_sz, void *res,
 scf_handle_t *
 scf_handle_create(scf_version_t v)
 {
+	pthread_mutexattr_t attr;
 	scf_handle_t *ret;
 	int failed;
 
@@ -779,10 +781,35 @@ scf_handle_create(scf_version_t v)
 		return (NULL);
 	}
 
+	if (pthread_mutexattr_init(&attr) != 0) {
+		uu_list_destroy(ret->rh_dataels);
+		uu_list_destroy(ret->rh_iters);
+		uu_free(ret);
+		(void) scf_set_error(SCF_ERROR_NO_MEMORY);
+		return (NULL);
+	}
+
+	if (pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ERRORCHECK) != 0) {
+		(void) pthread_mutexattr_destroy(&attr);
+		uu_list_destroy(ret->rh_dataels);
+		uu_list_destroy(ret->rh_iters);
+		uu_free(ret);
+		(void) scf_set_error(SCF_ERROR_INTERNAL);
+		return (NULL);
+	}
+
 	ret->rh_doorfd = -1;
 	ret->rh_doorfd_old = -1;
 	ret->rh_zoneid = -1;
-	(void) pthread_mutex_init(&ret->rh_lock, NULL);
+	if (pthread_mutex_init(&ret->rh_lock, &attr) != 0) {
+		(void) pthread_mutexattr_destroy(&attr);
+		uu_list_destroy(ret->rh_dataels);
+		uu_list_destroy(ret->rh_iters);
+		uu_free(ret);
+		(void) scf_set_error(SCF_ERROR_INTERNAL);
+		return (NULL);
+	}
+	(void) pthread_mutexattr_destroy(&attr);
 
 	handle_hold_subhandles(ret, RH_HOLD_ALL);
 
@@ -853,26 +880,26 @@ scf_handle_decorate(scf_handle_t *handle, const char *name, scf_value_t *v)
 	if (v != SCF_DECORATE_CLEAR && handle != v->value_handle)
 		return (scf_set_error(SCF_ERROR_HANDLE_MISMATCH));
 
-	(void) pthread_mutex_lock(&handle->rh_lock);
+	pthread_mutex_enter_np(&handle->rh_lock);
 	if (handle_is_bound(handle)) {
-		(void) pthread_mutex_unlock(&handle->rh_lock);
+		pthread_mutex_exit_np(&handle->rh_lock);
 		return (scf_set_error(SCF_ERROR_IN_USE));
 	}
-	(void) pthread_mutex_unlock(&handle->rh_lock);
+	pthread_mutex_exit_np(&handle->rh_lock);
 
 	if (strcmp(name, "debug") == 0) {
 		if (v == SCF_DECORATE_CLEAR) {
-			(void) pthread_mutex_lock(&handle->rh_lock);
+			pthread_mutex_enter_np(&handle->rh_lock);
 			handle->rh_debug = 0;
-			(void) pthread_mutex_unlock(&handle->rh_lock);
+			pthread_mutex_exit_np(&handle->rh_lock);
 		} else {
 			uint64_t val;
 			if (scf_value_get_count(v, &val) < 0)
 				return (-1);		/* error already set */
 
-			(void) pthread_mutex_lock(&handle->rh_lock);
+			pthread_mutex_enter_np(&handle->rh_lock);
 			handle->rh_debug = (uid_t)val;
-			(void) pthread_mutex_unlock(&handle->rh_lock);
+			pthread_mutex_exit_np(&handle->rh_lock);
 		}
 		return (0);
 	}
@@ -880,9 +907,9 @@ scf_handle_decorate(scf_handle_t *handle, const char *name, scf_value_t *v)
 		char name[sizeof (handle->rh_doorpath)];
 
 		if (v == SCF_DECORATE_CLEAR) {
-			(void) pthread_mutex_lock(&handle->rh_lock);
+			pthread_mutex_enter_np(&handle->rh_lock);
 			handle->rh_doorpath[0] = 0;
-			(void) pthread_mutex_unlock(&handle->rh_lock);
+			pthread_mutex_exit_np(&handle->rh_lock);
 		} else {
 			ssize_t len;
 
@@ -894,10 +921,10 @@ scf_handle_decorate(scf_handle_t *handle, const char *name, scf_value_t *v)
 				return (scf_set_error(
 				    SCF_ERROR_INVALID_ARGUMENT));
 			}
-			(void) pthread_mutex_lock(&handle->rh_lock);
+			pthread_mutex_enter_np(&handle->rh_lock);
 			(void) strlcpy(handle->rh_doorpath, name,
 			    sizeof (handle->rh_doorpath));
-			(void) pthread_mutex_unlock(&handle->rh_lock);
+			pthread_mutex_exit_np(&handle->rh_lock);
 		}
 		return (0);
 	}
@@ -936,9 +963,9 @@ scf_handle_decorate(scf_handle_t *handle, const char *name, scf_value_t *v)
 		}
 
 		if (v == SCF_DECORATE_CLEAR) {
-			(void) pthread_mutex_lock(&handle->rh_lock);
+			pthread_mutex_enter_np(&handle->rh_lock);
 			handle->rh_doorpath[0] = 0;
-			(void) pthread_mutex_unlock(&handle->rh_lock);
+			pthread_mutex_exit_np(&handle->rh_lock);
 
 			return (0);
 		}
@@ -966,11 +993,11 @@ scf_handle_decorate(scf_handle_t *handle, const char *name, scf_value_t *v)
 		    default_door_path) >= sizeof (door))
 			return (scf_set_error(SCF_ERROR_INTERNAL));
 
-		(void) pthread_mutex_lock(&handle->rh_lock);
+		pthread_mutex_enter_np(&handle->rh_lock);
 		(void) strlcpy(handle->rh_doorpath, door,
 		    sizeof (handle->rh_doorpath));
 		handle->rh_zoneid = zid;
-		(void) pthread_mutex_unlock(&handle->rh_lock);
+		pthread_mutex_exit_np(&handle->rh_lock);
 
 		return (0);
 	}
@@ -998,9 +1025,9 @@ _scf_handle_decorations(scf_handle_t *handle, scf_decoration_func *f,
 
 	i.sdi_name = (const char *)"debug";
 	i.sdi_type = SCF_TYPE_COUNT;
-	(void) pthread_mutex_lock(&handle->rh_lock);
+	pthread_mutex_enter_np(&handle->rh_lock);
 	debug = handle->rh_debug;
-	(void) pthread_mutex_unlock(&handle->rh_lock);
+	pthread_mutex_exit_np(&handle->rh_lock);
 	if (debug != 0) {
 		scf_value_set_count(v, debug);
 		i.sdi_value = v;
@@ -1013,9 +1040,9 @@ _scf_handle_decorations(scf_handle_t *handle, scf_decoration_func *f,
 
 	i.sdi_name = (const char *)"door_path";
 	i.sdi_type = SCF_TYPE_ASTRING;
-	(void) pthread_mutex_lock(&handle->rh_lock);
+	pthread_mutex_enter_np(&handle->rh_lock);
 	(void) strlcpy(name, handle->rh_doorpath, sizeof (name));
-	(void) pthread_mutex_unlock(&handle->rh_lock);
+	pthread_mutex_exit_np(&handle->rh_lock);
 	if (name[0] != 0) {
 		(void) scf_value_set_astring(v, name);
 		i.sdi_value = v;
@@ -1167,9 +1194,9 @@ scf_handle_bind(scf_handle_t *handle)
 	repository_door_response_t response;
 	const char *door_name = default_door_path;
 
-	(void) pthread_mutex_lock(&handle->rh_lock);
+	pthread_mutex_enter_np(&handle->rh_lock);
 	if (handle_is_bound(handle)) {
-		(void) pthread_mutex_unlock(&handle->rh_lock);
+		pthread_mutex_exit_np(&handle->rh_lock);
 		return (scf_set_error(SCF_ERROR_IN_USE));
 	}
 
@@ -1185,7 +1212,7 @@ scf_handle_bind(scf_handle_t *handle)
 
 	/* check again, since we had to drop the lock */
 	if (handle_is_bound(handle)) {
-		(void) pthread_mutex_unlock(&handle->rh_lock);
+		pthread_mutex_exit_np(&handle->rh_lock);
 		return (scf_set_error(SCF_ERROR_IN_USE));
 	}
 
@@ -1196,7 +1223,7 @@ scf_handle_bind(scf_handle_t *handle)
 
 	fd = open(door_name, O_RDONLY | O_NOFOLLOW, 0);
 	if (fd == -1) {
-		(void) pthread_mutex_unlock(&handle->rh_lock);
+		pthread_mutex_exit_np(&handle->rh_lock);
 		return (scf_set_error(SCF_ERROR_NO_SERVER));
 	}
 
@@ -1221,7 +1248,7 @@ scf_handle_bind(scf_handle_t *handle)
 		ucred_free(cr);
 
 		if (err != SCF_ERROR_NONE) {
-			(void) pthread_mutex_unlock(&handle->rh_lock);
+			pthread_mutex_exit_np(&handle->rh_lock);
 			(void) close(fd);
 			return (scf_set_error(err));
 		}
@@ -1240,7 +1267,7 @@ scf_handle_bind(scf_handle_t *handle)
 	(void) close(fd);
 
 	if (res < 0) {
-		(void) pthread_mutex_unlock(&handle->rh_lock);
+		pthread_mutex_exit_np(&handle->rh_lock);
 
 		assert(res != NOT_BOUND);
 		if (res == CALL_FAILED)
@@ -1250,7 +1277,7 @@ scf_handle_bind(scf_handle_t *handle)
 	}
 
 	if (handle->rh_doorfd < 0) {
-		(void) pthread_mutex_unlock(&handle->rh_lock);
+		pthread_mutex_exit_np(&handle->rh_lock);
 
 		switch (response.rdr_status) {
 		case REPOSITORY_DOOR_SUCCESS:
@@ -1282,7 +1309,7 @@ scf_handle_bind(scf_handle_t *handle)
 		(void) close(handle->rh_doorfd);
 		handle->rh_doorfd = -1;
 
-		(void) pthread_mutex_unlock(&handle->rh_lock);
+		pthread_mutex_exit_np(&handle->rh_lock);
 		return (scf_set_error(SCF_ERROR_NO_SERVER));
 	}
 
@@ -1297,7 +1324,7 @@ scf_handle_bind(scf_handle_t *handle)
 		if (datael_attach(el) == -1) {
 			assert(scf_error() != SCF_ERROR_HANDLE_DESTROYED);
 			(void) handle_unbind_unlocked(handle);
-			(void) pthread_mutex_unlock(&handle->rh_lock);
+			pthread_mutex_exit_np(&handle->rh_lock);
 			return (-1);
 		}
 	}
@@ -1307,11 +1334,11 @@ scf_handle_bind(scf_handle_t *handle)
 		if (iter_attach(iter) == -1) {
 			assert(scf_error() != SCF_ERROR_HANDLE_DESTROYED);
 			(void) handle_unbind_unlocked(handle);
-			(void) pthread_mutex_unlock(&handle->rh_lock);
+			pthread_mutex_exit_np(&handle->rh_lock);
 			return (-1);
 		}
 	}
-	(void) pthread_mutex_unlock(&handle->rh_lock);
+	pthread_mutex_exit_np(&handle->rh_lock);
 	return (SCF_SUCCESS);
 }
 
@@ -1319,22 +1346,22 @@ int
 scf_handle_unbind(scf_handle_t *handle)
 {
 	int ret;
-	(void) pthread_mutex_lock(&handle->rh_lock);
+	pthread_mutex_enter_np(&handle->rh_lock);
 	ret = handle_unbind_unlocked(handle);
-	(void) pthread_mutex_unlock(&handle->rh_lock);
+	pthread_mutex_exit_np(&handle->rh_lock);
 	return (ret == SCF_SUCCESS ? ret : scf_set_error(SCF_ERROR_NOT_BOUND));
 }
 
 static scf_handle_t *
 handle_get(scf_handle_t *h)
 {
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (h->rh_flags & HANDLE_DEAD) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		(void) scf_set_error(SCF_ERROR_HANDLE_DESTROYED);
 		return (NULL);
 	}
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return (h);
 }
 
@@ -1366,7 +1393,7 @@ handle_unrefed(scf_handle_t *handle)
 	    handle->rh_extrefs > 0 ||
 	    handle->rh_fd_users > 0 ||
 	    (handle->rh_flags & HANDLE_UNREFED)) {
-		(void) pthread_mutex_unlock(&handle->rh_lock);
+		pthread_mutex_exit_np(&handle->rh_lock);
 		return;
 	}
 
@@ -1380,7 +1407,7 @@ handle_unrefed(scf_handle_t *handle)
 	assert(handle->rh_intrefs >= 0);
 	handle->rh_extrefs = handle->rh_intrefs;
 	handle->rh_intrefs = 0;
-	(void) pthread_mutex_unlock(&handle->rh_lock);
+	pthread_mutex_exit_np(&handle->rh_lock);
 
 	handle_hold_subhandles(handle, RH_HOLD_ALL);
 
@@ -1423,7 +1450,7 @@ handle_unrefed(scf_handle_t *handle)
 	if (v != NULL)
 		scf_value_destroy(v);
 
-	(void) pthread_mutex_lock(&handle->rh_lock);
+	pthread_mutex_enter_np(&handle->rh_lock);
 
 	/* there should be no outstanding children at this point */
 	assert(handle->rh_extrefs == 0);
@@ -1437,7 +1464,7 @@ handle_unrefed(scf_handle_t *handle)
 	uu_list_destroy(handle->rh_iters);
 	handle->rh_dataels = NULL;
 	handle->rh_iters = NULL;
-	(void) pthread_mutex_unlock(&handle->rh_lock);
+	pthread_mutex_exit_np(&handle->rh_lock);
 
 	(void) pthread_mutex_destroy(&handle->rh_lock);
 
@@ -1450,13 +1477,13 @@ scf_handle_destroy(scf_handle_t *handle)
 	if (handle == NULL)
 		return;
 
-	(void) pthread_mutex_lock(&handle->rh_lock);
+	pthread_mutex_enter_np(&handle->rh_lock);
 	if (handle->rh_flags & HANDLE_DEAD) {
 		/*
 		 * This is an error (you are not allowed to reference the
 		 * handle after it is destroyed), but we can't report it.
 		 */
-		(void) pthread_mutex_unlock(&handle->rh_lock);
+		pthread_mutex_exit_np(&handle->rh_lock);
 		return;
 	}
 	handle->rh_flags |= HANDLE_DEAD;
@@ -1589,19 +1616,19 @@ datael_init(scf_datael_t *dp, scf_handle_t *h, uint32_t type)
 	dp->rd_type = type;
 	dp->rd_reset = 0;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (h->rh_flags & HANDLE_DEAD) {
 		/*
 		 * we're in undefined territory (the user cannot use a handle
 		 * directly after it has been destroyed), but we don't want
 		 * to allow any new references to happen, so we fail here.
 		 */
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_HANDLE_DESTROYED));
 	}
 	dp->rd_entity = handle_alloc_entityid(h);
 	if (dp->rd_entity == 0) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		uu_list_node_fini(dp, &dp->rd_node, datael_pool);
 		return (scf_set_error(SCF_ERROR_NO_MEMORY));
 	}
@@ -1613,7 +1640,7 @@ datael_init(scf_datael_t *dp, scf_handle_t *h, uint32_t type)
 	} else {
 		uu_list_node_fini(dp, &dp->rd_node, datael_pool);
 	}
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	return (ret);
 }
@@ -1626,7 +1653,7 @@ datael_destroy(scf_datael_t *dp)
 	struct rep_protocol_entity_teardown request;
 	rep_protocol_response_t response;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	uu_list_remove(h->rh_dataels, dp);
 	--h->rh_extrefs;
 
@@ -1683,9 +1710,9 @@ datael_reset(scf_datael_t *dp)
 {
 	scf_handle_t *h = dp->rd_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	dp->rd_reset = 1;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 }
 
 static void
@@ -1712,7 +1739,7 @@ datael_get_name(const scf_datael_t *dp, char *buf, size_t size, uint32_t type)
 	struct rep_protocol_name_response response;
 	ssize_t r;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	request.rpr_request = REP_PROTOCOL_ENTITY_NAME;
 	request.rpr_entityid = dp->rd_entity;
 	request.rpr_answertype = type;
@@ -1720,7 +1747,7 @@ datael_get_name(const scf_datael_t *dp, char *buf, size_t size, uint32_t type)
 	datael_finish_reset(dp);
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (r < 0)
 		DOOR_ERRORS_BLOCK(r);
@@ -1753,7 +1780,7 @@ datael_get_parent(const scf_datael_t *dp, scf_datael_t *pp)
 	if (h != pp->rd_handle)
 		return (scf_set_error(SCF_ERROR_HANDLE_MISMATCH));
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	request.rpr_request = REP_PROTOCOL_ENTITY_GET_PARENT;
 	request.rpr_entityid = dp->rd_entity;
 	request.rpr_outid = pp->rd_entity;
@@ -1762,7 +1789,7 @@ datael_get_parent(const scf_datael_t *dp, scf_datael_t *pp)
 	datael_finish_reset(pp);
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (r < 0)
 		DOOR_ERRORS_BLOCK(r);
@@ -1969,13 +1996,13 @@ datael_get_child(const scf_datael_t *dp, const char *name, uint32_t type,
 		}
 	}
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (composed)
 		ret = datael_get_child_composed_locked(dp, name, type, out,
 		    iter);
 	else
 		ret = datael_get_child_locked(dp, name, type, out);
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (composed)
 		HANDLE_RELE_ITER(h);
@@ -2052,7 +2079,7 @@ datael_add_child(const scf_datael_t *dp, const char *name, uint32_t type,
 		goto err;
 	}
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	request.rpr_request = REP_PROTOCOL_ENTITY_CREATE_CHILD;
 	request.rpr_entityid = dp->rd_entity;
 	request.rpr_childtype = type;
@@ -2062,7 +2089,7 @@ datael_add_child(const scf_datael_t *dp, const char *name, uint32_t type,
 	request.rpr_changeid = handle_next_changeid(h);
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (held)
 		handle_rele_subhandles(h, held);
@@ -2116,7 +2143,7 @@ datael_add_pg(const scf_datael_t *dp, const char *name, const char *type,
 		goto err;
 	}
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	request.rpr_entityid = dp->rd_entity;
 	request.rpr_childid = cp->rd_entity;
 	request.rpr_flags = flags;
@@ -2126,7 +2153,7 @@ datael_add_pg(const scf_datael_t *dp, const char *name, const char *type,
 	request.rpr_changeid = handle_next_changeid(h);
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (holding_els)
 		HANDLE_RELE_PG(h);
@@ -2154,7 +2181,7 @@ datael_delete(const scf_datael_t *dp)
 	struct rep_protocol_response response;
 	ssize_t r;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	request.rpr_request = REP_PROTOCOL_ENTITY_DELETE;
 	request.rpr_entityid = dp->rd_entity;
 
@@ -2162,7 +2189,7 @@ datael_delete(const scf_datael_t *dp)
 	request.rpr_changeid = handle_next_changeid(h);
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (r < 0)
 		DOOR_ERRORS_BLOCK(r);
@@ -2203,10 +2230,10 @@ scf_iter_create(scf_handle_t *h)
 	iter->iter_sequence = 1;
 	iter->iter_type = REP_PROTOCOL_ENTITY_NONE;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	iter->iter_id = handle_alloc_iterid(h);
 	if (iter->iter_id == 0) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		uu_list_node_fini(iter, &iter->iter_node, iter_pool);
 		(void) scf_set_error(SCF_ERROR_NO_MEMORY);
 		uu_free(iter);
@@ -2214,13 +2241,13 @@ scf_iter_create(scf_handle_t *h)
 	}
 	if (iter_attach(iter) == -1) {
 		uu_list_node_fini(iter, &iter->iter_node, iter_pool);
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		uu_free(iter);
 		return (NULL);
 	}
 	(void) uu_list_insert_before(h->rh_iters, NULL, iter);
 	h->rh_extrefs++;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return (iter);
 }
 
@@ -2251,9 +2278,9 @@ scf_iter_reset_locked(scf_iter_t *iter)
 void
 scf_iter_reset(scf_iter_t *iter)
 {
-	(void) pthread_mutex_lock(&iter->iter_handle->rh_lock);
+	pthread_mutex_enter_np(&iter->iter_handle->rh_lock);
 	scf_iter_reset_locked(iter);
-	(void) pthread_mutex_unlock(&iter->iter_handle->rh_lock);
+	pthread_mutex_exit_np(&iter->iter_handle->rh_lock);
 }
 
 void
@@ -2269,7 +2296,7 @@ scf_iter_destroy(scf_iter_t *iter)
 
 	handle = iter->iter_handle;
 
-	(void) pthread_mutex_lock(&handle->rh_lock);
+	pthread_mutex_enter_np(&handle->rh_lock);
 	request.rpr_request = REP_PROTOCOL_ITER_TEARDOWN;
 	request.rpr_iterid = iter->iter_id;
 
@@ -2321,22 +2348,22 @@ scf_iter_handle_scopes(scf_iter_t *iter, const scf_handle_t *handle)
 	if (h != handle)
 		return (scf_set_error(SCF_ERROR_HANDLE_MISMATCH));
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	scf_iter_reset_locked(iter);
 
 	if (!handle_is_bound(h)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_NOT_BOUND));
 	}
 
 	if (!handle_has_server_locked(h)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_CONNECTION_BROKEN));
 	}
 
 	iter->iter_type = REP_PROTOCOL_ENTITY_SCOPE;
 	iter->iter_sequence = 1;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return (0);
 }
 
@@ -2349,13 +2376,13 @@ scf_iter_next_scope(scf_iter_t *iter, scf_scope_t *out)
 	if (h != out->rd_d.rd_handle)
 		return (scf_set_error(SCF_ERROR_HANDLE_MISMATCH));
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (iter->iter_type == REP_PROTOCOL_ENTITY_NONE) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_NOT_SET));
 	}
 	if (iter->iter_type != REP_PROTOCOL_ENTITY_SCOPE) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 	}
 	if (iter->iter_sequence == 1) {
@@ -2368,7 +2395,7 @@ scf_iter_next_scope(scf_iter_t *iter, scf_scope_t *out)
 		datael_reset_locked(&out->rd_d);
 		ret = 0;
 	}
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return (ret);
 }
 
@@ -2380,7 +2407,7 @@ scf_handle_get_scope(scf_handle_t *h, const char *name, scf_scope_t *out)
 	if (h != out->rd_d.rd_handle)
 		return (scf_set_error(SCF_ERROR_HANDLE_MISMATCH));
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (strcmp(name, SCF_SCOPE_LOCAL) == 0) {
 		ret = handle_get_local_scope_locked(h, out);
 	} else {
@@ -2390,7 +2417,7 @@ scf_handle_get_scope(scf_handle_t *h, const char *name, scf_scope_t *out)
 		else
 			ret = scf_set_error(SCF_ERROR_NOT_FOUND);
 	}
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return (ret);
 }
 
@@ -2408,7 +2435,7 @@ datael_setup_iter(scf_iter_t *iter, const scf_datael_t *dp, uint32_t res_type,
 	if (h != iter->iter_handle)
 		return (scf_set_error(SCF_ERROR_HANDLE_MISMATCH));
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	scf_iter_reset_locked(iter);
 	iter->iter_type = res_type;
 
@@ -2425,15 +2452,15 @@ datael_setup_iter(scf_iter_t *iter, const scf_datael_t *dp, uint32_t res_type,
 	    &response, sizeof (response));
 
 	if (r < 0) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		DOOR_ERRORS_BLOCK(r);
 	}
 	if (response.rpr_response != REP_PROTOCOL_SUCCESS) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(proto_error(response.rpr_response)));
 	}
 	iter->iter_sequence++;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return (SCF_SUCCESS);
 }
 
@@ -2457,7 +2484,7 @@ datael_setup_iter_pgtyped(scf_iter_t *iter, const scf_datael_t *dp,
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 	}
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	request.rpr_request = REP_PROTOCOL_ITER_START;
 	request.rpr_iterid = iter->iter_id;
 	request.rpr_entity = dp->rd_entity;
@@ -2473,16 +2500,16 @@ datael_setup_iter_pgtyped(scf_iter_t *iter, const scf_datael_t *dp,
 	    &response, sizeof (response));
 
 	if (r < 0) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 
 		DOOR_ERRORS_BLOCK(r);
 	}
 	if (response.rpr_response != REP_PROTOCOL_SUCCESS) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(proto_error(response.rpr_response)));
 	}
 	iter->iter_sequence++;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return (SCF_SUCCESS);
 }
 
@@ -2498,15 +2525,15 @@ datael_iter_next(scf_iter_t *iter, scf_datael_t *out)
 	if (h != out->rd_handle)
 		return (scf_set_error(SCF_ERROR_HANDLE_MISMATCH));
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (iter->iter_type == REP_PROTOCOL_ENTITY_NONE ||
 	    iter->iter_sequence == 1) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_NOT_SET));
 	}
 
 	if (out->rd_type != iter->iter_type) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 	}
 
@@ -2520,20 +2547,20 @@ datael_iter_next(scf_iter_t *iter, scf_datael_t *out)
 	    &response, sizeof (response));
 
 	if (r < 0) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		DOOR_ERRORS_BLOCK(r);
 	}
 
 	if (response.rpr_response == REP_PROTOCOL_DONE) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (0);
 	}
 	if (response.rpr_response != REP_PROTOCOL_SUCCESS) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(proto_error(response.rpr_response)));
 	}
 	iter->iter_sequence++;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	return (1);
 }
@@ -3131,7 +3158,7 @@ snaplevel_next(const scf_datael_t *src, scf_snaplevel_t *dst_arg)
 		dups = 1;
 		dst = HANDLE_HOLD_SNAPLVL(h);
 	}
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	request.rpr_request = REP_PROTOCOL_NEXT_SNAPLEVEL;
 	request.rpr_entity_src = src->rd_entity;
 	request.rpr_entity_dst = dst->rd_d.rd_entity;
@@ -3153,7 +3180,7 @@ snaplevel_next(const scf_datael_t *src, scf_snaplevel_t *dst_arg)
 		dst->rd_d.rd_entity = dst_arg->rd_d.rd_entity;
 		dst_arg->rd_d.rd_entity = entity;
 	}
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (dups)
 		HANDLE_RELE_SNAPLVL(h);
@@ -3260,7 +3287,7 @@ datael_update(scf_datael_t *dp)
 
 	int r;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	request.rpr_request = REP_PROTOCOL_ENTITY_UPDATE;
 	request.rpr_entityid = dp->rd_entity;
 
@@ -3269,7 +3296,7 @@ datael_update(scf_datael_t *dp)
 
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (r < 0)
 		DOOR_ERRORS_BLOCK(r);
@@ -3314,18 +3341,18 @@ _scf_pg_wait(scf_propertygroup_t *pg, int timeout)
 
 	int r;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	request.rpr_request = REP_PROTOCOL_PROPERTYGRP_SETUP_WAIT;
 	request.rpr_entityid = pg->rd_d.rd_entity;
 
 	datael_finish_reset(&pg->rd_d);
 	if (!handle_is_bound(h)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_CONNECTION_BROKEN));
 	}
 	r = make_door_call_retfd(h->rh_doorfd, &request, sizeof (request),
 	    &response, sizeof (response), &pollfd.fd);
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (r < 0)
 		DOOR_ERRORS_BLOCK(r);
@@ -3355,14 +3382,14 @@ scf_notify_add_pattern(scf_handle_t *h, int type, const char *name)
 	struct rep_protocol_response response;
 	int r;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	request.rpr_request = REP_PROTOCOL_CLIENT_ADD_NOTIFY;
 	request.rpr_type = type;
 	(void) strlcpy(request.rpr_pattern, name, sizeof (request.rpr_pattern));
 
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (r < 0)
 		DOOR_ERRORS_BLOCK(r);
@@ -3396,10 +3423,10 @@ _scf_notify_wait(scf_propertygroup_t *pg, char *out, size_t sz)
 	int fd;
 	int r;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	datael_finish_reset(&pg->rd_d);
 	if (!handle_is_bound(h)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_CONNECTION_BROKEN));
 	}
 	fd = h->rh_doorfd;
@@ -3408,12 +3435,12 @@ _scf_notify_wait(scf_propertygroup_t *pg, char *out, size_t sz)
 
 	request.rpr_request = REP_PROTOCOL_CLIENT_WAIT;
 	request.rpr_entityid = pg->rd_d.rd_entity;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	r = make_door_call_retfd(fd, &request, sizeof (request),
 	    &response, sizeof (response), &dummy);
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	assert(h->rh_fd_users > 0);
 	if (--h->rh_fd_users == 0) {
 		(void) pthread_cond_broadcast(&h->rh_cv);
@@ -3461,7 +3488,7 @@ _scf_snapshot_take(scf_instance_t *inst, const char *name,
 	    sizeof (request.rpr_name)) >= sizeof (request.rpr_name))
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	request.rpr_request = REP_PROTOCOL_SNAPSHOT_TAKE;
 	request.rpr_entityid_src = inst->rd_d.rd_entity;
 	request.rpr_entityid_dest = snap->rd_d.rd_entity;
@@ -3472,7 +3499,7 @@ _scf_snapshot_take(scf_instance_t *inst, const char *name,
 
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (r < 0)
 		DOOR_ERRORS_BLOCK(r);
@@ -3510,7 +3537,7 @@ _scf_snapshot_take_new_named(scf_instance_t *inst,
 	    sizeof (request.rpr_name)) >= sizeof (request.rpr_name))
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	request.rpr_request = REP_PROTOCOL_SNAPSHOT_TAKE_NAMED;
 	request.rpr_entityid_src = inst->rd_d.rd_entity;
 	request.rpr_entityid_dest = snap->rd_d.rd_entity;
@@ -3520,7 +3547,7 @@ _scf_snapshot_take_new_named(scf_instance_t *inst,
 
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (r < 0)
 		DOOR_ERRORS_BLOCK(r);
@@ -3560,7 +3587,7 @@ _scf_snapshot_attach(scf_snapshot_t *src, scf_snapshot_t *dest)
 	if (h != src->rd_d.rd_handle)
 		return (scf_set_error(SCF_ERROR_HANDLE_MISMATCH));
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	request.rpr_request = REP_PROTOCOL_SNAPSHOT_ATTACH;
 	request.rpr_entityid_src = src->rd_d.rd_entity;
 	request.rpr_entityid_dest = dest->rd_d.rd_entity;
@@ -3570,7 +3597,7 @@ _scf_snapshot_attach(scf_snapshot_t *src, scf_snapshot_t *dest)
 
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (r < 0)
 		DOOR_ERRORS_BLOCK(r);
@@ -3657,9 +3684,9 @@ scf_property_type(const scf_property_t *prop, scf_type_t *out)
 	rep_protocol_value_type_t out_raw;
 	int ret;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	ret = property_type_locked(prop, &out_raw);
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (ret == SCF_SUCCESS)
 		*out = scf_protocol_type_to_type(out_raw);
@@ -3678,9 +3705,9 @@ scf_property_is_type(const scf_property_t *prop, scf_type_t base_arg)
 	if (base == REP_PROTOCOL_TYPE_INVALID)
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	ret = property_type_locked(prop, &type);
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (ret == SCF_SUCCESS) {
 		if (!scf_is_compatible_protocol_type(base, type))
@@ -3764,9 +3791,9 @@ scf_transaction_start(scf_transaction_t *tran, scf_propertygroup_t *pg)
 	if (h != pg->rd_d.rd_handle)
 		return (scf_set_error(SCF_ERROR_HANDLE_MISMATCH));
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (tran->tran_state != TRAN_STATE_NEW) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_IN_USE));
 	}
 	request.rpr_request = REP_PROTOCOL_PROPERTYGRP_TX_START;
@@ -3780,7 +3807,7 @@ scf_transaction_start(scf_transaction_t *tran, scf_propertygroup_t *pg)
 	    &response, sizeof (response));
 
 	if (r < 0) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		DOOR_ERRORS_BLOCK(r);
 	}
 
@@ -3788,13 +3815,13 @@ scf_transaction_start(scf_transaction_t *tran, scf_propertygroup_t *pg)
 
 	if (response.rpr_response != REP_PROTOCOL_SUCCESS ||
 	    r < sizeof (response)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(proto_error(response.rpr_response)));
 	}
 
 	tran->tran_state = TRAN_STATE_SETUP;
 	tran->tran_invalid = 0;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return (SCF_SUCCESS);
 }
 
@@ -3875,7 +3902,7 @@ transaction_add(scf_transaction_t *tran, scf_transaction_entry_t *entry,
 
 	prop_p = HANDLE_HOLD_PROPERTY(h);
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (tran->tran_state != TRAN_STATE_SETUP) {
 		error = SCF_ERROR_NOT_SET;
 		goto error;
@@ -3946,14 +3973,14 @@ transaction_add(scf_transaction_t *tran, scf_transaction_entry_t *entry,
 	entry->entry_tx = tran;
 	uu_list_insert(tran->tran_props, entry, idx);
 
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	HANDLE_RELE_PROPERTY(h);
 
 	return (SCF_SUCCESS);
 
 error:
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	HANDLE_RELE_PROPERTY(h);
 
@@ -4107,10 +4134,10 @@ scf_transaction_commit(scf_transaction_t *tran)
 	size_t new_total;
 	int r;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (tran->tran_state != TRAN_STATE_SETUP ||
 	    tran->tran_invalid) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 	}
 
@@ -4119,7 +4146,7 @@ scf_transaction_commit(scf_transaction_t *tran)
 	    cur = uu_list_next(tran->tran_props, cur)) {
 		size = commit_process(cur, NULL);
 		if (size == BAD_SIZE) {
-			(void) pthread_mutex_unlock(&h->rh_lock);
+			pthread_mutex_exit_np(&h->rh_lock);
 			return (scf_set_error(SCF_ERROR_INTERNAL));
 		}
 		assert(TX_SIZE(size) == size);
@@ -4141,7 +4168,7 @@ scf_transaction_commit(scf_transaction_t *tran)
 	    cur = uu_list_next(tran->tran_props, cur)) {
 		size = commit_process(cur, (void *)cmd);
 		if (size == BAD_SIZE) {
-			(void) pthread_mutex_unlock(&h->rh_lock);
+			pthread_mutex_exit_np(&h->rh_lock);
 			return (scf_set_error(SCF_ERROR_INTERNAL));
 		}
 		cmd += size;
@@ -4153,18 +4180,18 @@ scf_transaction_commit(scf_transaction_t *tran)
 	    &response, sizeof (response));
 
 	if (r < 0) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		DOOR_ERRORS_BLOCK(r);
 	}
 
 	if (response.rpr_response != REP_PROTOCOL_SUCCESS &&
 	    response.rpr_response != REP_PROTOCOL_FAIL_NOT_LATEST) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(proto_error(response.rpr_response)));
 	}
 
 	tran->tran_state = TRAN_STATE_COMMITTED;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return (response.rpr_response == REP_PROTOCOL_SUCCESS);
 }
 
@@ -4184,7 +4211,7 @@ scf_transaction_reset_impl(scf_transaction_t *tran, int and_destroy,
 	scf_transaction_entry_t *cur;
 	void *cookie;
 
-	(void) pthread_mutex_lock(&tran->tran_pg.rd_d.rd_handle->rh_lock);
+	pthread_mutex_enter_np(&tran->tran_pg.rd_d.rd_handle->rh_lock);
 	cookie = NULL;
 	while ((cur = uu_list_teardown(tran->tran_props, &cookie)) != NULL) {
 		cur->entry_tx = NULL;
@@ -4253,16 +4280,16 @@ scf_entry_create(scf_handle_t *h)
 	ret->entry_action = REP_PROTOCOL_TX_ENTRY_INVALID;
 	ret->entry_handle = h;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (h->rh_flags & HANDLE_DEAD) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		uu_free(ret);
 		(void) scf_set_error(SCF_ERROR_HANDLE_DESTROYED);
 		return (NULL);
 	}
 	h->rh_entries++;
 	h->rh_extrefs++;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	uu_list_node_init(ret, &ret->entry_link, tran_entry_pool);
 
@@ -4280,9 +4307,9 @@ scf_entry_reset(scf_transaction_entry_t *entry)
 {
 	scf_handle_t *h = entry->entry_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	entry_invalidate(entry, 0, 0);
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 }
 
 void
@@ -4290,7 +4317,7 @@ scf_entry_destroy_children(scf_transaction_entry_t *entry)
 {
 	scf_handle_t *h = entry->entry_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	entry_invalidate(entry, 1, 0);
 	handle_unrefed(h);			/* drops h->rh_lock */
 }
@@ -4305,7 +4332,7 @@ scf_entry_destroy(scf_transaction_entry_t *entry)
 
 	h = entry->entry_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	entry_destroy_locked(entry);
 	handle_unrefed(h);			/* drops h->rh_lock */
 }
@@ -4329,41 +4356,41 @@ scf_entry_add_value(scf_transaction_entry_t *entry, scf_value_t *v)
 	if (h != v->value_handle)
 		return (scf_set_error(SCF_ERROR_HANDLE_MISMATCH));
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 
 	if (entry->entry_state == ENTRY_STATE_INVALID) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_NOT_SET));
 	}
 
 	if (entry->entry_state != ENTRY_STATE_IN_TX_ACTION) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_INTERNAL));
 	}
 
 	if (entry->entry_tx->tran_state != TRAN_STATE_SETUP) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 	}
 
 	if (entry->entry_action == REP_PROTOCOL_TX_ENTRY_DELETE) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 	}
 
 	if (v->value_type == REP_PROTOCOL_TYPE_INVALID) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 	}
 
 	if (!scf_is_compatible_protocol_type(entry->entry_type,
 	    v->value_type)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_TYPE_MISMATCH));
 	}
 
 	if (v->value_tx != NULL) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_IN_USE));
 	}
 
@@ -4377,7 +4404,7 @@ scf_entry_add_value(scf_transaction_entry_t *entry, scf_value_t *v)
 		entry->entry_tail = v;
 	}
 
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	return (SCF_SUCCESS);
 }
@@ -4399,16 +4426,16 @@ scf_value_create(scf_handle_t *h)
 	if (ret != NULL) {
 		ret->value_type = REP_PROTOCOL_TYPE_INVALID;
 		ret->value_handle = h;
-		(void) pthread_mutex_lock(&h->rh_lock);
+		pthread_mutex_enter_np(&h->rh_lock);
 		if (h->rh_flags & HANDLE_DEAD) {
-			(void) pthread_mutex_unlock(&h->rh_lock);
+			pthread_mutex_exit_np(&h->rh_lock);
 			uu_free(ret);
 			(void) scf_set_error(SCF_ERROR_HANDLE_DESTROYED);
 			return (NULL);
 		}
 		h->rh_values++;
 		h->rh_extrefs++;
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 	} else {
 		(void) scf_set_error(SCF_ERROR_NO_MEMORY);
 	}
@@ -4456,9 +4483,9 @@ scf_value_reset(scf_value_t *val)
 {
 	scf_handle_t *h = val->value_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	scf_value_reset_locked(val, 0);
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 }
 
 scf_handle_t *
@@ -4477,7 +4504,7 @@ scf_value_destroy(scf_value_t *val)
 
 	h = val->value_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	scf_value_reset_locked(val, 1);
 	handle_unrefed(h);			/* drops h->rh_lock */
 }
@@ -4488,9 +4515,9 @@ scf_value_base_type(const scf_value_t *val)
 	rep_protocol_value_type_t t, cur;
 	scf_handle_t *h = val->value_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	t = val->value_type;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	for (;;) {
 		cur = scf_proto_underlying_type(t);
@@ -4508,9 +4535,9 @@ scf_value_type(const scf_value_t *val)
 	rep_protocol_value_type_t t;
 	scf_handle_t *h = val->value_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	t = val->value_type;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	return (scf_protocol_type_to_type(t));
 }
@@ -4522,9 +4549,9 @@ scf_value_is_type(const scf_value_t *val, scf_type_t base_arg)
 	rep_protocol_value_type_t base = scf_type_to_protocol_type(base_arg);
 	scf_handle_t *h = val->value_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	t = val->value_type;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (t == REP_PROTOCOL_TYPE_INVALID)
 		return (scf_set_error(SCF_ERROR_NOT_SET));
@@ -4567,9 +4594,9 @@ scf_value_get_boolean(const scf_value_t *val, uint8_t *out)
 	scf_handle_t *h = val->value_handle;
 	uint8_t o;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (!scf_value_check_type(val, REP_PROTOCOL_TYPE_BOOLEAN)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (-1);
 	}
 
@@ -4577,7 +4604,7 @@ scf_value_get_boolean(const scf_value_t *val, uint8_t *out)
 	assert((c == '0' || c == '1') && val->value_value[1] == 0);
 
 	o = (c != '0');
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	if (out != NULL)
 		*out = o;
 	return (SCF_SUCCESS);
@@ -4589,14 +4616,14 @@ scf_value_get_count(const scf_value_t *val, uint64_t *out)
 	scf_handle_t *h = val->value_handle;
 	uint64_t o;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (!scf_value_check_type(val, REP_PROTOCOL_TYPE_COUNT)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (-1);
 	}
 
 	o = strtoull(val->value_value, NULL, 10);
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	if (out != NULL)
 		*out = o;
 	return (SCF_SUCCESS);
@@ -4608,14 +4635,14 @@ scf_value_get_integer(const scf_value_t *val, int64_t *out)
 	scf_handle_t *h = val->value_handle;
 	int64_t o;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (!scf_value_check_type(val, REP_PROTOCOL_TYPE_INTEGER)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (-1);
 	}
 
 	o = strtoll(val->value_value, NULL, 10);
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	if (out != NULL)
 		*out = o;
 	return (SCF_SUCCESS);
@@ -4629,9 +4656,9 @@ scf_value_get_time(const scf_value_t *val, int64_t *sec_out, int32_t *nsec_out)
 	int64_t os;
 	int32_t ons;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (!scf_value_check_type(val, REP_PROTOCOL_TYPE_TIME)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (-1);
 	}
 
@@ -4640,7 +4667,7 @@ scf_value_get_time(const scf_value_t *val, int64_t *sec_out, int32_t *nsec_out)
 		ons = strtoul(p + 1, NULL, 10);
 	else
 		ons = 0;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	if (sec_out != NULL)
 		*sec_out = os;
 	if (nsec_out != NULL)
@@ -4660,13 +4687,13 @@ scf_value_get_astring(const scf_value_t *val, char *out, size_t len)
 	ssize_t ret;
 	scf_handle_t *h = val->value_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (!scf_value_check_type(val, REP_PROTOCOL_TYPE_STRING)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return ((ssize_t)-1);
 	}
 	ret = (ssize_t)strlcpy(out, val->value_value, len);
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return (ret);
 }
 
@@ -4676,13 +4703,13 @@ scf_value_get_ustring(const scf_value_t *val, char *out, size_t len)
 	ssize_t ret;
 	scf_handle_t *h = val->value_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (!scf_value_check_type(val, REP_PROTOCOL_SUBTYPE_USTRING)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return ((ssize_t)-1);
 	}
 	ret = (ssize_t)strlcpy(out, val->value_value, len);
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return (ret);
 }
 
@@ -4692,9 +4719,9 @@ scf_value_get_opaque(const scf_value_t *v, void *out, size_t len)
 	ssize_t ret;
 	scf_handle_t *h = v->value_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (!scf_value_check_type(v, REP_PROTOCOL_TYPE_OPAQUE)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return ((ssize_t)-1);
 	}
 	if (len > v->value_size)
@@ -4702,7 +4729,7 @@ scf_value_get_opaque(const scf_value_t *v, void *out, size_t len)
 	ret = len;
 
 	(void) memcpy(out, v->value_value, len);
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return (ret);
 }
 
@@ -4711,11 +4738,11 @@ scf_value_set_boolean(scf_value_t *v, uint8_t new)
 {
 	scf_handle_t *h = v->value_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	scf_value_reset_locked(v, 0);
 	v->value_type = REP_PROTOCOL_TYPE_BOOLEAN;
 	(void) sprintf(v->value_value, "%d", (new != 0));
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 }
 
 void
@@ -4723,11 +4750,11 @@ scf_value_set_count(scf_value_t *v, uint64_t new)
 {
 	scf_handle_t *h = v->value_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	scf_value_reset_locked(v, 0);
 	v->value_type = REP_PROTOCOL_TYPE_COUNT;
 	(void) sprintf(v->value_value, "%llu", (unsigned long long)new);
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 }
 
 void
@@ -4735,11 +4762,11 @@ scf_value_set_integer(scf_value_t *v, int64_t new)
 {
 	scf_handle_t *h = v->value_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	scf_value_reset_locked(v, 0);
 	v->value_type = REP_PROTOCOL_TYPE_INTEGER;
 	(void) sprintf(v->value_value, "%lld", (long long)new);
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 }
 
 int
@@ -4747,10 +4774,10 @@ scf_value_set_time(scf_value_t *v, int64_t new_sec, int32_t new_nsec)
 {
 	scf_handle_t *h = v->value_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	scf_value_reset_locked(v, 0);
 	if (new_nsec < 0 || new_nsec >= NANOSEC) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 	}
 	v->value_type = REP_PROTOCOL_TYPE_TIME;
@@ -4759,7 +4786,7 @@ scf_value_set_time(scf_value_t *v, int64_t new_sec, int32_t new_nsec)
 	else
 		(void) sprintf(v->value_value, "%lld.%09u", (long long)new_sec,
 		    (unsigned)new_nsec);
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return (0);
 }
 
@@ -4768,19 +4795,19 @@ scf_value_set_astring(scf_value_t *v, const char *new)
 {
 	scf_handle_t *h = v->value_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	scf_value_reset_locked(v, 0);
 	if (!scf_validate_encoded_value(REP_PROTOCOL_TYPE_STRING, new)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 	}
 	if (strlcpy(v->value_value, new, sizeof (v->value_value)) >=
 	    sizeof (v->value_value)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 	}
 	v->value_type = REP_PROTOCOL_TYPE_STRING;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return (0);
 }
 
@@ -4789,19 +4816,19 @@ scf_value_set_ustring(scf_value_t *v, const char *new)
 {
 	scf_handle_t *h = v->value_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	scf_value_reset_locked(v, 0);
 	if (!scf_validate_encoded_value(REP_PROTOCOL_SUBTYPE_USTRING, new)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 	}
 	if (strlcpy(v->value_value, new, sizeof (v->value_value)) >=
 	    sizeof (v->value_value)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 	}
 	v->value_type = REP_PROTOCOL_SUBTYPE_USTRING;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return (0);
 }
 
@@ -4810,16 +4837,16 @@ scf_value_set_opaque(scf_value_t *v, const void *new, size_t len)
 {
 	scf_handle_t *h = v->value_handle;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	scf_value_reset_locked(v, 0);
 	if (len > sizeof (v->value_value)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 	}
 	(void) memcpy(v->value_value, new, len);
 	v->value_size = len;
 	v->value_type = REP_PROTOCOL_TYPE_OPAQUE;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return (0);
 }
 
@@ -4841,16 +4868,16 @@ scf_value_get_as_string_common(const scf_value_t *v_arg,
 	ssize_t r;
 	uint8_t b;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	if (t != REP_PROTOCOL_TYPE_INVALID && !scf_value_check_type(v_arg, t)) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (-1);
 	}
 
 	v_s = *v_arg;			/* copy locally so we can unlock */
 	h->rh_values++;			/* keep the handle from going away */
 	h->rh_extrefs++;
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 
 	switch (REP_PROTOCOL_BASE_TYPE(v->value_type)) {
@@ -4889,7 +4916,7 @@ scf_value_get_as_string_common(const scf_value_t *v_arg,
 		break;
 	}
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	h->rh_values--;
 	h->rh_extrefs--;
 	handle_unrefed(h);
@@ -5009,25 +5036,25 @@ scf_value_set_from_string(scf_value_t *v, scf_type_t type, const char *str)
 	case SCF_TYPE_NET_ADDR_V6:
 		ty = scf_type_to_protocol_type(type);
 
-		(void) pthread_mutex_lock(&h->rh_lock);
+		pthread_mutex_enter_np(&h->rh_lock);
 		scf_value_reset_locked(v, 0);
 		if (type == SCF_TYPE_OPAQUE) {
 			v->value_size = scf_opaque_decode(v->value_value,
 			    str, sizeof (v->value_value));
 			if (!scf_validate_encoded_value(ty, str)) {
-				(void) pthread_mutex_unlock(&h->rh_lock);
+				pthread_mutex_exit_np(&h->rh_lock);
 				goto bad;
 			}
 		} else {
 			(void) strlcpy(v->value_value, str,
 			    sizeof (v->value_value));
 			if (!scf_validate_encoded_value(ty, v->value_value)) {
-				(void) pthread_mutex_unlock(&h->rh_lock);
+				pthread_mutex_exit_np(&h->rh_lock);
 				goto bad;
 			}
 		}
 		v->value_type = ty;
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (SCF_SUCCESS);
 
 	case REP_PROTOCOL_TYPE_INVALID:
@@ -5060,17 +5087,17 @@ scf_iter_next_value(scf_iter_t *iter, scf_value_t *v)
 	if (h != v->value_handle)
 		return (scf_set_error(SCF_ERROR_HANDLE_MISMATCH));
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 
 	scf_value_reset_locked(v, 0);
 
 	if (iter->iter_type == REP_PROTOCOL_ENTITY_NONE) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_NOT_SET));
 	}
 
 	if (iter->iter_type != REP_PROTOCOL_ENTITY_VALUE) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 	}
 
@@ -5082,16 +5109,16 @@ scf_iter_next_value(scf_iter_t *iter, scf_value_t *v)
 	    &response, sizeof (response));
 
 	if (r < 0) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		DOOR_ERRORS_BLOCK(r);
 	}
 
 	if (response.rpr_response == REP_PROTOCOL_DONE) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (0);
 	}
 	if (response.rpr_response != REP_PROTOCOL_SUCCESS) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		return (scf_set_error(proto_error(response.rpr_response)));
 	}
 	iter->iter_sequence++;
@@ -5108,7 +5135,7 @@ scf_iter_next_value(scf_iter_t *iter, scf_value_t *v)
 		v->value_size = scf_opaque_decode(v->value_value,
 		    response.rpr_value, sizeof (v->value_value));
 	}
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	return (1);
 }
@@ -5124,7 +5151,7 @@ scf_property_get_value(const scf_property_t *prop, scf_value_t *v)
 	if (h != v->value_handle)
 		return (scf_set_error(SCF_ERROR_HANDLE_MISMATCH));
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 
 	request.rpr_request = REP_PROTOCOL_PROPERTY_GET_VALUE;
 	request.rpr_entityid = prop->rd_d.rd_entity;
@@ -5136,13 +5163,13 @@ scf_property_get_value(const scf_property_t *prop, scf_value_t *v)
 	    &response, sizeof (response));
 
 	if (r < 0) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		DOOR_ERRORS_BLOCK(r);
 	}
 
 	if (response.rpr_response != REP_PROTOCOL_SUCCESS &&
 	    response.rpr_response != REP_PROTOCOL_FAIL_TRUNCATED) {
-		(void) pthread_mutex_unlock(&h->rh_lock);
+		pthread_mutex_exit_np(&h->rh_lock);
 		assert(response.rpr_response !=
 		    REP_PROTOCOL_FAIL_TYPE_MISMATCH);
 		return (scf_set_error(proto_error(response.rpr_response)));
@@ -5156,7 +5183,7 @@ scf_property_get_value(const scf_property_t *prop, scf_value_t *v)
 		v->value_size = scf_opaque_decode(v->value_value,
 		    response.rpr_value, sizeof (v->value_value));
 	}
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 	return ((response.rpr_response == REP_PROTOCOL_SUCCESS)?
 	    SCF_SUCCESS : scf_set_error(SCF_ERROR_CONSTRAINT_VIOLATED));
 }
@@ -5858,14 +5885,14 @@ scf_pg_to_fmri(const scf_propertygroup_t *pg, char *out, size_t sz)
 	char tmp[REP_PROTOCOL_NAME_LEN];
 	ssize_t len, r;
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	request.rpr_request = REP_PROTOCOL_ENTITY_PARENT_TYPE;
 	request.rpr_entityid = pg->rd_d.rd_entity;
 
 	datael_finish_reset(&pg->rd_d);
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (r < 0)
 		DOOR_ERRORS_BLOCK(r);
@@ -7405,13 +7432,13 @@ _scf_request_backup(scf_handle_t *h, const char *name)
 	    sizeof (request.rpr_name))
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	request.rpr_request = REP_PROTOCOL_BACKUP;
 	request.rpr_changeid = handle_next_changeid(h);
 
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (r < 0) {
 		DOOR_ERRORS_BLOCK(r);
@@ -7447,7 +7474,7 @@ _scf_repository_switch(scf_handle_t *h, int scf_sw)
 	 * Setup request protocol and make door call
 	 * Hold rh_lock lock before handle_next_changeid call
 	 */
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 
 	request.rpr_flag = scf_sw;
 	request.rpr_request = REP_PROTOCOL_SWITCH;
@@ -7456,7 +7483,7 @@ _scf_repository_switch(scf_handle_t *h, int scf_sw)
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
 
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (r < 0) {
 		DOOR_ERRORS_BLOCK(r);
@@ -7525,10 +7552,10 @@ _scf_set_annotation(scf_handle_t *h, const char *operation, const char *file)
 	if (copied >= sizeof (request.rpr_file))
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 
-	(void) pthread_mutex_lock(&h->rh_lock);
+	pthread_mutex_enter_np(&h->rh_lock);
 	r = make_door_call(h, &request, sizeof (request),
 	    &response, sizeof (response));
-	(void) pthread_mutex_unlock(&h->rh_lock);
+	pthread_mutex_exit_np(&h->rh_lock);
 
 	if (r < 0) {
 		DOOR_ERRORS_BLOCK(r);

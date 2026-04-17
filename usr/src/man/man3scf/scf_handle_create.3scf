@@ -1,16 +1,15 @@
 '\" te
 .\" Copyright (c) 2007, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2026 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH SCF_HANDLE_CREATE 3SCF "Aug 17, 2007"
+.TH SCF_HANDLE_CREATE 3SCF "Apr 17, 2026"
 .SH NAME
 scf_handle_create, scf_handle_destroy, scf_handle_decorate, scf_handle_bind,
 scf_handle_unbind, scf_myname \- Service Configuration Facility handle
 functions
 .SH SYNOPSIS
-.LP
-.nf
 cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.\|. ]
 #include <libscf.h>
 
@@ -44,8 +43,6 @@ cc [ \fIflag\fR\&.\|.\|. ] \fIfile\fR\&.\|.\|. \fB-lscf\fR [ \fIlibrary\fR\&.\|.
 .fi
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBscf_handle_create()\fR function creates a new Service Configuration
 Facility handle that is used as the base for all communication with the
 configuration repository. The version argument must be \fBSCF_VERSION\fR.
@@ -88,8 +85,6 @@ The \fBscf_myname()\fR function retrieves the FMRI for the service of which the
 connecting process is a part. If the full FMRI does not fit in the provided
 buffer, it is truncated and, if \fIsz\fR > 0, zero-terminated.
 .SH RETURN VALUES
-.sp
-.LP
 Upon successful completion, \fBscf_handle_create()\fR returns the new handle.
 Otherwise, it returns \fINULL\fR.
 .sp
@@ -102,8 +97,6 @@ they return -1.
 The \fBscf_myname()\fR function returns the length of the full FMRI. Otherwise,
 it returns -1.
 .SH ERRORS
-.sp
-.LP
 The \fBscf_handle_create()\fR function will fail if:
 .sp
 .ne 2
@@ -122,6 +115,16 @@ There is no memory available.
 .RS 30n
 The version is invalid, or the application was compiled against a version of
 the library that is more recent than the one on the system.
+.RE
+
+.sp
+.ne 2
+.na
+\fB\fBSCF_ERROR_INTERNAL\fR\fR
+.ad
+.RS 30n
+An internal error occurred while trying to initialize handle resources such as
+a mutex.
 .RE
 
 .sp
@@ -260,8 +263,6 @@ This process is not marked as a SMF service.
 .LP
 The \fBscf_error\fR(3SCF) function can be used to retrieve the error value.
 .SH ATTRIBUTES
-.sp
-.LP
 See \fBattributes\fR(7) for descriptions of the following attributes:
 .sp
 
@@ -284,8 +285,6 @@ Operations on different handles are MT-Safe. Objects associated with different
 handles cannot be mixed, as this will lead to an
 \fBSCF_ERROR_HANDLE_MISMATCH\fR error.
 .SH SEE ALSO
-.sp
-.LP
 .BR libscf (3LIB),
 .BR scf_error (3SCF),
 .BR attributes (7)
