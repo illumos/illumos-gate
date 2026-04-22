@@ -26,6 +26,7 @@
 /*
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 #include <sys/types.h>
@@ -1047,6 +1048,13 @@ int
 sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
     socklen_t inlen)
 {
+	return (sctp_set_opt_common(sctp, level, name, invalp, inlen, B_FALSE));
+}
+
+int
+sctp_set_opt_common(sctp_t *sctp, int level, int name, const void *invalp,
+    socklen_t inlen, boolean_t kernel_special)
+{
 	int		*i1 = (int *)invalp;
 	boolean_t	onoff;
 	int		retval = 0, addrcnt;
@@ -1249,17 +1257,25 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				    B_TRUE);
 			}
 			break;
-		case SCTP_UC_SWAP: {
-			struct sctp_uc_swap *us;
+		case SCTP_UC_SWAP:
+			if (kernel_special) {
+				struct sctp_uc_swap *us;
 
-			/*
-			 * Change handle & upcalls.
-			 */
-			us = (struct sctp_uc_swap *)invalp;
-			sctp->sctp_ulpd = us->sus_handle;
-			sctp->sctp_upcalls = us->sus_upcalls;
+				/*
+				 * Change handle & upcalls.
+				 */
+				us = (struct sctp_uc_swap *)invalp;
+				sctp->sctp_ulpd = us->sus_handle;
+				sctp->sctp_upcalls = us->sus_upcalls;
+			} else {
+				/*
+				 * We don't want ANYONE other than
+				 * our own kernel-ness mucking with this
+				 * socket option. Everyone else gets an error.
+				 */
+				retval = ENOPROTOOPT;
+			}
 			break;
-		}
 		case SCTP_PRSCTP:
 			sctp->sctp_prsctp_aware = onoff;
 			break;

@@ -23,6 +23,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015 Joyent, Inc.  All rights reserved.
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 #include <sys/types.h>
@@ -1655,13 +1656,13 @@ sosctp_ioctl(struct sonode *so, int cmd, intptr_t arg, int mode,
 				SSA_REFRELE(ss, ssa);
 				mutex_exit(&so->so_lock);
 			}
-			kmem_free(buf, intval);
+			kmem_free(buf, optlen);
 			return (EFAULT);
 		}
 		/* The option level has to be IPPROTO_SCTP */
 		error = sctp_set_opt((struct sctp_s *)conn, IPPROTO_SCTP,
 		    STRUCT_FGET(opt, sopt_name), buf, optlen);
-		if (ssa) {
+		if (ssa != NULL) {
 			mutex_enter(&so->so_lock);
 			SSA_REFRELE(ss, ssa);
 			mutex_exit(&so->so_lock);
@@ -1762,8 +1763,13 @@ sosctp_ioctl(struct sonode *so, int cmd, intptr_t arg, int mode,
 		 */
 		mutex_enter(&nso->so_lock);
 
-		error = sctp_set_opt((struct sctp_s *)ssa->ssa_conn,
-		    IPPROTO_SCTP, SCTP_UC_SWAP, &us, sizeof (us));
+		/*
+		 * We need the mechanisms of option setting for SCTP
+		 * processing reasons, but this socket option never should
+		 * come from ANYWHERE ELSE but here.
+		 */
+		error = sctp_set_opt_common((struct sctp_s *)ssa->ssa_conn,
+		    IPPROTO_SCTP, SCTP_UC_SWAP, &us, sizeof (us), B_TRUE);
 		if (error) {
 			goto peelerr;
 		}
