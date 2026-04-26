@@ -50,9 +50,9 @@ extern _h_val __huge_val;
 #define	HUGE_VAL __huge_val._d
 #endif	/* !defined(_STDC_C99) && _XOPEN_SOURCE - 0 < 600 && ... */
 
-#if __cplusplus >= 199711L
-namespace std {
-#endif
+/*
+ * Declarations for C (and C++ global namespace)
+ */
 
 extern double acos(double);
 extern double asin(double);
@@ -81,166 +81,202 @@ extern double fabs(double);
 extern double floor(double);
 extern double fmod(double, double);
 
-#if defined(__MATHERR_ERRNO_DONTCARE)
-#pragma does_not_read_global_data(acos, asin, atan, atan2)
-#pragma does_not_read_global_data(cos, sin, tan, cosh, sinh, tanh)
-#pragma does_not_read_global_data(exp, log, log10, pow, sqrt)
-#pragma does_not_read_global_data(frexp, ldexp, modf)
-#pragma does_not_read_global_data(ceil, fabs, floor, fmod)
-#pragma does_not_write_global_data(acos, asin, atan, atan2)
-#pragma does_not_write_global_data(cos, sin, tan, cosh, sinh, tanh)
-#pragma does_not_write_global_data(exp, log, log10, pow, sqrt)
-#pragma does_not_write_global_data(ldexp)
-#pragma does_not_write_global_data(ceil, fabs, floor, fmod)
-#pragma no_side_effect(acos, asin, atan, atan2)
-#pragma no_side_effect(cos, sin, tan, cosh, sinh, tanh)
-#pragma no_side_effect(exp, log, log10, pow, sqrt)
-#pragma no_side_effect(ldexp)
-#pragma no_side_effect(ceil, fabs, floor, fmod)
-#endif
+/*
+ * ISO C++98 and later require float and long double overloads of
+ * all C90 math functions.  The declarations are in the global
+ * namespace. The namespace std gets them via "using ::" aliases
+ * and the float and long double overloads as inlines.
+ *
+ * This global-primary layout ensures that when GCC's <cmath> does
+ * "using ::log" to populate namespace std, only the double form
+ * reaches ::.  GCC then appends its integer-covering template to
+ * namespace std, making log(int) unambiguous.
+ */
 
 #if __cplusplus >= 199711L
-extern float __acosf(float);
-extern float __asinf(float);
-extern float __atanf(float);
-extern float __atan2f(float, float);
-extern float __ceilf(float);
-extern float __cosf(float);
-extern float __coshf(float);
-extern float __expf(float);
-extern float __fabsf(float);
-extern float __floorf(float);
-extern float __fmodf(float, float);
-extern float __frexpf(float, int *);
-extern float __ldexpf(float, int);
-extern float __logf(float);
-extern float __log10f(float);
-extern float __modff(float, float *);
-extern float __powf(float, float);
-extern float __sinf(float);
-extern float __sinhf(float);
-extern float __sqrtf(float);
-extern float __tanf(float);
-extern float __tanhf(float);
 
-extern long double __acosl(long double);
-extern long double __asinl(long double);
-extern long double __atanl(long double);
-extern long double __atan2l(long double, long double);
-extern long double __ceill(long double);
-extern long double __cosl(long double);
-extern long double __coshl(long double);
-extern long double __expl(long double);
-extern long double __fabsl(long double);
-extern long double __floorl(long double);
-extern long double __fmodl(long double, long double);
-extern long double __frexpl(long double, int *);
-extern long double __ldexpl(long double, int);
-extern long double __logl(long double);
-extern long double __log10l(long double);
-extern long double __modfl(long double, long double *);
-extern long double __powl(long double, long double);
-extern long double __sinl(long double);
-extern long double __sinhl(long double);
-extern long double __sqrtl(long double);
-extern long double __tanl(long double);
-extern long double __tanhl(long double);
+/*
+ * float variants of above
+ */
+extern float acosf(float);
+extern float asinf(float);
+extern float atanf(float);
+extern float atan2f(float, float);
+extern float ceilf(float);
+extern float cosf(float);
+extern float coshf(float);
+extern float expf(float);
+extern float fabsf(float);
+extern float floorf(float);
+extern float fmodf(float, float);
+extern float frexpf(float, int *);
+extern float ldexpf(float, int);
+extern float logf(float);
+extern float log10f(float);
+extern float modff(float, float *);
+extern float powf(float, float);
+extern float sinf(float);
+extern float sinhf(float);
+extern float sqrtf(float);
+extern float tanf(float);
+extern float tanhf(float);
 
-extern "C++" {
-#undef	__X
-#undef	__Y
-	inline double abs(double __X) { return fabs(__X); }
+/*
+ * long double variants of above
+ */
+extern long double acosl(long double);
+extern long double asinl(long double);
+extern long double atanl(long double);
+extern long double atan2l(long double, long double);
+extern long double ceill(long double);
+extern long double cosl(long double);
+extern long double coshl(long double);
+extern long double expl(long double);
+extern long double fabsl(long double);
+extern long double floorl(long double);
+extern long double fmodl(long double, long double);
+extern long double frexpl(long double, int *);
+extern long double ldexpl(long double, int);
+extern long double logl(long double);
+extern long double log10l(long double);
+extern long double modfl(long double, long double *);
+extern long double powl(long double, long double);
+extern long double sinl(long double);
+extern long double sinhl(long double);
+extern long double sqrtl(long double);
+extern long double tanl(long double);
+extern long double tanhl(long double);
 
-	inline double pow(double __X, int __Y) {
-		return (pow(__X, (double)(__Y)));
-	}
-
-	inline float abs(float __X) { return __fabsf(__X); }
-	inline float acos(float __X) { return __acosf(__X); }
-	inline float asin(float __X) { return __asinf(__X); }
-	inline float atan(float __X) { return __atanf(__X); }
-	inline float atan2(float __X, float __Y) { return __atan2f(__X, __Y); }
-	inline float ceil(float __X) { return __ceilf(__X); }
-	inline float cos(float __X) { return __cosf(__X); }
-	inline float cosh(float __X) { return __coshf(__X); }
-	inline float exp(float __X) { return __expf(__X); }
-	inline float fabs(float __X) { return __fabsf(__X); }
-	inline float floor(float __X) { return __floorf(__X); }
-	inline float fmod(float __X, float __Y) { return __fmodf(__X, __Y); }
-	inline float frexp(float __X, int *__Y) { return __frexpf(__X, __Y); }
-	inline float ldexp(float __X, int __Y) { return __ldexpf(__X, __Y); }
-	inline float log(float __X) { return __logf(__X); }
-	inline float log10(float __X) { return __log10f(__X); }
-	inline float modf(float __X, float *__Y) { return __modff(__X, __Y); }
-	inline float pow(float __X, float __Y) { return __powf(__X, __Y); }
-
-	inline float pow(float __X, int __Y) {
-		return (pow((double)(__X), (double)(__Y)));
-	}
-
-	inline float sin(float __X) { return __sinf(__X); }
-	inline float sinh(float __X) { return __sinhf(__X); }
-	inline float sqrt(float __X) { return __sqrtf(__X); }
-	inline float tan(float __X) { return __tanf(__X); }
-	inline float tanh(float __X) { return __tanhf(__X); }
-
-	inline long double abs(long double __X) { return __fabsl(__X); }
-	inline long double acos(long double __X) { return __acosl(__X); }
-	inline long double asin(long double __X) { return __asinl(__X); }
-	inline long double atan(long double __X) { return __atanl(__X); }
-
-	inline long double atan2(long double __X, long double __Y) {
-		return (__atan2l(__X, __Y));
-	}
-
-	inline long double ceil(long double __X) { return __ceill(__X); }
-	inline long double cos(long double __X) { return __cosl(__X); }
-	inline long double cosh(long double __X) { return __coshl(__X); }
-	inline long double exp(long double __X) { return __expl(__X); }
-	inline long double fabs(long double __X) { return __fabsl(__X); }
-	inline long double floor(long double __X) { return __floorl(__X); }
-
-	inline long double fmod(long double __X, long double __Y) {
-		return (__fmodl(__X, __Y));
-	}
-
-	inline long double frexp(long double __X, int *__Y) {
-		return (__frexpl(__X, __Y));
-	}
-
-	inline long double ldexp(long double __X, int __Y) {
-		return (__ldexpl(__X, __Y));
-	}
-
-	inline long double log(long double __X) { return __logl(__X); }
-	inline long double log10(long double __X) { return __log10l(__X); }
-
-	inline long double modf(long double __X, long double *__Y) {
-		return (__modfl(__X, __Y));
-	}
-
-	inline long double pow(long double __X, long double __Y) {
-		return (__powl(__X, __Y));
-	}
-
-	inline long double pow(long double __X, int __Y) {
-		return (__powl(__X, (long double) (__Y)));
-	}
-
-	inline long double sin(long double __X) { return __sinl(__X); }
-	inline long double sinh(long double __X) { return __sinhl(__X); }
-	inline long double sqrt(long double __X) { return __sqrtl(__X); }
-	inline long double tan(long double __X) { return __tanl(__X); }
-	inline long double tanh(long double __X) { return __tanhl(__X); }
-}	/* end of extern "C++" */
 #endif	/* __cplusplus >= 199711L */
-
-#if __cplusplus >= 199711L
-}	/* end of namespace std */
-#endif
 
 #ifdef __cplusplus
 }
 #endif
+
+#if __cplusplus >= 199711L
+extern "C++" {
+namespace std {
+
+	/*
+	 * Each using declaration brings the double (C-standard) form
+	 * into std::.  The float and long double overloads are defined
+	 * as inlines below.
+	 */
+	using ::acos;
+	using ::asin;
+	using ::atan2;
+	using ::atan;
+	using ::ceil;
+	using ::cos;
+	using ::cosh;
+	using ::exp;
+	using ::fabs;
+	using ::floor;
+	using ::fmod;
+	using ::frexp;
+	using ::ldexp;
+	using ::log10;
+	using ::log;
+	using ::modf;
+	using ::pow;
+	using ::sin;
+	using ::sinh;
+	using ::sqrt;
+	using ::tan;
+	using ::tanh;
+
+	/*
+	 * C++98 requires overloads of C90 math functions for float and
+	 * long double arguments.  These inlines satisfy that requirement
+	 * by delegating to the corresponding C99 named variants.
+	 */
+#undef	__X
+#undef	__Y
+
+	/* inline double pow(double, int) not needed */
+
+	inline float acos(float __X) { return acosf(__X); }
+	inline float asin(float __X) { return asinf(__X); }
+	inline float atan(float __X) { return atanf(__X); }
+	inline float atan2(float __X, float __Y) { return atan2f(__X, __Y); }
+	inline float ceil(float __X) { return ceilf(__X); }
+	inline float cos(float __X) { return cosf(__X); }
+	inline float cosh(float __X) { return coshf(__X); }
+	inline float exp(float __X) { return expf(__X); }
+	inline float fabs(float __X) { return fabsf(__X); }
+	inline float floor(float __X) { return floorf(__X); }
+	inline float fmod(float __X, float __Y) { return fmodf(__X, __Y); }
+	inline float frexp(float __X, int *__Y) { return frexpf(__X, __Y); }
+	inline float ldexp(float __X, int __Y) { return ldexpf(__X, __Y); }
+	inline float log(float __X) { return logf(__X); }
+	inline float log10(float __X) { return log10f(__X); }
+	inline float modf(float __X, float *__Y) { return modff(__X, __Y); }
+	inline float pow(float __X, float __Y) { return powf(__X, __Y); }
+	inline float sin(float __X) { return sinf(__X); }
+	inline float sinh(float __X) { return sinhf(__X); }
+	inline float sqrt(float __X) { return sqrtf(__X); }
+	inline float tan(float __X) { return tanf(__X); }
+	inline float tanh(float __X) { return tanhf(__X); }
+
+	inline long double acos(long double __X) { return acosl(__X); }
+	inline long double asin(long double __X) { return asinl(__X); }
+	inline long double atan(long double __X) { return atanl(__X); }
+
+	inline long double atan2(long double __X, long double __Y) {
+		return (atan2l(__X, __Y));
+	}
+
+	inline long double ceil(long double __X) { return ceill(__X); }
+	inline long double cos(long double __X) { return cosl(__X); }
+	inline long double cosh(long double __X) { return coshl(__X); }
+	inline long double exp(long double __X) { return expl(__X); }
+	inline long double fabs(long double __X) { return fabsl(__X); }
+	inline long double floor(long double __X) { return floorl(__X); }
+
+	inline long double fmod(long double __X, long double __Y) {
+		return (fmodl(__X, __Y));
+	}
+
+	inline long double frexp(long double __X, int *__Y) {
+		return (frexpl(__X, __Y));
+	}
+
+	inline long double ldexp(long double __X, int __Y) {
+		return (ldexpl(__X, __Y));
+	}
+
+	inline long double log(long double __X) { return logl(__X); }
+	inline long double log10(long double __X) { return log10l(__X); }
+
+	inline long double modf(long double __X, long double *__Y) {
+		return (modfl(__X, __Y));
+	}
+
+	inline long double pow(long double __X, long double __Y) {
+		return (powl(__X, __Y));
+	}
+
+	inline long double sin(long double __X) { return sinl(__X); }
+	inline long double sinh(long double __X) { return sinhl(__X); }
+	inline long double sqrt(long double __X) { return sqrtl(__X); }
+	inline long double tan(long double __X) { return tanl(__X); }
+	inline long double tanh(long double __X) { return tanhl(__X); }
+
+/*
+ * For compatibility with GCC and GLIBCXX, let either stdlib.h or math.h
+ * provide both the integer and floating point abs() variants, regardless
+ * which is included first.
+ */
+#ifndef _CXX_ABS_FLOAT_DEFINED
+#define	_CXX_ABS_FLOAT_DEFINED
+	inline double abs(double __X) { return fabs(__X); }
+	inline float abs(float __X) { return fabsf(__X); }
+	inline long double abs(long double __X) { return fabsl(__X); }
+#endif /* !_CXX_ABS_FLOAT_DEFINED */
+
+}  /* namespace std */
+
+}  /* extern "C++" */
+#endif	/* __cplusplus >= 199711L */
 
 #endif	/* _ISO_MATH_ISO_H */

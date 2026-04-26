@@ -35,32 +35,6 @@
 #include <iso/math_iso.h>
 #include <iso/math_c99.h>
 
-#if __cplusplus >= 199711L
-using std::abs;
-using std::acos;
-using std::asin;
-using std::atan2;
-using std::atan;
-using std::ceil;
-using std::cos;
-using std::cosh;
-using std::exp;
-using std::fabs;
-using std::floor;
-using std::fmod;
-using std::frexp;
-using std::ldexp;
-using std::log10;
-using std::log;
-using std::modf;
-using std::pow;
-using std::sin;
-using std::sinh;
-using std::sqrt;
-using std::tan;
-using std::tanh;
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif

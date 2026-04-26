@@ -137,6 +137,14 @@ extern _NORETURN_KYWD void exit(int)
 	__NORETURN;
 extern void free(void *);
 extern char *getenv(const char *);
+/*
+ * Duplicated from math_iso.h for C++ abs() inlines below.
+ */
+#if __cplusplus >= 199711L
+extern double fabs(double);
+extern float fabsf(float);
+extern long double fabsl(long double);
+#endif
 extern long int labs(long);
 extern ldiv_t ldiv(long, long);
 extern void *malloc(size_t);
@@ -164,9 +172,22 @@ extern size_t wcstombs(char *_RESTRICT_KYWD, const wchar_t *_RESTRICT_KYWD,
 
 #if __cplusplus >= 199711L
 extern "C++" {
-	inline long   abs(long _l) { return labs(_l); }
-	inline ldiv_t div(long _l1, long _l2) { return ldiv(_l1, _l2); }
-}
+#undef	__X
+#undef	__Y
+	inline long   abs(long __X) { return labs(__X); }
+	inline ldiv_t div(long __X, long __Y) { return ldiv(__X, __Y); }
+/*
+ * For compatibility with GCC and GLIBCXX, let either stdlib.h or math.h
+ * provide both the integer and floating point abs() variants, regardless
+ * which is included first.
+ */
+#ifndef _CXX_ABS_FLOAT_DEFINED
+#define	_CXX_ABS_FLOAT_DEFINED
+	inline double abs(double __X) { return fabs(__X); }
+	inline float abs(float __X) { return fabsf(__X); }
+	inline long double abs(long double __X) { return fabsl(__X); }
+#endif /* !_CXX_ABS_FLOAT_DEFINED */
+} /* extern C++ */
 #endif /* __cplusplus */
 
 #if __cplusplus >= 199711L

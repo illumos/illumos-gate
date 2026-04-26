@@ -382,8 +382,9 @@ extern long double fminl(long double, long double);
 
 extern long double fmal(long double, long double, long double);
 
-#if !defined(_STRICT_STDC) && !defined(_NO_LONGLONG) || defined(_STDC_C99) || \
-	defined(__C99FEATURES__)
+#if !defined(_STRICT_STDC) && !defined(_NO_LONGLONG) || \
+	defined(_STDC_C99) || defined(__C99FEATURES__)
+
 extern long long int llrint(double);
 extern long long int llround(double);
 
@@ -392,12 +393,172 @@ extern long long int llroundf(float);
 
 extern long long int llrintl(long double);
 extern long long int llroundl(long double);
-#endif
-
-#endif	/* defined(__EXTENSIONS__) || defined(_STDC_C99) || ... */
+#endif	/* !_STRICT_STDC ... _STDC_C99 */
 
 #ifdef __cplusplus
 }
 #endif
+
+#if __cplusplus >= 199711L
+extern "C++" { namespace std {
+
+	using ::acosh;
+	using ::acoshf;
+	using ::acoshl;
+	using ::acosf;
+	using ::acosl;
+	using ::asinhf;
+	using ::asinhl;
+	using ::asinh;
+	using ::asinf;
+	using ::asinl;
+	using ::atan2f;
+	using ::atan2l;
+	using ::atanf;
+	using ::atanl;
+	using ::atanhf;
+	using ::atanhl;
+	using ::atanh;
+	using ::cbrt;
+	using ::cbrtf;
+	using ::cbrtl;
+	using ::ceilf;
+	using ::ceill;
+	using ::copysign;
+	using ::copysignf;
+	using ::copysignl;
+	using ::cosf;
+	using ::cosl;
+	using ::coshf;
+	using ::coshl;
+	using ::erf;
+	using ::erff;
+	using ::erfl;
+	using ::erfc;
+	using ::erfcf;
+	using ::erfcl;
+	using ::exp2;
+	using ::exp2f;
+	using ::exp2l;
+	using ::expf;
+	using ::expl;
+	using ::expm1;
+	using ::expm1f;
+	using ::expm1l;
+	using ::fabsf;
+	using ::fabsl;
+	using ::fdim;
+	using ::fdimf;
+	using ::fdiml;
+	using ::floorf;
+	using ::floorl;
+	using ::fma;
+	using ::fmaf;
+	using ::fmal;
+	using ::fmax;
+	using ::fmaxf;
+	using ::fmaxl;
+	using ::fmin;
+	using ::fminf;
+	using ::fminl;
+	using ::fmodf;
+	using ::fmodl;
+	using ::frexpf;
+	using ::frexpl;
+	using ::hypot;
+	using ::hypotf;
+	using ::hypotl;
+	using ::ilogb;
+	using ::ilogbf;
+	using ::ilogbl;
+	using ::ldexpf;
+	using ::ldexpl;
+	using ::lgamma;
+	using ::lgammaf;
+	using ::lgammal;
+	using ::log10f;
+	using ::log10l;
+	using ::log1p;
+	using ::log1pf;
+	using ::log1pl;
+	using ::log2;
+	using ::log2f;
+	using ::log2l;
+	using ::logb;
+	using ::logbf;
+	using ::logbl;
+	using ::logf;
+	using ::logl;
+	using ::lrint;
+	using ::lrintf;
+	using ::lrintl;
+	using ::lround;
+	using ::lroundf;
+	using ::lroundl;
+	using ::modff;
+	using ::modfl;
+	using ::nan;
+	using ::nanf;
+	using ::nanl;
+	using ::nearbyint;
+	using ::nearbyintf;
+	using ::nearbyintl;
+	using ::nextafter;
+	using ::nextafterf;
+	using ::nextafterl;
+	using ::nexttoward;
+	using ::nexttowardf;
+	using ::nexttowardl;
+	using ::powf;
+	using ::powl;
+	using ::remainder;
+	using ::remainderf;
+	using ::remainderl;
+	using ::remquo;
+	using ::remquof;
+	using ::remquol;
+	using ::rint;
+	using ::rintf;
+	using ::rintl;
+	using ::round;
+	using ::roundf;
+	using ::roundl;
+	using ::scalbln;
+	using ::scalblnf;
+	using ::scalblnl;
+	using ::scalbn;
+	using ::scalbnf;
+	using ::scalbnl;
+	using ::sinf;
+	using ::sinl;
+	using ::sinhf;
+	using ::sinhl;
+	using ::sqrtf;
+	using ::sqrtl;
+	using ::tanf;
+	using ::tanl;
+	using ::tanhf;
+	using ::tanhl;
+	using ::tgamma;
+	using ::tgammaf;
+	using ::tgammal;
+	using ::trunc;
+	using ::truncf;
+	using ::truncl;
+
+#if !defined(_STRICT_STDC) && !defined(_NO_LONGLONG) || \
+	defined(_STDC_C99) || defined(__C99FEATURES__)
+	using ::llrint;
+	using ::llrintf;
+	using ::llrintl;
+	using ::llround;
+	using ::llroundf;
+	using ::llroundl;
+#endif
+
+} }	/* end of: namespace std; extern "C++" */
+#endif	/* __cplusplus >= 199711L */
+
+#endif	/* defined(__EXTENSIONS__) || defined(_STDC_C99) || ... */
 
 #endif	/* _ISO_MATH_C99_H */
