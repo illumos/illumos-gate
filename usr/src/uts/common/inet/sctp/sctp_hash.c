@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 #include <sys/sysmacros.h>
@@ -335,146 +336,55 @@ sctp_find_conn(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
 }
 
 /*
- * This is called from sctp_fanout() with IP header src & dst addresses.
- * First call sctp_conn_match() to get a match by passing in src & dst
- * addresses from IP header.
- * However sctp_conn_match() can return no match under condition such as :
- * A host can send an INIT ACK from a different address than the INIT was sent
- * to (in a multi-homed env).
- * According to RFC4960, a host can send additional addresses in an INIT
- * ACK chunk.
- * Therefore extract all addresses from the INIT ACK chunk, pass to
- * sctp_conn_match() to get a match.
+ * We need to see if there is an INIT ACK chunk in this packet with multiple
+ * other remote IP addresses. This requires deeper packet parsing not unlike
+ * sctp_input_data(). Be careful!
  */
 static sctp_t *
-sctp_lookup_by_faddrs(mblk_t *mp, sctp_hdr_t *sctph, in6_addr_t *srcp,
-    in6_addr_t *dstp, uint32_t ports, zoneid_t zoneid, sctp_stack_t *sctps,
-    iaflags_t iraflags)
+sctp_lookup_by_initack(mblk_t *mp, sctp_hdr_t *sctph, zoneid_t zoneid,
+    sctp_stack_t *sctps, uint_t ip_hdr_length, iaflags_t iraflags)
 {
-	sctp_t			*sctp;
-	sctp_chunk_hdr_t	*ich;
-	sctp_init_chunk_t	*iack;
-	sctp_parm_hdr_t		*ph;
-	ssize_t			mlen, remaining;
-	uint16_t		param_type, addr_len = PARM_ADDR4_LEN;
-	in6_addr_t		src;
-	in6_addr_t		**addrbuf = NULL, **faddrpp = NULL;
-	boolean_t		isv4;
-	uint32_t		totaddr, nfaddr = 0;
+	mblk_t *save_mp = mp;
+	sctp_t *sctp = NULL;
+	sctp_chunk_hdr_t *ich;
+	ssize_t remaining;
+
+	ASSERT3P(mp->b_rptr, <, sctph);
+	ASSERT3P(mp->b_wptr, >, sctph);
 
 	/*
-	 * If we get a match with the passed-in IP header src & dst addresses,
-	 * quickly return the matched sctp.
-	 */
-	if ((sctp = sctp_conn_match(&srcp, 1, dstp, ports, zoneid, iraflags,
-	    sctps)) != NULL) {
-		return (sctp);
-	}
-
-	/*
-	 * Currently sctph is set to NULL in icmp error fanout case
-	 * (ip_fanout_sctp()).
-	 * The above sctp_conn_match() should handle that, otherwise
-	 * return no match found.
-	 */
-	if (sctph == NULL)
-		return (NULL);
-
-	/*
-	 * Do a pullup again in case the previous one was partially successful,
-	 * so try to complete the pullup here and have a single contiguous
-	 * chunk for processing of entire INIT ACK chunk below.
+	 * All subsequent code is vastly simplified if it can assume a single
+	 * contiguous chunk of data.
 	 */
 	if (mp->b_cont != NULL) {
-		if (pullupmsg(mp, -1) == 0) {
+		mp = msgpullup(mp, -1);
+		if (mp == NULL)
 			return (NULL);
-		}
+		sctph = (sctp_hdr_t *)(mp->b_rptr + ip_hdr_length);
 	}
 
-	mlen = mp->b_wptr - (uchar_t *)(sctph + 1);
-	if ((ich = sctp_first_chunk((uchar_t *)(sctph + 1), mlen)) == NULL) {
-		return (NULL);
-	}
+	/*
+	 * At this point mp is contiguous, regardless if it's the same one
+	 * that got passed in to us. Callers that reach us, however, might
+	 * make assumptions about the passed-in mp (save_mp) that we Must Not
+	 * Shatter, so we keep that one around. We also don't have to
+	 * recompute pointers that point into save_mp.
+	 */
+	remaining = mp->b_wptr - (uint8_t *)(sctph + 1);
+	ich = sctp_first_chunk((uint8_t *)(sctph + 1), remaining);
+	if (ich == NULL || ich->sch_id != CHUNK_INIT_ACK)
+		goto bail;
 
-	if (ich->sch_id == CHUNK_INIT_ACK) {
-		remaining = ntohs(ich->sch_len) - sizeof (*ich) -
-		    sizeof (*iack);
-		if (remaining < sizeof (*ph)) {
-			return (NULL);
-		}
+	/* Let's check the input some. */
+	if (!sctp_check_input(ich, remaining, B_TRUE))
+		goto bail;
 
-		isv4 = (iraflags & IRAF_IS_IPV4) ? B_TRUE : B_FALSE;
-		if (!isv4)
-			addr_len = PARM_ADDR6_LEN;
-		totaddr = remaining/addr_len;
+	sctp = sctp_addrlist2sctp(mp, sctph, ich, zoneid, iraflags, sctps);
 
-		iack = (sctp_init_chunk_t *)(ich + 1);
-		ph = (sctp_parm_hdr_t *)(iack + 1);
+bail:
+	if (mp != save_mp)
+		freemsg(mp);
 
-		addrbuf = (in6_addr_t **)
-		    kmem_zalloc(totaddr * sizeof (in6_addr_t *), KM_NOSLEEP);
-		if (addrbuf == NULL)
-			return (NULL);
-		faddrpp = addrbuf;
-
-		while (ph != NULL) {
-			/*
-			 * According to RFC4960 :
-			 * All integer fields in an SCTP packet MUST be
-			 * transmitted in network byte order,
-			 * unless otherwise stated.
-			 * Therefore convert the param type to host byte order.
-			 * Also do not add src address present in IP header
-			 * as it has already been thru sctp_conn_match() above.
-			 */
-			param_type = ntohs(ph->sph_type);
-			switch (param_type) {
-			case PARM_ADDR4:
-				IN6_INADDR_TO_V4MAPPED((struct in_addr *)
-				    (ph + 1), &src);
-				if (IN6_ARE_ADDR_EQUAL(&src, srcp))
-					break;
-				*faddrpp = (in6_addr_t *)
-				    kmem_zalloc(sizeof (in6_addr_t),
-				    KM_NOSLEEP);
-				if (*faddrpp == NULL)
-					break;
-				IN6_INADDR_TO_V4MAPPED((struct in_addr *)
-				    (ph + 1), *faddrpp);
-				nfaddr++;
-				faddrpp++;
-				break;
-			case PARM_ADDR6:
-				*faddrpp = (in6_addr_t *)(ph + 1);
-				if (IN6_ARE_ADDR_EQUAL(*faddrpp, srcp))
-					break;
-				nfaddr++;
-				faddrpp++;
-				break;
-			default:
-				break;
-			}
-			ph = sctp_next_parm(ph, &remaining);
-		}
-
-		ASSERT(nfaddr < totaddr);
-
-		if (nfaddr > 0) {
-			sctp = sctp_conn_match(addrbuf, nfaddr, dstp, ports,
-			    zoneid, iraflags, sctps);
-
-			if (isv4) {
-				for (faddrpp = addrbuf; nfaddr > 0;
-				    faddrpp++, nfaddr--) {
-					if (IN6_IS_ADDR_V4MAPPED(*faddrpp)) {
-						kmem_free(*faddrpp,
-						    sizeof (in6_addr_t));
-					}
-				}
-			}
-		}
-		kmem_free(addrbuf, totaddr * sizeof (in6_addr_t *));
-	}
 	return (sctp);
 }
 
@@ -487,37 +397,51 @@ sctp_fanout(in6_addr_t *src, in6_addr_t *dst, uint32_t ports,
 {
 	zoneid_t zoneid = ira->ira_zoneid;
 	iaflags_t iraflags = ira->ira_flags;
+	uint_t ip_hdr_length = ira->ira_ip_hdr_length;
 	sctp_t *sctp;
 
-	sctp = sctp_lookup_by_faddrs(mp, sctph, src, dst, ports, zoneid,
-	    sctps, iraflags);
-	if (sctp == NULL) {
-		/* Not in conn fanout; check listen fanout */
-		sctp = listen_match(dst, ports, zoneid, iraflags, sctps);
-		if (sctp == NULL)
-			return (NULL);
-		/*
-		 * On systems running trusted extensions, check if dst
-		 * should accept the packet. "IPV6_VERSION" indicates
-		 * that dst is in 16 byte AF_INET6 format. IPv4-mapped
-		 * IPv6 addresses are supported.
-		 */
-		if ((iraflags & IRAF_SYSTEM_LABELED) &&
-		    !tsol_receive_local(mp, dst, IPV6_VERSION, ira,
-		    sctp->sctp_connp)) {
-			DTRACE_PROBE3(
-			    tx__ip__log__info__classify__sctp,
-			    char *,
-			    "connp(1) could not receive mp(2)",
-			    conn_t *, sctp->sctp_connp, mblk_t *, mp);
-			SCTP_REFRELE(sctp);
-			return (NULL);
-		}
-	}
+	/* Simple case. */
+	sctp = sctp_conn_match(&src, 1, dst, ports, zoneid, iraflags, sctps);
+	if (sctp != NULL)
+		goto match;
+
 	/*
-	 * For labeled systems, there's no need to check the
-	 * label here.  It's known to be good as we checked
-	 * before allowing the connection to become bound.
+	 * Lookup by multiple remote addresses in case "src" isn't the one
+	 * we started with.
+	 *
+	 * The ICMP error fanout caller sets sctph to NULL, and it would have
+	 * matched above if it was needed. Check sctph here before calling the
+	 * deeper packet-parsing for INIT ACK remote-address checks.
+	 */
+	sctp = (sctph == NULL) ? NULL : sctp_lookup_by_initack(mp, sctph,
+	    zoneid, sctps, ip_hdr_length, iraflags);
+	if (sctp != NULL)
+		goto match;
+
+	/* Not in conn fanout; check listen fanout */
+	sctp = listen_match(dst, ports, zoneid, iraflags, sctps);
+	if (sctp == NULL)
+		return (NULL);
+
+	/*
+	 * On systems running trusted extensions, check if dst should accept
+	 * the packet. "IPV6_VERSION" indicates that dst is in 16 byte
+	 * AF_INET6 format. IPv4-mapped IPv6 addresses are supported.
+	 */
+	if ((iraflags & IRAF_SYSTEM_LABELED) &&
+	    !tsol_receive_local(mp, dst, IPV6_VERSION, ira, sctp->sctp_connp)) {
+		DTRACE_PROBE3(tx__ip__log__info__classify__sctp,
+		    char *, "connp(1) could not receive mp(2)",
+		    conn_t *, sctp->sctp_connp, mblk_t *, mp);
+		SCTP_REFRELE(sctp);
+		return (NULL);
+	}
+
+match:
+	/*
+	 * For labeled systems, there's no need to check the label here.  It's
+	 * known to be good as we checked before allowing the connection to
+	 * become bound, or just cleared the checks after listen_match().
 	 */
 	return (sctp->sctp_connp);
 }

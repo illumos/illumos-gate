@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 #ifndef	_INET_SCTP_SCTP_IMPL_H
@@ -274,7 +275,7 @@ typedef struct {
 		} else {						\
 			ASSERT(SCTP_CHUNK_DEST(mp)->sf_suna >= ((chunkdata) + \
 							sizeof (*sdc))); \
-			SCTP_CHUNK_DEST(mp)->sf_suna -= ((chunkdata) + 	\
+			SCTP_CHUNK_DEST(mp)->sf_suna -= ((chunkdata) +	\
 					sizeof (*sdc));			\
 		}							\
 		DTRACE_PROBE3(sctp__chunk__sent2, sctp_t *, sctp,	\
@@ -302,7 +303,7 @@ typedef struct {
 #define	SCTP_CHUNK_REXMIT(sctp, mp) {					\
 	DTRACE_PROBE2(sctp__chunk__rexmit, sctp_t *, sctp, mblk_t *,	\
 	    mp);							\
-	(mp)->b_flag |= SCTP_CHUNK_FLAG_REXMIT; 			\
+	(mp)->b_flag |= SCTP_CHUNK_FLAG_REXMIT;				\
 }
 #define	SCTP_CHUNK_CLEAR_REXMIT(mp) ((mp)->b_flag &= ~SCTP_CHUNK_FLAG_REXMIT)
 #define	SCTP_CHUNK_WANT_REXMIT(mp) ((mp)->b_flag & SCTP_CHUNK_FLAG_REXMIT)
@@ -348,7 +349,7 @@ typedef struct {
 
 /* SCTP association hash function. */
 #define	SCTP_CONN_HASH(sctps, ports)			\
-	((((ports) ^ ((ports) >> 16)) * 31) & 		\
+	((((ports) ^ ((ports) >> 16)) * 31) &		\
 	    ((sctps)->sctps_conn_hash_size - 1))
 
 /*
@@ -985,7 +986,7 @@ extern mblk_t	*sctp_add_proto_hdr(sctp_t *, sctp_faddr_t *, mblk_t *, int,
 		    int *);
 extern void	sctp_addr_req(sctp_t *, mblk_t *);
 extern sctp_t	*sctp_addrlist2sctp(mblk_t *, sctp_hdr_t *, sctp_chunk_hdr_t *,
-		    zoneid_t, sctp_stack_t *);
+		    zoneid_t, iaflags_t, sctp_stack_t *);
 extern void	sctp_check_adv_ack_pt(sctp_t *, mblk_t *, mblk_t *);
 extern void	sctp_assoc_event(sctp_t *, uint16_t, uint16_t,
 		    sctp_chunk_hdr_t *);
@@ -998,6 +999,7 @@ extern int	sctp_bind_add(sctp_t *, const void *, uint32_t, boolean_t,
 extern int	sctp_bind_del(sctp_t *, const void *, uint32_t, boolean_t);
 extern int	sctp_build_hdrs(sctp_t *, int);
 
+extern boolean_t sctp_check_input(sctp_chunk_hdr_t *, ssize_t, boolean_t);
 extern int	sctp_check_abandoned_msg(sctp_t *, mblk_t *);
 extern void	sctp_clean_death(sctp_t *, int);
 extern void	sctp_close_eager(sctp_t *);
@@ -1028,6 +1030,7 @@ extern void	sctp_faddr_init(void);
 extern void	sctp_fast_rexmit(sctp_t *);
 extern void	sctp_fill_sack(sctp_t *, unsigned char *, int);
 extern uint32_t sctp_find_listener_conf(sctp_stack_t *, in_port_t);
+extern sctp_chunk_hdr_t	*sctp_first_chunk(uchar_t *, ssize_t);
 extern void	sctp_free_faddr_timers(sctp_t *);
 extern void	sctp_free_ftsn_set(sctp_ftsn_set_t *);
 extern void	sctp_free_msg(mblk_t *);
@@ -1128,6 +1131,7 @@ extern void	sctp_send_cookie_echo(sctp_t *, sctp_chunk_hdr_t *, mblk_t *,
 extern void	sctp_send_initack(sctp_t *, sctp_hdr_t *, sctp_chunk_hdr_t *,
 		    mblk_t *, ip_recv_attr_t *);
 extern void	sctp_send_shutdown(sctp_t *, int);
+extern void	sctp_send_shutdown_ack(sctp_t *, sctp_faddr_t *, boolean_t);
 extern void	sctp_send_heartbeat(sctp_t *, sctp_faddr_t *);
 extern void	sctp_sendfail_event(sctp_t *, mblk_t *, int, boolean_t);
 extern void	sctp_set_faddr_current(sctp_t *, sctp_faddr_t *);
@@ -1166,14 +1170,12 @@ extern int	sctp_xmit_list_clean(sctp_t *, ssize_t);
 
 extern void	sctp_zap_addrs(sctp_t *);
 extern void	sctp_zap_faddrs(sctp_t *, int);
-extern sctp_chunk_hdr_t	*sctp_first_chunk(uchar_t *, ssize_t);
-extern void	sctp_send_shutdown_ack(sctp_t *, sctp_faddr_t *, boolean_t);
 
 /* Contract private interface between SCTP and Clustering - PSARC/2005/602 */
 
 extern void	(*cl_sctp_listen)(sa_family_t, uchar_t *, uint_t, in_port_t);
 extern void	(*cl_sctp_unlisten)(sa_family_t, uchar_t *, uint_t, in_port_t);
-extern void 	(*cl_sctp_connect)(sa_family_t, uchar_t *, uint_t, in_port_t,
+extern void	(*cl_sctp_connect)(sa_family_t, uchar_t *, uint_t, in_port_t,
 		    uchar_t *, uint_t, in_port_t, boolean_t, cl_sctp_handle_t);
 extern void	(*cl_sctp_disconnect)(sa_family_t, cl_sctp_handle_t);
 extern void	(*cl_sctp_assoc_change)(sa_family_t, uchar_t *, size_t, uint_t,

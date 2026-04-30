@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 #include <sys/types.h>
@@ -3240,9 +3241,8 @@ sctp_strange_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
  * Returns 1 if the chunk and all encloded params are legitimate,
  * 0 otherwise.
  */
-/*ARGSUSED*/
-static int
-sctp_check_input(sctp_t *sctp, sctp_chunk_hdr_t *ch, ssize_t len, int first)
+boolean_t
+sctp_check_input(sctp_chunk_hdr_t *ch, ssize_t len, boolean_t first)
 {
 	sctp_parm_hdr_t	*ph;
 	void		*p = NULL;
@@ -3251,15 +3251,15 @@ sctp_check_input(sctp_t *sctp, sctp_chunk_hdr_t *ch, ssize_t len, int first)
 
 	ch_len = ntohs(ch->sch_len);
 	if (ch_len > len) {
-		return (0);
+		return (B_FALSE);
 	}
 
 	switch (ch->sch_id) {
 	case CHUNK_DATA:
 		if (ch_len < sizeof (sctp_data_hdr_t)) {
-			return (0);
+			return (B_FALSE);
 		}
-		return (1);
+		return (B_TRUE);
 	case CHUNK_INIT:
 	case CHUNK_INIT_ACK:
 		{
@@ -3272,7 +3272,7 @@ sctp_check_input(sctp_t *sctp, sctp_chunk_hdr_t *ch, ssize_t len, int first)
 			if (!first || sctp_next_chunk(ch, &remlen) != NULL ||
 			    (ch_len < (sizeof (*ch) +
 			    sizeof (sctp_init_chunk_t)))) {
-				return (0);
+				return (B_FALSE);
 			}
 			/* may have params that need checking */
 			p = (char *)(ch + 1) + sizeof (sctp_init_chunk_t);
@@ -3282,19 +3282,19 @@ sctp_check_input(sctp_t *sctp, sctp_chunk_hdr_t *ch, ssize_t len, int first)
 		break;
 	case CHUNK_SACK:
 		if (ch_len < (sizeof (*ch) + sizeof (sctp_sack_chunk_t))) {
-			return (0);
+			return (B_FALSE);
 		}
 		/* dup and gap reports checked by got_sack() */
-		return (1);
+		return (B_TRUE);
 	case CHUNK_SHUTDOWN:
 		if (ch_len < (sizeof (*ch) + sizeof (uint32_t))) {
-			return (0);
+			return (B_FALSE);
 		}
-		return (1);
+		return (B_TRUE);
 	case CHUNK_ABORT:
 	case CHUNK_ERROR:
 		if (ch_len < sizeof (*ch)) {
-			return (0);
+			return (B_FALSE);
 		}
 		/* may have params that need checking */
 		p = ch + 1;
@@ -3308,10 +3308,10 @@ sctp_check_input(sctp_t *sctp, sctp_chunk_hdr_t *ch, ssize_t len, int first)
 	case CHUNK_ASCONF:
 	case CHUNK_ASCONF_ACK:
 		if (ch_len < sizeof (*ch)) {
-			return (0);
+			return (B_FALSE);
 		}
 		/* heartbeat data checked by process_heartbeat() */
-		return (1);
+		return (B_TRUE);
 	case CHUNK_SHUTDOWN_COMPLETE:
 		{
 			ssize_t remlen = len;
@@ -3322,28 +3322,28 @@ sctp_check_input(sctp_t *sctp, sctp_chunk_hdr_t *ch, ssize_t len, int first)
 			 */
 			if (!first || sctp_next_chunk(ch, &remlen) != NULL ||
 			    ch_len < sizeof (*ch)) {
-				return (0);
+				return (B_FALSE);
 			}
 		}
-		return (1);
+		return (B_TRUE);
 	case CHUNK_COOKIE:
 	case CHUNK_COOKIE_ACK:
 	case CHUNK_SHUTDOWN_ACK:
 		if (ch_len < sizeof (*ch) || !first) {
-			return (0);
+			return (B_FALSE);
 		}
-		return (1);
+		return (B_TRUE);
 	case CHUNK_FORWARD_TSN:
 		if (ch_len < (sizeof (*ch) + sizeof (uint32_t)))
-			return (0);
-		return (1);
+			return (B_FALSE);
+		return (B_TRUE);
 	default:
-		return (1);	/* handled by strange_chunk() */
+		return (B_TRUE);	/* handled by strange_chunk() */
 	}
 
 	/* check and byteorder parameters */
 	if (clen <= 0) {
-		return (1);
+		return (B_TRUE);
 	}
 	ASSERT(p != NULL);
 
@@ -3351,13 +3351,14 @@ sctp_check_input(sctp_t *sctp, sctp_chunk_hdr_t *ch, ssize_t len, int first)
 	while (ph != NULL && clen > 0) {
 		ch_len = ntohs(ph->sph_len);
 		if (ch_len > len || ch_len < sizeof (*ph)) {
-			return (0);
+			return (B_FALSE);
 		}
+		/* TODO -> per-parm reality checks? */
 		ph = sctp_next_parm(ph, &clen);
 	}
 
 	/* All OK */
-	return (1);
+	return (B_TRUE);
 }
 
 static mblk_t *
@@ -3464,7 +3465,7 @@ sctp_ootb_input(mblk_t *mp, ip_recv_attr_t *ira, ip_stack_t *ipst)
 		break;
 	case CHUNK_INIT_ACK:
 		/* check for changed src addr */
-		sctp = sctp_addrlist2sctp(mp, sctph, ch, zoneid, sctps);
+		sctp = sctp_addrlist2sctp(mp, sctph, ch, zoneid, 0, sctps);
 		if (sctp != NULL) {
 			/* success; proceed to normal path */
 			mutex_enter(&sctp->sctp_lock);
@@ -3709,7 +3710,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 		return;
 	}
 
-	if (!sctp_check_input(sctp, ch, mlen, 1)) {
+	if (!sctp_check_input(ch, mlen, B_TRUE)) {
 		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsInDiscards);
 		ip_drop_input("ipIfStatsInDiscards", mp, NULL);
 		goto done;
@@ -4359,7 +4360,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, ip_recv_attr_t *ira)
 		} /* switch (sctp->sctp_state) */
 
 		ch = sctp_next_chunk(ch, &mlen);
-		if (ch != NULL && !sctp_check_input(sctp, ch, mlen, 0))
+		if (ch != NULL && !sctp_check_input(ch, mlen, B_FALSE))
 			goto done;
 	} while (ch != NULL);
 

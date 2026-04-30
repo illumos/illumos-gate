@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2004, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 #include <sys/types.h>
@@ -1437,17 +1438,17 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
  */
 sctp_t *
 sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
-    zoneid_t zoneid, sctp_stack_t *sctps)
+    zoneid_t zoneid, iaflags_t iraflags, sctp_stack_t *sctps)
 {
 	int isv4;
 	ipha_t *iph;
 	ip6_t *ip6h;
-	in6_addr_t dst;
-	in6_addr_t src, *srcp = &src;
+	in6_addr_t dst, src, *v4_array, *current_v4;
+	in6_addr_t **srcs = NULL;
 	sctp_parm_hdr_t *ph;
-	ssize_t remaining;
+	ssize_t remaining, most_v4;
 	sctp_init_chunk_t *iack;
-	uint32_t ports;
+	uint32_t ports, pointer_count = 0;
 	sctp_t *sctp = NULL;
 
 	ASSERT(ich->sch_id == CHUNK_INIT_ACK);
@@ -1468,17 +1469,44 @@ sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
 
 	/* pull out any address parameters */
 	remaining = ntohs(ich->sch_len) - sizeof (*ich) - sizeof (*iack);
-	if (remaining < sizeof (*ph)) {
+	if (remaining < sizeof (*ph))
 		return (NULL);
-	}
 
 	iack = (sctp_init_chunk_t *)(ich + 1);
 	ph = (sctp_parm_hdr_t *)(iack + 1);
 
-	while (ph != NULL) {
+	/*
+	 * At this point we know only up to how many POSSIBLE addresses we
+	 * can have.  We should allocate now.
+	 *
+	 * IPv4 address parameters are 8 bytes (RFC 9260, sec 3.3.2.1.1), and
+	 * IPv6 address parameters are 20 bytes.
+	 */
+	most_v4 = (remaining >> 3) + 1;
+	/*
+	 * Alas, our lookups use IPv6 addresses, using v4-mapped for IPv4.
+	 *
+	 * sctp_conn_match() takes an array of IPv6 address *pointers*, but
+	 * we need to convert on-the-wire IPv4 to v4-mapped IPv6 to match
+	 * IPv4 ones.  In theory we can have all IPv4 which means conversion
+	 * to IPv6 and THEN pointing to it in the array.
+	 *
+	 * Easiest way to cover the worst case is to allocate for it, and
+	 * opt to/not-to use the conversion space depending on v4 or v6.
+	 */
+	v4_array = kmem_zalloc(most_v4 *
+	    (sizeof (in6_addr_t) + sizeof (in6_addr_t *)), KM_NOSLEEP_LAZY);
+	if (v4_array == NULL)
+		return (NULL);
+	current_v4 = v4_array;
+	srcs = (in6_addr_t **)(v4_array + most_v4);
+
+	while (ph != NULL && pointer_count < most_v4) {
 		/*
-		 * params have been verified in sctp_check_input(),
-		 * so no need to do it again here.
+		 * params have ONLY been verified in sctp_check_input()
+		 * for size fitting the chunk.  The parameters themselves may
+		 * be malformed. We only care about addresses, so check those
+		 * carefully.
 		 *
 		 * For labeled systems, there's no need to check the
 		 * label here.  It's known to be good as we checked
@@ -1490,36 +1518,56 @@ sctp_addrlist2sctp(mblk_t *mp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ich,
 		 * Therefore convert the param type to network byte order.
 		 */
 		if (ph->sph_type == htons(PARM_ADDR4)) {
+			if (ph->sph_len != htons(8)) {
+				/* AAAAAAH! MALFORMED! */
+				remaining = -1; /* error indication */
+				break;
+			}
 			IN6_INADDR_TO_V4MAPPED((struct in_addr *)(ph + 1),
-			    srcp);
-
-			sctp = sctp_conn_match(&srcp, 1, &dst, ports, zoneid,
-			    0, sctps);
+			    current_v4);
+			srcs[pointer_count] = current_v4;
+			current_v4++;
+			pointer_count++;
 
 			dprint(1,
 			    ("sctp_addrlist2sctp: src=%x:%x:%x:%x, sctp=%p\n",
 			    SCTP_PRINTADDR(src), (void *)sctp));
-
-
-			if (sctp != NULL) {
-				return (sctp);
-			}
 		} else if (ph->sph_type == htons(PARM_ADDR6)) {
-			srcp = (in6_addr_t *)(ph + 1);
-			sctp = sctp_conn_match(&srcp, 1, &dst, ports, zoneid,
-			    0, sctps);
+			if (ph->sph_len != htons(20)) {
+				/* AAAAAAH! MALFORMED! */
+				remaining = -1; /* error indication */
+				break;
+			}
+			srcs[pointer_count] = (in6_addr_t *)(ph + 1);
+			pointer_count++;
 
 			dprint(1,
 			    ("sctp_addrlist2sctp: src=%x:%x:%x:%x, sctp=%p\n",
 			    SCTP_PRINTADDR(src), (void *)sctp));
-
-			if (sctp != NULL) {
-				return (sctp);
-			}
-		}
+		} /* else skip for now. */
 
 		ph = sctp_next_parm(ph, &remaining);
 	}
 
-	return (NULL);
+	if (ph != NULL) {
+		if (remaining < 0) {
+			/* Malformed PARM_ADDR[46] pointed to by ph */
+			DTRACE_PROBE1(sctp__bad__addrparm, sctp_parm_hdr_t *,
+			    ph);
+		} else {
+			/*
+			 * Maybe rip this out since ideally this will never
+			 * happen.
+			 */
+			VERIFY3U(pointer_count, <=, most_v4);
+		}
+	}
+
+	sctp = sctp_conn_match(srcs, pointer_count, &dst, ports, zoneid,
+	    iraflags, sctps);
+
+	kmem_free(v4_array, most_v4 *
+	    (sizeof (in6_addr_t) + sizeof (in6_addr_t *)));
+
+	return (sctp);
 }
