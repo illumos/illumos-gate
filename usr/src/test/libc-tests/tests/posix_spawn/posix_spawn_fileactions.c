@@ -26,6 +26,7 @@
 #include <limits.h>
 #include <spawn.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -271,6 +272,34 @@ close_action_fd_setup(spawn_fa_test_t *test,
 	ret = posix_spawn_file_actions_addclose(acts, 10);
 	if (ret != 0) {
 		warnx("TEST FAILED: %s: addclose failed with %s",
+		    desc, strerrorname_np(ret));
+		return (false);
+	}
+
+	return (true);
+}
+
+/*
+ * Close a descriptor that is not open, then open fd 10 - tests that the
+ * failed close is ignored and later actions still run.
+ */
+static bool
+close_badfd_setup(spawn_fa_test_t *test, posix_spawn_file_actions_t *acts)
+{
+	const char *desc = test->sft_name;
+	int ret;
+
+	ret = posix_spawn_file_actions_addclose(acts, test->sft_close_fd);
+	if (ret != 0) {
+		warnx("TEST FAILED: %s: addclose failed with %s",
+		    desc, strerrorname_np(ret));
+		return (false);
+	}
+
+	ret = posix_spawn_file_actions_addopen(acts, 10,
+	    "/dev/null", O_RDONLY, 0);
+	if (ret != 0) {
+		warnx("TEST FAILED: %s: addopen failed with %s",
 		    desc, strerrorname_np(ret));
 		return (false);
 	}
@@ -617,6 +646,49 @@ static spawn_fa_test_t tests[] = {
 	    .sft_expected = {
 		{ .srf_fd = -1, .srf_open = 0 },
 		{ .srf_fd = 20, .srf_open = 1, .srf_flags = O_RDONLY } } },
+
+	/*
+	 * A file action whose open fails must abort the spawn with that
+	 * errno rather than treating the error as an opened descriptor.
+	 */
+	{ .sft_name = "addopen of nonexistent path fails with ENOENT",
+	    .sft_setup = addopen_setup,
+	    .sft_open_fd = 10,
+	    .sft_open_path = "/devices/nonexistent/posix_spawn_test",
+	    .sft_open_flags = O_RDONLY,
+	    .sft_expect_errno = ENOENT },
+	{ .sft_name = "addopen onto fd 2 of nonexistent path fails ENOENT",
+	    .sft_setup = addopen_setup,
+	    .sft_open_fd = 2,
+	    .sft_open_path = "/devices/nonexistent/posix_spawn_test",
+	    .sft_open_flags = O_RDONLY,
+	    .sft_expect_errno = ENOENT },
+
+	/*
+	 * A descriptor too large to fit in the table is validated when the
+	 * action runs, not when it is added. open and dup2 actions fail
+	 * the spawn with EBADF. A close action on a descriptor that is not
+	 * open is not an error and the spawn succeeds.
+	 */
+	{ .sft_name = "addopen onto INT32_MAX fails with EBADF",
+	    .sft_setup = addopen_setup,
+	    .sft_open_fd = INT32_MAX, .sft_open_path = "/dev/null",
+	    .sft_open_flags = O_RDONLY,
+	    .sft_expect_errno = EBADF },
+	{ .sft_name = "adddup2 from INT32_MAX fails with EBADF",
+	    .sft_setup = adddup2_setup,
+	    .sft_dup2_from = INT32_MAX, .sft_dup2_to = 20,
+	    .sft_expect_errno = EBADF },
+	{ .sft_name = "adddup2 to INT32_MAX fails with EBADF",
+	    .sft_setup = adddup2_setup,
+	    .sft_dup2_from = STDOUT_FILENO, .sft_dup2_to = INT32_MAX,
+	    .sft_expect_errno = EBADF },
+	{ .sft_name = "addclose of INT32_MAX (not open) is ignored",
+	    .sft_setup = close_badfd_setup,
+	    .sft_nfds = 1, .sft_fds = { 10 },
+	    .sft_expected = {
+		{ .srf_fd = 10, .srf_open = 1, .srf_flags = O_RDONLY } },
+	    .sft_close_fd = INT32_MAX },
 };
 
 int

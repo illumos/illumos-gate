@@ -31,6 +31,7 @@
 # Copyright 2019, Joyent, Inc.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2020 Peter Tribble
+# Copyright 2026 Oxide Computer Company
 #
 
 #
@@ -845,6 +846,16 @@ opt/os-tests/tests/cores/amd64/libdumper.so	i386
 # implementation -- which is fully controlled by gate.
 #
 usr/include/sys/ktest_impl.h
+
+#
+# Private definitions for the private spawn(2) system call.
+#
+usr/include/sys/spawn_impl.h
+
+#
+# Private subcodes for the pgrpsys(2) system call.
+#
+usr/include/sys/pgrpsys.h
 
 #
 # Temporary exception until the ACPI nexus is sorted out.

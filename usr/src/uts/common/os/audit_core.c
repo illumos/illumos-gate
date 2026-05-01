@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/param.h>
@@ -209,7 +210,7 @@ audit_update_context(proc_t *p, cred_t *ncr)
  */
 
 void
-audit_newproc(struct proc *cp)	/* initialized child proc structure */
+audit_newproc(struct proc *cp, bool isspawn)
 {
 	p_audit_data_t *pad;	/* child process audit data */
 	p_audit_data_t *opad;	/* parent process audit data */
@@ -249,6 +250,17 @@ audit_newproc(struct proc *cp)	/* initialized child proc structure */
 		return;
 
 	/*
+	 * A spawn(2) child cannot run until it has exec'd, and the parent's
+	 * system call does not return until after that, so there is no need
+	 * to complete the parent's audit record early as there is for fork
+	 * below. It is completed at system call exit as usual, by which
+	 * time it carries the details of the spawn and a return token holding
+	 * the child's pid, or the error.
+	 */
+	if (isspawn)
+		return;
+
+	/*
 	 * finish auditing of parent here so that it will be done
 	 * before child has a chance to run. We include the child
 	 * pid since the return value in the return token is a dummy
@@ -274,15 +286,13 @@ audit_newproc(struct proc *cp)	/* initialized child proc structure */
  * CALLBY:	EXIT
  *		FORK_FAIL
  * NOTE:	all lwp except current one have stopped in SEXITLWPS
- * 		why we are single threaded?
+ *		why we are single threaded?
  *		. all lwp except current one have stopped in SEXITLWPS.
  */
 
 void
-audit_pfree(struct proc *p)		/* proc structure to be freed */
-
-{	/* AUDIT_PFREE */
-
+audit_pfree(struct proc *p)
+{
 	p_audit_data_t *pad;
 
 	pad = P2A(p);
@@ -389,8 +399,7 @@ audit_thread_free(kthread_t *t)
 
 void
 audit_falloc(struct file *fp)
-{	/* AUDIT_FALLOC */
-
+{
 	f_audit_data_t *fad;
 
 	/* allocate per file audit structure if there a'int any */
@@ -400,7 +409,7 @@ audit_falloc(struct file *fp)
 
 	F2A(fp) = fad;
 
-	fad->fad_thread = curthread; 	/* file audit data back ptr; DEBUG */
+	fad->fad_thread = curthread;	/* file audit data back ptr; DEBUG */
 }
 
 /*

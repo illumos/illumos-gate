@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -363,7 +363,7 @@ const struct systable systable[] = {
 {"sharefs",	3, DEC, NOV, DEC, HEX, DEC},			/* 140 */
 {"seteuid",	1, DEC, NOV, UNS},				/* 141 */
 {"forksys",	2, DEC, NOV, DEC, HHX},				/* 142 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"spawn",	5, DEC, NOV, STG, HEX, UNS, HEX, UNS },		/* 143 */
 {"sigtimedwait", 3, DEC, NOV, HEX, HEX, HEX},			/* 144 */
 {"lwp_info",	1, DEC, NOV, HEX},				/* 145 */
 {"yield",	0, DEC, NOV},					/* 146 */

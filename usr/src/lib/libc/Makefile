@@ -24,6 +24,7 @@
 # Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 Oxide Computer Company
 #
 
 LIBBASENAME=	libc
@@ -105,6 +106,14 @@ BASEHDRS=	getxby_door.h
 CHECKHDRS=	$(BASEHDRS:%.h=port/gen/%.check)
 HDRS=		$(BASEHDRS)
 
+TYPECHECK_LIB =	libc.so.1
+TYPELIST = \
+	kfile_attr_t \
+	kspawn_sched_t \
+	spawn_args_t \
+	spawn_attr_t \
+	spawn_param_t
+
 CLOBBERFILES += THIRDPARTYLICENSE extract-copyright
 
 # install rules for install_h target
@@ -178,7 +187,10 @@ install_h: all_h $(ROOTHDRS)
 
 all_h:	$(MACH)/assym.h $(MACH64)/assym.h
 
-check:	$(CHECKHDRS)
+$(TYPECHECK): $(TYPECHECK_LIB32) $(TYPECHECK_LIB64)
+	$(TYPECHECK.lib)
+
+check:	$(CHECKHDRS) $(TYPECHECK)
 
 $(ROOTVARIANTDIR): $(ROOTLIB)
 	$(INS.dir)

@@ -28,6 +28,7 @@
 
 /*
  * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SPAWN_H
@@ -35,32 +36,13 @@
 
 #include <sys/feature_tests.h>
 #include <sys/types.h>
+#include <sys/spawn.h>
 #include <signal.h>
 #include <sched.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-/*
- * flags for posix_spawnattr_setflags()
- */
-#define	POSIX_SPAWN_RESETIDS		0x0001
-#define	POSIX_SPAWN_SETPGROUP		0x0002
-#define	POSIX_SPAWN_SETSIGDEF		0x0004
-#define	POSIX_SPAWN_SETSIGMASK		0x0008
-#define	POSIX_SPAWN_SETSCHEDPARAM	0x0010
-#define	POSIX_SPAWN_SETSCHEDULER	0x0020
-#define	POSIX_SPAWN_SETSID		0x0040
-/*
- * non-portable extensions
- */
-#if !defined(_STRICT_POSIX)
-#define	POSIX_SPAWN_SETSIGIGN_NP	0x0800
-#define	POSIX_SPAWN_NOSIGCHLD_NP	0x1000
-#define	POSIX_SPAWN_WAITPID_NP		0x2000
-#define	POSIX_SPAWN_NOEXECERR_NP	0x4000
-#endif	/* !_STRICT_POSIX */
 
 typedef struct {
 	void *__spawn_attrp;	/* implementation-private */

@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _BSM_AUDIT_KERNEL_H
@@ -163,25 +164,25 @@ typedef struct p_audit_data p_audit_data_t;
 /*
  * Defines for process audit flags (pad_flags)
  */
-#define	PAD_SETMASK 	0x00000001	/* need to complete pending setmask */
+#define	PAD_SETMASK	0x00000001	/* need to complete pending setmask */
 
 extern kmem_cache_t *au_pad_cache;
 
 /*
  * Defines for thread audit control/status flags (tad_ctrl)
  */
-#define	TAD_ABSPATH 	0x00000001	/* path from lookup is absolute */
+#define	TAD_ABSPATH	0x00000001	/* path from lookup is absolute */
 #define	TAD_ATCALL	0x00000002	/* *at() syscall, like openat() */
-#define	TAD_ATTPATH  	0x00000004	/* attribute file lookup */
+#define	TAD_ATTPATH	0x00000004	/* attribute file lookup */
 #define	TAD_CORE	0x00000008	/* save attribute during core dump */
 #define	TAD_ERRJMP	0x00000010	/* abort record generation on error */
 #define	TAD_MLD		0x00000020	/* system call involves MLD */
-#define	TAD_NOATTRB 	0x00000040	/* do not automatically add attribute */
-#define	TAD_NOAUDIT 	0x00000080	/* discard audit record */
-#define	TAD_NOPATH  	0x00000100	/* force no paths in audit record */
-#define	TAD_PATHFND 	0x00000200	/* found path, don't retry lookup */
+#define	TAD_NOATTRB	0x00000040	/* do not automatically add attribute */
+#define	TAD_NOAUDIT	0x00000080	/* discard audit record */
+#define	TAD_NOPATH	0x00000100	/* force no paths in audit record */
+#define	TAD_PATHFND	0x00000200	/* found path, don't retry lookup */
 #define	TAD_PUBLIC_EV	0x00000400	/* syscall is defined as a public op */
-#define	TAD_SAVPATH 	0x00000800	/* save path for further processing */
+#define	TAD_SAVPATH	0x00000800	/* save path for further processing */
 #define	TAD_TRUE_CREATE 0x00001000	/* true create, file not found */
 
 /*
@@ -313,7 +314,7 @@ struct au_kcontext {
 
 	/* Only one audit svc per zone at a time */
 	/* With the elimination of auditsvc, can this also go? see 6648414 */
-	kmutex_t 		auk_svc_lock;
+	kmutex_t		auk_svc_lock;
 
 	au_state_t		auk_ets[MAX_KEVENTS + 1];
 };
@@ -340,6 +341,7 @@ extern struct t_audit_data *tad0;
 void au_pathhold(struct audit_path *);
 void au_pathrele(struct audit_path *);
 struct audit_path *au_pathdup(const struct audit_path *, int, int);
+struct audit_path *au_pathmake(const char *);
 
 void au_pad_init(void);
 
@@ -396,7 +398,7 @@ au_buff_t *au_get_buff(void), *au_free_buff(au_buff_t *);
 	    au_to_groups(crgetgroups(c),		\
 	    crgetngroups(c))) : (void) 0)
 
-#define	AUDIT_SETSUBJ(u, c, a, k)      		\
+#define	AUDIT_SETSUBJ(u, c, a, k)			\
 	AUDIT_SETSUBJ_GENERIC(u, c, a, k, curproc->p_pid)
 
 #define	AUDIT_SETPROC_GENERIC(u, c, a, p)		\
@@ -405,7 +407,7 @@ au_buff_t *au_get_buff(void), *au_free_buff(au_buff_t *);
 	    p, (a)->ai_auid, (a)->ai_asid,		\
 	    &((a)->ai_termid))));
 
-#define	AUDIT_SETPROC(u, c, a)      		\
+#define	AUDIT_SETPROC(u, c, a)				\
 	AUDIT_SETPROC_GENERIC(u, c, a, curproc->p_pid)
 
 /*

@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
@@ -35,6 +39,7 @@
 #include <sys/proc.h>
 #include <sys/session.h>
 #include <sys/debug.h>
+#include <sys/pgrpsys.h>
 
 /* ARGSUSED */
 int
@@ -46,7 +51,7 @@ setpgrp(int flag, int pid, int pgid)
 
 	switch (flag) {
 
-	case 1: /* setpgrp() */
+	case PGRPSYS_SETPGRP:
 		mutex_enter(&pidlock);
 		if (p->p_sessp->s_sidp != p->p_pidp && !pgmembers(p->p_pid)) {
 			mutex_exit(&pidlock);
@@ -58,7 +63,7 @@ setpgrp(int flag, int pid, int pgid)
 		mutex_exit(&p->p_splock);
 		return (sid);
 
-	case 3: /* setsid() */
+	case PGRPSYS_SETSID:
 		mutex_enter(&pidlock);
 		if (p->p_pgidp == p->p_pidp || pgmembers(p->p_pid)) {
 			mutex_exit(&pidlock);
@@ -71,7 +76,7 @@ setpgrp(int flag, int pid, int pgid)
 		mutex_exit(&p->p_splock);
 		return (sid);
 
-	case 5: /* setpgid() */
+	case PGRPSYS_SETPGID:
 	{
 		mutex_enter(&pidlock);
 		if (pid == 0)
@@ -142,14 +147,14 @@ setpgrp(int flag, int pid, int pgid)
 		break;
 	}
 
-	case 0: /* getpgrp() */
+	case PGRPSYS_GETPGRP:
 		mutex_enter(&pidlock);
 		retval = p->p_pgrp;
 		mutex_exit(&pidlock);
 		break;
 
-	case 2: /* getsid() */
-	case 4: /* getpgid() */
+	case PGRPSYS_GETSID:
+	case PGRPSYS_GETPGID:
 		if (pid < 0 || pid >= maxpid) {
 			return (set_errno(EINVAL));
 		}
@@ -159,7 +164,7 @@ setpgrp(int flag, int pid, int pgid)
 			mutex_exit(&pidlock);
 			return (set_errno(ESRCH));
 		}
-		if (flag == 2)
+		if (flag == PGRPSYS_GETSID)
 			retval = p->p_sessp->s_sid;
 		else
 			retval = p->p_pgrp;

@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
@@ -92,6 +96,34 @@ au_pathdup(const struct audit_path *oldapp, int newsect, int charincr)
 	bcopy(oldcp, newcp, oldlen);
 
 	return (newapp);
+}
+
+/*
+ * allocate an auditpath holding a single path, copied from a NUL-terminated
+ * string. Unlike au_pathdup() this is not anchored by a name lookup, so the
+ * result has just the one section and no attribute paths.
+ */
+struct audit_path *
+au_pathmake(const char *path)
+{
+	struct audit_path	*app;
+	int	alloc_size, len;
+	char	*cp;
+
+	len = strlen(path) + 1;
+	alloc_size = sizeof (struct audit_path) + sizeof (char *) + len;
+
+	app = kmem_alloc(alloc_size, KM_SLEEP);
+	app->audp_ref = 1;
+	app->audp_size = alloc_size;
+	app->audp_cnt = 1;
+
+	cp = (char *)(&app->audp_sect[app->audp_cnt + 1]);
+	app->audp_sect[0] = cp;
+	app->audp_sect[1] = cp + len;
+	bcopy(path, cp, len);
+
+	return (app);
 }
 
 /*ARGSUSED1*/

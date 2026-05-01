@@ -23,7 +23,7 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2011 Bayard G. Bell. All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -466,7 +466,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 123 (loadable) was xstat */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 124 (loadable) was lxstat */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 125 (loadable) was fxstat */
+aui_null,	AUE_NULL,	aus_null,	/* 125 upanic */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 126 (loadable) was xmknod */
 		auf_null,	0,
@@ -502,7 +502,7 @@ aui_null,	AUE_SETEUID,	aus_seteuid,	/* 141 seteuid */
 		auf_null,	0,
 aui_forksys,	AUE_NULL,	aus_null,	/* 142 forksys */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 143 (loadable) was fork1 */
+aui_null,	AUE_SPAWN,	aus_null,	/* 143 spawn */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 144 sigwait */
 		auf_null,	0,

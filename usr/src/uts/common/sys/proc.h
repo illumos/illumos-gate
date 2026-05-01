@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2021 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -369,6 +369,13 @@ typedef struct	proc {
 	clock_t	p_ttime;		/* buffered task time */
 
 	/*
+	 * Spawn handshake parameters; set at creation for a spawn(2) child
+	 * and cleared by the child once it has reported back to the parent.
+	 * Only ever accessed by the child's single LWP thereafter.
+	 */
+	struct kspawn_param *p_spawn_ksp;
+
+	/*
 	 * The user structure
 	 */
 	struct user p_user;		/* (see sys/user.h) */
@@ -465,6 +472,7 @@ extern struct pid pid0;		/* p0's pid */
 #define	CLDCONT		0x0002	/* child has notified parent of CLD_CONTINUED */
 #define	CLDNOSIGCHLD	0x0004	/* do not post SIGCHLD when child terminates */
 #define	CLDWAITPID	0x0008	/* only waitid(P_PID, pid) can reap the child */
+#define	CLDEVAPORATE	0x0010	/* disappear on exit; no SIGCHLD, no zombie */
 
 /* p_proc_flag codes -- these flags are mostly private to /proc */
 #define	P_PR_TRACE	0x0001	/* signal, fault or syscall tracing via /proc */
@@ -497,6 +505,7 @@ extern struct pid pid0;		/* p0's pid */
 #define	SEXTKILLED 0x00000800	/* SKILLED is from another contract */
 #define	SUGID	   0x00002000	/* process was result of set[ug]id exec */
 #define	SEXECED	   0x00004000	/* this process has execed */
+#define	SSPAWNING  0x00008000	/* spawn(2) child that has not yet exec'd */
 #define	SJCTL	   0x00010000	/* SIGCHLD sent when children stop/continue */
 #define	SNOWAIT    0x00020000	/* children never become zombies */
 #define	SVFORK	   0x00040000	/* child of vfork that has not yet exec'd */

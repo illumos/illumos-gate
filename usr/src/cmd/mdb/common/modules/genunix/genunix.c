@@ -65,6 +65,7 @@
 #include <regex.h>
 #include <sys/port_impl.h>
 #include <sys/contract/process_impl.h>
+#include <sys/spawn_impl.h>
 
 #include "avl.h"
 #include "bio.h"
@@ -205,6 +206,7 @@ pflags(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		{ "SEXTKILLED",		SEXTKILLED,	SEXTKILLED	},
 		{ "SUGID",		SUGID,		SUGID		},
 		{ "SEXECED",		SEXECED,	SEXECED		},
+		{ "SSPAWNING",		SSPAWNING,	SSPAWNING	},
 		{ "SJCTL",		SJCTL,		SJCTL		},
 		{ "SNOWAIT",		SNOWAIT,	SNOWAIT		},
 		{ "SVFORK",		SVFORK,		SVFORK		},
@@ -265,6 +267,89 @@ pflags(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    p_pidflag_bits);
 	mdb_printf("\tp_proc_flag: %08x <%b>\n", pr.p_proc_flag, pr.p_proc_flag,
 	    p_proc_flag_bits);
+
+	return (DCMD_OK);
+}
+
+typedef struct mdb_spawn_proc {
+	struct pid	*p_pidp;
+	pid_t		p_ppid;
+	struct kspawn_param *p_spawn_ksp;
+} mdb_spawn_proc_t;
+
+static void
+spawn_help(void)
+{
+	mdb_printf("Display processes which are currently within spawn(2).\n"
+	    "The output is a snapshot of in-flight operations. Without an\n"
+	    "address, every process is examined.\n\n");
+
+	mdb_printf("The columns are:\n\n");
+	mdb_printf("ADDR\tThe kernel address of the child's proc_t.\n");
+	mdb_printf("PID\tThe process id of the child (decimal).\n");
+	mdb_printf("PPID\tThe process id of the spawning parent (decimal).\n");
+	mdb_printf("KSP\tThe kernel address of the kspawn_param_t.\n");
+	mdb_printf("PATH\tThe path being executed. For posix_spawnp(3C)\n"
+	    "\tthis is updated as the search path is walked.\n\n");
+
+	mdb_printf("When output is piped, the proc_t addresses of the\n"
+	    "matching processes are emitted instead.\n");
+}
+
+/*
+ * Display processes which are currently within spawn(2). A process refers
+ * to its kspawn parameter block only while the spawn is in flight, so this
+ * shows children which have not yet reported back to their parents.
+ */
+static int
+spawn(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	mdb_spawn_proc_t pr;
+	kspawn_param_t ksp;
+	struct pid pid;
+
+	if (argc != 0)
+		return (DCMD_USAGE);
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		if (mdb_fpwalk_dcmd("proc", "spawn", argc, argv, 0,
+		    flags & DCMD_PIPE_OUT) == -1) {
+			mdb_warn("can't walk 'proc'");
+			return (DCMD_ERR);
+		}
+		return (DCMD_OK);
+	}
+
+	if (mdb_ctf_vread(&pr, "proc_t", "mdb_spawn_proc_t", addr, 0) == -1) {
+		mdb_warn("cannot read proc_t at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	if (flags & DCMD_PIPE_OUT) {
+		if (pr.p_spawn_ksp != NULL)
+			mdb_printf("%p\n", addr);
+		return (DCMD_OK);
+	}
+
+	if (DCMD_HDRSPEC(flags)) {
+		mdb_printf("%<u>%?s %6s %6s %?s %s%</u>\n",
+		    "ADDR", "PID", "PPID", "KSP", "PATH");
+	}
+
+	if (pr.p_spawn_ksp == NULL) {
+		if (!(flags & DCMD_LOOP))
+			mdb_printf("process is not within spawn(2)\n");
+		return (DCMD_OK);
+	}
+
+	if (mdb_vread(&pid, sizeof (pid), (uintptr_t)pr.p_pidp) == -1 ||
+	    mdb_vread(&ksp, sizeof (ksp), (uintptr_t)pr.p_spawn_ksp) == -1) {
+		mdb_warn("cannot read spawn state for proc %p", addr);
+		return (DCMD_ERR);
+	}
+
+	mdb_printf("%?p %6d %6d %?p %s\n", addr, pid.pid_id, pr.p_ppid,
+	    pr.p_spawn_ksp, ksp.ksp_path);
 
 	return (DCMD_OK);
 }
@@ -4181,6 +4266,8 @@ static const mdb_dcmd_t dcmds[] = {
 		"pattern match against all processes", pgrep },
 	{ "ptree", NULL, "print process tree", ptree },
 	{ "refstr", NULL, "print string from a refstr_t", cmd_refstr, NULL },
+	{ "spawn", "?", "list processes within spawn(2)", spawn,
+	    spawn_help },
 	{ "sysevent", "?[-sv]", "print sysevent pending or sent queue",
 		sysevent},
 	{ "sysevent_channel", "?", "print sysevent channel database",

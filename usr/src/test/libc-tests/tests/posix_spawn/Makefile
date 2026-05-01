@@ -14,7 +14,8 @@
 #
 
 PROGS = posix_spawn_chdir posix_spawn_fileactions posix_spawn_attr \
-	posix_spawn_path posix_spawn_pipe_np posix_spawn_priv
+	posix_spawn_defpath posix_spawn_path posix_spawn_pipe_np \
+	posix_spawn_priv posix_spawn_wait
 
 HELPERS32 = posix_spawn_child.32
 HELPERS64 = posix_spawn_child.64
@@ -41,6 +42,11 @@ include $(SRC)/cmd/Makefile.ctf
 CSTD = $(CSTD_GNU17)
 CPPFLAGS += -D_REENTRANT
 CTF_MODE = link
+
+posix_spawn_priv.32 := LDLIBS += -lproc
+posix_spawn_priv.64 := LDLIBS64 += -lproc
+posix_spawn_wait.32 := LDLIBS += -lproc
+posix_spawn_wait.64 := LDLIBS64 += -lproc
 
 .KEEP_STATE:
 

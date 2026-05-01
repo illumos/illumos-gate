@@ -24,12 +24,19 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #include "lint.h"
 #include "thr_uberdata.h"
 #include <sched.h>
+#include <spawn.h>
+#include <stdbool.h>
 #include <sys/tspriocntl.h>
 #include <sys/rtpriocntl.h>
 #include <sys/fxpriocntl.h>
+#include <sys/spawn_impl.h>
 
 /*
  * The following array is used for caching information
@@ -240,52 +247,65 @@ get_parms(idtype_t idtype, id_t id, pcparms_t *pcparmp)
 }
 
 /*
- * Helper function for setprio() and setparam(), below.
+ * Helper function for set_priority() and spawn_sched_resolve(), below.
+ * Resolve a policy and priority into the form to be applied to the
+ * target.
  */
 static int
-set_priority(idtype_t idtype, id_t id, int policy, int prio,
-    pcparms_t *pcparmp, int settq)
+resolve_priority(int policy, int prio, int settq, pcparms_t *pcparmp,
+    pcprio_t *pcpriop)
 {
-	int rv;
-
 	switch (policy) {
 	case SCHED_OTHER:
 	{
 		tsparms_t *tsp = (tsparms_t *)pcparmp->pc_clparms;
+
 		tsp->ts_uprilim = prio;
 		tsp->ts_upri = prio;
-		break;
+		return (PC_SETPARMS);
 	}
 	case SCHED_FIFO:
 	case SCHED_RR:
 	{
 		rtparms_t *rtp = (rtparms_t *)pcparmp->pc_clparms;
+
 		rtp->rt_tqnsecs = settq?
 		    (policy == SCHED_FIFO? RT_TQINF : RT_TQDEF) :
 		    RT_NOCHANGE;
 		rtp->rt_pri = prio;
-		break;
+		return (PC_SETPARMS);
 	}
 	default:
 	{
 		/*
 		 * Class-independent method for setting the priority.
 		 */
-		pcprio_t pcprio;
+		pcpriop->pc_op = PC_SETPRIO;
+		pcpriop->pc_cid = pcparmp->pc_cid;
+		pcpriop->pc_val = prio;
+		return (PC_DOPRIO);
+	}
+	}
+}
 
-		pcprio.pc_op = PC_SETPRIO;
-		pcprio.pc_cid = pcparmp->pc_cid;
-		pcprio.pc_val = prio;
-		do {
-			rv = priocntl(idtype, id, PC_DOPRIO, &pcprio);
-		} while (rv == -1 && errno == ENOMEM);
-		return (rv);
-	}
-	}
+/*
+ * Helper function for setprio() and setparam(), below.
+ */
+static int
+set_priority(idtype_t idtype, id_t id, int policy, int prio,
+    pcparms_t *pcparmp, int settq)
+{
+	pcprio_t pcprio;
+	caddr_t arg;
+	int cmd, rv;
+
+	cmd = resolve_priority(policy, prio, settq, pcparmp, &pcprio);
+	arg = (cmd == PC_SETPARMS) ? (caddr_t)pcparmp : (caddr_t)&pcprio;
 
 	do {
-		rv = priocntl(idtype, id, PC_SETPARMS, pcparmp);
+		rv = priocntl(idtype, id, cmd, arg);
 	} while (rv == -1 && errno == ENOMEM);
+
 	return (rv);
 }
 
@@ -427,6 +447,52 @@ setparam(idtype_t idtype, id_t id, int policy, int prio)
 	if (set_priority(idtype, id, policy, prio, &pcparm, 1) == -1)
 		return (-1);
 	return (pccp->pcc_info.pc_cid);
+}
+
+/*
+ * Utility function, private to libc, used by posix_spawn() when the
+ * scheduler attribute flags are in effect. It performs the same validation and
+ * resolution that setparam() or setprio() above would, but the target of the
+ * change (the spawn(2) child) does not yet exist so the result is handed back
+ * ready for passing to the kernel.
+ */
+int
+spawn_sched_resolve(int psflags, int policy, int prio, kspawn_sched_t *ks)
+{
+	bool setsched = (psflags & POSIX_SPAWN_SETSCHEDULER) != 0;
+	pcparms_t *pcparmp = &ks->ksched_parms;
+	const pcclass_t *pccp;
+	pcprio_t pcprio;
+
+	(void) memset(ks, 0, sizeof (*ks));
+
+	if (setsched) {
+		if (policy == SCHED_SYS ||
+		    (pccp = get_info_by_policy(policy)) == NULL)
+			return (EINVAL);
+		pcparmp->pc_cid = pccp->pcc_info.pc_cid;
+	} else {
+		/*
+		 * The priority change is applied within the scheduling
+		 * class that the child inherits from this process.
+		 */
+		if ((pccp = get_parms(P_LWPID, P_MYID, pcparmp)) == NULL)
+			return (errno);
+		policy = pccp->pcc_policy;
+	}
+
+	if (prio < pccp->pcc_primin || prio > pccp->pcc_primax)
+		return (EINVAL);
+
+	if (resolve_priority(policy, prio, setsched, pcparmp,
+	    &pcprio) == PC_SETPARMS) {
+		ks->ksched_op = KSCHED_PARMS;
+	} else {
+		ks->ksched_op = KSCHED_PRIO;
+		ks->ksched_prio = pcprio;
+	}
+
+	return (0);
 }
 
 int

@@ -150,9 +150,15 @@ tests = [
 	'posix_spawn_path.32',
 	'posix_spawn_path.64',
 	'posix_spawn_pipe_np.32',
-	'posix_spawn_pipe_np.64'
+	'posix_spawn_pipe_np.64',
+	'posix_spawn_wait.32',
+	'posix_spawn_wait.64'
 	]
 
+[/opt/libc-tests/tests/posix_spawn/posix_spawn_defpath.32]
+user = root
+[/opt/libc-tests/tests/posix_spawn/posix_spawn_defpath.64]
+user = root
 [/opt/libc-tests/tests/posix_spawn/posix_spawn_priv.32]
 user = root
 [/opt/libc-tests/tests/posix_spawn/posix_spawn_priv.64]

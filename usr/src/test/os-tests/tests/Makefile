@@ -53,6 +53,7 @@ SUBDIRS =       \
 		signalfd \
 		sigqueue \
 		sockfs \
+		spawn \
 		spoof-ras \
 		stackalign \
 		stress \

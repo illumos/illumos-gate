@@ -24,7 +24,7 @@
  * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
  * Copyright 2019, Carlos Neira <cneirabustos@gmail.com>
  * Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -260,7 +260,7 @@ static const char *const systable[] = {
 	"sharefs",		/* 140 */
 	"seteuid",		/* 141 */
 	"forksys",		/* 142 */
-	NULL,			/* 143 */
+	"spawn",		/* 143 */
 	"sigtimedwait",		/* 144 */
 	"lwp_info",		/* 145 */
 	"yield",		/* 146 */

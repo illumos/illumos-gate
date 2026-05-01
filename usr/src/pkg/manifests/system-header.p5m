@@ -29,7 +29,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright 2019 Peter Tribble.
 # Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2025 Oxide Computer company
+# Copyright 2026 Oxide Computer company
 #
 
 set name=pkg.fmri value=pkg:/system/header@$(PKGVERS)
@@ -1347,6 +1347,7 @@ file path=usr/include/sys/socket_impl.h
 file path=usr/include/sys/socket_proto.h
 file path=usr/include/sys/socketvar.h
 file path=usr/include/sys/sockio.h
+file path=usr/include/sys/spawn.h
 file path=usr/include/sys/spl.h
 file path=usr/include/sys/squeue.h
 file path=usr/include/sys/squeue_impl.h

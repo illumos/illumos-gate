@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #pragma weak _getpgrp = getpgrp
 #pragma weak _setpgrp = setpgrp
 #pragma weak _getsid = getsid
@@ -35,39 +39,40 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/syscall.h>
+#include <sys/pgrpsys.h>
 
 pid_t
 getpgrp(void)
 {
-	return ((pid_t)syscall(SYS_pgrpsys, 0));
+	return ((pid_t)syscall(SYS_pgrpsys, PGRPSYS_GETPGRP));
 }
 
 pid_t
 setpgrp(void)
 {
-	return ((pid_t)syscall(SYS_pgrpsys, 1));
+	return ((pid_t)syscall(SYS_pgrpsys, PGRPSYS_SETPGRP));
 }
 
 pid_t
 getsid(pid_t pid)
 {
-	return ((pid_t)syscall(SYS_pgrpsys, 2, pid));
+	return ((pid_t)syscall(SYS_pgrpsys, PGRPSYS_GETSID, pid));
 }
 
 pid_t
 setsid(void)
 {
-	return ((pid_t)syscall(SYS_pgrpsys, 3));
+	return ((pid_t)syscall(SYS_pgrpsys, PGRPSYS_SETSID));
 }
 
 pid_t
 getpgid(pid_t pid)
 {
-	return ((pid_t)syscall(SYS_pgrpsys, 4, pid));
+	return ((pid_t)syscall(SYS_pgrpsys, PGRPSYS_GETPGID, pid));
 }
 
 int
 setpgid(pid_t pid, pid_t pgid)
 {
-	return (syscall(SYS_pgrpsys, 5, pid, pgid));
+	return (syscall(SYS_pgrpsys, PGRPSYS_SETPGID, pid, pgid));
 }

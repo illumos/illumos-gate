@@ -439,6 +439,53 @@ out:
 }
 
 
+/*
+ * An fchdir file action that names a descriptor too large to fit in the
+ * descriptor table is accepted when it is added (the fd is non-negative) but
+ * must fail the spawn with EBADF when the action runs.
+ */
+static bool
+posix_spawn_test_fchdir_maxfd(void)
+{
+	int ret, pipes[2];
+	bool bret = false;
+	posix_spawn_file_actions_t acts;
+	char *const argv[2] = { spawn_pwd, NULL };
+	char *const envp[1] = { NULL };
+	siginfo_t sig;
+	pid_t pid;
+
+	posix_spawn_pipe_setup(&acts, pipes);
+
+	ret = posix_spawn_file_actions_addfchdir(&acts, INT32_MAX);
+	if (ret != 0) {
+		warnc(ret, "TEST FAILED: addfchdir(INT32_MAX) failed "
+		    "unexpectedly when added");
+		goto out;
+	}
+
+	ret = posix_spawn(&pid, spawn_pwd, &acts, NULL, argv, envp);
+	if (ret == 0) {
+		warnx("TEST FAILED: fchdir(INT32_MAX): posix_spawn "
+		    "unexpectedly succeeded");
+		(void) waitid(P_PID, pid, &sig, WEXITED);
+	} else if (ret != EBADF) {
+		warnx("TEST FAILED: fchdir(INT32_MAX): posix_spawn failed with "
+		    "%s, expected EBADF", strerrorname_np(ret));
+	} else {
+		(void) printf("TEST PASSED: fchdir(INT32_MAX): posix_spawn "
+		    "correctly failed with EBADF\n");
+		bret = true;
+	}
+
+out:
+	VERIFY0(posix_spawn_file_actions_destroy(&acts));
+	VERIFY0(close(pipes[1]));
+	VERIFY0(close(pipes[0]));
+	return (bret);
+}
+
+
 static bool
 posix_spawn_test_one_flags(const spawn_flags_test_t *test)
 {
@@ -615,6 +662,9 @@ main(void)
 	if (!posix_spawn_test_bad_fchdir()) {
 		ret = EXIT_FAILURE;
 	}
+
+	if (!posix_spawn_test_fchdir_maxfd())
+		ret = EXIT_FAILURE;
 
 	for (size_t h = 0; h < ARRAY_SIZE(helpers); h++) {
 		posix_spawn_find_helper(spawn_child, sizeof (spawn_child),

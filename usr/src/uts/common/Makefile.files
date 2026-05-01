@@ -335,6 +335,7 @@ GENUNIX_OBJS +=	\
 		sigsuspend.o	\
 		sigtimedwait.o	\
 		sleepq.o	\
+		spawn.o		\
 		sock_conf.o	\
 		space.o		\
 		sscanf.o	\

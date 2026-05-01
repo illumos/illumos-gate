@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -793,7 +794,8 @@ sysexit(private_t *pri, int dotrace)
 			(void) fputc('\n', stdout);
 		}
 
-		if (what == SYS_vfork || what == SYS_forksys) {
+		if (what == SYS_vfork || what == SYS_forksys ||
+		    what == SYS_spawn) {
 			if (pri->Rval2 == 0)		/* child was created */
 				pri->child = pri->Rval1;
 			else if (cflag && istraced)	/* this is the child */

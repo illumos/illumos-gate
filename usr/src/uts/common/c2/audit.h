@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2022 Garrett D'Amore <garrett@damore.org>
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -218,8 +219,8 @@ typedef au_id_t auid_t;
 /*				23	OBSOLETE */
 /*				24	OBSOLETE */
 #define	BSM_AUDIT		25
-/* 				26	OBSOLETE */
-/* 				27	EOL announced for Sol 10 */
+/*				26	OBSOLETE */
+/*				27	EOL announced for Sol 10 */
 /*				28	OBSOLETE */
 #define	BSM_AUDITCTL		29
 /*				30	OBSOLETE */
@@ -473,6 +474,7 @@ typedef struct audit_stat au_stat_t;
 #include <sys/types.h>
 #include <sys/model.h>
 #include <sys/proc.h>
+#include <sys/stdbool.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
 #include <sys/file.h>
@@ -510,7 +512,7 @@ void	audit_cryptoadm(int, char *, crypto_mech_name_t *,
 	    uint_t, uint_t, uint32_t, int);
 void	audit_init(void);
 void	audit_init_module(void);
-void	audit_newproc(struct proc *);
+void	audit_newproc(struct proc *, bool);
 void	audit_pfree(struct proc *);
 void	audit_thread_create(kthread_id_t);
 void	audit_thread_free(kthread_id_t);
@@ -537,6 +539,8 @@ void	audit_vncreate_start(void);
 void	audit_setfsat_path(int argnum);
 void	audit_vncreate_finish(struct vnode *, int);
 void	audit_exec(const char *, const char *, ssize_t, ssize_t, cred_t *);
+void	audit_spawn(const char *, struct vattr *, const char *, const char *,
+    ssize_t, ssize_t);
 void	audit_enterprom(int);
 void	audit_exitprom(int);
 void	audit_chdirec(struct vnode *, struct vnode **);

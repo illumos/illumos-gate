@@ -136,6 +136,7 @@ systeminfo		139
 sharefs			140
 seteuid			141
 forksys			142
+spawn			143
 sigwait			144
 lwp_info		145
 yield			146

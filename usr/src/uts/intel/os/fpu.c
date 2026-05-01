@@ -22,7 +22,7 @@
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2021 Joyent, Inc.
  * Copyright 2021 RackTop Systems, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2025 Edgecast Cloud LLC.
  */
 
@@ -339,6 +339,15 @@
  * we also install the FPU context operations into the new thread, which ensures
  * that all future threads that are descendants of the current one get the
  * thread context operations (unless they call exec).
+ *
+ * The spawn(2) system call behind posix_spawn(3C) leans on this exec path too.
+ * A spawned child is created as a bare kernel thread that does not go through
+ * fork or fp_new_lwp(), so it inherits no FPU register state and no context
+ * operations from the spawning thread. Like init, it has no parent to fork from
+ * as far as the FPU is concerned. It runs in the kernel until it execs its
+ * target, at which point fp_exec() installs the context operations and the
+ * initial state. There is nothing to inherit; any state copied from the
+ * spawning thread would only be discarded by the exec that always follows.
  *
  * To deal with some things like the agent lwp, we double check the state of the
  * FPU in sys_rtt_common() to make sure that it has been enabled before

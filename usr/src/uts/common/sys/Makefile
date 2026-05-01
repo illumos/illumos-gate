@@ -461,6 +461,7 @@ CHKHDRS=			\
 	pfmod.h			\
 	pg.h			\
 	pghw.h			\
+	pgrpsys.h		\
 	physmem.h		\
 	pkp_hash.h		\
 	pm.h			\
@@ -545,6 +546,8 @@ CHKHDRS=			\
 	sockfilter.h		\
 	sockio.h		\
 	soundcard.h		\
+	spawn.h			\
+	spawn_impl.h		\
 	squeue.h		\
 	squeue_impl.h		\
 	srn.h			\

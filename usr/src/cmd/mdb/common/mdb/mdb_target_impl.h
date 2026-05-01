@@ -24,7 +24,7 @@
  */
 /*
  * Copyright (c) 2018, Joyent, Inc.  All rights reserved.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_MDB_TARGET_IMPL_H
@@ -286,6 +286,8 @@ extern int mdb_tgt_sym_match(const GElf_Sym *, uint_t);
 extern void mdb_tgt_elf_export(mdb_gelf_file_t *);
 
 extern int mdb_tgt_sespec_activate_one(mdb_tgt_t *t, mdb_sespec_t *);
+extern int mdb_tgt_sespec_activate_matching(mdb_tgt_t *t,
+    const mdb_se_ops_t *);
 extern int mdb_tgt_sespec_activate_all(mdb_tgt_t *t);
 
 extern void mdb_tgt_sespec_idle_one(mdb_tgt_t *t, mdb_sespec_t *, int);

@@ -287,6 +287,9 @@ file path=opt/os-tests/tests/sockfs/so_protocol mode=0555
 file path=opt/os-tests/tests/sockfs/sockpair mode=0555
 file path=opt/os-tests/tests/sockfs/timeouts.32 mode=0555
 file path=opt/os-tests/tests/sockfs/timeouts.64 mode=0555
+dir  path=opt/os-tests/tests/spawn
+file path=opt/os-tests/tests/spawn/spawn-syscall.32 mode=0555
+file path=opt/os-tests/tests/spawn/spawn-syscall.64 mode=0555
 file path=opt/os-tests/tests/spoof-ras mode=0555
 dir  path=opt/os-tests/tests/stackalign
 file path=opt/os-tests/tests/stackalign/stackalign.32 mode=0555
@@ -367,6 +370,8 @@ $(i386_ONLY)file path=opt/os-tests/tests/xsave/setcontext_restore.32 mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/xsave/setcontext_restore.64 mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/xsave/signal_restore.32 mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/xsave/signal_restore.64 mode=0555
+$(i386_ONLY)file path=opt/os-tests/tests/xsave/spawn_fpu.32 mode=0555
+$(i386_ONLY)file path=opt/os-tests/tests/xsave/spawn_fpu.64 mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/xsave/swapcontext_extd.32 mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/xsave/swapcontext_extd.64 mode=0555
 $(i386_ONLY)file path=opt/os-tests/tests/xsave/xregs_dump.32 mode=0555

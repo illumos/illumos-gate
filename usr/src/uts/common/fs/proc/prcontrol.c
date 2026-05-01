@@ -26,7 +26,7 @@
 
 /*
  * Copyright (c) 2013, Joyent, Inc.  All rights reserved.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -583,8 +583,11 @@ pr_control(long cmd, void *generic, prnode_t *pnp, cred_t *cr)
 	p = pcp->prc_proc;
 	ASSERT(p != NULL);
 
-	/* System processes defy control. */
-	if (p->p_flag & SSYS) {
+	/*
+	 * System processes defy control, as does a spawn(2) child that
+	 * has not yet exec'd and is only partially constructed.
+	 */
+	if (p->p_flag & (SSYS | SSPAWNING)) {
 		prunlock(pnp);
 		return (EBUSY);
 	}
@@ -869,7 +872,11 @@ pr_control32(long cmd, void *generic, prnode_t *pnp, cred_t *cr)
 	p = pcp->prc_proc;
 	ASSERT(p != NULL);
 
-	if (p->p_flag & SSYS) {
+	/*
+	 * System processes defy control, as does a spawn(2) child that
+	 * has not yet exec'd and is only partially constructed.
+	 */
+	if (p->p_flag & (SSYS | SSPAWNING)) {
 		prunlock(pnp);
 		return (EBUSY);
 	}
@@ -1736,6 +1743,13 @@ pr_setentryexit(proc_t *p, sysset_t *sysset, int entry)
 #define	ALLFLAGS	\
 	(PR_FORK|PR_RLC|PR_KLC|PR_ASYNC|PR_BPTADJ|PR_MSACCT|PR_MSFORK|PR_PTRACE)
 
+/*
+ * Apply the /proc control flags (PR_FORK, PR_RLC, PR_PTRACE and the rest)
+ * to a process. This only records control intent by setting flag bits, so
+ * the SSYS / p_as == kas test suffices on its own and, unlike the stop
+ * paths, no SSPAWNING test is needed. A flag set during the tail of a
+ * spawn(2) child's exec takes effect once the child is fully built.
+ */
 int
 pr_set(proc_t *p, long flags)
 {
@@ -1770,6 +1784,7 @@ pr_set(proc_t *p, long flags)
 	return (0);
 }
 
+/* Undo the flags pr_set() sets. The same guard reasoning applies. */
 int
 pr_unset(proc_t *p, long flags)
 {

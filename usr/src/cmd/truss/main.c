@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -685,6 +685,7 @@ main(int argc, char *argv[])
 	praddset(&traceeven, SYS_open64);
 	praddset(&traceeven, SYS_vfork);
 	praddset(&traceeven, SYS_forksys);
+	praddset(&traceeven, SYS_spawn);
 	praddset(&traceeven, SYS_upanic);
 
 	/* for I/O buffer dumps, force tracing of read()s and write()s */

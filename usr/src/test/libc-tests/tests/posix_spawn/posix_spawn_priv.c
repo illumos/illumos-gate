@@ -23,9 +23,13 @@
 #include <fcntl.h>
 #include <libgen.h>
 #include <limits.h>
+#include <libproc.h>
 #include <priv.h>
+#include <project.h>
 #include <pwd.h>
+#include <rctl.h>
 #include <sched.h>
+#include <signal.h>
 #include <spawn.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -34,10 +38,14 @@
 #include <unistd.h>
 #include <wait.h>
 #include <sys/debug.h>
+#include <sys/fork.h>
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
+#include <sys/task.h>
 
 #include "posix_spawn_common.h"
+
+extern char **environ;
 
 typedef struct spawn_priv_test {
 	const char	*spt_name;
@@ -48,22 +56,67 @@ typedef struct spawn_priv_test {
 static char posix_spawn_child_path[PATH_MAX];
 
 /*
+ * Spawn the child helper with the given attributes and verify that it
+ * reports the expected scheduling policy and priority.
+ */
+static bool
+spawn_sched_check(const char *desc, posix_spawnattr_t *attr, int want_policy,
+    int want_prio)
+{
+	posix_spawn_file_actions_t acts;
+	spawn_sched_result_t res;
+	ssize_t n;
+	bool bret = true;
+	char *argv[] = { posix_spawn_child_path, "sched", NULL };
+	int pipes[2];
+
+	posix_spawn_pipe_setup(&acts, pipes);
+
+	if (!posix_spawn_run_child(desc, posix_spawn_child_path,
+	    &acts, attr, argv)) {
+		bret = false;
+		goto out;
+	}
+
+	n = read(pipes[0], &res, sizeof (res));
+	if (n != sizeof (res)) {
+		warnx("TEST FAILED: %s: short read from pipe (%zd)", desc, n);
+		bret = false;
+		goto out;
+	}
+
+	if (res.ssr_policy != want_policy) {
+		warnx("TEST FAILED: %s: child policy is %d, expected %d",
+		    desc, res.ssr_policy, want_policy);
+		bret = false;
+	}
+
+	if (res.ssr_priority != want_prio) {
+		warnx("TEST FAILED: %s: child priority is %d, expected %d",
+		    desc, res.ssr_priority, want_prio);
+		bret = false;
+	}
+
+out:
+	VERIFY0(posix_spawn_file_actions_destroy(&acts));
+	VERIFY0(close(pipes[1]));
+	VERIFY0(close(pipes[0]));
+
+	return (bret);
+}
+
+/*
  * SETSCHEDULER: set the child's scheduling policy to a real-time class with a
  * specific priority. Verify the child sees the correct policy and priority.
  */
 static bool
 setscheduler_test(spawn_priv_test_t *test)
 {
-	posix_spawn_file_actions_t acts;
 	posix_spawnattr_t attr;
 	struct sched_param param;
-	spawn_sched_result_t res;
-	ssize_t n;
-	bool bret = true;
+	bool bret;
 	int orig_policy, new_policy, prio_min;
-	char *argv[] = { posix_spawn_child_path, "sched", NULL };
 	const char *desc = test->spt_name;
-	int pipes[2];
 
 	/*
 	 * Pick a real-time class that is not the policy for the current
@@ -78,45 +131,56 @@ setscheduler_test(spawn_priv_test_t *test)
 		return (false);
 	}
 
-	posix_spawn_pipe_setup(&acts, pipes);
-
 	VERIFY0(posix_spawnattr_init(&attr));
 	VERIFY0(posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSCHEDULER));
 	VERIFY0(posix_spawnattr_setschedpolicy(&attr, new_policy));
 	param.sched_priority = prio_min;
 	VERIFY0(posix_spawnattr_setschedparam(&attr, &param));
 
-	if (!posix_spawn_run_child(desc, posix_spawn_child_path,
-	    &acts, &attr, argv)) {
-		bret = false;
-		goto out;
-	}
+	bret = spawn_sched_check(desc, &attr, new_policy, prio_min);
 
-	n = read(pipes[0], &res, sizeof (res));
-	if (n != sizeof (res)) {
-		warnx("TEST FAILED: %s: short read from pipe (%zd)", desc, n);
-		bret = false;
-		goto out;
-	}
-
-	if (res.ssr_policy != new_policy) {
-		warnx("TEST FAILED: %s: "
-		    "child policy is %d, expected %d",
-		    desc, res.ssr_policy, new_policy);
-		bret = false;
-	}
-
-	if (res.ssr_priority != prio_min) {
-		warnx("TEST FAILED: %s: child priority is %d, expected %d",
-		    desc, res.ssr_priority, prio_min);
-		bret = false;
-	}
-
-out:
 	VERIFY0(posix_spawnattr_destroy(&attr));
-	VERIFY0(posix_spawn_file_actions_destroy(&acts));
-	VERIFY0(close(pipes[1]));
-	VERIFY0(close(pipes[0]));
+
+	return (bret);
+}
+
+/*
+ * SETSCHEDULER: set the child's scheduling policy to the fixed-priority
+ * class. libc constructs explicit scheduling class parameters only for the
+ * TS and RT classes, for everything else it uses the class-independent
+ * priority interface, so unlike the test above this exercises that path.
+ */
+static bool
+setscheduler_fx_test(spawn_priv_test_t *test)
+{
+	posix_spawnattr_t attr;
+	struct sched_param param;
+	bool bret;
+	int prio_max;
+	const char *desc = test->spt_name;
+
+	prio_max = sched_get_priority_max(SCHED_FX);
+	if (prio_max == -1) {
+		warn("TEST FAILED: %s: sched_get_priority_max(SCHED_FX)",
+		    desc);
+		return (false);
+	}
+	if (prio_max < 2) {
+		warnx("TEST FAILED: %s: FX priority range too small (%d)",
+		    desc, prio_max);
+		return (false);
+	}
+
+	VERIFY0(posix_spawnattr_init(&attr));
+	VERIFY0(posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSCHEDULER));
+	VERIFY0(posix_spawnattr_setschedpolicy(&attr, SCHED_FX));
+	/* A priority distinguishable from the FX default of 0 */
+	param.sched_priority = prio_max / 2;
+	VERIFY0(posix_spawnattr_setschedparam(&attr, &param));
+
+	bret = spawn_sched_check(desc, &attr, SCHED_FX, prio_max / 2);
+
+	VERIFY0(posix_spawnattr_destroy(&attr));
 
 	return (bret);
 }
@@ -131,15 +195,10 @@ static bool
 setschedparam_test(spawn_priv_test_t *test)
 {
 	const char *desc = test->spt_name;
-	int pipes[2];
-	posix_spawn_file_actions_t acts;
 	posix_spawnattr_t attr;
 	struct sched_param param, orig_param;
-	spawn_sched_result_t res;
-	ssize_t n;
-	bool bret = true;
+	bool bret;
 	int orig_policy, new_policy, parent_policy, prio_min;
-	char *argv[] = { posix_spawn_child_path, "sched", NULL };
 
 	/*
 	 * Save the original scheduling policy so we can restore it later.
@@ -179,51 +238,221 @@ setschedparam_test(spawn_priv_test_t *test)
 
 	parent_policy = sched_getscheduler(0);
 
-	posix_spawn_pipe_setup(&acts, pipes);
-
 	VERIFY0(posix_spawnattr_init(&attr));
 	VERIFY0(posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSCHEDPARAM));
 	param.sched_priority = prio_min + 1;
 	VERIFY0(posix_spawnattr_setschedparam(&attr, &param));
 
-	if (!posix_spawn_run_child(desc, posix_spawn_child_path,
-	    &acts, &attr, argv)) {
-		bret = false;
-		goto out;
-	}
+	bret = spawn_sched_check(desc, &attr, parent_policy, prio_min + 1);
 
-	n = read(pipes[0], &res, sizeof (res));
-	if (n != sizeof (res)) {
-		warnx("TEST FAILED: %s: short read from pipe (%zd)", desc, n);
-		bret = false;
-		goto out;
-	}
-
-	if (res.ssr_policy != parent_policy) {
-		warnx("TEST FAILED: %s: "
-		    "child policy is %d, expected parent's policy (%d)",
-		    desc, res.ssr_policy, parent_policy);
-		bret = false;
-	}
-
-	if (res.ssr_priority != prio_min + 1) {
-		warnx("TEST FAILED: %s: child priority is %d, expected %d",
-		    desc, res.ssr_priority, prio_min + 1);
-		bret = false;
-	}
-
-out:
 	/*
 	 * Restore the original scheduling policy.
 	 */
 	(void) sched_setscheduler(0, orig_policy, &orig_param);
 
 	VERIFY0(posix_spawnattr_destroy(&attr));
-	VERIFY0(posix_spawn_file_actions_destroy(&acts));
-	VERIFY0(close(pipes[1]));
-	VERIFY0(close(pipes[0]));
 
 	return (bret);
+}
+
+/*
+ * SETSCHEDPARAM with the parent in the fixed-priority class. The child
+ * inherits FX and the priority change is applied through the
+ * class-independent priority interface, as for the FX SETSCHEDULER test
+ * above.
+ */
+static bool
+setschedparam_fx_test(spawn_priv_test_t *test)
+{
+	const char *desc = test->spt_name;
+	posix_spawnattr_t attr;
+	struct sched_param param, orig_param;
+	bool bret;
+	int orig_policy, prio_max;
+
+	/*
+	 * Save the original scheduling policy so we can restore it later.
+	 */
+	orig_policy = sched_getscheduler(0);
+	if (orig_policy == -1) {
+		warn("TEST FAILED: %s: sched_getscheduler", desc);
+		return (false);
+	}
+	if (sched_getparam(0, &orig_param) != 0) {
+		warn("TEST FAILED: %s: sched_getparam", desc);
+		return (false);
+	}
+
+	prio_max = sched_get_priority_max(SCHED_FX);
+	if (prio_max == -1) {
+		warn("TEST FAILED: %s: sched_get_priority_max(SCHED_FX)",
+		    desc);
+		return (false);
+	}
+	if (prio_max < 2) {
+		warnx("TEST FAILED: %s: FX priority range too small (%d)",
+		    desc, prio_max);
+		return (false);
+	}
+
+	param.sched_priority = prio_max / 2;
+	if (sched_setscheduler(0, SCHED_FX, &param) == -1) {
+		warn("TEST FAILED: %s: sched_setscheduler(SCHED_FX) failed",
+		    desc);
+		return (false);
+	}
+
+	VERIFY0(posix_spawnattr_init(&attr));
+	VERIFY0(posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSCHEDPARAM));
+	param.sched_priority = prio_max / 2 + 1;
+	VERIFY0(posix_spawnattr_setschedparam(&attr, &param));
+
+	bret = spawn_sched_check(desc, &attr, SCHED_FX, prio_max / 2 + 1);
+
+	/*
+	 * Restore the original scheduling policy.
+	 */
+	(void) sched_setscheduler(0, orig_policy, &orig_param);
+
+	VERIFY0(posix_spawnattr_destroy(&attr));
+
+	return (bret);
+}
+
+/*
+ * Spawn a child and verify that it lands in the same task, project and
+ * process contract as its parent. The work is done in a forked child since
+ * entering a new task cannot be undone.
+ *
+ * Exit codes from the forked child, for diagnostics:
+ *   99 settaskid failed, 98 posix_spawn failed, 97 could not read psinfo,
+ *   96 task id mismatch, 95 project id mismatch, 94 contract id mismatch.
+ */
+static bool
+spawn_task_inherit_test(spawn_priv_test_t *test)
+{
+	const char *desc = test->spt_name;
+	siginfo_t sig;
+	pid_t fork_pid;
+
+	fork_pid = forkx(FORK_NOSIGCHLD | FORK_WAITPID);
+	if (fork_pid == -1) {
+		err(EXIT_FAILURE, "INTERNAL TEST ERROR: %s: fork", desc);
+	}
+
+	if (fork_pid == 0) {
+		char *argv[] = { "sleep", "30", NULL };
+		psinfo_t mine, theirs;
+		taskid_t task;
+		pid_t pid;
+		int status;
+
+		if ((task = settaskid(getprojid(), TASK_NORMAL)) == -1)
+			_exit(99);
+
+		if (posix_spawn(&pid, "/usr/bin/sleep", NULL, NULL, argv,
+		    environ) != 0) {
+			_exit(98);
+		}
+
+		if (proc_get_psinfo(getpid(), &mine) != 0 ||
+		    proc_get_psinfo(pid, &theirs) != 0) {
+			status = 97;
+		} else if (theirs.pr_taskid != task ||
+		    theirs.pr_taskid != mine.pr_taskid) {
+			status = 96;
+		} else if (theirs.pr_projid != mine.pr_projid) {
+			status = 95;
+		} else if (theirs.pr_contract != mine.pr_contract) {
+			status = 94;
+		} else {
+			status = 0;
+		}
+
+		(void) kill(pid, SIGKILL);
+		(void) waitpid(pid, NULL, 0);
+		_exit(status);
+	}
+
+	if (waitid(P_PID, fork_pid, &sig, WEXITED) != 0)
+		err(EXIT_FAILURE, "INTERNAL TEST ERROR: %s: waitid", desc);
+
+	if (sig.si_code != CLD_EXITED || sig.si_status != 0) {
+		warnx("TEST FAILED: %s: fork child reported %d",
+		    desc, sig.si_status);
+		return (false);
+	}
+
+	return (true);
+}
+
+/*
+ * Spawn under a task.max-lwps resource control that cannot accommodate the
+ * child's LWP. The spawn must fail cleanly with EAGAIN.
+ *
+ * Exit codes: 99 settaskid failed, 98 setrctl failed, 97 spawn unexpectedly
+ * succeeded, 100+e spawn failed with unexpected errno e.
+ */
+static bool
+spawn_rctl_fail_test(spawn_priv_test_t *test)
+{
+	const char *desc = test->spt_name;
+	siginfo_t sig;
+	pid_t fork_pid;
+
+	fork_pid = forkx(FORK_NOSIGCHLD | FORK_WAITPID);
+	if (fork_pid == -1) {
+		err(EXIT_FAILURE, "INTERNAL TEST ERROR: %s: fork", desc);
+	}
+
+	if (fork_pid == 0) {
+		char *argv[] = { "true", NULL };
+		rctlblk_t *blk;
+		pid_t pid;
+		int ret;
+
+		if (settaskid(getprojid(), TASK_NORMAL) == -1)
+			_exit(99);
+
+		/*
+		 * This process has a single LWP, so a privileged deny limit
+		 * of one means the spawned child's LWP must be refused.
+		 */
+		if ((blk = calloc(1, rctlblk_size())) == NULL)
+			_exit(99);
+		rctlblk_set_value(blk, 1);
+		rctlblk_set_privilege(blk, RCPRIV_PRIVILEGED);
+		rctlblk_set_local_action(blk, RCTL_LOCAL_DENY, 0);
+		if (setrctl("task.max-lwps", NULL, blk, RCTL_INSERT) != 0)
+			_exit(98);
+
+		ret = posix_spawn(&pid, "/usr/bin/true", NULL, NULL, argv,
+		    environ);
+		if (ret == 0) {
+			(void) waitpid(pid, NULL, 0);
+			_exit(97);
+		}
+		if (ret != EAGAIN)
+			_exit(100 + ret);
+		_exit(0);
+	}
+
+	if (waitid(P_PID, fork_pid, &sig, WEXITED) != 0)
+		err(EXIT_FAILURE, "INTERNAL TEST ERROR: %s: waitid", desc);
+
+	if (sig.si_code != CLD_EXITED || sig.si_status != 0) {
+		if (sig.si_status > 100) {
+			warnx("TEST FAILED: %s: spawn failed with %s, "
+			    "expected EAGAIN", desc,
+			    strerrorname_np(sig.si_status - 100));
+		} else {
+			warnx("TEST FAILED: %s: fork child reported %d",
+			    desc, sig.si_status);
+		}
+		return (false);
+	}
+
+	return (true);
 }
 
 /*
@@ -349,10 +578,17 @@ resetids_suid_test(spawn_priv_test_t *test)
 	/*
 	 * Create a setuid copy of the child helper owned by nobody.
 	 */
-	(void) snprintf(suid_path, sizeof (suid_path),
-	    "/tmp/posix_spawn_suid_child.%d", (int)getpid());
-	(void) snprintf(cmdbuf, sizeof (cmdbuf),
-	    "cp %s %s", posix_spawn_child_path, suid_path);
+	if (snprintf(suid_path, sizeof (suid_path),
+	    "/tmp/posix_spawn_suid_child.%d", (int)getpid()) >=
+	    sizeof (suid_path)) {
+		warnx("TEST FAILED: %s: suid path too long", desc);
+		return (false);
+	}
+	if (snprintf(cmdbuf, sizeof (cmdbuf),
+	    "cp %s %s", posix_spawn_child_path, suid_path) >= sizeof (cmdbuf)) {
+		warnx("TEST FAILED: %s: copy command too long", desc);
+		return (false);
+	}
 	if (system(cmdbuf) != 0) {
 		warnx("TEST FAILED: %s: failed to copy child helper", desc);
 		return (false);
@@ -458,12 +694,22 @@ cleanup:
 static spawn_priv_test_t tests[] = {
 	{ .spt_name = "SETSCHEDULER: RT SCHED with min priority",
 	    .spt_func = setscheduler_test, .spt_priv = PRIV_PROC_PRIOCNTL },
+	{ .spt_name = "SETSCHEDULER: FX SCHED with mid-range priority",
+	    .spt_func = setscheduler_fx_test, .spt_priv = PRIV_PROC_PRIOCNTL },
 	{ .spt_name = "SETSCHEDPARAM: priority change under RT SCHED",
 	    .spt_func = setschedparam_test, .spt_priv = PRIV_PROC_PRIOCNTL },
+	{ .spt_name = "SETSCHEDPARAM: priority change under FX SCHED",
+	    .spt_func = setschedparam_fx_test, .spt_priv = PRIV_PROC_PRIOCNTL },
 	{ .spt_name = "RESETIDS: euid reset after seteuid(nobody)",
 	    .spt_func = resetids_priv_test, .spt_priv = PRIV_PROC_SETID },
 	{ .spt_name = "RESETIDS: setuid binary retains suid euid",
 	    .spt_func = resetids_suid_test, .spt_priv = PRIV_PROC_SETID },
+	{ .spt_name = "child inherits task, project and contract",
+	    .spt_func = spawn_task_inherit_test,
+	    .spt_priv = PRIV_PROC_TASKID },
+	{ .spt_name = "spawn against task.max-lwps fails with EAGAIN",
+	    .spt_func = spawn_rctl_fail_test,
+	    .spt_priv = PRIV_SYS_RESOURCE },
 };
 
 int

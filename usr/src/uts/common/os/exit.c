@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1988, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -76,6 +76,7 @@
 #include <sys/core.h>
 #include <sys/brand.h>
 #include <sys/libc_kernel.h>
+#include <sys/spawn_impl.h>
 
 /*
  * convert code/data pair into old style wait status
@@ -490,6 +491,16 @@ proc_exit(int why, int what)
 	if (exitlwps(0) != 0)
 		return (1);
 
+	/*
+	 * If this is a spawn(2) child that has not yet reported back to its
+	 * parent, do that now and unblock the parent. This is done as soon as
+	 * the exit is committed, past exitlwps(), so the parent's spawn(2)
+	 * returns promptly. It has no ordering requirement against the DTrace
+	 * exit probes below.
+	 */
+	if (p->p_spawn_ksp != NULL)
+		spawn_complete(p->p_spawn_ksp, 0);
+
 	mutex_enter(&p->p_lock);
 	if (p->p_ttime > 0) {
 		/*
@@ -535,11 +546,17 @@ proc_exit(int why, int what)
 	 * Special case:  If we will be making the process disappear
 	 * without a trace because it is either:
 	 *	* an exiting SSYS process, or
-	 *	* a posix_spawn() vfork child who requests it,
+	 *	* a vfork child exiting with _EVAPORATE (no longer used by
+	 *	  libc but retained for branded userlands), or
+	 *	* a spawn(2) child whose setup failed (CLDEVAPORATE),
 	 * we don't bother to allocate a useless sigqueue.
+	 *
+	 * p_pidflag is ordinarily protected by pidlock but CLDEVAPORATE is
+	 * only ever set by this process itself, before it exits.
 	 */
 	evaporate = (p->p_flag & SSYS) || ((p->p_flag & SVFORK) &&
-	    why == CLD_EXITED && what == _EVAPORATE);
+	    why == CLD_EXITED && what == _EVAPORATE) ||
+	    (p->p_pidflag & CLDEVAPORATE);
 	if (!evaporate)
 		sqp = kmem_zalloc(sizeof (sigqueue_t), KM_SLEEP);
 

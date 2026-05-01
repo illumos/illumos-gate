@@ -21,10 +21,11 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
@@ -64,27 +65,46 @@
  */
 static int	chdirec(vnode_t *, int ischroot, int do_traverse);
 
-int
-chdir(char *fname)
+static int
+chdir_common(char *fname, uio_seg_t seg)
 {
 	vnode_t *vp;
 	int error;
 	int estale_retry = 0;
 
 lookup:
-	if (error = lookupname(fname, UIO_USERSPACE, FOLLOW, NULLVPP, &vp)) {
-		if ((error == ESTALE) && fs_need_estale_retry(estale_retry++))
+	error = lookupname(fname, seg, FOLLOW, NULLVPP, &vp);
+	if (error != 0) {
+		if (error == ESTALE && fs_need_estale_retry(estale_retry++))
 			goto lookup;
-		return (set_errno(error));
+		return (error);
 	}
 
 	error = chdirec(vp, 0, 1);
-	if (error) {
-		if ((error == ESTALE) && fs_need_estale_retry(estale_retry++))
-			goto lookup;
+	if (error == ESTALE && fs_need_estale_retry(estale_retry++))
+		goto lookup;
+	return (error);
+}
+
+int
+chdir(char *fname)
+{
+	int error = chdir_common(fname, UIO_USERSPACE);
+
+	if (error != 0)
 		return (set_errno(error));
-	}
 	return (0);
+}
+
+/*
+ * Kernel-callable version of chdir() taking a kernel-resident path, used to
+ * apply spawn(2) file actions in a spawned child. Unlike chdir(), the error
+ * is returned directly rather than via set_errno().
+ */
+int
+kchdir(const char *fname)
+{
+	return (chdir_common((char *)fname, UIO_SYSSPACE));
 }
 
 /*

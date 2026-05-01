@@ -23,7 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -462,9 +462,10 @@ startover:
 	case PIOCSTOP:		/* stop process or lwp from running */
 	case PIOCWSTOP:		/* wait for process or lwp to stop */
 		/*
-		 * Can't apply to a system process.
+		 * Can't apply to a system process or to a spawn(2) child
+		 * that has not yet exec'd.
 		 */
-		if ((p->p_flag & SSYS) || p->p_as == &kas) {
+		if ((p->p_flag & (SSYS | SSPAWNING)) || p->p_as == &kas) {
 			prunlock(pnp);
 			error = EBUSY;
 			break;
@@ -1986,9 +1987,10 @@ startover:
 	case PIOCSTOP:		/* stop process or lwp from running */
 	case PIOCWSTOP:		/* wait for process or lwp to stop */
 		/*
-		 * Can't apply to a system process.
+		 * Can't apply to a system process or to a spawn(2) child
+		 * that has not yet exec'd.
 		 */
-		if ((p->p_flag & SSYS) || p->p_as == &kas) {
+		if ((p->p_flag & (SSYS | SSPAWNING)) || p->p_as == &kas) {
 			prunlock(pnp);
 			error = EBUSY;
 			break;

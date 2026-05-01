@@ -24,6 +24,7 @@
  */
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_SYS_MACHCPUVAR_H
@@ -150,7 +151,7 @@ struct kpti_frame {
  *
  * There are CTASSERTs in os/intr.c that verify this all works out.
  */
-#define	MACHCPU_SIZE	(1568 + 696)
+#define	MACHCPU_SIZE	(1576 + 696)
 #define	MACHCPU_PAD	(MMU_PAGESIZE - MACHCPU_SIZE)
 #define	MACHCPU_PAD2	(MMU_PAGESIZE - 16 - 3 * sizeof (struct kpti_frame))
 

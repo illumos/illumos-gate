@@ -28,6 +28,7 @@
 
 /* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
 /* Copyright 2020 Joyent, Inc. */
+/* Copyright 2026 Oxide Computer Company */
 
 #ifndef _SYS_FILE_H
 #define	_SYS_FILE_H
@@ -196,6 +197,7 @@ struct proc;	/* forward reference for function prototype */
 struct vnodeops;
 struct vattr;
 struct uf_info;
+struct kspawn_param;
 
 extern file_t *getf(int);
 extern file_t *getf_gen(int, uf_entry_gen_t *);
@@ -205,11 +207,14 @@ extern void areleasef(int, struct uf_info *);
 extern void closeall(struct uf_info *);
 #endif
 extern void flist_fork(struct uf_info *, struct uf_info *);
+extern void flist_spawn(struct uf_info *, struct uf_info *,
+    const struct kspawn_param *);
 extern int closef(file_t *);
 extern int closeandsetf(int, file_t *);
 extern int ufalloc_file(int, file_t *);
 extern int ufalloc(int);
 extern int ufcanalloc(struct proc *, uint_t);
+extern int kopenat(int, char *, int, int, model_t);
 extern int falloc(struct vnode *, int, file_t **, int *);
 extern void finit(void);
 extern void unfalloc(file_t *);
@@ -222,6 +227,9 @@ extern int f_getfl(int, int *);
 extern int f_badfd(int, int *, int);
 extern int fassign(struct vnode **, int, int *);
 extern void fcnt_add(struct uf_info *, int);
+extern int fdup2(int, int);
+extern void fd_too_big(struct proc *);
+extern void closefrom_all(int);
 extern void close_exec(struct uf_info *);
 extern void clear_stale_fd(void);
 extern void clear_active_fd(int);

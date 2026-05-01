@@ -124,7 +124,11 @@ write_to_child_test(spawn_pipe_test_t *test)
 	}
 	(void) close(tmpfd);
 
-	(void) snprintf(cmd, sizeof (cmd), "cat > %s", tmpfile);
+	if (snprintf(cmd, sizeof (cmd), "cat > %s", tmpfile) >=
+	    sizeof (cmd)) {
+		warnx("TEST FAILED: %s: command too long", desc);
+		return (false);
+	}
 
 	VERIFY0(posix_spawn_file_actions_init(&fact));
 	VERIFY0(posix_spawnattr_init(&attr));
@@ -205,8 +209,8 @@ bad_cmd_test(spawn_pipe_test_t *test)
 	 * will successfully spawn sh. The shell itself will report the error
 	 * via a non-zero exit status.
 	 */
-	ret = posix_spawn_pipe_np(&pid, &fd, "/nonexistent/cmd", B_FALSE,
-	    &fact, &attr);
+	ret = posix_spawn_pipe_np(&pid, &fd, "/devices/nonexistent/cmd",
+	    B_FALSE, &fact, &attr);
 	if (ret != 0) {
 		warnx("TEST FAILED: %s: posix_spawn_pipe_np failed with %s, "
 		    "expected success (sh spawns)", desc, strerrorname_np(ret));

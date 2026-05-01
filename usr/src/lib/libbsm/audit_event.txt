@@ -1,6 +1,7 @@
 #
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+# Copyright 2026 Oxide Computer Company
 #
 #
 # CDDL HEADER START
@@ -368,6 +369,7 @@
 316:AUE_AUDITON_GETKAUDIT:auditon(2) - get kernel audit characteristics:aa
 317:AUE_AUDITON_SETKAUDIT:auditon(2) - set kernel audit characteristics:as
 318:AUE_AUDITON_OTHER:auditon(2) - other event:aa
+319:AUE_SPAWN:spawn(2):ps,ex
 #
 # user level audit events
 #	2048 -  6143	Reserved

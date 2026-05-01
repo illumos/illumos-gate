@@ -113,6 +113,8 @@ file path=opt/libc-tests/tests/posix_spawn/posix_spawn_chdir.32 mode=0555
 file path=opt/libc-tests/tests/posix_spawn/posix_spawn_chdir.64 mode=0555
 file path=opt/libc-tests/tests/posix_spawn/posix_spawn_child.32 mode=0555
 file path=opt/libc-tests/tests/posix_spawn/posix_spawn_child.64 mode=0555
+file path=opt/libc-tests/tests/posix_spawn/posix_spawn_defpath.32 mode=0555
+file path=opt/libc-tests/tests/posix_spawn/posix_spawn_defpath.64 mode=0555
 file path=opt/libc-tests/tests/posix_spawn/posix_spawn_fileactions.32 mode=0555
 file path=opt/libc-tests/tests/posix_spawn/posix_spawn_fileactions.64 mode=0555
 file path=opt/libc-tests/tests/posix_spawn/posix_spawn_noshebang mode=0555
@@ -122,6 +124,8 @@ file path=opt/libc-tests/tests/posix_spawn/posix_spawn_pipe_np.32 mode=0555
 file path=opt/libc-tests/tests/posix_spawn/posix_spawn_pipe_np.64 mode=0555
 file path=opt/libc-tests/tests/posix_spawn/posix_spawn_priv.32 mode=0555
 file path=opt/libc-tests/tests/posix_spawn/posix_spawn_priv.64 mode=0555
+file path=opt/libc-tests/tests/posix_spawn/posix_spawn_wait.32 mode=0555
+file path=opt/libc-tests/tests/posix_spawn/posix_spawn_wait.64 mode=0555
 file path=opt/libc-tests/tests/printf-15294.32 mode=0555
 file path=opt/libc-tests/tests/printf-15294.64 mode=0555
 file path=opt/libc-tests/tests/printf-6961.64 mode=0555

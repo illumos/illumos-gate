@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #ifndef _SYS_LIBC_KERNEL_H
 #define	_SYS_LIBC_KERNEL_H
 
@@ -41,8 +45,9 @@ extern "C" {
 /*
  * A vfork() child that calls _exit(_EVAPORATE) without having performed
  * an execve() will disappear without a trace, just as though the parent
- * had set the disposition of the SIGCHLD signal to be ignored.  This is
- * used by the the posix_spawn() implementation in libc.
+ * had set the disposition of the SIGCHLD signal to be ignored. libc's
+ * posix_spawn() no longer uses this, but it is retained for branded
+ * userlands whose libc predates spawn(2).
  */
 #define	_EVAPORATE	0xffff0000
 

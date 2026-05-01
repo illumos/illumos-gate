@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -934,16 +934,16 @@ mdb_tgt_sespec_activate_one(mdb_tgt_t *t, mdb_sespec_t *sep)
 }
 
 /*
- * Transition each sespec on the idle list to the ACTIVE state.  This function
- * is called, for example, after the target's t_run() function returns.  If
- * the se_ctor() function fails, the specifier is not yet applicable; it will
+ * Transition each sespec on the idle list whose ops vector matches the one
+ * given, or every sespec there if it is NULL, to the ACTIVE state.  If the
+ * se_ctor() function fails, the specifier is not yet applicable; it will
  * remain on the idle list and can be activated later.
  *
  * Returns 1 if there weren't any unexpected activation failures; 0 if there
  * were.
  */
 int
-mdb_tgt_sespec_activate_all(mdb_tgt_t *t)
+mdb_tgt_sespec_activate_matching(mdb_tgt_t *t, const mdb_se_ops_t *ops)
 {
 	mdb_sespec_t *sep, *nsep;
 	int rc = 1;
@@ -951,12 +951,25 @@ mdb_tgt_sespec_activate_all(mdb_tgt_t *t)
 	for (sep = mdb_list_next(&t->t_idle); sep != NULL; sep = nsep) {
 		nsep = mdb_list_next(sep);
 
+		if (ops != NULL && sep->se_ops != ops)
+			continue;
+
 		if (mdb_tgt_sespec_activate_one(t, sep) < 0 &&
 		    sep->se_errno != EMDB_NOOBJ)
 			rc = 0;
 	}
 
 	return (rc);
+}
+
+/*
+ * Transition each sespec on the idle list to the ACTIVE state.  This function
+ * is called, for example, after the target's t_run() function returns.
+ */
+int
+mdb_tgt_sespec_activate_all(mdb_tgt_t *t)
+{
+	return (mdb_tgt_sespec_activate_matching(t, NULL));
 }
 
 /*

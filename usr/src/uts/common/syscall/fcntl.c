@@ -23,7 +23,7 @@
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2018, Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -57,7 +57,6 @@
 
 static int flock_check(vnode_t *, flock64_t *, offset_t, offset_t);
 static int flock_get_start(vnode_t *, flock64_t *, offset_t, u_offset_t *);
-static void fd_too_big(proc_t *);
 
 /*
  * File control.
@@ -219,53 +218,34 @@ fcntl(int fdes, int cmd, intptr_t arg, intptr_t arg1)
 
 	case F_DUP2FD:
 	case F_DUP3FD:
-		p = curproc;
+		/*
+		 * For equal descriptors dup2() and dup3() are a no-op and
+		 * must leave FD_CLOEXEC and FD_CLOFORK unchanged. Return here
+		 * rather than calling fdup2() which would clear those flags.
+		 */
 		if (fdes == iarg) {
 			retval = iarg;
-		} else if ((uint_t)iarg >= p->p_fno_ctl) {
-			if (iarg >= 0)
-				fd_too_big(p);
-			error = EBADF;
-		} else {
-			/*
-			 * We can't hold our getf(fdes) across the call to
-			 * closeandsetf() because it creates a window for
-			 * deadlock: if one thread is doing dup2(a, b) while
-			 * another is doing dup2(b, a), each one will block
-			 * waiting for the other to call releasef().  The
-			 * solution is to increment the file reference count
-			 * (which we have to do anyway), then releasef(fdes),
-			 * then closeandsetf().  Incrementing f_count ensures
-			 * that fp won't disappear after we call releasef().
-			 * When closeandsetf() fails, we try avoid calling
-			 * closef() because of all the side effects.
-			 */
-			mutex_enter(&fp->f_tlock);
-			fp->f_count++;
-			mutex_exit(&fp->f_tlock);
-			releasef(fdes);
-			if ((error = closeandsetf(iarg, fp)) == 0) {
-				if (cmd == F_DUP2FD_CLOEXEC) {
-					f_setfd_or(iarg, FD_CLOEXEC);
-				} else if (cmd == F_DUP2FD_CLOFORK) {
-					f_setfd_or(iarg, FD_CLOFORK);
-				} else if (cmd == F_DUP3FD) {
-					f_setfd_or(iarg, (int)arg1);
-				}
-				retval = iarg;
-			} else {
-				mutex_enter(&fp->f_tlock);
-				if (fp->f_count > 1) {
-					fp->f_count--;
-					mutex_exit(&fp->f_tlock);
-				} else {
-					mutex_exit(&fp->f_tlock);
-					(void) closef(fp);
-				}
-			}
-			goto out;
+			goto done;
 		}
-		goto done;
+
+		/*
+		 * fdup2() takes its own hold on fdes so release ours first
+		 * (it cannot be held across the closeandsetf() in there
+		 * without creating a window for deadlock against a
+		 * concurrent dup2() in the opposite direction).
+		 */
+		releasef(fdes);
+		if ((error = fdup2(fdes, iarg)) == 0) {
+			if (cmd == F_DUP2FD_CLOEXEC) {
+				f_setfd_or(iarg, FD_CLOEXEC);
+			} else if (cmd == F_DUP2FD_CLOFORK) {
+				f_setfd_or(iarg, FD_CLOFORK);
+			} else if (cmd == F_DUP3FD) {
+				f_setfd_or(iarg, (int)arg1);
+			}
+			retval = iarg;
+		}
+		goto out;
 
 	case F_SETFL:
 		vp = fp->f_vnode;
@@ -960,16 +940,4 @@ flock_get_start(vnode_t *vp, flock64_t *flp, offset_t offset, u_offset_t *start)
 	}
 
 	return (0);
-}
-
-/*
- * Take rctl action when the requested file descriptor is too big.
- */
-static void
-fd_too_big(proc_t *p)
-{
-	mutex_enter(&p->p_lock);
-	(void) rctl_action(rctlproc_legacy[RLIMIT_NOFILE],
-	    p->p_rctls, p, RCA_SAFE);
-	mutex_exit(&p->p_lock);
 }

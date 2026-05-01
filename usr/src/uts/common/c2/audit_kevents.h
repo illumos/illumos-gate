@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _BSM_AUDIT_KEVENTS_H
@@ -139,8 +140,8 @@ extern "C" {
 #define	AUE_SHMCTL_SET		93	/* =ip shmctl(2): IPC_SET command */
 #define	AUE_SHMCTL_STAT		94	/* =ip shmctl(2): IPC_STAT command */
 #define	AUE_SHMGET		95	/* =ip shmget(2) */
-#define	AUE_SHMAT 		96	/* =ip shmat(2) */
-#define	AUE_SHMDT 		97	/* =ip shmdt(2) */
+#define	AUE_SHMAT		96	/* =ip shmat(2) */
+#define	AUE_SHMDT		97	/* =ip shmdt(2) */
 #define	AUE_SEMCTL		98	/* =ip semctl(2): illegal command */
 #define	AUE_SEMCTL_RMID		99	/* =ip semctl(2): IPC_RMID command */
 #define	AUE_SEMCTL_SET		100	/* =ip semctl(2): IPC_SET command */
@@ -355,9 +356,10 @@ extern "C" {
 #define	AUE_AUDITON_GETKAUDIT	316	/* =aa */
 #define	AUE_AUDITON_SETKAUDIT	317	/* =as */
 #define	AUE_AUDITON_OTHER	318	/* =aa */
+#define	AUE_SPAWN		319	/* =ps,ex spawn(2) */
 
 /* NOTE: update MAX_KEVENTS below if events are added. */
-#define	MAX_KEVENTS		318
+#define	MAX_KEVENTS		319
 
 #ifdef __cplusplus
 }

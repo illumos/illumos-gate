@@ -29,6 +29,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SYS_EXEC_H
@@ -100,6 +101,7 @@ typedef struct uarg {
 	model_t	from_model;
 	size_t	to_ptrsize;
 	size_t	from_ptrsize;
+	uio_seg_t argseg;
 	size_t	ncargs;
 	struct execsw *execswp;
 	uintptr_t entry;
@@ -206,7 +208,7 @@ extern char nomagicstr[];
 extern int exec_args(execa_t *, uarg_t *, intpdata_t *, void **);
 extern int exece(uintptr_t, const char **, const char **, int);
 extern int exec_common(const char *, const char **, const char **, vnode_t *,
-    int);
+    int, uio_seg_t);
 extern int gexec(vnode_t **vp, struct execa *uap, struct uarg *args,
     struct intpdata *idata, int level, size_t *execsz, caddr_t exec_file,
     struct cred *cred, int brand_action);

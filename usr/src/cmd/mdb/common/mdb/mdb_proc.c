@@ -26,7 +26,7 @@
 /*
  * Copyright 2018 Joyent, Inc.
  * Copyright (c) 2014 by Delphix. All rights reserved.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -119,6 +119,7 @@ static const pt_ptl_ops_t proc_lwp_ops;
 static const pt_ptl_ops_t proc_tdb_ops;
 static const mdb_se_ops_t proc_brkpt_ops;
 static const mdb_se_ops_t proc_wapt_ops;
+static const mdb_se_ops_t proc_sysexit_ops;
 
 static int pt_setrun(mdb_tgt_t *, mdb_tgt_status_t *, int);
 static void pt_activate_common(mdb_tgt_t *);
@@ -458,10 +459,11 @@ pt_post_attach(mdb_tgt_t *t)
 	(void) Psetflags(P, PR_FORK);		/* inherit tracing on fork */
 
 	/*
-	 * Install event specifiers to track fork and exec activities:
+	 * Install event specifiers to track fork, exec and spawn activities:
 	 */
 	(void) mdb_tgt_add_sysexit(t, SYS_vfork, hflag, pt_fork, NULL);
 	(void) mdb_tgt_add_sysexit(t, SYS_forksys, hflag, pt_fork, NULL);
+	(void) mdb_tgt_add_sysexit(t, SYS_spawn, hflag, pt_fork, NULL);
 	(void) mdb_tgt_add_sysexit(t, SYS_execve, hflag, pt_exec, NULL);
 
 	/*
@@ -623,6 +625,7 @@ pt_fork(mdb_tgt_t *t, int vid, void *private)
 	int follow_parent = mdb.m_forkmode != MDB_FM_CHILD;
 	int is_vfork = (psp->pr_what == SYS_vfork ||
 	    (psp->pr_what == SYS_forksys && psp->pr_sysarg[0] == 2));
+	int is_spawn = (psp->pr_what == SYS_spawn);
 
 	struct ps_prochandle *C;
 	const lwpstatus_t *csp;
@@ -680,14 +683,21 @@ pt_fork(mdb_tgt_t *t, int vid, void *private)
 
 	csp = &Pstatus(C)->pr_lwp;
 
+	/*
+	 * A spawned child never returns from a fork; its first observable
+	 * stop is on exit from the exec of its new program.
+	 */
 	if (csp->pr_why != PR_SYSEXIT ||
-	    (csp->pr_what != SYS_vfork && csp->pr_what != SYS_forksys)) {
-		warn("forked child process %ld did not stop on exit from "
-		    "fork as expected\n", psp->pr_rval1);
+	    (is_spawn ? csp->pr_what != SYS_execve :
+	    (csp->pr_what != SYS_vfork && csp->pr_what != SYS_forksys))) {
+		warn("%s child process %ld did not stop on exit from "
+		    "%s as expected\n", is_spawn ? "spawned" : "forked",
+		    psp->pr_rval1, is_spawn ? "exec" : "fork");
 	}
 
-	warn("target forked child process %ld (debugger following %s)\n",
-	    psp->pr_rval1, follow_parent ? "parent" : "child");
+	warn("target %s child process %ld (debugger following %s)\n",
+	    is_spawn ? "spawned" : "forked", psp->pr_rval1,
+	    follow_parent ? "parent" : "child");
 
 	(void) Punsetflags(C, PR_ASYNC);	/* require synchronous mode */
 	(void) Psetflags(C, PR_BPTADJ);		/* always adjust eip on x86 */
@@ -702,8 +712,10 @@ pt_fork(mdb_tgt_t *t, int vid, void *private)
 	 * the process at the time of fork when events were armed.  We must
 	 * therefore handle this as a special case and re-invoke the disarm
 	 * callback of each active specifier to clean out the child process.
+	 * A spawned child has a brand new address space in which our events
+	 * were never armed, so there is nothing to clean out there.
 	 */
-	if (!is_vfork) {
+	if (!is_vfork && !is_spawn) {
 		for (t->t_pshandle = C, sep = mdb_list_next(&t->t_active);
 		    sep != NULL; sep = mdb_list_next(sep)) {
 			if (sep->se_state == MDB_TGT_SPEC_ACTIVE)
@@ -744,8 +756,9 @@ pt_fork(mdb_tgt_t *t, int vid, void *private)
 
 			} while (csp->pr_why != PR_SYSEXIT ||
 			    csp->pr_errno != 0 || csp->pr_what != SYS_execve);
-		} else
+		} else if (!is_spawn) {
 			t->t_pshandle = C;
+		}
 	}
 
 	/*
@@ -773,6 +786,9 @@ pt_fork(mdb_tgt_t *t, int vid, void *private)
 		mdb_list_append(&pt->p_vforkp, vfp);
 		mdb_tgt_sespec_idle_all(t, EBUSY, FALSE);
 
+	} else if (is_spawn && follow_parent) {
+		mdb_tgt_sespec_idle_all(t, EBUSY, FALSE);
+		Prelease(C, PRELEASE_CLEAR);
 	} else {
 		mdb_tgt_sespec_idle_all(t, EBUSY, FALSE);
 		Prelease(t->t_pshandle, PRELEASE_CLEAR);
@@ -786,15 +802,32 @@ pt_fork(mdb_tgt_t *t, int vid, void *private)
 	 * If we are following the child, reset the libthread_db handle as well
 	 * as the rtld agent.
 	 */
-	if (follow_parent)
+	if (follow_parent) {
 		t->t_pshandle = P;
-	else {
+	} else {
 		t->t_pshandle = C;
-		pt->p_rtld = Prd_agent(C);
-		(void) Pobject_iter(t->t_pshandle, (proc_map_f *)thr_check, t);
+		if (!is_spawn) {
+			pt->p_rtld = Prd_agent(C);
+			(void) Pobject_iter(t->t_pshandle,
+			    (proc_map_f *)thr_check, t);
+		}
 	}
 
-	(void) mdb_tgt_sespec_activate_all(t);
+	if (is_spawn && !follow_parent) {
+		/*
+		 * The child of a spawn is running a different program to the
+		 * parent and is stopped on exit from the exec of it. The
+		 * pending stop will be matched by the execve specifier and
+		 * delivered to pt_exec(), which discards the parent's symbol
+		 * state, loads that of the new program and re-initialises
+		 * our events as if the debuggee itself had exec'd.
+		 * We still need to activate the system call specifiers, whose
+		 * arming does not touch the child's memory.
+		 */
+		(void) mdb_tgt_sespec_activate_matching(t, &proc_sysexit_ops);
+	} else {
+		(void) mdb_tgt_sespec_activate_all(t);
+	}
 	(void) mdb_tgt_continue(t, NULL);
 }
 

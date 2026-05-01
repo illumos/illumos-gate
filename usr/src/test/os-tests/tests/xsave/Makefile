@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 PROGS = \
@@ -20,6 +20,7 @@ PROGS = \
 	proc_xregs_set \
 	setcontext_replace \
 	setcontext_restore \
+	spawn_fpu \
 	swapcontext_extd \
 	signal_restore \
 	xregs_dump \

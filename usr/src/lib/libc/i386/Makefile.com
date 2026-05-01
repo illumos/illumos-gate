@@ -28,6 +28,7 @@
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2025 Hans Rosenfeld
 # Copyright 2025 MNX Cloud, Inc.
+# Copyright 2026 Oxide Computer Company
 #
 
 LIBCDIR=	$(SRC)/lib/libc
@@ -189,6 +190,7 @@ COMSYSOBJS=			\
 	__rusagesys.o		\
 	__signotify.o		\
 	__sigrt.o		\
+	__spawn.o		\
 	__time.o		\
 	_lgrp_home_fast.o	\
 	_lgrpsys.o		\

@@ -32,6 +32,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <sys/stat.h>
 #include <errno.h>
 #include <libgen.h>
 
@@ -43,6 +44,14 @@ extern char **environ;
  * Directory containing the no-shebang script, used as PATH for spawnp tests.
  */
 static char posix_spawn_noshebang_dir[PATH_MAX];
+
+/*
+ * Runtime-constructed PATH strings.
+ */
+static char noexec_dir[PATH_MAX];
+static char eacces_path[PATH_MAX * 2];
+static char toolong_path[PATH_MAX + 16];
+static char toolong_ok_path[PATH_MAX + 32];
 
 typedef struct spawn_path_test spawn_path_test_t;
 
@@ -221,13 +230,13 @@ static spawn_path_test_t tests[] = {
 	    .spt_func = path_resolve_test,
 	    .spt_file = "true", .spt_path = "/usr/lib:/usr/bin",
 	    .spt_pass = true },
-	{ .spt_desc = "fail with PATH=/nonexistent",
+	{ .spt_desc = "fail with PATH=/devices/nonexistent",
 	    .spt_func = path_resolve_test,
-	    .spt_file = "true", .spt_path = "/nonexistent",
+	    .spt_file = "true", .spt_path = "/devices/nonexistent",
 	    .spt_pass = false, .spt_err = ENOENT },
 	{ .spt_desc = "absolute path ignores PATH",
 	    .spt_func = path_resolve_test,
-	    .spt_file = "/usr/bin/true", .spt_path = "/nonexistent",
+	    .spt_file = "/usr/bin/true", .spt_path = "/devices/nonexistent",
 	    .spt_pass = true },
 	{ .spt_desc = "empty file returns EACCES",
 	    .spt_func = path_resolve_test,
@@ -239,7 +248,71 @@ static spawn_path_test_t tests[] = {
 	    .spt_pass = true },
 	{ .spt_desc = "ENOEXEC: shell fallback for no-shebang script",
 	    .spt_func = enoexec_fallback_test },
+	{ .spt_desc = "EACCES from earlier component beats later ENOENT",
+	    .spt_func = path_resolve_test,
+	    .spt_file = "posix_spawn_noexec", .spt_path = eacces_path,
+	    .spt_pass = false, .spt_err = EACCES },
+	{ .spt_desc = "over-long PATH component returns ENAMETOOLONG",
+	    .spt_func = path_resolve_test,
+	    .spt_file = "true", .spt_path = toolong_path,
+	    .spt_pass = false, .spt_err = ENAMETOOLONG },
+	{ .spt_desc = "over-long PATH component is skipped, search continues",
+	    .spt_func = path_resolve_test,
+	    .spt_file = "true", .spt_path = toolong_ok_path,
+	    .spt_pass = true },
 };
+
+static void
+path_test_setup(void)
+{
+	char file[PATH_MAX];
+	int fd;
+
+	if (snprintf(noexec_dir, sizeof (noexec_dir),
+	    "/tmp/posix_spawn_path.%d", (int)getpid()) >=
+	    sizeof (noexec_dir)) {
+		errx(EXIT_FAILURE, "noexec directory path too long");
+	}
+	/*
+	 * A scratch directory that holds a non-executable file, used to
+	 * provoke EACCES from a PATH search. The directory itself is
+	 * searchable, it's the file within it that does not have the
+	 * execute bit.
+	 */
+	if (mkdir(noexec_dir, 0755) != 0)
+		err(EXIT_FAILURE, "could not create %s", noexec_dir);
+	if (snprintf(file, sizeof (file), "%s/posix_spawn_noexec",
+	    noexec_dir) >= sizeof (file)) {
+		errx(EXIT_FAILURE, "noexec file path too long");
+	}
+	if ((fd = open(file, O_CREAT | O_WRONLY, 0644)) == -1)
+		err(EXIT_FAILURE, "could not create %s", file);
+	VERIFY0(close(fd));
+
+	if (snprintf(eacces_path, sizeof (eacces_path),
+	    "%s:/devices/nonexistent", noexec_dir) >= sizeof (eacces_path)) {
+		errx(EXIT_FAILURE, "EACCES search path too long");
+	}
+
+	(void) memset(toolong_path, 'a', PATH_MAX);
+	toolong_path[PATH_MAX] = '\0';
+
+	(void) memcpy(toolong_ok_path, toolong_path, PATH_MAX);
+	(void) strlcpy(toolong_ok_path + PATH_MAX, ":/usr/bin",
+	    sizeof (toolong_ok_path) - PATH_MAX);
+}
+
+static void
+path_test_cleanup(void)
+{
+	char file[PATH_MAX];
+
+	if (snprintf(file, sizeof (file), "%s/posix_spawn_noexec",
+	    noexec_dir) < sizeof (file)) {
+		(void) unlink(file);
+	}
+	(void) rmdir(noexec_dir);
+}
 
 int
 main(void)
@@ -251,12 +324,16 @@ main(void)
 	(void) strlcpy(posix_spawn_noshebang_dir, dirname(path),
 	    sizeof (posix_spawn_noshebang_dir));
 
+	path_test_setup();
+
 	for (size_t i = 0; i < ARRAY_SIZE(tests); i++) {
 		if (tests[i].spt_func(&tests[i]))
 			(void) printf("TEST PASSED: %s\n", tests[i].spt_desc);
 		else
 			ret = EXIT_FAILURE;
 	}
+
+	path_test_cleanup();
 
 	if (ret == EXIT_SUCCESS)
 		(void) printf("All tests passed successfully!\n");

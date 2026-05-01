@@ -26,444 +26,352 @@
 
 /*
  * Copyright (c) 2011 by Delphix. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "lint.h"
 #include "thr_uberdata.h"
-#include <sys/libc_kernel.h>
-#include <sys/procset.h>
-#include <sys/fork.h>
-#include <dirent.h>
-#include <alloca.h>
+#include <sys/sysmacros.h>
+#include <limits.h>
 #include <spawn.h>
+#include <stdbool.h>
+#include <sys/spawn_impl.h>
 #include <paths.h>
 
-#define	ALL_POSIX_SPAWN_FLAGS			\
-		(POSIX_SPAWN_RESETIDS |		\
-		POSIX_SPAWN_SETPGROUP |		\
-		POSIX_SPAWN_SETSIGDEF |		\
-		POSIX_SPAWN_SETSIGMASK |	\
-		POSIX_SPAWN_SETSCHEDPARAM |	\
-		POSIX_SPAWN_SETSCHEDULER |	\
-		POSIX_SPAWN_SETSID |		\
-		POSIX_SPAWN_SETSIGIGN_NP |	\
-		POSIX_SPAWN_NOSIGCHLD_NP |	\
-		POSIX_SPAWN_WAITPID_NP |	\
-		POSIX_SPAWN_NOEXECERR_NP)
-
-typedef struct {
-	int		sa_psflags;	/* POSIX_SPAWN_* flags */
-	int		sa_priority;
-	int		sa_schedpolicy;
-	pid_t		sa_pgroup;
-	sigset_t	sa_sigdefault;
-	sigset_t	sa_sigignore;
-	sigset_t	sa_sigmask;
-} spawn_attr_t;
-
-typedef enum file_action {
-	FA_OPEN,
-	FA_CLOSE,
-	FA_DUP2,
-	FA_CLOSEFROM,
-	FA_CHDIR,
-	FA_FCHDIR
-} file_action_t;
-
-typedef struct file_attr {
-	struct file_attr *fa_next;	/* circular list of file actions */
-	struct file_attr *fa_prev;
-	file_action_t	fa_type;	/* type of action */
-	int		fa_need_dirbuf;	/* only consulted in the head action */
-	char		*fa_path;	/* copied pathname for open() */
-	uint_t		fa_pathsize;	/* size of fa_path[] array */
-	int		fa_oflag;	/* oflag for open() */
-	mode_t		fa_mode;	/* mode for open() */
-	int		fa_filedes;	/* file descriptor for open()/close() */
-	int		fa_newfiledes;	/* new file descriptor for dup2() */
-} file_attr_t;
-
-#if defined(_LP64)
-#define	__open64	__open
-#define	getdents64	getdents
-#define	dirent64_t	dirent_t
-#else
-extern int getdents64(int, dirent64_t *, size_t);
-#endif
-
 extern const char **_environ;
-
-/*
- * Support function:
- * Close all open file descriptors greater than or equal to lowfd.
- * This is executed in the child of vfork(), so we must not call
- * opendir() / readdir() because that would alter the parent's
- * address space.  We use the low-level getdents64() system call.
- * Return non-zero on error.
- */
-static int
-spawn_closefrom(int lowfd, void *buf)
-{
-	int procfd;
-	int fd;
-	int buflen;
-	dirent64_t *dp;
-	dirent64_t *dpend;
-
-	if (lowfd <  0)
-		lowfd = 0;
-
-	/*
-	 * Close lowfd right away as a hedge against failing
-	 * to open the /proc file descriptor directory due
-	 * all file descriptors being currently used up.
-	 */
-	(void) __close(lowfd++);
-
-	if ((procfd = __open64("/proc/self/fd", O_RDONLY, 0)) < 0) {
-		/*
-		 * We could not open the /proc file descriptor directory.
-		 * Just fail and be done with it.
-		 */
-		return (-1);
-	}
-
-	for (;;) {
-		/*
-		 * Collect a bunch of open file descriptors and close them.
-		 * Repeat until the directory is exhausted.
-		 */
-		dp = (dirent64_t *)buf;
-		if ((buflen = getdents64(procfd, dp, DIRBUF)) <= 0) {
-			(void) __close(procfd);
-			break;
-		}
-		dpend = (dirent64_t *)((uintptr_t)buf + buflen);
-		do {
-			/* skip '.', '..' and procfd */
-			if (dp->d_name[0] != '.' &&
-			    (fd = atoi(dp->d_name)) != procfd &&
-			    fd >= lowfd)
-				(void) __close(fd);
-			dp = (dirent64_t *)((uintptr_t)dp + dp->d_reclen);
-		} while (dp < dpend);
-	}
-
-	return (0);
-}
-
-static int
-perform_flag_actions(spawn_attr_t *sap)
-{
-	int sig;
-	struct sigaction action;
-
-	if (sap->sa_psflags & POSIX_SPAWN_SETSIGMASK) {
-		(void) __lwp_sigmask(SIG_SETMASK, &sap->sa_sigmask);
-	}
-
-	if (sap->sa_psflags & POSIX_SPAWN_SETSIGIGN_NP) {
-		(void) memset(&action, 0, sizeof (action));
-		action.sa_handler = SIG_IGN;
-		for (sig = 1; sig < NSIG; sig++) {
-			if (sigismember(&sap->sa_sigignore, sig))
-				(void) __sigaction(sig, &action, NULL);
-		}
-	}
-
-	if (sap->sa_psflags & POSIX_SPAWN_SETSIGDEF) {
-		(void) memset(&action, 0, sizeof (action));
-		action.sa_handler = SIG_DFL;
-		for (sig = 1; sig < NSIG; sig++) {
-			if (sigismember(&sap->sa_sigdefault, sig))
-				(void) __sigaction(sig, &action, NULL);
-		}
-	}
-
-	if (sap->sa_psflags & POSIX_SPAWN_RESETIDS) {
-		if (setgid(getgid()) != 0 || setuid(getuid()) != 0)
-			return (errno);
-	}
-
-	if (sap->sa_psflags & POSIX_SPAWN_SETSID) {
-		if (setsid() == (pid_t)-1) {
-			return (errno);
-		}
-	}
-
-	if (sap->sa_psflags & POSIX_SPAWN_SETPGROUP) {
-		if (setpgid(0, sap->sa_pgroup) != 0)
-			return (errno);
-	}
-
-	if (sap->sa_psflags & POSIX_SPAWN_SETSCHEDULER) {
-		if (setparam(P_LWPID, P_MYID,
-		    sap->sa_schedpolicy, sap->sa_priority) == -1)
-			return (errno);
-	} else if (sap->sa_psflags & POSIX_SPAWN_SETSCHEDPARAM) {
-		if (setprio(P_LWPID, P_MYID, sap->sa_priority, NULL) == -1)
-			return (errno);
-	}
-
-	return (0);
-}
-
-static int
-perform_file_actions(file_attr_t *fap, void *dirbuf)
-{
-	file_attr_t *froot = fap;
-	int fd;
-
-	do {
-		switch (fap->fa_type) {
-		case FA_OPEN:
-			fd = __open(fap->fa_path, fap->fa_oflag, fap->fa_mode);
-			if (fd < 0)
-				return (errno);
-			if (fd != fap->fa_filedes) {
-				if (__fcntl(fd, F_DUP2FD, fap->fa_filedes) < 0)
-					return (errno);
-				(void) __close(fd);
-			}
-			break;
-		case FA_CHDIR:
-			if (chdir(fap->fa_path) == -1)
-				return (errno);
-			break;
-		case FA_CLOSE:
-			if (__close(fap->fa_filedes) == -1 &&
-			    errno != EBADF)	/* already closed, no error */
-				return (errno);
-			break;
-		case FA_DUP2:
-			fd = __fcntl(fap->fa_filedes, F_DUP2FD,
-			    fap->fa_newfiledes);
-			if (fd < 0)
-				return (errno);
-			break;
-		case FA_CLOSEFROM:
-			if (spawn_closefrom(fap->fa_filedes, dirbuf))
-				return (errno);
-			break;
-		case FA_FCHDIR:
-			if (fchdir(fap->fa_filedes) == -1)
-				return (errno);
-			break;
-		}
-	} while ((fap = fap->fa_next) != froot);
-
-	return (0);
-}
-
-static int
-forkflags(spawn_attr_t *sap)
-{
-	int flags = 0;
-
-	if (sap != NULL) {
-		if (sap->sa_psflags & POSIX_SPAWN_NOSIGCHLD_NP)
-			flags |= FORK_NOSIGCHLD;
-		if (sap->sa_psflags & POSIX_SPAWN_WAITPID_NP)
-			flags |= FORK_WAITPID;
-	}
-
-	return (flags);
-}
-
-/*
- * set_error() / get_error() are used to guarantee that the local variable
- * 'error' is set correctly in memory on return from vfork() in the parent.
- */
-
-static int
-set_error(int *errp, int err)
-{
-	return (*errp = err);
-}
-
-static int
-get_error(int *errp)
-{
-	return (*errp);
-}
-
-/*
- * For MT safety, do not invoke the dynamic linker after calling vfork().
- * If some other thread was in the dynamic linker when this thread's parent
- * called vfork() then the dynamic linker's lock would still be held here
- * (with a defunct owner) and we would deadlock ourself if we invoked it.
- *
- * Therefore, all of the functions we call here after returning from
- * vforkx() in the child are not and must never be exported from libc
- * as global symbols.  To do so would risk invoking the dynamic linker.
- */
-
-int
-posix_spawn(
-	pid_t *pidp,
-	const char *path,
-	const posix_spawn_file_actions_t *file_actions,
-	const posix_spawnattr_t *attrp,
-	char *const *argv,
-	char *const *envp)
-{
-	spawn_attr_t *sap = attrp? attrp->__spawn_attrp : NULL;
-	file_attr_t *fap = file_actions? file_actions->__file_attrp : NULL;
-	void *dirbuf = NULL;
-	int error;		/* this will be set by the child */
-	pid_t pid;
-
-	if (attrp != NULL && sap == NULL)
-		return (EINVAL);
-
-	if (fap != NULL && fap->fa_need_dirbuf) {
-		/*
-		 * Preallocate the buffer for the call to getdents64() in
-		 * spawn_closefrom() since we can't do it in the vfork() child.
-		 */
-		if ((dirbuf = lmalloc(DIRBUF)) == NULL)
-			return (ENOMEM);
-	}
-
-	switch (pid = vforkx(forkflags(sap))) {
-	case 0:			/* child */
-		break;
-	case -1:		/* parent, failure */
-		if (dirbuf)
-			lfree(dirbuf, DIRBUF);
-		return (errno);
-	default:		/* parent, success */
-		/*
-		 * We don't get here until the child exec()s or exit()s
-		 */
-		if (pidp != NULL && get_error(&error) == 0)
-			*pidp = pid;
-		if (dirbuf)
-			lfree(dirbuf, DIRBUF);
-		return (get_error(&error));
-	}
-
-	if (sap != NULL)
-		if (set_error(&error, perform_flag_actions(sap)) != 0)
-			_exit(_EVAPORATE);
-
-	if (fap != NULL)
-		if (set_error(&error, perform_file_actions(fap, dirbuf)) != 0)
-			_exit(_EVAPORATE);
-
-	(void) set_error(&error, 0);
-	(void) execve(path, argv, envp);
-	if (sap != NULL && (sap->sa_psflags & POSIX_SPAWN_NOEXECERR_NP))
-		_exit(127);
-	(void) set_error(&error, errno);
-	_exit(_EVAPORATE);
-	return (0);	/* not reached */
-}
-
-/*
- * Much of posix_spawnp() blatently stolen from execvp() (port/gen/execvp.c).
- */
-
 extern int libc__xpg4;
 
-static const char *
-execat(const char *s1, const char *s2, char *si)
-{
-	int cnt = PATH_MAX + 1;
-	char *s;
-	char c;
+extern pid_t __spawn(const char *, const void *, uint32_t, const void *,
+    uint32_t);
 
-	for (s = si; (c = *s1) != '\0' && c != ':'; s1++) {
-		if (cnt > 0) {
-			*s++ = c;
-			cnt--;
-		}
-	}
-	if (si != s && cnt > 0) {
-		*s++ = '/';
-		cnt--;
-	}
-	for (; (c = *s2) != '\0' && cnt > 0; s2++) {
-		*s++ = c;
-		cnt--;
-	}
-	*s = '\0';
-	return (*s1? ++s1: NULL);
+/*
+ * Add sz to the running total *lenp, refusing if the total would exceed
+ * ARG_MAX. ARG_MAX is well below UINT32_MAX, so capping there also keeps the
+ * marshalled totals and offsets within their uint32_t fields.
+ */
+static inline bool
+spawn_addlen(size_t *lenp, size_t sz)
+{
+	if (sz > ARG_MAX - *lenp)
+		return (false);
+	*lenp += sz;
+	return (true);
 }
 
-/* ARGSUSED */
-int
-posix_spawnp(
-	pid_t *pidp,
-	const char *file,
-	const posix_spawn_file_actions_t *file_actions,
-	const posix_spawnattr_t *attrp,
-	char *const *argv,
-	char *const *envp)
+/*
+ * Pack the argv[] and envp[] string vectors into sargs->sa_data as a single
+ * blob of NUL-terminated strings. Called first with sargs == NULL to compute
+ * the required buffer size, then again to populate the data and record the
+ * offsets and counts. Returns false if the combined size would exceed ARG_MAX
+ * or, on the second pass, would overflow the allocated buffer.
+ */
+static bool
+spawn_marshal_argenv(spawn_args_t *sargs, char *const *argp, char *const *envp,
+    size_t *lenp)
 {
-	spawn_attr_t *sap = attrp? attrp->__spawn_attrp : NULL;
-	file_attr_t *fap = file_actions? file_actions->__file_attrp : NULL;
-	void *dirbuf = NULL;
-	const char *pathstr = (strchr(file, '/') == NULL)? getenv("PATH") : "";
-	int xpg4 = libc__xpg4;
-	int error = 0;		/* this will be set by the child */
-	char path[PATH_MAX+4];
-	const char *cp;
-	pid_t pid;
-	char **newargs;
-	int argc;
-	int i;
+	struct vec {
+		char *const *vec;
+		uint32_t *off;
+		uint32_t *cnt;
+	} vecs[] = {
+		{ .vec = argp },
+		{ .vec = envp }
+	};
 
-	if (attrp != NULL && sap == NULL)
+	if (sargs != NULL) {
+		vecs[0].off = &sargs->sa_arg_off;
+		vecs[0].cnt = &sargs->sa_arg_cnt;
+		vecs[1].off = &sargs->sa_env_off;
+		vecs[1].cnt = &sargs->sa_env_cnt;
+	}
+
+	for (size_t i = 0; i < ARRAY_SIZE(vecs); i++) {
+		struct vec *vec = &vecs[i];
+		uint32_t cnt = 0;
+		char *const *p;
+
+		if (vec->off != NULL)
+			*vec->off = (uint32_t)*lenp;
+
+		for (p = vec->vec; p != NULL && *p != NULL; p++) {
+			size_t sz = strlen(*p) + 1;
+
+			if (sargs != NULL) {
+				if (*lenp + sz > sargs->sa_datalen)
+					return (false);
+				(void) memcpy(&sargs->sa_data[*lenp], *p, sz);
+			}
+			if (!spawn_addlen(lenp, sz))
+				return (false);
+			cnt++;
+		}
+
+		if (vec->cnt != NULL)
+			*vec->cnt = cnt;
+	}
+
+	return (true);
+}
+
+/*
+ * Pack the spawn_attr_t, the resolved scheduling attributes, the circular
+ * list of file_attr_t records and, for posix_spawnp(), the shell and search
+ * path strings into sparam->sp_data.
+ * Called first with sparam == NULL to compute the required buffer size, then
+ * again to populate the data and record the offsets, lengths and counts.
+ * Returns false if the combined size would exceed ARG_MAX or, on the second
+ * pass, would overflow the allocated buffer.
+ */
+static bool
+spawn_marshal_param(spawn_param_t *sparam, const spawn_attr_t *sa,
+    const kspawn_sched_t *ksched, const file_attr_t *fa, const char *shell,
+    const char *pathstr, size_t *lenp)
+{
+	if (sa != NULL) {
+		size_t sz = sizeof (*sa);
+
+		if (sparam != NULL) {
+			if (*lenp + sz > sparam->sp_datalen)
+				return (false);
+			sparam->sp_attr_off = (uint32_t)*lenp;
+			sparam->sp_attr_len = (uint32_t)sz;
+			(void) memcpy(&sparam->sp_data[*lenp], sa, sz);
+		}
+		if (!spawn_addlen(lenp, sz))
+			return (false);
+	}
+
+	if (ksched != NULL) {
+		size_t sz = sizeof (*ksched);
+
+		if (sparam != NULL) {
+			if (*lenp + sz > sparam->sp_datalen)
+				return (false);
+			sparam->sp_sched_off = (uint32_t)*lenp;
+			sparam->sp_sched_len = (uint32_t)sz;
+			(void) memcpy(&sparam->sp_data[*lenp], ksched, sz);
+		}
+		if (!spawn_addlen(lenp, sz))
+			return (false);
+	}
+
+	if (fa != NULL) {
+		const file_attr_t *froot = fa;
+		uint32_t cnt = 0;
+
+		if (sparam != NULL)
+			sparam->sp_fattr_off = (uint32_t)*lenp;
+
+		do {
+			/*
+			 * Each record is padded so that the next remains
+			 * 32-bit aligned.
+			 */
+			size_t sz = P2ROUNDUP(
+			    sizeof (kfile_attr_t) + fa->fa_pathsize,
+			    sizeof (uint32_t));
+
+			if (sparam != NULL) {
+				kfile_attr_t *ka;
+
+				if (*lenp + sz > sparam->sp_datalen)
+					return (false);
+
+				ka = (kfile_attr_t *)&sparam->sp_data[*lenp];
+				ka->kfa_len = sz;
+				ka->kfa_type = fa->fa_type;
+				ka->kfa_pathsize = fa->fa_pathsize;
+
+				switch (fa->fa_type) {
+				case FA_OPEN:
+					ka->kfa_filedes = fa->fa_filedes;
+					ka->kfa_oflag = fa->fa_oflag;
+					ka->kfa_mode = fa->fa_mode;
+					/* FALLTHROUGH */
+				case FA_CHDIR:
+					(void) memcpy(ka->kfa_path,
+					    fa->fa_path, fa->fa_pathsize);
+					break;
+				case FA_DUP2:
+					ka->kfa_newfiledes = fa->fa_newfiledes;
+					/* FALLTHROUGH */
+				case FA_CLOSE:
+				case FA_CLOSEFROM:
+				case FA_FCHDIR:
+					ka->kfa_filedes = fa->fa_filedes;
+					break;
+				}
+			}
+			if (!spawn_addlen(lenp, sz))
+				return (false);
+			cnt++;
+		} while ((fa = fa->fa_next) != froot);
+
+		if (sparam != NULL)
+			sparam->sp_fattr_cnt = cnt;
+	}
+
+	if (shell != NULL) {
+		size_t sz = strlen(shell) + 1;
+
+		if (sparam != NULL) {
+			if (*lenp + sz > sparam->sp_datalen)
+				return (false);
+			sparam->sp_shell_off = (uint32_t)*lenp;
+			sparam->sp_shell_len = (uint32_t)sz;
+			(void) memcpy(&sparam->sp_data[*lenp], shell, sz);
+		}
+		if (!spawn_addlen(lenp, sz))
+			return (false);
+	}
+
+	if (pathstr != NULL) {
+		size_t sz = strlen(pathstr) + 1;
+
+		if (sparam != NULL) {
+			if (*lenp + sz > sparam->sp_datalen)
+				return (false);
+			sparam->sp_path_off = (uint32_t)*lenp;
+			sparam->sp_path_len = (uint32_t)sz;
+			(void) memcpy(&sparam->sp_data[*lenp], pathstr, sz);
+		}
+		if (!spawn_addlen(lenp, sz))
+			return (false);
+	}
+
+	return (true);
+}
+
+static int
+posix_spawn_common(pid_t *pidp, const char *path,
+    const posix_spawn_file_actions_t *file_actions,
+    const posix_spawnattr_t *attrp, char *const *argp, char *const *envp,
+    const char *shell, const char *pathstr)
+{
+	spawn_attr_t *sa = (attrp != NULL) ? attrp->__spawn_attrp : NULL;
+	file_attr_t *fa = (file_actions != NULL) ? file_actions->__file_attrp :
+	    NULL;
+	const kspawn_sched_t *ksched = NULL;
+	kspawn_sched_t ks;
+	spawn_args_t *sargs = NULL;
+	spawn_param_t *sparam = NULL;
+	pid_t pid;
+	size_t datalen, len;
+	int ret = 0;
+
+	if (attrp != NULL && sa == NULL)
 		return (EINVAL);
+
+	/*
+	 * The scheduling attributes are resolved here into the form that the
+	 * child applies to itself in the kernel.
+	 */
+	if (sa != NULL && (sa->sa_psflags &
+	    (POSIX_SPAWN_SETSCHEDULER | POSIX_SPAWN_SETSCHEDPARAM)) != 0) {
+		ret = spawn_sched_resolve(sa->sa_psflags, sa->sa_schedpolicy,
+		    sa->sa_priority, &ks);
+		if (ret != 0)
+			return (ret);
+		ksched = &ks;
+	}
+
+	/*
+	 * spawn(2) creates a brand-new child process that does not share the
+	 * parent's address space, so every piece of state needed to set up the
+	 * child must be copied into the kernel ahead of time. Marshal the
+	 * spawn attributes, the list of file actions and, for posix_spawnp(),
+	 * the shell and search path, into a single contiguous blob that the
+	 * kernel can copy in and retain.
+	 */
+	datalen = 0;
+	if (!spawn_marshal_param(NULL, sa, ksched, fa, shell, pathstr,
+	    &datalen)) {
+		ret = E2BIG;
+		goto out;
+	}
+	if (datalen > 0) {
+		len = sizeof (*sparam) + datalen;
+		sparam = lmalloc(len);
+		if (sparam == NULL) {
+			ret = errno;
+			goto out;
+		}
+		sparam->sp_size = len;
+		sparam->sp_datalen = datalen;
+
+		datalen = 0;
+		if (!spawn_marshal_param(sparam, sa, ksched, fa, shell,
+		    pathstr, &datalen) || datalen != sparam->sp_datalen) {
+			ret = EINVAL;
+			goto out;
+		}
+	}
+
+	/*
+	 * Likewise the argument and environment vectors. As supplied by the
+	 * caller these are arrays of pointers into strings that may well be
+	 * scattered around the parent's address space. Flatten the strings
+	 * into a single contiguous blob that the kernel can copy in.
+	 */
+	datalen = 0;
+	if (!spawn_marshal_argenv(NULL, argp, envp, &datalen)) {
+		ret = E2BIG;
+		goto out;
+	}
+	len = sizeof (*sargs) + datalen;
+	sargs = lmalloc(len);
+	if (sargs == NULL) {
+		ret = errno;
+		goto out;
+	}
+	sargs->sa_size = len;
+	sargs->sa_datalen = datalen;
+
+	datalen = 0;
+	if (!spawn_marshal_argenv(sargs, argp, envp, &datalen) ||
+	    datalen != sargs->sa_datalen) {
+		ret = EINVAL;
+		goto out;
+	}
+
+	pid = __spawn(path, sparam, sparam != NULL ? sparam->sp_size : 0,
+	    sargs, sargs->sa_size);
+
+	if (pid == -1) {
+		ret = errno;
+		goto out;
+	}
+
+	if (pidp != NULL)
+		*pidp = pid;
+
+out:
+	if (sparam != NULL)
+		lfree(sparam, sparam->sp_size);
+	if (sargs != NULL)
+		lfree(sargs, sargs->sa_size);
+	return (ret);
+}
+
+int
+posix_spawn(pid_t *pidp, const char *path,
+    const posix_spawn_file_actions_t *file_actions,
+    const posix_spawnattr_t *attrp, char *const *argp, char *const *envp)
+{
+	return (posix_spawn_common(pidp, path, file_actions, attrp,
+	    argp, envp, NULL, NULL));
+}
+
+int
+posix_spawnp(pid_t *pidp, const char *file,
+    const posix_spawn_file_actions_t *file_actions,
+    const posix_spawnattr_t *attrp, char *const *argp, char *const *envp)
+{
+	const char *pathstr =
+	    (strchr(file, '/') == NULL) ? getenv("PATH") : "";
 
 	if (*file == '\0')
 		return (EACCES);
-
-	if (fap != NULL && fap->fa_need_dirbuf) {
-		/*
-		 * Preallocate the buffer for the call to getdents64() in
-		 * spawn_closefrom() since we can't do it in the vfork() child.
-		 */
-		if ((dirbuf = lmalloc(DIRBUF)) == NULL)
-			return (ENOMEM);
-	}
-
-	/*
-	 * We may need to invoke the shell with a slightly modified
-	 * argv[] array.  To do this we need to preallocate the array.
-	 * We must call alloca() before calling vfork() because doing
-	 * it after vfork() (in the child) would corrupt the parent.
-	 */
-	for (argc = 0; argv[argc] != NULL; argc++)
-		continue;
-	newargs = alloca((argc + 2) * sizeof (char *));
-
-	switch (pid = vforkx(forkflags(sap))) {
-	case 0:			/* child */
-		break;
-	case -1:		/* parent, failure */
-		if (dirbuf)
-			lfree(dirbuf, DIRBUF);
-		return (errno);
-	default:		/* parent, success */
-		/*
-		 * We don't get here until the child exec()s or exit()s
-		 */
-		if (pidp != NULL && get_error(&error) == 0)
-			*pidp = pid;
-		if (dirbuf)
-			lfree(dirbuf, DIRBUF);
-		return (get_error(&error));
-	}
-
-	if (sap != NULL)
-		if (set_error(&error, perform_flag_actions(sap)) != 0)
-			_exit(_EVAPORATE);
-
-	if (fap != NULL)
-		if (set_error(&error, perform_file_actions(fap, dirbuf)) != 0)
-			_exit(_EVAPORATE);
 
 	if (pathstr == NULL) {
 		/*
@@ -472,79 +380,39 @@ posix_spawnp(
 		 * with a colon when not root.  Keep these paths in sync
 		 * with _CS_PATH in confstr.c.  Note that pathstr must end
 		 * with a colon when not root so that when file doesn't
-		 * contain '/', the last call to execat() will result in an
-		 * attempt to execv file from the current directory.
+		 * contain '/', the last attempt will be to exec the file
+		 * from the current directory.
 		 */
 		if (geteuid() == 0 || getuid() == 0) {
-			if (!xpg4)
+			if (!libc__xpg4) {
 				pathstr = "/usr/sbin:/usr/ccs/bin:/usr/bin";
-			else
+			} else {
 				pathstr = "/usr/xpg4/bin:/usr/ccs/bin:"
 				    "/usr/bin:/opt/SUNWspro/bin:/usr/sbin";
+			}
 		} else {
-			if (!xpg4)
+			if (!libc__xpg4) {
 				pathstr = "/usr/ccs/bin:/usr/bin:";
-			else
+			} else {
 				pathstr = "/usr/xpg4/bin:/usr/ccs/bin:"
 				    "/usr/bin:/opt/SUNWspro/bin:";
+			}
 		}
 	}
 
-	cp = pathstr;
-	do {
-		cp = execat(cp, file, path);
-		/*
-		 * 4025035 and 4038378
-		 * if a filename begins with a "-" prepend "./" so that
-		 * the shell can't interpret it as an option
-		 */
-		if (*path == '-') {
-			char *s;
-
-			for (s = path; *s != '\0'; s++)
-				continue;
-			for (; s >= path; s--)
-				*(s + 2) = *s;
-			path[0] = '.';
-			path[1] = '/';
-		}
-		(void) set_error(&error, 0);
-		(void) execve(path, argv, envp);
-		if (set_error(&error, errno) == ENOEXEC) {
-			newargs[0] = "sh";
-			newargs[1] = path;
-			for (i = 1; i <= argc; i++)
-				newargs[i + 1] = argv[i];
-			(void) set_error(&error, 0);
-			(void) execve(_PATH_BSHELL, newargs, envp);
-			if (sap != NULL &&
-			    (sap->sa_psflags & POSIX_SPAWN_NOEXECERR_NP))
-				_exit(127);
-			(void) set_error(&error, errno);
-			_exit(_EVAPORATE);
-		}
-	} while (cp);
-
-	if (sap != NULL &&
-	    (sap->sa_psflags & POSIX_SPAWN_NOEXECERR_NP)) {
-		(void) set_error(&error, 0);
-		_exit(127);
-	}
-	_exit(_EVAPORATE);
-	return (0);	/* not reached */
+	return (posix_spawn_common(pidp, file, file_actions, attrp,
+	    argp, envp, _PATH_BSHELL, pathstr));
 }
 
 int
-posix_spawn_file_actions_init(
-	posix_spawn_file_actions_t *file_actions)
+posix_spawn_file_actions_init(posix_spawn_file_actions_t *file_actions)
 {
 	file_actions->__file_attrp = NULL;
 	return (0);
 }
 
 int
-posix_spawn_file_actions_destroy(
-	posix_spawn_file_actions_t *file_actions)
+posix_spawn_file_actions_destroy(posix_spawn_file_actions_t *file_actions)
 {
 	file_attr_t *froot = file_actions->__file_attrp;
 	file_attr_t *fap;
@@ -576,22 +444,12 @@ add_file_attr(posix_spawn_file_actions_t *file_actions, file_attr_t *fap)
 		froot->fa_prev->fa_next = fap;
 		froot->fa_prev = fap;
 	}
-
-	/*
-	 * Once set, __file_attrp no longer changes, so this assignment
-	 * always goes into the first element in the list, as required.
-	 */
-	if (fap->fa_type == FA_CLOSEFROM)
-		froot->fa_need_dirbuf = 1;
 }
 
 int
 posix_spawn_file_actions_addopen(
-	posix_spawn_file_actions_t *restrict file_actions,
-	int filedes,
-	const char *restrict path,
-	int oflag,
-	mode_t mode)
+    posix_spawn_file_actions_t *restrict file_actions,
+    int filedes, const char *restrict path, int oflag, mode_t mode)
 {
 	file_attr_t *fap;
 
@@ -618,8 +476,7 @@ posix_spawn_file_actions_addopen(
 
 int
 posix_spawn_file_actions_addclose(
-	posix_spawn_file_actions_t *restrict file_actions,
-	int filedes)
+    posix_spawn_file_actions_t *restrict file_actions, int filedes)
 {
 	file_attr_t *fap;
 
@@ -637,9 +494,8 @@ posix_spawn_file_actions_addclose(
 
 int
 posix_spawn_file_actions_adddup2(
-	posix_spawn_file_actions_t *restrict file_actions,
-	int filedes,
-	int newfiledes)
+    posix_spawn_file_actions_t *restrict file_actions,
+    int filedes, int newfiledes)
 {
 	file_attr_t *fap;
 
@@ -658,8 +514,7 @@ posix_spawn_file_actions_adddup2(
 
 int
 posix_spawn_file_actions_addclosefrom_np(
-	posix_spawn_file_actions_t *restrict file_actions,
-	int lowfiledes)
+    posix_spawn_file_actions_t *restrict file_actions, int lowfiledes)
 {
 	file_attr_t *fap;
 
@@ -707,8 +562,7 @@ posix_spawn_file_actions_addchdir_np(
 
 int
 posix_spawn_file_actions_addfchdir(
-    posix_spawn_file_actions_t *restrict file_actions,
-    int fd)
+    posix_spawn_file_actions_t *restrict file_actions, int fd)
 {
 	file_attr_t *fap;
 
@@ -724,15 +578,13 @@ posix_spawn_file_actions_addfchdir(
 
 int
 posix_spawn_file_actions_addfchdir_np(
-    posix_spawn_file_actions_t *restrict file_actions,
-    int fd)
+    posix_spawn_file_actions_t *restrict file_actions, int fd)
 {
 	return (posix_spawn_file_actions_addfchdir(file_actions, fd));
 }
 
 int
-posix_spawnattr_init(
-	posix_spawnattr_t *attr)
+posix_spawnattr_init(posix_spawnattr_t *attr)
 {
 	if ((attr->__spawn_attrp = lmalloc(sizeof (posix_spawnattr_t))) == NULL)
 		return (ENOMEM);
@@ -743,8 +595,7 @@ posix_spawnattr_init(
 }
 
 int
-posix_spawnattr_destroy(
-	posix_spawnattr_t *attr)
+posix_spawnattr_destroy(posix_spawnattr_t *attr)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -760,9 +611,7 @@ posix_spawnattr_destroy(
 }
 
 int
-posix_spawnattr_setflags(
-	posix_spawnattr_t *attr,
-	short flags)
+posix_spawnattr_setflags(posix_spawnattr_t *attr, short flags)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -775,9 +624,7 @@ posix_spawnattr_setflags(
 }
 
 int
-posix_spawnattr_getflags(
-	const posix_spawnattr_t *attr,
-	short *flags)
+posix_spawnattr_getflags(const posix_spawnattr_t *attr, short *flags)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -789,9 +636,7 @@ posix_spawnattr_getflags(
 }
 
 int
-posix_spawnattr_setpgroup(
-	posix_spawnattr_t *attr,
-	pid_t pgroup)
+posix_spawnattr_setpgroup(posix_spawnattr_t *attr, pid_t pgroup)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -803,9 +648,7 @@ posix_spawnattr_setpgroup(
 }
 
 int
-posix_spawnattr_getpgroup(
-	const posix_spawnattr_t *attr,
-	pid_t *pgroup)
+posix_spawnattr_getpgroup(const posix_spawnattr_t *attr, pid_t *pgroup)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -817,9 +660,8 @@ posix_spawnattr_getpgroup(
 }
 
 int
-posix_spawnattr_setschedparam(
-	posix_spawnattr_t *attr,
-	const struct sched_param *schedparam)
+posix_spawnattr_setschedparam(posix_spawnattr_t *attr,
+    const struct sched_param *schedparam)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -834,9 +676,8 @@ posix_spawnattr_setschedparam(
 }
 
 int
-posix_spawnattr_getschedparam(
-	const posix_spawnattr_t *attr,
-	struct sched_param *schedparam)
+posix_spawnattr_getschedparam(const posix_spawnattr_t *attr,
+    struct sched_param *schedparam)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -848,9 +689,7 @@ posix_spawnattr_getschedparam(
 }
 
 int
-posix_spawnattr_setschedpolicy(
-	posix_spawnattr_t *attr,
-	int schedpolicy)
+posix_spawnattr_setschedpolicy(posix_spawnattr_t *attr, int schedpolicy)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -858,8 +697,7 @@ posix_spawnattr_setschedpolicy(
 		return (EINVAL);
 
 	/*
-	 * Cache the policy information for later use
-	 * by the vfork() child of posix_spawn().
+	 * Cache the policy information for later use by posix_spawn().
 	 */
 	if (get_info_by_policy(schedpolicy) == NULL)
 		return (errno);
@@ -869,9 +707,7 @@ posix_spawnattr_setschedpolicy(
 }
 
 int
-posix_spawnattr_getschedpolicy(
-	const posix_spawnattr_t *attr,
-	int *schedpolicy)
+posix_spawnattr_getschedpolicy(const posix_spawnattr_t *attr, int *schedpolicy)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -883,9 +719,8 @@ posix_spawnattr_getschedpolicy(
 }
 
 int
-posix_spawnattr_setsigdefault(
-	posix_spawnattr_t *attr,
-	const sigset_t *sigdefault)
+posix_spawnattr_setsigdefault(posix_spawnattr_t *attr,
+    const sigset_t *sigdefault)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -897,9 +732,8 @@ posix_spawnattr_setsigdefault(
 }
 
 int
-posix_spawnattr_getsigdefault(
-	const posix_spawnattr_t *attr,
-	sigset_t *sigdefault)
+posix_spawnattr_getsigdefault(const posix_spawnattr_t *attr,
+    sigset_t *sigdefault)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -911,9 +745,8 @@ posix_spawnattr_getsigdefault(
 }
 
 int
-posix_spawnattr_setsigignore_np(
-	posix_spawnattr_t *attr,
-	const sigset_t *sigignore)
+posix_spawnattr_setsigignore_np(posix_spawnattr_t *attr,
+    const sigset_t *sigignore)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -925,9 +758,8 @@ posix_spawnattr_setsigignore_np(
 }
 
 int
-posix_spawnattr_getsigignore_np(
-	const posix_spawnattr_t *attr,
-	sigset_t *sigignore)
+posix_spawnattr_getsigignore_np(const posix_spawnattr_t *attr,
+    sigset_t *sigignore)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -939,9 +771,8 @@ posix_spawnattr_getsigignore_np(
 }
 
 int
-posix_spawnattr_setsigmask(
-	posix_spawnattr_t *attr,
-	const sigset_t *sigmask)
+posix_spawnattr_setsigmask(posix_spawnattr_t *attr,
+    const sigset_t *sigmask)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
@@ -953,9 +784,8 @@ posix_spawnattr_setsigmask(
 }
 
 int
-posix_spawnattr_getsigmask(
-	const posix_spawnattr_t *attr,
-	sigset_t *sigmask)
+posix_spawnattr_getsigmask(const posix_spawnattr_t *attr,
+    sigset_t *sigmask)
 {
 	spawn_attr_t *sap = attr->__spawn_attrp;
 
