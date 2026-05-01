@@ -10,10 +10,11 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 PROGS = \
+	strftime_18091	\
 	tznames		\
 	tzload		\
 	zoneinfo_dump

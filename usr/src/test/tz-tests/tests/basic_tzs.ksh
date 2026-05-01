@@ -11,7 +11,7 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 #
@@ -88,15 +88,15 @@ typeset -A btz_tzs=(
 	["World (Brisbane, ':')"]=(zone=":Australia/Brisbane" ts="946684800"
 	    res="Sat Jan  1 10:00:00 AEST 2000")
 	["World (Casablanca)"]=(zone="Africa/Casablanca" ts="946684800"
-	    res="Sat Jan  1 00:00:00 +01 2000")
+	    res="Sat Jan  1 00:00:00 +00 2000")
 	["World (Damascus)"]=(zone="Asia/Damascus" ts="946684800"
-	    res="Sat Jan  1 02:00:00 +03 2000")
+	    res="Sat Jan  1 02:00:00 EET 2000")
 	["World (Egypt)"]=(zone="Egypt" ts="946684800"
 	    res="Sat Jan  1 02:00:00 EET 2000")
 	["World (GMT)"]=(zone="GMT" ts="946684800"
 	    res="Sat Jan  1 00:00:00 GMT 2000")
 	["World (Guam)"]=(zone="Pacific/Guam" ts="946684800"
-	    res="Sat Jan  1 10:00:00 ChST 2000")
+	    res="Sat Jan  1 10:00:00 GST 2000")
 	["World (Hong Kong)"]=(zone="Hongkong" ts="946684800"
 	    res="Sat Jan  1 08:00:00 HKT 2000")
 	["World (Japan)"]=(zone="Japan" ts="946684800"

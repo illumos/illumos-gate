@@ -13,8 +13,19 @@
 # Copyright 2026 Oxide Computer Company
 #
 
-.PARALLEL: $(SUBDIRS)
+#
+# Time zone tests. These are the tests that can be used to validate basic
+# functionality or are otherwise regression tests.
+#
 
-SUBDIRS = cmd doc runfiles tests
+[DEFAULT]
+pre =
+verbose = False
+quiet = False
+timeout = 60
+outputdir = /var/tmp/test_results
 
-include $(SRC)/test/Makefile.com
+[/opt/tz-tests/tests/basic_tzs]
+[/opt/tz-tests/tests/strftime_18091.32]
+[/opt/tz-tests/tests/strftime_18091.64]
+[/opt/tz-tests/tests/tzname_17947]

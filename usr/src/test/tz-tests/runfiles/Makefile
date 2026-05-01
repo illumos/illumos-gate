@@ -13,8 +13,28 @@
 # Copyright 2026 Oxide Computer Company
 #
 
-.PARALLEL: $(SUBDIRS)
+include $(SRC)/Makefile.master
 
-SUBDIRS = cmd doc runfiles tests
+RUNFILES = default.run
 
-include $(SRC)/test/Makefile.com
+ROOTOPTPKG = $(ROOT)/opt/tz-tests
+ROOTRUNDIR = $(ROOTOPTPKG)/runfiles
+
+ROOTRUNFILES = $(RUNFILES:%=$(ROOTRUNDIR)/%)
+$(ROOTRUNFILES) := FILEMODE = 0444
+
+all: $(SRCS)
+
+install: $(ROOTRUNFILES)
+
+clean:
+
+clobber:
+
+$(ROOTRUNFILES): $(ROOTRUNDIR)
+
+$(ROOTRUNDIR):
+	$(INS.dir)
+
+$(ROOTRUNDIR)/%: %
+	$(INS.file)

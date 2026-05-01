@@ -13,8 +13,28 @@
 # Copyright 2026 Oxide Computer Company
 #
 
-.PARALLEL: $(SUBDIRS)
+include $(SRC)/Makefile.master
 
-SUBDIRS = cmd doc runfiles tests
+CMDS = tz-test
 
-include $(SRC)/test/Makefile.com
+ROOTOPTPKG = $(ROOT)/opt/tz-tests
+ROOTCMDDIR = $(ROOTOPTPKG)/bin
+
+ROOTCMDS = $(CMDS:%=$(ROOTCMDDIR)/%)
+$(ROOTCMDS) := FILEMODE = 0555
+
+all:
+
+install: $(ROOTCMDS)
+
+clean:
+
+clobber:
+
+$(ROOTCMDS): $(ROOTCMDDIR)
+
+$(ROOTCMDDIR):
+	$(INS.dir)
+
+$(ROOTCMDDIR)/%: %.ksh
+	$(INS.rename)

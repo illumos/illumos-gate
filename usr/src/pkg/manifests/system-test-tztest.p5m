@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 #
@@ -28,8 +28,14 @@ set name=variant.arch value=$(ARCH)
 dir  path=opt/tz-tests
 dir  path=opt/tz-tests
 file path=opt/tz-tests/README mode=0444
+dir  path=opt/tz-tests/bin
+file path=opt/tz-tests/bin/tz-test mode=0555
+dir  path=opt/tz-tests/runfiles
+file path=opt/tz-tests/runfiles/default.run mode=0444
 dir  path=opt/tz-tests/tests
 file path=opt/tz-tests/tests/basic_tzs mode=0555
+file path=opt/tz-tests/tests/strftime_18091.32 mode=0555
+file path=opt/tz-tests/tests/strftime_18091.64 mode=0555
 file path=opt/tz-tests/tests/tz_dump mode=0555
 file path=opt/tz-tests/tests/tzlist.64 mode=0555
 file path=opt/tz-tests/tests/tzload.32 mode=0555

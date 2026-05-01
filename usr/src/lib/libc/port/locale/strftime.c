@@ -2,6 +2,7 @@
  * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2010 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 1989 The Regents of the University of California.
+ * Copyright 2026 Oxide Computer Company
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms are permitted
@@ -25,6 +26,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <locale.h>
+#include <tzint.h>
 #include "timelocal.h"
 #include "localeimpl.h"
 
@@ -115,6 +117,9 @@ _fmt(locale_t loc, const char *format, const struct tm *t, char *pt,
 {
 	int Ealternative, Oalternative, PadIndex;
 	const struct lc_time *tptr = loc->time;
+	tzinfo_ctx_t ctx;
+
+	tzinfo_tm_to_ctx(t, &ctx);
 
 #define	PADDING(x)	fmt_padding[x][PadIndex]
 
@@ -420,9 +425,10 @@ label:
 				    pt, ptlim);
 				continue;
 			case 'Z':
-				if (t->tm_isdst >= 0)
-					pt = _add(tzname[t->tm_isdst != 0],
-					    pt, ptlim);
+				if (t->tm_isdst >= 0) {
+					pt = _add(ctx.tzc_tzname[t->tm_isdst !=
+					    0], pt, ptlim);
+				}
 				/*
 				 * C99 says that %Z must be replaced by the
 				 * empty string if the time zone is not
@@ -456,9 +462,9 @@ label:
 				 * appropriate variables are not available.
 				 */
 				if (t->tm_isdst == 0)
-					diff = -timezone;
+					diff = -ctx.tzc_timezone;
 				else
-					diff = -altzone;
+					diff = -ctx.tzc_altzone;
 				if (diff < 0) {
 					sign = "-";
 					diff = -diff;
