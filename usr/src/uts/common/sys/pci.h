@@ -648,6 +648,7 @@ extern "C" {
  */
 #define	PCI_PMCAP_VER_1_0	0x1	/* PCI PM spec 1.0 */
 #define	PCI_PMCAP_VER_1_1	0x2	/* PCI PM spec 1.1 */
+#define	PCI_PMCAP_VER_1_2	0x3	/* PCI PM spec 1.2 */
 #define	PCI_PMCAP_VER_MASK	0x7	/* version mask */
 #define	PCI_PMCAP_PME_CLOCK	0x8	/* needs PCI clock for PME */
 #define	PCI_PMCAP_DSI		0x20	/* needs device specific init */
@@ -677,6 +678,7 @@ extern "C" {
 #define	PCI_PMCSR_D2			0x2	/* power state D2 */
 #define	PCI_PMCSR_D3HOT			0x3	/* power state D3hot */
 #define	PCI_PMCSR_STATE_MASK		0x3	/* power state mask */
+#define	PCI_PMCSR_NOSOFTRESET		0x8	/* No Soft Reset */
 #define	PCI_PMCSR_PME_EN		0x100	/* enable PME assertion */
 #define	PCI_PMCSR_DSEL_D0_PWR_C		0x0	/* D0 power consumed */
 #define	PCI_PMCSR_DSEL_D1_PWR_C		0x200	/* D1 power consumed */
