@@ -323,7 +323,7 @@ nvme_lpd_eom_len(uint64_t *outp, const void *data, size_t len)
 	case NVME_EOM_IN_PROGRESS:
 		break;
 	case NVME_EOM_DONE:
-		out += hdr.eom_ds * hdr.eom_nd;
+		out += (uint64_t)hdr.eom_ds * (uint64_t)hdr.eom_nd;
 		break;
 	default:
 		/*

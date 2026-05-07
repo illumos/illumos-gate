@@ -691,10 +691,11 @@ phyeye_lane_iter(const nvme_eom_hdr_t *hdr, off_t max,
 				    desc->eld_ncols);
 			}
 
-			dlen += desc->eld_nrows * desc->eld_ncols;
+			dlen += (uint32_t)desc->eld_nrows *
+			    (uint32_t)desc->eld_ncols;
 		} else if (desc->eld_nrows != 0 || desc->eld_ncols != 0) {
 			errx(-1, "printable eye feature not present but both "
-			    "NROWS (0x%x) and NCOLS (0x%x) are not zero",
+			    "NROWS (0x%x) and NCOLS (0x%x) should be zero",
 			    desc->eld_nrows, desc->eld_ncols);
 		}
 

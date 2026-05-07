@@ -1871,10 +1871,18 @@ void
 nvme_print_identify_ctrl_list(const char *header,
     const nvme_identify_ctrl_list_t *ctlist)
 {
-	int i;
+	const size_t max = ARRAY_SIZE(ctlist->cl_ctlid);
+	size_t nents = ctlist->cl_nid;
+
+	if (ctlist->cl_nid > max) {
+		warnx("device has indicated %zu controller entities which "
+		    "exceeds the maximum of %zu, limiting to %zu", nents,
+		    max, max);
+		nents = max;
+	}
 
 	nvme_print(0, header, -1, NULL);
-	for (i = 0; i != ctlist->cl_nid; i++) {
+	for (size_t i = 0; i < nents; i++) {
 		nvme_print_uint64(2, "Controller Identifier",
 		    ctlist->cl_ctlid[i], NULL, NULL);
 	}
