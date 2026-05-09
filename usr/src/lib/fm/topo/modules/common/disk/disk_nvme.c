@@ -12,7 +12,7 @@
 /*
  * Copyright 2020 Joyent, Inc.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -341,10 +341,10 @@ disk_nvme_make_ns(nvme_enum_info_t *nei, nvme_ns_info_t *ns_info)
 	nvlist_t *auth = NULL, *fmri = NULL;
 	const uint32_t nsid = nvme_ns_info_nsid(ns_info);
 	const topo_instance_t inst = nsid - 1;
-	char serial[64], capstr[64];
+	char serial[64];
 	const nvme_nvm_lba_fmt_t *fmt;
 	const char *bd_addr;
-	uint64_t cap, blksz, capblks;
+	uint64_t blksz, capblks;
 	tnode_t *tn;
 	int err;
 
@@ -431,12 +431,22 @@ disk_nvme_make_ns(nvme_enum_info_t *nei, nvme_ns_info_t *ns_info)
 		goto done;
 	}
 
-	cap = blksz * capblks;
-	if (snprintf(capstr, sizeof (capstr), "%" PRIu64, cap) >=
-	    sizeof (capstr)) {
-		topo_mod_dprintf(mod, "overflowed capacity calculation on "
-		    "nsid %u", nsid);
-		goto done;
+	/*
+	 * If the multiplication would overflow a uint64_t property, or the
+	 * reported block size is zero, the capacity property is not added.
+	 */
+	if (capblks != 0 && blksz <= UINT64_MAX / capblks) {
+		uint64_t cap = blksz * capblks;
+
+		if (topo_prop_set_uint64(tn, TOPO_PGROUP_STORAGE,
+		    TOPO_STORAGE_CAPACITY, TOPO_PROP_IMMUTABLE,
+		    cap, &err) != 0) {
+			topo_mod_dprintf(mod,
+			    "failed to create property %s:%s on %s[%" PRIu64
+			    "]: %s", TOPO_PGROUP_STORAGE, TOPO_STORAGE_CAPACITY,
+			    DISK, inst, topo_strerror(err));
+			goto done;
+		}
 	}
 
 	/*
@@ -513,6 +523,7 @@ make_nvme_node(nvme_enum_info_t *nvme_info)
 	char *pname = topo_node_name(nvme_info->nei_parent);
 	char *label = NULL;
 	topo_instance_t pinst = topo_node_instance(nvme_info->nei_parent);
+	nvme_uint128_t cap;
 	int err = 0, ret = -1;
 
 	/*
@@ -622,6 +633,21 @@ make_nvme_node(nvme_enum_info_t *nvme_info)
 	    TOPO_PROP_IMMUTABLE, vers, &err) != 0) {
 		topo_mod_dprintf(mod, "%s: failed to set %s/%s property",
 		    __func__, TOPO_PGROUP_NVME, TOPO_PROP_NVME_VER);
+		(void) topo_mod_seterrno(mod, err);
+		goto error;
+	}
+
+	/*
+	 * The total NVM capacity is only available on controllers that support
+	 * namespace management (added in NVMe 1.2). Only record it if the high
+	 * 64 bits are zero so that it fits in a uint64 property.
+	 */
+	if (nvme_ctrl_info_cap(info, &cap) && cap.hi == 0 &&
+	    topo_prop_set_uint64(nvme,
+	    TOPO_PGROUP_NVME, TOPO_PROP_NVME_NVM_CAPACITY, TOPO_PROP_IMMUTABLE,
+	    cap.lo, &err) != 0) {
+		topo_mod_dprintf(mod, "%s: failed to set %s/%s property",
+		    __func__, TOPO_PGROUP_NVME, TOPO_PROP_NVME_NVM_CAPACITY);
 		(void) topo_mod_seterrno(mod, err);
 		goto error;
 	}
