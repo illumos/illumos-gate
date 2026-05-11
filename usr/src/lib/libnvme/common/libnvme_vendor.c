@@ -30,6 +30,7 @@ const nvme_vsd_t *const nvme_vsd_devices[] = {
 	&micron_7300,
 	&micron_74x0,
 	&micron_x500,
+	&micron_7600,
 	&micron_9550,
 	&intel_p5510,
 	&solidigm_p5x20,

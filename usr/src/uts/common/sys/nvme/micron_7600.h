@@ -13,14 +13,14 @@
  * Copyright 2026 Oxide Computer Company
  */
 
-#ifndef _SYS_NVME_MICRON_9550_H
-#define	_SYS_NVME_MICRON_9550_H
+#ifndef _SYS_NVME_MICRON_7600_H
+#define	_SYS_NVME_MICRON_7600_H
 
 /*
  * This header defines vendor-specific NVMe interfaces and is not a committed
  * interface. Its contents and existence are subject to change.
  *
- * This covers the Micron 9550 series devices.
+ * This covers the Micron 7600 series devices.
  */
 
 #include <sys/nvme/ocp.h>
@@ -29,21 +29,19 @@
 extern "C" {
 #endif
 
-#define	MICRON_9550_PRO_DID	0x51bb
-#define	MICRON_9550_MAX_DID	0x51bd
+#define	MICRON_7600_PRO_DID	0x51c9
+#define	MICRON_7600_MAX_DID	0x51ca
 
 typedef enum {
-	MICRON_9550_LOG_OCP_SMART	= OCP_LOG_DSSD_SMART,
-	MICRON_9550_LOG_OCP_ERRREC	= OCP_LOG_DSSD_ERROR_REC,
-	MICRON_9550_LOG_OCP_FWACT	= OCP_LOG_DSSD_FWACT,
-	MICRON_9550_LOG_OCP_LATENCY	= OCP_LOG_DSSD_LATENCY,
-	MICRON_9550_LOG_OCP_DEV_CAP	= OCP_LOG_DSSD_DEV_CAP,
-	MICRON_9550_LOG_OCP_UNSUP	= OCP_LOG_DSSD_UNSUP_REQ,
-	MICRON_9550_LOG_OCP_TELEMETRY	= OCP_LOG_DSSD_TELEMETRY,
-} micron_9500_vul_t;
+	MICRON_7600_LOG_OCP_SMART	= OCP_LOG_DSSD_SMART,
+	MICRON_7600_LOG_OCP_ERRREC	= OCP_LOG_DSSD_ERROR_REC,
+	MICRON_7600_LOG_OCP_LATENCY	= OCP_LOG_DSSD_LATENCY,
+	MICRON_7600_LOG_OCP_DEV_CAP	= OCP_LOG_DSSD_DEV_CAP,
+	MICRON_7600_LOG_OCP_TELEMETRY	= OCP_LOG_DSSD_TELEMETRY
+} micron_7600_vul_t;
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _SYS_NVME_MICRON_9550_H */
+#endif /* _SYS_NVME_MICRON_7600_H */

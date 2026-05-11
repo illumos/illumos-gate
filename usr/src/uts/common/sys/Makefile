@@ -29,7 +29,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2019 Peter Tribble.
 # Copyright 2015, Joyent, Inc. All rights reserved.
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 include $(SRC)/uts/Makefile.uts
@@ -907,6 +907,7 @@ NVMEHDRS=		\
 	micron.h		\
 	micron_7300.h		\
 	micron_74x0.h		\
+	micron_7600.h		\
 	micron_x500.h		\
 	micron_9550.h		\
 	ocp.h			\

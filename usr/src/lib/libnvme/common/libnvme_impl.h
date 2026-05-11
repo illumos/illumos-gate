@@ -549,6 +549,7 @@ extern const nvme_vsd_t sandisk_sn861;
 extern const nvme_vsd_t micron_7300;
 extern const nvme_vsd_t micron_74x0;
 extern const nvme_vsd_t micron_x500;
+extern const nvme_vsd_t micron_7600;
 extern const nvme_vsd_t micron_9550;
 extern const nvme_vsd_t intel_p5510;
 extern const nvme_vsd_t solidigm_p5x20;
