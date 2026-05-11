@@ -1696,3 +1696,4 @@ Bugid   Risk Synopsis
 15260	ld crashes if group members are stripped by -s
 15515	ld accepts nonsensical arguments
 15516	LD_ALTEXEC parsing is too restrictive
+18100	Linker should merge gcc_except_table sections

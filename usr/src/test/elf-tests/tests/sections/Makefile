@@ -12,8 +12,9 @@
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2018 Joyent, Inc.
+# Copyright 2026 Oxide Computer Company
 #
 
-SUBDIRS = shf-exclude
+SUBDIRS = shf-exclude gcc-except-table
 
 include $(SRC)/test/Makefile.com

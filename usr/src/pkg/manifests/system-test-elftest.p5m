@@ -10,6 +10,7 @@
 #
 
 # Copyright 2021, Richard Lowe.
+# Copyright 2026 Oxide Computer Company
 
 set name=pkg.fmri value=pkg:/system/test/elftest@$(PKGVERS)
 set name=pkg.summary value="ELF Test Suite"
@@ -117,6 +118,10 @@ file \
     mode=0555
 file path=opt/elf-tests/tests/resolution/mixed-hidden-comdat/visible.s mode=0444
 dir  path=opt/elf-tests/tests/sections
+dir  path=opt/elf-tests/tests/sections/gcc-except-table
+file path=opt/elf-tests/tests/sections/gcc-except-table/gcct1.s mode=0444
+file path=opt/elf-tests/tests/sections/gcc-except-table/gcct2.s mode=0444
+file path=opt/elf-tests/tests/sections/gcc-except-table/simple mode=0555
 dir  path=opt/elf-tests/tests/sections/shf-exclude
 file path=opt/elf-tests/tests/sections/shf-exclude/Makefile.test mode=0444
 file path=opt/elf-tests/tests/sections/shf-exclude/exclude-exec mode=0555

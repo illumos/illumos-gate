@@ -25,7 +25,7 @@
  *
  * Copyright (c) 1991, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, Joyent, Inc. All rights reserved.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -470,6 +470,7 @@ static struct split_sec_mapping {
 	{ ".data.",			".data",		B_FALSE },
 	{ ".dtors.",			".dtors",		B_FALSE },
 	{ ".fini_array.",		".fini_array",		B_FALSE },
+	{ ".gcc_except_table.",		".gcc_except_table",	B_FALSE },
 	{ ".init_array.",		".init_array",		B_FALSE },
 	{ ".lbss.",			".lbss",		B_FALSE },
 	{ ".ldata.",			".ldata",		B_FALSE },

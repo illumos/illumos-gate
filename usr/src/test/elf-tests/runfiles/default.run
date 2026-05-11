@@ -10,6 +10,7 @@
 #
 
 # Copyright 2021, Richard Lowe.
+# Copyright 2026 Oxide Computer Company
 
 [DEFAULT]
 pre =
@@ -55,6 +56,10 @@ tests = ['mixed-hidden-comdat']
 [/opt/elf-tests/tests/sections/shf-exclude]
 arch = i86pc
 tests = ['exclude-kmod', 'exclude-exec', 'exclude-so', 'include-reloc', 'unknown-os']
+
+[/opt/elf-tests/tests/sections/gcc-except-table]
+arch = i86pc
+tests = ['simple']
 
 [/opt/elf-tests/tests/string-merge/]
 tests = ['simple']
