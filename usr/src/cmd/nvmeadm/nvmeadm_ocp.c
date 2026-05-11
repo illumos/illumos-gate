@@ -894,6 +894,306 @@ const nvmeadm_log_field_info_t ocp_vul_unsup_field_info = {
 	.nlfi_drive = ocp_vul_unsup_drive
 };
 
+static uint32_t
+ocp_vul_hw_comp_getvers(const void *data, size_t len)
+{
+	if (len < sizeof (ocp_vul_hw_comp_t)) {
+		errx(-1, "cannot parse revision information, found 0x%zx "
+		    "bytes, need at least 0x%zx", len,
+		    sizeof (ocp_vul_hw_comp_t));
+	}
+
+	const ocp_vul_hw_comp_t *log = data;
+	return (log->ohc_vers);
+}
+
+#define	OCP_F_HWCOMP(f)	.nf_off = offsetof(ocp_vul_hw_comp_t, ohc_##f), \
+	.nf_len = sizeof (((ocp_vul_hw_comp_t *)NULL)->ohc_##f)
+
+#define	OCP_F_HWDESC(f)	.nf_off = offsetof(ocp_hw_comp_desc_t, cd_##f), \
+	.nf_len = sizeof (((ocp_hw_comp_desc_t *)NULL)->cd_##f)
+
+static const nvmeadm_field_t ocp_vul_hwcomp_header_v1[] = { {
+	OCP_F_HWCOMP(vers),
+	.nf_short = "lpv",
+	.nf_desc = "Log Page Version",
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	OCP_F_HWCOMP(guid),
+	.nf_short = "lpg",
+	.nf_desc = "Log Page GUID",
+	.nf_type = NVMEADM_FT_GUID
+}, {
+	OCP_F_HWCOMP(len),
+	.nf_short = "hcls",
+	.nf_desc = "Hardware Component Log Size",
+	.nf_type = NVMEADM_FT_HEX,
+	.nf_addend = { .nfa_shift = 2 }
+} };
+
+static const nvmeadm_field_t ocp_vul_hwcomp_header_v2[] = { {
+	OCP_F_HWCOMP(vers),
+	.nf_short = "lpv",
+	.nf_desc = "Log Page Version",
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	OCP_F_HWCOMP(guid),
+	.nf_short = "lpg",
+	.nf_desc = "Log Page GUID",
+	.nf_type = NVMEADM_FT_GUID
+}, {
+	OCP_F_HWCOMP(len),
+	.nf_short = "hcls",
+	.nf_desc = "Hardware Component Log Size",
+	.nf_type = NVMEADM_FT_HEX
+} };
+
+static const nvmeadm_field_t ocp_vul_hw_comp_desc[] = { {
+	OCP_F_HWDESC(cdls),
+	.nf_short = "cdls",
+	.nf_desc = "Component Date/Lot Size",
+	.nf_type = NVMEADM_FT_HEX,
+	.nf_addend = { .nfa_shift = 2 }
+}, {
+	OCP_F_HWDESC(cais),
+	.nf_short = "cais",
+	.nf_desc = "Component Additional Information Size",
+	.nf_type = NVMEADM_FT_HEX,
+	.nf_addend = { .nfa_shift = 2 }
+}, {
+	OCP_F_HWDESC(cid),
+	.nf_short = "cid",
+	.nf_desc = "Component Identifier",
+	.nf_type = NVMEADM_FT_STRMAP,
+	.nf_strs = {
+		[OCP_HW_COMP_ASIC] = "ASIC",
+		[OCP_HW_COMP_NAND] = "NAND",
+		[OCP_HW_COMP_DRAM] = "DRAM",
+		[OCP_HW_COMP_PMIC] = "PMIC",
+		[OCP_HW_COMP_PCB] = "PCB",
+		[OCP_HW_COMP_CAP] = "Capacitor",
+		[OCP_HW_COMP_RES] = "Resistor",
+		[OCP_HW_COMP_CASE] = "Case",
+		[OCP_HW_COMP_DEV_SN] = "Device Serial Number",
+		[OCP_HW_COMP_COO] = "Country of Origin",
+		[OCP_HW_COMP_GREV] = "Global Device Hardware Revision"
+	}
+}, {
+	OCP_F_HWDESC(cmfg),
+	.nf_short = "cmfg",
+	.nf_desc = "Component Manufacturer",
+	.nf_type = NVMEADM_FT_BLOB,
+}, {
+	OCP_F_HWDESC(crev),
+	.nf_short = "crev",
+	.nf_desc = "Component Revision",
+	.nf_type = NVMEADM_FT_BLOB,
+}, {
+	OCP_F_HWDESC(cmc),
+	.nf_short = "cmc",
+	.nf_desc = "Component Manufacturer Code",
+	.nf_type = NVMEADM_FT_BLOB,
+} };
+
+/*
+ * Drive printing of the hardware component information. We always print the
+ * header, and then figure out all the rest of the information that we need to
+ * print and how to go from there.
+ */
+static bool
+ocp_vul_hw_comp_drive(nvmeadm_field_print_t *print, const void *data,
+    size_t len)
+{
+	const ocp_vul_hw_comp_t *log = data;
+	uint64_t mult;
+	uint32_t log_len;
+	bool ret = true;
+
+	print->fp_header = "Hardware Component Header";
+	print->fp_base = "hch";
+	print->fp_data = data;
+	print->fp_dlen = len;
+	print->fp_off = 0;
+
+	if (log->ohc_vers == 1) {
+		print->fp_fields = ocp_vul_hwcomp_header_v1;
+		print->fp_nfields = ARRAY_SIZE(ocp_vul_hwcomp_header_v1);
+		mult = sizeof (uint32_t);
+	} else {
+		print->fp_fields = ocp_vul_hwcomp_header_v2;
+		print->fp_nfields = ARRAY_SIZE(ocp_vul_hwcomp_header_v2);
+		mult = 1;
+	}
+	nvmeadm_field_print(print);
+
+	/*
+	 * Iterate over the number of component descriptors that are present. We
+	 * are given a number of bytes that we've found in the file and know
+	 * that we have at least the header's amount present. So we look at the
+	 * log and compare how much data that it has. Some of this a bit
+	 * duplicative of the library code. If we get field information into
+	 * libnvme eventually then we can just reuse that calculator.
+	 */
+	for (size_t i = 4; i < 16; i++) {
+		if (log->ohc_len[i] != 0) {
+			warnx("hardware component log size exceeds the "
+			    "supported uint32_t maximum");
+			return (false);
+		}
+	}
+
+	(void) memcpy(&log_len, log->ohc_len, sizeof (log_len));
+	uint64_t max = mult * (uint64_t)log_len;
+	if (max > len) {
+		warnx("log page indicates it is %" PRIu64 " bytes long; "
+		    "however, only %" PRIu64 " bytes are available, limiting "
+		    "to %" PRIu64 " bytes", max, len, len);
+		max = len;
+	}
+
+	uint64_t off = sizeof (ocp_vul_hw_comp_t);
+	uint32_t comp_count = 0;
+	while (off < max) {
+		uint64_t rem = max - off;
+		char base[32], header[64];
+
+		/*
+		 * Do we have enough data for a base ocp_hw_comp_desc_t.
+		 * Determine that first. Once we do, then see if we have enough
+		 * extra data to cover the variable length pieces.
+		 */
+		if (rem < sizeof (ocp_hw_comp_desc_t)) {
+			warnx("remaining data (%" PRIu64 " bytes) does not "
+			    "cover the component header (%zu bytes)", rem,
+			    sizeof (ocp_hw_comp_desc_t));
+			ret = false;
+			break;
+		}
+
+		const ocp_hw_comp_desc_t *desc = data + off;
+
+		(void) snprintf(base, sizeof (base), "desc%u", comp_count);
+		(void) snprintf(header, sizeof (header),
+		    "Component Descriptor %u", comp_count);
+		comp_count++;
+		print->fp_header = header;
+		print->fp_base = base;
+		print->fp_fields = ocp_vul_hw_comp_desc;
+		print->fp_nfields = ARRAY_SIZE(ocp_vul_hw_comp_desc);
+		print->fp_data = desc;
+		print->fp_dlen = sizeof (ocp_hw_comp_desc_t);
+		print->fp_off = off;
+		nvmeadm_field_print(print);
+
+		off += sizeof (ocp_hw_comp_desc_t);
+		rem -= sizeof (ocp_hw_comp_desc_t);
+
+		/*
+		 * Check if the component date/lot size and the component
+		 * additional information size fit. These are stored in
+		 * quantities of uint32_t values. Make sure those don't overflow
+		 * the multiplication. We'll then figure out if there is enough
+		 * space for these.
+		 */
+		const uint64_t ndw_max = UINT64_MAX / sizeof (uint32_t);
+		if (desc->cd_cdls > ndw_max) {
+			warnx("component data/lot size (%" PRIu64 ") would "
+			    "exceed a 64-bit quantity", desc->cd_cdls);
+			ret = false;
+			break;
+		}
+
+		if (desc->cd_cais > ndw_max) {
+			warnx("component additional information size (%" PRIu64
+			    ") would exceed a 64-bit quantity", desc->cd_cais);
+			ret = false;
+			break;
+		}
+
+		const uint64_t cdls = (uint64_t)desc->cd_cdls *
+		    sizeof (uint32_t);
+		if (cdls > rem) {
+			warnx("component data/lot size (%" PRIu64 ") exceeds "
+			    "available remaining information (%" PRIu64 ")",
+			    cdls, rem);
+			ret = false;
+			break;
+		}
+
+		if (cdls > 0) {
+			nvmeadm_field_t field;
+
+			(void) memset(&field, 0, sizeof (nvmeadm_field_t));
+			field.nf_off = 0;
+			field.nf_len = cdls;
+			field.nf_short = "cdl";
+			field.nf_desc = "Component Date/Lot Code";
+			field.nf_type = NVMEADM_FT_BLOB;
+
+			print->fp_header = NULL;
+			print->fp_fields = &field;
+			print->fp_nfields = 1;
+			print->fp_off = off;
+			print->fp_data = &desc->cd_data[0];
+			print->fp_dlen = cdls;
+			nvmeadm_field_print(print);
+
+			off += cdls;
+			rem -= cdls;
+		}
+
+
+		const uint64_t cais = (uint64_t)desc->cd_cais *
+		    sizeof (uint32_t);
+		if (cais > rem) {
+			warnx("component additional information size (%" PRIu64
+			    ") exceeds available remaining information (%"
+			    PRIu64 ")", cais, rem);
+			ret = false;
+			break;
+		}
+
+		if (cais > 0) {
+			nvmeadm_field_t field;
+
+			(void) memset(&field, 0, sizeof (nvmeadm_field_t));
+			field.nf_off = 0;
+			field.nf_len = cais;
+			field.nf_short = "cai";
+			field.nf_desc = "Component Additional Information";
+			switch (desc->cd_cid) {
+			case OCP_HW_COMP_DEV_SN:
+			case OCP_HW_COMP_COO:
+				field.nf_type = NVMEADM_FT_ASCIIZ;
+				break;
+			default:
+				field.nf_type = NVMEADM_FT_BLOB;
+				break;
+			}
+
+			print->fp_header = NULL;
+			print->fp_fields = &field;
+			print->fp_nfields = 1;
+			print->fp_off = off;
+			print->fp_data = &desc->cd_data[cdls];
+			print->fp_dlen = cais;
+			nvmeadm_field_print(print);
+
+			off += cais;
+			rem -= cais;
+		}
+	}
+
+	return (ret);
+}
+
+const nvmeadm_log_field_info_t ocp_vul_hw_comp_field_info = {
+	.nlfi_log = "ocp/hwcomp",
+	.nlfi_min = sizeof (ocp_vul_hw_comp_t),
+	.nlfi_getrev = ocp_vul_hw_comp_getvers,
+	.nlfi_drive = ocp_vul_hw_comp_drive
+};
+
 #define	OCP_F_TELSTR(f)	.nf_off = offsetof(ocp_vul_telstr_t, ots_##f), \
 	.nf_len = sizeof (((ocp_vul_telstr_t *)NULL)->ots_##f)
 

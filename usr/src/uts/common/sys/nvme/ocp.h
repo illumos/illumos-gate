@@ -68,6 +68,11 @@ typedef enum {
 	 */
 	OCP_LOG_DSSD_UNSUP_REQ	= 0xc5,
 	/*
+	 * This log page contains information about the hardware components
+	 * present on a device. Added in v2.5.
+	 */
+	OCP_LOG_DSSD_HW_COMP	= 0xc6,
+	/*
 	 * This log page covers various trusted computing group configuration.
 	 * Added in v2.5. Scoped to the NVM subsystem.
 	 */
@@ -650,6 +655,47 @@ typedef struct {
 	uint8_t our_guid[16];
 } ocp_vul_unsup_req_t;
 
+typedef struct {
+	uint64_t cd_cdls;
+	uint64_t cd_cais;
+	uint32_t cd_cid;
+	uint64_t cd_cmfg;
+	uint64_t cd_crev;
+	uint64_t cd_cmc;
+	uint8_t cd_data[];
+} ocp_hw_comp_desc_t;
+
+typedef enum {
+	OCP_HW_COMP_ASIC	= 1,
+	OCP_HW_COMP_NAND,
+	OCP_HW_COMP_DRAM,
+	OCP_HW_COMP_PMIC,
+	OCP_HW_COMP_PCB,
+	OCP_HW_COMP_CAP,
+	OCP_HW_COMP_RES,
+	OCP_HW_COMP_CASE,
+	OCP_HW_COMP_DEV_SN,
+	OCP_HW_COMP_COO,
+	OCP_HW_COMP_GREV,
+	OCP_HW_COMP_VENDOR_MIN = 0x8000,
+	OCP_HW_COMP_VENDOR_MNX = 0xffff
+} ocp_hw_comp_id_t;
+
+typedef struct {
+	/*
+	 * V2.5: 1, V2.6: 2
+	 */
+	uint16_t ohc_vers;
+	uint8_t ohc_rsvd2[16 - 2];
+	/*
+	 * Log Page GUID: BCB6821F30CD4ED0B76B31B99F0F57DC
+	 */
+	uint8_t ohc_guid[16];
+	uint8_t ohc_len[16];
+	uint8_t ohc_rsvd48[16];
+	uint8_t ohc_data[];
+} ocp_vul_hw_comp_t;
+
 /*
  * Telemetry String Log. This log, added in OCP v2.5 is structured with a header
  * of fixed tables followed by variable information based upon the header
@@ -772,6 +818,8 @@ CTASSERT(sizeof (ocp_vul_devcap_t) == 4096);
 CTASSERT(offsetof(ocp_vul_devcap_t, odc_rsvd144) == 144);
 CTASSERT(sizeof (ocp_req_str_t) == 16);
 CTASSERT(sizeof (ocp_vul_unsup_req_t) == 4096);
+CTASSERT(sizeof (ocp_hw_comp_desc_t) == 44);
+CTASSERT(sizeof (ocp_vul_hw_comp_t) == 64);
 CTASSERT(sizeof (ocp_vul_telstr_t) == 432);
 CTASSERT(offsetof(ocp_vul_telstr_t, ots_fifo0) == 128);
 CTASSERT(offsetof(ocp_vul_telstr_t, ots_rsvd384) == 384);

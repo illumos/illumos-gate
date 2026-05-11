@@ -177,7 +177,7 @@ static const nvme_vsd_ident_t micron_7600_idents[] = {
 
 static const nvme_log_page_info_t *micron_7600_log_pages[] = {
 	&ocp_log_smart, &ocp_log_errrec, &ocp_log_lat, &ocp_log_devcap,
-	&ocp_log_telstr
+	&ocp_log_hwcomp, &ocp_log_telstr
 };
 
 const nvme_vsd_t micron_7600 = {

@@ -393,7 +393,12 @@ typedef enum nvmeadm_field_type_t {
 	 * is probably space padded. Either way padding is not guaranteed.
 	 */
 	NVMEADM_FT_ASCII,
-	NVMEADM_FT_ASCIIZ
+	NVMEADM_FT_ASCIIZ,
+	/*
+	 * Indicates that this data is an opaque blob that we should dump as an
+	 * array of hex bytes.
+	 */
+	NVMEADM_FT_BLOB
 } nvmeadm_field_type_t;
 
 typedef struct {
@@ -574,6 +579,7 @@ extern const nvmeadm_log_field_info_t ocp_vul_smart_field_info;
 extern const nvmeadm_log_field_info_t ocp_vul_errrec_field_info;
 extern const nvmeadm_log_field_info_t ocp_vul_devcap_field_info;
 extern const nvmeadm_log_field_info_t ocp_vul_unsup_field_info;
+extern const nvmeadm_log_field_info_t ocp_vul_hw_comp_field_info;
 extern const nvmeadm_log_field_info_t ocp_vul_telstr_field_info;
 extern const nvmeadm_log_field_info_t solidigm_vul_power_field_info;
 extern const nvmeadm_log_field_info_t solidigm_vul_temp_field_info;

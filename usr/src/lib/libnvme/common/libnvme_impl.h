@@ -541,6 +541,7 @@ extern const nvme_log_page_info_t ocp_log_fwact;
 extern const nvme_log_page_info_t ocp_log_lat;
 extern const nvme_log_page_info_t ocp_log_devcap;
 extern const nvme_log_page_info_t ocp_log_unsup;
+extern const nvme_log_page_info_t ocp_log_hwcomp;
 extern const nvme_log_page_info_t ocp_log_telstr;
 
 extern const nvme_vsd_t wdc_sn840;

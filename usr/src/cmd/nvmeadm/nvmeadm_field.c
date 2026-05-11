@@ -40,6 +40,7 @@ static const nvmeadm_log_field_info_t *field_log_map[] = {
 	&ocp_vul_errrec_field_info,
 	&ocp_vul_devcap_field_info,
 	&ocp_vul_unsup_field_info,
+	&ocp_vul_hw_comp_field_info,
 	&ocp_vul_telstr_field_info,
 	&solidigm_vul_power_field_info,
 	&solidigm_vul_temp_field_info,
@@ -292,15 +293,107 @@ field_extract_ascii(const void *data, nvmeadm_field_type_t type, size_t len,
 	ilstr_fini(&ilstr);
 }
 
-static uint64_t
-nvmeadm_apply_addend(uint64_t val, const nvmeadm_field_addend_t *add)
+/*
+ * We have a blob of data. This will be transformed into a series of hex bytes,
+ * meaning each byte requires two characters. If every byte in this is a zero,
+ * then we just print it as a single zero for the human value.
+ */
+static void
+field_extract_blob(const void *data, nvmeadm_field_type_t type, size_t len,
+    size_t off, field_ofmt_t *ofarg)
 {
-	if (add->nfa_shift > 0) {
-		val <<= add->nfa_shift;
+	const size_t max = (sizeof (ofarg->fo_hval) - 1) / 2;
+	const uint8_t *u8p = data + off;
+	VERIFY3U(len, !=, 0);
+
+	if (len > max) {
+		warnx("encountered blob type field larger than %zu bytes, "
+		    "limiting output data to %zu bytes", max, max);
+		len = max;
 	}
 
-	val += add->nfa_addend;
+	ilstr_t ilstr;
+	ilstr_init_prealloc(&ilstr, ofarg->fo_val, sizeof (ofarg->fo_val));
+
+	bool zero = true;
+	for (size_t i = 0; i < len; i++) {
+		if (u8p[i] != 0) {
+			zero = false;
+		}
+		ilstr_aprintf(&ilstr, "%02x", u8p[i]);
+	}
+
+	if (ilstr_errno(&ilstr) != ILSTR_ERROR_OK) {
+		errx(-1, "failed to construct internal string for field %s: "
+		    "0x%x", ofarg->fo_desc, ilstr_errno(&ilstr));
+	}
+
+	if (zero) {
+		ofarg->fo_hval[0] = '0';
+		ofarg->fo_hval[1] = '\0';
+	} else {
+		(void) memcpy(ofarg->fo_hval, ofarg->fo_val,
+		    ilstr_len(&ilstr) + 1);
+	}
+	ilstr_fini(&ilstr);
+}
+
+static uint64_t
+nvmeadm_apply_addend(uint64_t val, const char *field,
+    const nvmeadm_field_addend_t *add)
+{
+	if (add->nfa_shift > 0) {
+		if ((UINT64_MAX >> add->nfa_shift) < val) {
+			warnx("applying field %s shift (%u) as would overflow: "
+			    "saturating value", field, add->nfa_shift);
+			val = UINT64_MAX;
+		} else {
+			val <<= add->nfa_shift;
+		}
+	}
+
+	if (add->nfa_addend > 0) {
+		if (UINT64_MAX - add->nfa_addend < val) {
+			warnx("applying field %s addend (%" PRId64 ") would "
+			    "overflow: saturating value", field,
+			    add->nfa_addend);
+			val = UINT64_MAX;
+		} else {
+			val += add->nfa_addend;
+		}
+	} else if (add->nfa_addend < 0) {
+		if (add->nfa_addend > val) {
+			warnx("applying field %s addend (%" PRId64 ") would "
+			    "underflow: saturating value", field,
+			    add->nfa_addend);
+			val = 0;
+		} else {
+			val += add->nfa_addend;
+		}
+	}
+
 	return (val);
+}
+
+/*
+ * Right now we basically only support formatting u128 addend's that fit in the
+ * lower uint64_t. We really should define a uint128_t more broadly and leverage
+ * platform support for it, but we're not there. Given that most things with
+ * addends are not going to be in the 128-bit space for now, do something
+ * that'll work enough.
+ */
+static void
+nvmeadm_apply_addend_u128(const nvmeadm_field_t *field, nvme_uint128_t *u128)
+{
+	if (u128->hi != 0) {
+		warnx("encountered 128-bit size with addend request for field "
+		    "%s, but conversion with upper 64 bits set is not "
+		    "implemented", field->nf_desc);
+		return;
+	}
+
+	u128->lo = nvmeadm_apply_addend(u128->lo, field->nf_desc,
+	    &field->nf_addend);
 }
 
 static void
@@ -319,12 +412,14 @@ nvmeadm_field_bit_extract(const nvmeadm_field_bit_t *bit, uint64_t fval,
 		/*
 		 * The "human" string is the version with the addend applied.
 		 */
-		bval = nvmeadm_apply_addend(bval, &bit->nfb_addend);
+		bval = nvmeadm_apply_addend(bval, bit->nfb_desc,
+		    &bit->nfb_addend);
 		(void) snprintf(ofarg->fo_hval, sizeof (ofarg->fo_hval),
 		    "0x%" PRIx64, bval);
 		break;
 	case NVMEADM_FT_UNIT:
-		bval = nvmeadm_apply_addend(bval, &bit->nfb_addend);
+		bval = nvmeadm_apply_addend(bval, bit->nfb_desc,
+		    &bit->nfb_addend);
 		(void) snprintf(ofarg->fo_hval, sizeof (ofarg->fo_hval),
 		    "%" PRIu64 " %s", bval, bit->nfb_addend.nfa_unit);
 		break;
@@ -346,7 +441,8 @@ nvmeadm_field_bit_extract(const nvmeadm_field_bit_t *bit, uint64_t fval,
 		    bval);
 		break;
 	case NVMEADM_FT_BYTES:
-		bval = nvmeadm_apply_addend(bval, &bit->nfb_addend);
+		bval = nvmeadm_apply_addend(bval, bit->nfb_desc,
+		    &bit->nfb_addend);
 		nicenum(bval, ofarg->fo_hval, sizeof (ofarg->fo_hval));
 		break;
 	case NVMEADM_FT_GUID:
@@ -354,6 +450,7 @@ nvmeadm_field_bit_extract(const nvmeadm_field_bit_t *bit, uint64_t fval,
 		abort();
 	case NVMEADM_FT_ASCII:
 	case NVMEADM_FT_ASCIIZ:
+	case NVMEADM_FT_BLOB:
 		/* We should handle this once it shows up here */
 		abort();
 	case NVMEADM_FT_CONTAINER:
@@ -450,6 +547,9 @@ field_print_one(nvmeadm_field_print_t *print, field_ofmt_t *ofarg,
 	case NVMEADM_FT_ASCIIZ:
 		(void) printf(" %s\n", ofarg->fo_hval);
 		break;
+	case NVMEADM_FT_BLOB:
+		(void) printf(" 0x%s\n", ofarg->fo_hval);
+		break;
 	case NVMEADM_FT_CONTAINER:
 		(void) printf("\n");
 		break;
@@ -487,16 +587,11 @@ nvmeadm_field_extract_u128(const nvmeadm_field_t *field, const void *data,
 			warnx("encountered 128-bit size with upper bits set "
 			    "for field %s, cannot accurately convert",
 			    field->nf_desc);
+			u128.hi = 0;
 			u128.lo = UINT64_MAX;
 		}
 
-		if (field->nf_addend.nfa_shift != 0 ||
-		    field->nf_addend.nfa_addend != 0) {
-			warnx("encountered 128-bit size with addend request "
-			    "for field %s, but conversion not implemented",
-			    field->nf_desc);
-		}
-
+		nvmeadm_apply_addend_u128(field, &u128);
 		nicenum(u128.lo, ofarg->fo_hval, sizeof (ofarg->fo_hval));
 		break;
 	case NVMEADM_FT_GUID:
@@ -510,13 +605,14 @@ nvmeadm_field_extract_u128(const nvmeadm_field_t *field, const void *data,
 		    u8p[3], u8p[2], u8p[1], u8p[0]);
 		break;
 	case NVMEADM_FT_HEX:
-		if (field->nf_addend.nfa_shift != 0 ||
-		    field->nf_addend.nfa_addend != 0) {
-			warnx("encountered 128-bit field with addend, but "
-			    "cannot apply it");
+		nvmeadm_apply_addend_u128(field, &u128);
+		if (u128.hi == 0) {
+			(void) snprintf(ofarg->fo_hval, sizeof (ofarg->fo_hval),
+			    "0x%x", u128.lo);
+		} else {
+			(void) snprintf(ofarg->fo_hval, sizeof (ofarg->fo_hval),
+			    "0x%x%016x", u128.hi, u128.lo);
 		}
-		(void) memcpy(ofarg->fo_hval, ofarg->fo_val,
-		    sizeof (ofarg->fo_hval));
 		break;
 	default:
 		break;
@@ -530,19 +626,24 @@ nvmeadm_field_extract(const nvmeadm_field_t *field, const void *data,
 	uint64_t val;
 
 	/*
-	 * Don't touch containers. There is nothing to extract.
+	 * A subset of types have large variable width fields. Deal with them
+	 * now or there's nothing to do here.
 	 */
-	if (field->nf_type == NVMEADM_FT_CONTAINER)
+	switch (field->nf_type) {
+	case NVMEADM_FT_CONTAINER:
+		/* Don't touch containers. There's nothing to extract. */
 		return;
-
-	/*
-	 * If this is an ASCII field, then we just handle this immediately.
-	 */
-	if (field->nf_type == NVMEADM_FT_ASCII ||
-	    field->nf_type == NVMEADM_FT_ASCIIZ) {
+	case NVMEADM_FT_ASCII:
+	case NVMEADM_FT_ASCIIZ:
 		field_extract_ascii(data, field->nf_type, field->nf_len,
 		    field->nf_off, ofarg);
 		return;
+	case NVMEADM_FT_BLOB:
+		field_extract_blob(data, field->nf_type, field->nf_len,
+		    field->nf_off, ofarg);
+		return;
+	default:
+		break;
 	}
 
 	/*
@@ -586,12 +687,14 @@ nvmeadm_field_extract(const nvmeadm_field_t *field, const void *data,
 		/*
 		 * The "human" string is the version with the addend applied.
 		 */
-		val = nvmeadm_apply_addend(val, &field->nf_addend);
+		val = nvmeadm_apply_addend(val, field->nf_desc,
+		    &field->nf_addend);
 		(void) snprintf(ofarg->fo_hval, sizeof (ofarg->fo_hval),
 		    "0x%" PRIx64, val);
 		break;
 	case NVMEADM_FT_UNIT:
-		val = nvmeadm_apply_addend(val, &field->nf_addend);
+		val = nvmeadm_apply_addend(val, field->nf_desc,
+		    &field->nf_addend);
 		(void) snprintf(ofarg->fo_hval, sizeof (ofarg->fo_hval),
 		    "%" PRIu64 " %s", val, field->nf_addend.nfa_unit);
 		break;
@@ -609,7 +712,8 @@ nvmeadm_field_extract(const nvmeadm_field_t *field, const void *data,
 		}
 		break;
 	case NVMEADM_FT_BYTES:
-		val = nvmeadm_apply_addend(val, &field->nf_addend);
+		val = nvmeadm_apply_addend(val, field->nf_desc,
+		    &field->nf_addend);
 		nicenum(val, ofarg->fo_hval, sizeof (ofarg->fo_hval));
 		break;
 	case NVMEADM_FT_PERCENT:
@@ -624,6 +728,7 @@ nvmeadm_field_extract(const nvmeadm_field_t *field, const void *data,
 		abort();
 	case NVMEADM_FT_ASCII:
 	case NVMEADM_FT_ASCIIZ:
+	case NVMEADM_FT_BLOB:
 	case NVMEADM_FT_CONTAINER:
 		/* Should already be handled above */
 		abort();
