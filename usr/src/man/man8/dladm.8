@@ -46,8 +46,9 @@
 .\" Copyright 2024 Oxide Computer Company
 .\" Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2026 H. William Welliver <william@welliver.org>
+.\" Copyright 2026 Hans Rosenfeld
 .\"
-.Dd May 17, 2026
+.Dd May 26, 2026
 .Dt DLADM 8
 .Os
 .Sh NAME
@@ -300,9 +301,10 @@
 .Ar value |
 .Cm auto |
 .Cm factory Fl n Ar slot-identifier |
-.Cm random Op Fl r Ar prefix
+.Cm random Oo Fl r Ar prefix Oc |
+.Cm vrrp Fl V Ar vrid Fl A Ar address-family
 .Oc
-.Op Fl v Ar vlan-id
+.Op Fl v Ar vlan-id Op Fl f
 .Op Fl p Ar prop Ns Cm \&= Ns Ar value Ns Op ,...
 .Ar vnic-link
 .Nm
@@ -332,6 +334,30 @@
 .Nm
 .Cm show-etherstub
 .Op Ar etherstub
+.\" InfiniBand
+.Pp
+.Nm
+.Cm create-part
+.Op Fl t
+.Op Fl R Ar root-dir
+.Fl l Ar ib-link
+.Op Fl P Ar pkey
+.Ar part-link
+.Nm
+.Cm delete-part
+.Op Fl t
+.Op Fl R Ar root-dir
+.Ar part-link
+.Nm
+.Cm show-part
+.Op P
+.Op Oo Fl p Oc Fl o Ar field Ns Op ,...
+.Op Fl l Ar ib-link
+.Op Ar part-link
+.Nm
+.Cm show-ib
+.Op Oo Fl p Oc Fl o Ar field Ns Op ,...
+.Op Ar ib-link
 .\" IPTun
 .Pp
 .Nm
@@ -2801,9 +2827,10 @@ Display persistent secure object information
 .Ar value |
 .Cm auto |
 .Cm factory Fl n Ar slot-identifier |
-.Cm random Op Fl r Ar prefix
+.Cm random Oo Fl r Ar prefix Oc |
+.Cm vrrp Fl V Ar vrid Fl A Ar address-family
 .Oc
-.Op Fl v Ar vlan-id
+.Op Fl v Ar vlan-id Op Fl f
 .Op Fl p Ar prop Ns Cm \&= Ns Ar value Ns Op ,...
 .Ar vnic-link
 .Xc
@@ -2871,11 +2898,23 @@ If none is available, assign a random MAC address.
 is the default action if the
 .Fl m
 option is not specified.
-.It Fl v Ar vlan-id
+.It Cm vrrp Fl V Ar vrid Fl A Ar address-family
+Assign a virtual router MAC address for the virtual router identifer
+.Ar vrid
+and the given
+.Ar address-family ,
+as defined in IETF RFC 5798 for the
+.Sy Virtual Router Redundancy Protocol .
+.El
+.It Fl v Ar vlan-id Op Fl f
 Enable VLAN tagging for this VNIC.
 The VLAN tag will have id
 .Ar vlan-id .
-.El
+See the description of the
+.Cm create-vlan
+command above for an explanation of the optional
+.Fl \&-force Pq Fl f
+flag.
 .It Xo
 .Fl p Ar prop Ns Oo ,... Oc ,
 .Fl \&-prop Ns Cm = Ns Ar prop Ns Op ,...
@@ -2947,8 +2986,12 @@ distinguishes among the following MAC address types:
 .Bl -tag -width factory
 .It Sy random
 A random address assigned to the VNIC.
+.It Sy fixed
+A fixed address assigned to the VNIC.
 .It Sy factory
 A factory MAC address used by the VNIC.
+.It Sy vrrp
+A virtual router identifier assigned to the VNIC.
 .El
 .It Sy VID
 The VLAN ID for the VNIC.
@@ -3029,6 +3072,172 @@ above.
 Show all configured etherstubs by default, or the specified etherstub if
 .Ar etherstub
 is specified.
+.It Xo
+.Nm Cm create-part
+.Op Fl t
+.Op Fl R Ar root-dir
+.Fl l Ar ib-link
+.Op Fl P Ar pkey
+.Op Fl f
+.Ar part-link
+.Xc
+Create an IP-over-InfiniBand partition object over the physical InfiniBand link
+.Ar ib-link .
+.Pp
+The
+.Cm create-part
+subcommand accepts the following options:
+.Bl -tag -width 4n
+.It Fl l Ar ib-link , Fl \&-link Ns \&= Ns Ar ib-link
+Specifies the physical InfiniBand link over which the partition object is
+created.
+.It Fl P Ar pkey , Fl \&-pkey Ns \&= Ns Ar pkey
+A hexadecimal number specifying the P\&_Key for the
+.Po Port, P\&_Key Pc
+tuple of the partition object.
+This P\&_Key myst exist in the InfiniBand subnet, creating a partition for a
+non-existant P\&_Key will fail.
+.It Fl t , \&-temporary
+Specifies that the IP-over-InfiniBand partition object is temporary.
+Temporary objects last until the next reboot.
+.It Xo
+.Fl R Ar root-dir ,
+.Fl \&-root-dir Ns Cm = Ns Ar root-dir
+.Xc
+See
+.Sx Options ,
+above.
+.El
+.It Xo
+.Nm Cm delete-part
+.Op Fl t
+.Op Fl R Ar root-dir
+.Ar part-link
+.Xc
+Delete the IP-over-InfiniBand partition object specified.
+.Pp
+The
+.Cm delete-part
+subcommand accepts the following options:
+.Bl -tag -width 4n
+.It Fl t , \&-temporary
+Specifies that the deletion is temporary.
+Temporary deletions last until the next reboot.
+.It Xo
+.Fl R Ar root-dir ,
+.Fl \&-root-dir Ns Cm = Ns Ar root-dir
+.Xc
+See
+.Sx Options ,
+above.
+.El
+.It Xo
+.Nm Cm show-part
+.Op P
+.Op Oo Fl p Oc Fl o Ar field Ns Op ,...
+.Op Fl l Ar ib-link
+.Op Ar part-link
+.Xc
+Show information about all IP-over-InfiniBand partition objects, or for the
+specified IP-over-InfiniBand partition if
+.Ar part-link
+is specified.
+.Pp
+The
+.Cm show-part
+subcommand accepts the following options:
+.Bl -tag -width 4n
+.It Xo
+.Fl o Ar field Ns Oo ,... Oc ,
+.Fl \&-output Ns Cm \&= Ns Ar field Ns Op ,...
+.Xc
+A case-insensitive, comma-separated list of output fields to display.
+The field name must be one of the fields listed below, or the special value
+.Cm all
+to display all fields.
+For each InfiniBand partition, the following fields can be displayed:
+.Bl -tag -width STATE
+.It Sy LINK
+The name of the InifiniBand partition.
+.It Sy PKEY
+The PKEY associated with the InfiniBand partition.
+.It Sy OVER
+The name of the physical InfiniBand link over which this InfiniBand partition
+is configured.
+.It Sy STATE
+The state of the InfiniBand partition.
+.It Sy FLAGS
+A set of flags associated with the InfiniBand link.
+.El
+.It Fl p , \&-parsable
+Display using a stable machine-parsable format.
+The
+.Fl o
+option is
+required with
+.Fl p .
+See
+.Sx Parsable Output Format ,
+below.
+.It Fl P , \&-persistent
+Display the IP-over-InfiniBand partition objects from the persistent
+configuration rather than the state of the running system.
+.It Fl l Ar ib-link , Fl \&-link Ns \&= Ns Ar ib-link
+Display only the IP-over-InfiniBand partition objects created over the specified
+.Ar ib-link .
+.El
+.It Xo
+.Nm Cm show-ib
+.Op Oo Fl p Oc Fl o Ar field Ns Op ,...
+.Op Ar ib-link
+.Xc
+.Pp
+Show state information either for all physical InifiniBand links, or for the
+specified physical InfiniBand link if
+.Ar ib-link
+is specified.
+.Pp
+The
+.Cm show-ib
+subcommand accepts the following options:
+.Bl -tag -width 4n
+.It Xo
+.Fl o Ar field Ns Oo ,... Oc ,
+.Fl \&-output Ns Cm \&= Ns Ar field Ns Op ,...
+.Xc
+A case-insensitive, comma-separated list of output fields to display.
+The field name must be one of the fields listed below, or the special value
+.Cm all
+to display all fields.
+For each InfiniBand link, the following fields can be displayed:
+.Bl -tag -width PORTGUID
+.It Sy LINK
+The name of the InfiniBand link being displayed.
+.It Sy HCAGUID
+The GUID of the Host Channel Adapter to which the InfiniBand link belongs.
+.It Sy PORTGUID
+The port GUID of the InfiniBand link.
+.It Sy PORT
+The port number of the InfiniBand link.
+.It Sy STATE
+The state of the InfiniBand link.
+.It Sy PKEYS
+The P\&_Keys of the InfiniBand link.
+.El
+.It Fl p , \&-parsable
+Display using a stable machine-parsable format.
+The
+.Fl o
+option is
+required with
+.Fl p .
+See
+.Sx Parsable Output Format ,
+below.
+.It Fl P , \&-persistent
+Display the persistent InfiniBand link configuration rather than the state of
+the running system.
+.El
 .It Xo
 .Nm Cm create-iptun
 .Op Fl t
