@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <libxml/parser.h>
@@ -1656,7 +1657,7 @@ enum_run(topo_mod_t *mp, tf_rdata_t *rd)
 	if (e != 0) {
 		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
 		    "Enumeration failed (%s)\n",
-		    topo_strerror(topo_mod_errno(mp)));
+		    topo_strerror(topo_mod_errno(rd->rd_mod)));
 		(void) topo_hdl_seterrno(thp, EMOD_PARTIAL_ENUM);
 		return (topo_mod_seterrno(mp, EMOD_PARTIAL_ENUM));
 	}
@@ -1695,7 +1696,7 @@ fac_enum_run(topo_mod_t *mp, tnode_t *node, const char *name)
 	if (e != 0) {
 		topo_dprintf(thp, TOPO_DBG_ERR,
 		    "Facility provider enumeration failed (%s)\n",
-		    topo_strerror(topo_mod_errno(mp)));
+		    topo_strerror(topo_mod_errno(fmod)));
 		(void) topo_hdl_seterrno(thp, EMOD_PARTIAL_ENUM);
 		return (topo_mod_seterrno(mp, EMOD_PARTIAL_ENUM));
 	}
