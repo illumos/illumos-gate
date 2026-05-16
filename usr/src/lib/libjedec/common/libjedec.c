@@ -11,7 +11,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -19,7 +19,7 @@
 
 /*
  * This section of the library is dedicated to decoding the JEDEC vendor codes
- * as defined in JEP106BM (June 2025). The vendor code is encoded as a
+ * as defined in JEP106BN (June 2026). The vendor code is encoded as a
  * series of continuation bytes and then the current vendor value. Each of the
  * tables below corresponds to one of the continuation values and is ordered
  * based on JEP-106. Note, the first batch of entries in JEP-106 Table 1 has
@@ -1511,7 +1511,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_12[LIBJEDEC_TABLE_SIZE] = {
 	{ 0x34, "Acacia Communications" },
 	{ 0xB5, "Beijinjinshengyihe Technology Co Ltd" },
 	{ 0xB6, "Zyzyx" },
-	{ 0x37, "C-SKY Microsystems Co Ltd" },
+	{ 0x37, "C-SKY Microsystems Co Ltd (XuanTie)" },
 	{ 0x38, "Shenzhen Hystou Technology Co Ltd" },
 	{ 0xB9, "Syzexion" },
 	{ 0xBA, "Kembona" },
@@ -1973,7 +1973,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_15[LIBJEDEC_TABLE_SIZE] = {
 };
 
 static const libjedec_vendor_pair_t libjedec_vendors_16[LIBJEDEC_TABLE_SIZE] = {
-	{ 0x01, "Changxin Memory Technology (Shanghai)" },
+	{ 0x01, "CXSH" },
 	{ 0x02, "Synconv" },
 	{ 0x83, "MULTIUNIT" },
 	{ 0x04, "Zero ASIC Corporation" },
@@ -2101,7 +2101,7 @@ static const libjedec_vendor_pair_t libjedec_vendors_16[LIBJEDEC_TABLE_SIZE] = {
 	{ 0xFE, "Shenzhen Tanlr Technology Group Co Ltd" }
 };
 
-static const libjedec_vendor_pair_t libjedec_vendors_17[58] = {
+static const libjedec_vendor_pair_t libjedec_vendors_17[122] = {
 	{ 0x01, "Shenzhen JIEQING Technology Co Ltd" },
 	{ 0x02, "Orionix" },
 	{ 0x83, "JoulWatt Technology Co Ltd" },
@@ -2159,7 +2159,71 @@ static const libjedec_vendor_pair_t libjedec_vendors_17[58] = {
 	{ 0x37, "Beijing Ronghua Kangweiye Technology" },
 	{ 0x38, "Shanghai Yunsilicon Technology Co Ltd" },
 	{ 0xB9, "Shenzhen Wolongtai Technology Co Ltd." },
-	{ 0xBA, "Vervesemi Microelectronics" }
+	{ 0xBA, "Vervesemi Microelectronics" },
+	{ 0x3B, "HRDWYR Ventures Private Limited" },
+	{ 0xBC, "ENE Technology Inc" },
+	{ 0x3D, "GOFATOO" },
+	{ 0x3E, "Shenzhen Jingchu Technology Co Ltd" },
+	{ 0xBF, "NEVETA" },
+	{ 0x40, "RZX" },
+	{ 0xC1, "Shenzhen Zhongcheng Qingcong Technology Co" },
+	{ 0xC2, "Shenzhen Heyloo Electronic Technology Co" },
+	{ 0x43, "Shenzhen Shanghaowang Electronic Technology" },
+	{ 0xC4, "Shanghai Qimingxin Semiconductor Technology" },
+	{ 0x45, "Henan Great Wall Computer System Co Ltd" },
+	{ 0x46, "Beijing Memsilicon Technology Co Ltd" },
+	{ 0xC7, "Openchip & Software Technologies S L" },
+	{ 0xC8, "FlashLeap Tech (Shenzhen) Co Ltd" },
+	{ 0x49, "Shenzhen JinShanDe Technology Co Ltd" },
+	{ 0x4A, "RUIBOHU" },
+	{ 0xCB, "ETA Semiconductor Ltd" },
+	{ 0x4C, "L&T Semiconductor Technologies Limited" },
+	{ 0xCD, "RAYSMEM" },
+	{ 0xCE, "Sichuan Zhongzhao Yongye Semiconductor" },
+	{ 0x4F, "Shenzhen Ruiyuanchuangxin Technology" },
+	{ 0xD0, "CSSI South Africa (Pty) Ltd" },
+	{ 0x51, "Jeju Semiconductor Corp" },
+	{ 0x52, "Origin Code LLC" },
+	{ 0xD3, "Chengdu Masscore Microelectronics Tech" },
+	{ 0x54, "Shenzhen Whalekom Technology Co Ltd" },
+	{ 0xD5, "femtoAI" },
+	{ 0xD6, "Shanghai Chip4Tao Technology Co Ltd" },
+	{ 0x57, "Shenzhenshijimokkejiyouxiangongsi" },
+	{ 0x58, "DEGUA" },
+	{ 0xD9, "TENGYIN CELESTIALSTORAGE" },
+	{ 0xDA, "Shenzhen Minder Semiconductor Co Ltd" },
+	{ 0x5B, "GUANGSUJIE" },
+	{ 0xDC, "HVLANYN Technology" },
+	{ 0x5D, "Theo End (Shenzhen) Computing Tech Co" },
+	{ 0x5E, "Shenzhen Heroje Electronics Co Ltd" },
+	{ 0xDF, "Guangdong Yuecun Microelectronics Co" },
+	{ 0xE0, "Foxin Technology" },
+	{ 0x61, "JinTech Semiconductor Co Limited" },
+	{ 0x62, "Shenzhen Hongred Information Technology Co" },
+	{ 0xE3, "ZST Inc" },
+	{ 0x64, "Veris Danismanlik Limited Sirketi" },
+	{ 0xE5, "Starblaze" },
+	{ 0xE6, "Siptechx" },
+	{ 0x67, "Djelec" },
+	{ 0x68, "Ambarella Corporation" },
+	{ 0xE9, "SiliconX" },
+	{ 0xEA, "Shenzhen Tencent Computer System Co" },
+	{ 0x6B, "Shenzhen Econo Electronic Co Ltd (China)" },
+	{ 0xEC, "Pu Sl Technology (Shenzhen) Co Limited" },
+	{ 0x6D, "Shenzhen Kimviking Technology Co Ltd" },
+	{ 0x6E, "Shenzhen Touch Think Intelligence Co Ltd" },
+	{ 0xEF, "Beijing Institute of Open Source Chip" },
+	{ 0x70, "BYTE International Co Ltd" },
+	{ 0xF1, "Shenzhen ITZR Technology Co Ltd" },
+	{ 0xF2, "Centre Development Advanced Computing" },
+	{ 0x73, "Overlord Labs" },
+	{ 0xF4, "Shenzhen Chaocun Technology Co Ltd" },
+	{ 0x75, "Shenzhen Yuqi Electronics Co Ltd" },
+	{ 0x76, "Transsemi Miceoelectronics Co Ltd" },
+	{ 0xF7, "Pu Sl Technology (Shenzhen) Co Limited" },
+	{ 0xF8, "Shenzhen Xingjiachen Electronics Co Ltd" },
+	{ 0x79, "Shenzhen Xingjiachen Electronics Co Ltd" },
+	{ 0x7A, "Shenyang Lianxin Chuangxiang Technology" }
 };
 
 const char *
