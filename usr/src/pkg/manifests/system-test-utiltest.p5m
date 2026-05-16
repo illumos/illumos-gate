@@ -1614,6 +1614,7 @@ file path=opt/util-tests/tests/hex2spd/lpddr4/MT53D1024M32D4.spd mode=0444
 dir  path=opt/util-tests/tests/hex2spd/lpddr5
 file path=opt/util-tests/tests/hex2spd/lpddr5/CAMM2.spd mode=0444
 file path=opt/util-tests/tests/hex2spd/lpddr5/MT62F4G32D8DV-023.spd mode=0444
+file path=opt/util-tests/tests/hex2spd/lpddr5/SOCAMM2.spd mode=0444
 file path=opt/util-tests/tests/iconv_test mode=0555
 dir  path=opt/util-tests/tests/libcustr
 file path=opt/util-tests/tests/libcustr/custr_remove mode=0555

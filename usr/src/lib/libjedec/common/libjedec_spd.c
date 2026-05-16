@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -445,13 +445,18 @@ spd_parse_string(spd_info_t *si, uint32_t off, uint32_t len, const char *key)
 	uint32_t nbytes = len;
 	char buf[128];
 
+	/*
+	 * First trim trailing spaces then go back and see that everything is
+	 * printable.
+	 */
 	VERIFY3U(sizeof (buf), >, len);
-	for (uint32_t i = 0; i < len; i++) {
-		if (si->si_data[off + i] == ' ') {
-			nbytes = i;
+	while (nbytes > 0) {
+		if (si->si_data[off + nbytes - 1] != ' ')
 			break;
-		}
+		nbytes--;
+	}
 
+	for (uint32_t i = 0; i < nbytes; i++) {
 		if (isascii(si->si_data[off + i]) == 0 ||
 		    isprint(si->si_data[off + i]) == 0) {
 			spd_nvl_err(si, key, SPD_ERROR_UNPRINT,

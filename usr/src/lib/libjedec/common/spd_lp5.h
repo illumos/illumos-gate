@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SPD_LP5_H
@@ -18,8 +18,8 @@
 
 /*
  * Definitions for use in LPDDR5/LPDDR5X Serial Presence Detect decoding based
- * on JEDEC standard JESD406-5 LPDDR5/5X Serial Presence Detect (SPD) Contents.
- * Release 1.0. This does not cover DDR5. That is covered in spd_ddr5.h.
+ * on JEDEC standard JESD406-5D LPDDR5/5X Serial Presence Detect (SPD) Contents.
+ * Release 1.3. This does not cover DDR5. That is covered in spd_ddr5.h.
  *
  * LPDDR5/X modules are organized into a few main regions which is identical to
  * DDR5; however, the contents vary:
@@ -89,6 +89,7 @@ extern "C" {
 #define	SPD_LP5_MOD_TYPE_TYPE_CSODIMM	6
 #define	SPD_LP5_MOD_TYPE_TYPE_MRDIMM	7
 #define	SPD_LP5_MOD_TYPE_TYPE_CAMM2	8
+#define	SPD_LP5_MOD_TYPE_TYPE_SOCAMM2	9
 #define	SPD_LP5_MOD_TYPE_TYPE_DDIMM	10
 #define	SPD_LP5_MOD_TYPE_TYPE_SOLDER	11
 

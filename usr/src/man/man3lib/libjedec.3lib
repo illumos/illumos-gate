@@ -126,12 +126,12 @@ there is no guarantee that this will apply to future functions.
 .Rs
 .%Q JEDEC Solid State Technology Association
 .%T DDR5 Serial Presence Detect (SPD) Contents
-.%N JESD400-5B Document Release 1.2
-.%D October 2023
+.%N JESD400-5D.01 Document Release 1.4
+.%D January 2026
 .Re
 .Rs
 .%Q JEDEC Solid State Technology Association
 .%T LPDDR5/5X Serial Presence Detect (SPD) Contents
-.%N JESD406-5 Document Release 1.0
-.%D June 2024
+.%N JESD406-5D Document Release 1.3
+.%D March 2026
 .Re

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SPD_DDR5_H
@@ -18,8 +18,8 @@
 
 /*
  * Definitions for use in DDR5 Serial Presence Detect decoding based on JEDEC
- * Standard JESD400-5A.01 DDR5 Serial Presence Detect (SPD) Contents. Release
- * 1.2. This does not cover LPDDR5. While the two are similar, there are enough
+ * Standard JESD400-5D.01 DDR5 Serial Presence Detect (SPD) Contents. Release
+ * 1.4. This does not cover LPDDR5. While the two are similar, there are enough
  * differences that we maintain LPDDR5 in its own header (spd_lp5.h).
  *
  * DDR5 modules are organized into a few main regions:
@@ -89,6 +89,7 @@ extern "C" {
 #define	SPD_DDR5_MOD_TYPE_TYPE_CSODIMM	6
 #define	SPD_DDR5_MOD_TYPE_TYPE_MRDIMM	7
 #define	SPD_DDR5_MOD_TYPE_TYPE_CAMM2	8
+#define	SPD_DDR5_MOD_TYPE_TYPE_SOCAMM2	9
 #define	SPD_DDR5_MOD_TYPE_TYPE_DDIMM	10
 #define	SPD_DDR5_MOD_TYPE_TYPE_SOLDER	11
 
@@ -179,6 +180,7 @@ extern "C" {
  * S8.1.15 SDRAM Fault Handling and Temperature Sense
  */
 #define	SPD_DDR5_FLT	0x00e
+#define	SPD_DDR5_FLT_PRAC_ABO(r)	bitx8(r, 4, 4)
 #define	SPD_DDR5_FLT_WIDE_TS(r)		bitx8(r, 3, 3)
 #define	SPD_DDR5_FLT_WBSUPR_SUP(r)	bitx8(r, 2, 2)
 #define	SPD_DDR5_FLT_WBSUPR_SEL(r)	bitx8(r, 1, 1)
@@ -471,14 +473,23 @@ extern "C" {
 #define	SPD_DDR5_COM_REV_TS		0x0d5
 
 /*
- * S11.5 Common: Module Nominal Height
+ * S11.5 Common: Additional Support Devices. This was added in DDR5 1.3 and LP5
+ * 1.2.
+ */
+#define	SPD_DDR5_COM_ADDDEV	0x0e5
+#define	SPD_DDR5_COM_ADDDEV_TVS_MGMT(r)		bitx8(r, 2, 2)
+#define	SPD_DDR5_COM_ADDDEV_TVS_BULK(r)		bitx8(r, 1, 1)
+#define	SPD_DDR5_COM_ADDDEV_FUSE_BULK(r)	bitx8(r, 0, 0)
+
+/*
+ * S11.6 Common: Module Nominal Height
  */
 #define	SPD_DDR5_COM_HEIGHT	0x0e6
 #define	SPD_DDR5_COM_HEIGHT_MM(r)	bitx8(r, 4, 0)
 #define	SPD_DDR5_COM_HEIGHT_BASE	15
 
 /*
- * S11.6 Common: Module Maximum Thickness
+ * S11.7 Common: Module Maximum Thickness
  */
 #define	SPD_DDR5_COM_THICK	0x0e7
 #define	SPD_DDR5_COM_THICK_BACK(r)	bitx8(r, 7, 4)
@@ -486,7 +497,7 @@ extern "C" {
 #define	SPD_DDR5_COM_THICK_BASE		1
 
 /*
- * S11.7 Common: Reference Raw Card Used
+ * S11.8 Common: Reference Raw Card Used
  */
 #define	SPD_DDR5_COM_REF	0x0e8
 #define	SPD_DDR5_COM_REF_REV(r)		bitx8(r, 7, 5)
@@ -494,7 +505,7 @@ extern "C" {
 #define	SPD_DDR5_COM_REF_CARD(r)	bitx8(r, 4, 0)
 
 /*
- * S11.8 Common: DIMM Attributes
+ * S11.9 Common: DIMM Attributes
  */
 #define	SPD_DDR5_COM_ATTR	0x0e9
 #define	SPD_DDR5_COM_ATTR_OTR(r)	bitx8(r, 7, 4)
@@ -512,9 +523,11 @@ extern "C" {
 #define	SPD_DDR5_COM_ATTR_NROWS_UNDEF	0
 #define	SPD_DDR5_COM_ATTR_NROWS_1	1
 #define	SPD_DDR5_COM_ATTR_NROWS_2	2
+#define	SPD_DDR5_COM_ATTR_NROWS_4	3
+#define	SPD_DDR5_COM_ATTR_NROWS_3	4
 
 /*
- * S11.9 Common: Module Organization
+ * S11.10 Common: Module Organization
  */
 #define	SPD_DDR5_COM_ORG	0x0ea
 #define	SPD_DDR5_COM_ORG_MIX(r)		bitx8(r, 6, 6)
@@ -524,7 +537,7 @@ extern "C" {
 #define	SPD_DDR5_COM_ORG_NRANK_BASE	1
 
 /*
- * S11.10 Common: Memory Channel Bus Width. Unlike DDR4, these widths are in
+ * S11.11 Common: Memory Channel Bus Width. Unlike DDR4, these widths are in
  * terms of sub-channels.
  */
 #define	SPD_DDR5_COM_BUS_WIDTH	0x0eb
@@ -609,6 +622,7 @@ extern "C" {
 #define	SPD_DDR5_RDIMM_INFO_TYPE_RCD03	2
 #define	SPD_DDR5_RDIMM_INFO_TYPE_RCD04	3
 #define	SPD_DDR5_RDIMM_INFO_TYPE_RCD05	4
+#define	SPD_DDR5_RDIMM_INFO_TYPE_RCD06	5
 #define	SPD_DDR5_RDIMM_REV_RCD		0x0f3
 
 #define	SPD_DDR5_RDIMM_MFG_ID0_DB	0x0f4
@@ -709,6 +723,7 @@ extern "C" {
 #define	SPD_DDR5_MRDIMM_INFO_MRCD	0x0f2
 #define	SPD_DDR5_MRDIMM_INFO_TYPE_MRCD01	0
 #define	SPD_DDR5_MRDIMM_INFO_TYPE_MRCD02	1
+#define	SPD_DDR5_MRDIMM_INFO_TYPE_MRCD03	2
 #define	SPD_DDR5_MRDIMM_REV_MRCD	0x0f3
 
 #define	SPD_DDR5_MRDIMM_MFG_ID0_MDB	0x0f4
@@ -716,6 +731,7 @@ extern "C" {
 #define	SPD_DDR5_MRDIMM_INFO_MDB	0x0f6
 #define	SPD_DDR5_MRDIMM_INFO_TYPE_MDB01	0
 #define	SPD_DDR5_MRDIMM_INFO_TYPE_MDB02	1
+#define	SPD_DDR5_MRDIMM_INFO_TYPE_MDB03	2
 #define	SPD_DDR5_MRDIMM_REV_MDB		0x0f7
 
 /*
@@ -816,7 +832,8 @@ extern "C" {
 
 /*
  * Annex A.8: Module Specific Bytes for Compression Attached Memory Module Types
- * (CAMM2).
+ * (CAMM2). There are three revisions of this. The contents in revision 1.1 are
+ * specific to DDR5 and do not apply to LPDDR5/5X.
  */
 #define	SPD_DDR5_CAMM2_MFG_ID0_CKD0	0x0f0
 #define	SPD_DDR5_CAMM2_MFG_ID1_CKD0	0x0f1
@@ -827,6 +844,83 @@ extern "C" {
 #define	SPD_DDR5_CAMM2_MFG_ID1_CKD1	0x0f5
 #define	SPD_DDR5_CAMM2_INFO_CKD1	0x0f6
 #define	SPD_DDR5_CAMM2_INFO_REV_CKD1	0x0f7
+
+/*
+ * S19.3 CAMM2 v1.1: Clock Driver 0 RW00 CKD Configuration
+ * S19.6 CAMM2 v1.1: Clock Driver 1 RW00 CKD Configuration
+ */
+#define	SPD_DDR5_CAMM2_CKD_CFG_CKD0	0x100
+#define	SPD_DDR5_CAMM2_CKD_CFG_CKD1	0x103
+#define	SPD_DDR5_CAMM2_CKD_CFG_CHBQCK1(r)	bitx8(r, 7, 7)
+#define	SPD_DDR5_CAMM2_CKD_CFG_CHBQCK0(r)	bitx8(r, 6, 6)
+#define	SPD_DDR5_CAMM2_CKD_CFG_CHAQCK1(r)	bitx8(r, 5, 5)
+#define	SPD_DDR5_CAMM2_CKD_CFG_CHAQCK0(r)	bitx8(r, 4, 4)
+
+/*
+ * S19.4 CAMM2 v1.1: Clock Driver 0 RW02 QCK Driver Characteristics
+ * S19.7 CAMM2 v1.1: Clock Driver 1 RW02 QCK Driver Characteristics
+ */
+#define	SPD_DDR5_CAMM2_CKD_DRV_CKD0	0x101
+#define	SPD_DDR5_CAMM2_CKD_DRV_CKD1	0x104
+#define	SPD_DDR5_CAMM2_CKD_DRV_CHBQCK1_DRIVE(r)	bitx8(r, 7, 6)
+#define	SPD_DDR5_CAMM2_CKD_DRV_CHBQCK0_DRIVE(r)	bitx8(r, 5, 4)
+#define	SPD_DDR5_CAMM2_CKD_DRV_CHAQCK1_DRIVE(r)	bitx8(r, 3, 2)
+#define	SPD_DDR5_CAMM2_CKD_DRV_CHAQCK0_DRIVE(r)	bitx8(r, 1, 0)
+#define	SPD_DDR5_CAMM2_CKD_DRV_LIGHT	0
+#define	SPD_DDR5_CAMM2_CKD_DRV_MODERATE	1
+#define	SPD_DDR5_CAMM2_CKD_DRV_STRONG	2
+#define	SPD_DDR5_CAMM2_CKD_DRV_WEAK	3
+
+/*
+ * S19.6 CAMM2 v1.1: Clock Driver 0 RW03 QCK Output Differential Slew Rate
+ * S19.8 CAMM2 v1.1: Clock Driver 1 RW03 QCK Output Differential Slew Rate
+ */
+#define	SPD_DDR5_CAMM2_CKD_SLEW_CKD0	0x102
+#define	SPD_DDR5_CAMM2_CKD_SLEW_CKD1	0x105
+#define	SPD_DDR5_CAMM2_CKD_SLEW_CHBQCK_SLEW(r)	bitx8(r, 5, 4)
+#define	SPD_DDR5_CAMM2_CKD_SLEW_CHAQCK_SLEW(r)	bitx8(r, 1, 0)
+#define	SPD_DDR5_CAMM2_CKD_SLEW_SLEW_MODERATE	0
+#define	SPD_DDR5_CAMM2_CKD_SLEW_SLEW_FAST	1
+
+/*
+ * CAMM2 v1.2: Module Capacitance - VDDQ
+ *
+ * This is currently only defined in LPDDR5, but it applies to DDR5.
+ */
+#define	SPD_DDR5_CAMM2_MOD_CAP_VDDQ	0x106
+#define	SPD_DDR5_CAMM2_MOD_CAP_VDDQ_NOM(r)	bitx8(r, 4, 0)
+#define	SPD_DDR5_CAMM2_MOD_CAP_VDDQ_NOM_UNSPEC	0
+#define	SPD_DDR5_CAMM2_MOD_CAP_VDDQ_NOM_BASE	50
+#define	SPD_DDR5_CAMM2_MOD_CAP_VDDQ_NOM_STEP	25
+#define	SPD_DDR5_CAMM2_MOD_CAP_VDDQ_NOM_MAX	19
+
+/*
+ * Annex A.9: Module Specific Bytes for Small Outline Compression Attached
+ * Memory Module Types (SOCAMM2).
+ */
+#define	SPD_DDR5_SOCAMM2_MFG_ID0_VR0	0xf0
+#define	SPD_DDR5_SOCAMM2_MFG_ID1_VR0	0xf1
+#define	SPD_DDR5_SOCAMM2_SRC_VR0	0xf2
+#define	SPD_DDR5_SOCAMM2_REV_VR0	0xf3
+#define	SPD_DDR5_SOCAMM2_MFG_ID0_VR1	0xf4
+#define	SPD_DDR5_SOCAMM2_MFG_ID1_VR1	0xf5
+#define	SPD_DDR5_SOCAMM2_SRC_VR1	0xf6
+#define	SPD_DDR5_SOCAMM2_REV_VR1	0xf7
+#define	SPD_DDR5_SOCAMM2_MFG_ID0_VR2	0xf8
+#define	SPD_DDR5_SOCAMM2_MFG_ID1_VR2	0xf9
+#define	SPD_DDR5_SOCAMM2_SRC_VR2	0xfa
+#define	SPD_DDR5_SOCAMM2_REV_VR2	0xfb
+#define	SPD_DDR5_SOCAMM2_MFG_ID0_VR3	0xfc
+#define	SPD_DDR5_SOCAMM2_MFG_ID1_VR3	0xfd
+#define	SPD_DDR5_SOCAMM2_SRC_VR3	0xfe
+#define	SPD_DDR5_SOCAMM2_REV_VR3	0xff
+
+#define	SPD_DDR5_SOCAMM2_SRC_VR_PRES(r)		bitx8(r, 7, 7)
+#define	SPD_DDR5_SOCAMM2_SRC_VR_VDDQ(r)		bitx8(r, 4, 4)
+#define	SPD_DDR5_SOCAMM2_SRC_VR_VDD2(r)		bitx8(r, 3, 3)
+#define	SPD_DDR5_SOCAMM2_SRC_VR_VDD2L(r)	bitx8(r, 2, 2)
+#define	SPD_DDR5_SOCAMM2_SRC_VR_VDD2H(r)	bitx8(r, 1, 1)
+#define	SPD_DDR5_SOCAMM2_SRC_VR_VDD1(r)		bitx8(r, 0, 0)
 
 /*
  * S7.4 CRC. DDR5 modules have a single CRC calculation that covers bytes 0-509.

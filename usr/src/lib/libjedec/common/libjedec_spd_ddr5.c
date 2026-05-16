@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -53,6 +53,7 @@ static const spd_value_map_t spd_ddr5_mod_type_map[] = {
 	{ SPD_DDR5_MOD_TYPE_TYPE_CSODIMM, SPD_MOD_TYPE_CSODIMM, false },
 	{ SPD_DDR5_MOD_TYPE_TYPE_MRDIMM, SPD_MOD_TYPE_MRDIMM, false },
 	{ SPD_DDR5_MOD_TYPE_TYPE_CAMM2, SPD_MOD_TYPE_CAMM2, false },
+	{ SPD_DDR5_MOD_TYPE_TYPE_SOCAMM2, SPD_MOD_TYPE_SOCAMM2, false },
 	{ SPD_DDR5_MOD_TYPE_TYPE_DDIMM, SPD_MOD_TYPE_DDIMM, false },
 	{ SPD_DDR5_MOD_TYPE_TYPE_SOLDER, SPD_MOD_TYPE_SOLDER, false }
 };
@@ -334,6 +335,9 @@ spd_parse_ddr5_flt(spd_info_t *si, uint32_t off, uint32_t len,
 {
 	const uint8_t data = si->si_data[off];
 	spd_fault_t flt = 0;
+
+	if (SPD_DDR5_FLT_PRAC_ABO(data))
+		spd_nvl_insert_key(si, SPD_KEY_DDR5_PRAC);
 
 	if (SPD_DDR5_FLT_WIDE_TS(data) != 0)
 		spd_nvl_insert_key(si, SPD_KEY_DDR5_WIDE_TS);
@@ -887,7 +891,6 @@ static const spd_parse_t spd_ddr5_base_1v2[] = {
 	    .sp_key = SPD_KEY_TCCDMWTR, .sp_parse = spd_parse_ddr5_ps },
 	{ .sp_off = SPD_DDR5_TCCD_M_WTR_NCK, .sp_key = SPD_KEY_TCCDMWTR_NCK,
 	    .sp_parse = spd_parse_ddr5_nck }
-
 };
 
 static void
@@ -1032,6 +1035,36 @@ spd_parse_ddr5_ts(spd_info_t *si, uint32_t off, uint32_t len, const char *key)
 }
 
 /*
+ * This key presents a number of additional devices. It was added in DDR5 1.3
+ * and LPDDR 1.2. Because this requires a non-zero value that should have been
+ * reserved to be interpreted, we don't currently constrain based on the
+ * version.
+ */
+static void
+spd_parse_ddr5_add_dev(spd_info_t *si, uint32_t off, uint32_t len,
+    const char *key)
+{
+	const uint8_t data = si->si_data[off];
+	spd_fuse_t fuse = 0;
+	spd_tvs_t tvs = 0;
+
+	if (SPD_DDR5_COM_ADDDEV_TVS_MGMT(data))
+		tvs |= SPD_TVS_VIN_MGMT;
+
+	if (SPD_DDR5_COM_ADDDEV_TVS_BULK(data))
+		tvs |= SPD_TVS_VIN_BULK;
+
+	if (SPD_DDR5_COM_ADDDEV_FUSE_BULK(data))
+		fuse |= SPD_FUSE_VIN_BULK;
+
+	if (fuse != 0)
+		spd_nvl_insert_u32(si, SPD_KEY_DEV_FUSE, fuse);
+
+	if (tvs != 0)
+		spd_nvl_insert_u32(si, SPD_KEY_DEV_TVS, tvs);
+}
+
+/*
  * While DDR5 uses similar constants as earlier DDR standards, less values have
  * been officially defined yet so we use a different table from the others.
  */
@@ -1090,7 +1123,9 @@ spd_parse_ddr5_design(spd_info_t *si, uint32_t off, uint32_t len,
 static const spd_value_map_t spd_ddr5_attr_nrows_map[] = {
 	{ SPD_DDR5_COM_ATTR_NROWS_UNDEF, 0, true },
 	{ SPD_DDR5_COM_ATTR_NROWS_1, 1, false },
-	{ SPD_DDR5_COM_ATTR_NROWS_2, 2, false }
+	{ SPD_DDR5_COM_ATTR_NROWS_2, 2, false },
+	{ SPD_DDR5_COM_ATTR_NROWS_3, 3, false },
+	{ SPD_DDR5_COM_ATTR_NROWS_4, 4, false }
 };
 
 static const spd_value_map_t spd_ddr5_attr_otr_map[] = {
@@ -1186,6 +1221,7 @@ static const spd_parse_t spd_ddr5_module[] = {
 	    .sp_parse = spd_parse_ddr5_pmic2 },
 	{ .sp_off = SPD_DDR5_COM_MFG_ID0_TS, .sp_len = 4,
 	    .sp_parse = spd_parse_ddr5_ts },
+	{ .sp_off = SPD_DDR5_COM_ADDDEV, .sp_parse = spd_parse_ddr5_add_dev },
 	{ .sp_off = SPD_DDR5_COM_HEIGHT, .sp_key = SPD_KEY_MOD_HEIGHT,
 	    .sp_parse = spd_parse_height },
 	{ .sp_off = SPD_DDR5_COM_THICK, .sp_parse = spd_parse_thickness },
@@ -1249,20 +1285,42 @@ spd_parse_ddr5_udimm_cd(spd_info_t *si, uint32_t off, uint32_t len,
 	    spd_ddr5_cd_type_map, ARRAY_SIZE(spd_ddr5_cd_type_map));
 }
 
+/*
+ * The various clock driver routines are shared between CAMM2 and UDIMMs as they
+ * are based on the shared CKD01 spec.
+ */
 static void
-spd_parse_ddr5_udimm_ckd_cfg(spd_info_t *si, uint32_t off, uint32_t len,
-    const char *key)
+spd_parse_ddr5_ckd_cfg(spd_info_t *si, uint32_t off, const char *chack0,
+    const char *chack1, const char *ckbck0, const char *chbck1)
 {
 	const uint8_t data = si->si_data[off];
 
 	if (SPD_DDR5_UDIMM_CKD_CFG_CHAQCK0(data) == 0)
-		spd_nvl_insert_key(si, SPD_KEY_DDR5_CKD_CHAQCK0_EN);
+		spd_nvl_insert_key(si, chack0);
 	if (SPD_DDR5_UDIMM_CKD_CFG_CHAQCK1(data) == 0)
-		spd_nvl_insert_key(si, SPD_KEY_DDR5_CKD_CHAQCK1_EN);
+		spd_nvl_insert_key(si, chack1);
 	if (SPD_DDR5_UDIMM_CKD_CFG_CHBQCK0(data) == 0)
-		spd_nvl_insert_key(si, SPD_KEY_DDR5_CKD_CHBQCK0_EN);
+		spd_nvl_insert_key(si, chbck1);
 	if (SPD_DDR5_UDIMM_CKD_CFG_CHBQCK1(data) == 0)
-		spd_nvl_insert_key(si, SPD_KEY_DDR5_CKD_CHBQCK1_EN);
+		spd_nvl_insert_key(si, chbck1);
+}
+
+static void
+spd_parse_ddr5_ckd_cfg_ckd0(spd_info_t *si, uint32_t off, uint32_t len,
+    const char *key)
+{
+	return (spd_parse_ddr5_ckd_cfg(si, off, SPD_KEY_DDR5_CKD_CHAQCK0_EN,
+	    SPD_KEY_DDR5_CKD_CHAQCK1_EN, SPD_KEY_DDR5_CKD_CHBQCK0_EN,
+	    SPD_KEY_DDR5_CKD_CHBQCK1_EN));
+}
+
+static void
+spd_parse_ddr5_ckd_cfg_ckd1(spd_info_t *si, uint32_t off, uint32_t len,
+    const char *key)
+{
+	return (spd_parse_ddr5_ckd_cfg(si, off, SPD_KEY_DDR5_CKD1_CHAQCK0_EN,
+	    SPD_KEY_DDR5_CKD1_CHAQCK1_EN, SPD_KEY_DDR5_CKD1_CHBQCK0_EN,
+	    SPD_KEY_DDR5_CKD1_CHBQCK1_EN));
 }
 
 static const spd_value_map_t spd_ddr5_ckd_ds_map[] = {
@@ -1273,8 +1331,8 @@ static const spd_value_map_t spd_ddr5_ckd_ds_map[] = {
 };
 
 static void
-spd_parse_ddr5_udimm_ckd_drv(spd_info_t *si, uint32_t off, uint32_t len,
-    const char *key)
+spd_parse_ddr5_ckd_drv(spd_info_t *si, uint32_t off, const char *qck0a_key,
+    const char *qck1a_key, const char *qck0b_key, const char *qck1b_key)
 {
 	const uint8_t data = si->si_data[off];
 	const uint8_t qck0a = SPD_DDR5_UDIMM_CKD_DRV_CHAQCK0_DRIVE(data);
@@ -1282,15 +1340,32 @@ spd_parse_ddr5_udimm_ckd_drv(spd_info_t *si, uint32_t off, uint32_t len,
 	const uint8_t qck0b = SPD_DDR5_UDIMM_CKD_DRV_CHBQCK0_DRIVE(data);
 	const uint8_t qck1b = SPD_DDR5_UDIMM_CKD_DRV_CHBQCK1_DRIVE(data);
 
+	spd_insert_map(si, qck0a_key, qck0a, spd_ddr5_ckd_ds_map,
+	    ARRAY_SIZE(spd_ddr5_ckd_ds_map));
+	spd_insert_map(si, qck1a_key, qck1a, spd_ddr5_ckd_ds_map,
+	    ARRAY_SIZE(spd_ddr5_ckd_ds_map));
+	spd_insert_map(si, qck0b_key, qck0b, spd_ddr5_ckd_ds_map,
+	    ARRAY_SIZE(spd_ddr5_ckd_ds_map));
+	spd_insert_map(si, qck1b_key, qck1b, spd_ddr5_ckd_ds_map,
+	    ARRAY_SIZE(spd_ddr5_ckd_ds_map));
+}
 
-	spd_insert_map(si, SPD_KEY_DDR5_CKD_CHAQCK0_DS, qck0a,
-	    spd_ddr5_ckd_ds_map, ARRAY_SIZE(spd_ddr5_ckd_ds_map));
-	spd_insert_map(si, SPD_KEY_DDR5_CKD_CHAQCK1_DS, qck1a,
-	    spd_ddr5_ckd_ds_map, ARRAY_SIZE(spd_ddr5_ckd_ds_map));
-	spd_insert_map(si, SPD_KEY_DDR5_CKD_CHBQCK0_DS, qck0b,
-	    spd_ddr5_ckd_ds_map, ARRAY_SIZE(spd_ddr5_ckd_ds_map));
-	spd_insert_map(si, SPD_KEY_DDR5_CKD_CHBQCK1_DS, qck1b,
-	    spd_ddr5_ckd_ds_map, ARRAY_SIZE(spd_ddr5_ckd_ds_map));
+static void
+spd_parse_ddr5_ckd_drv_ckd0(spd_info_t *si, uint32_t off, uint32_t len,
+    const char *key)
+{
+	return (spd_parse_ddr5_ckd_drv(si, off, SPD_KEY_DDR5_CKD_CHAQCK0_DS,
+	    SPD_KEY_DDR5_CKD_CHAQCK1_DS, SPD_KEY_DDR5_CKD_CHBQCK0_DS,
+	    SPD_KEY_DDR5_CKD_CHBQCK1_DS));
+}
+
+static void
+spd_parse_ddr5_ckd_drv_ckd1(spd_info_t *si, uint32_t off, uint32_t len,
+    const char *key)
+{
+	return (spd_parse_ddr5_ckd_drv(si, off, SPD_KEY_DDR5_CKD1_CHAQCK0_DS,
+	    SPD_KEY_DDR5_CKD1_CHAQCK1_DS, SPD_KEY_DDR5_CKD1_CHBQCK0_DS,
+	    SPD_KEY_DDR5_CKD1_CHBQCK1_DS));
 }
 
 static const spd_value_map_t spd_ddr5_ckd_slew_map[] = {
@@ -1299,17 +1374,33 @@ static const spd_value_map_t spd_ddr5_ckd_slew_map[] = {
 };
 
 static void
-spd_parse_ddr5_udimm_ckd_slew(spd_info_t *si, uint32_t off, uint32_t len,
-    const char *key)
+spd_parse_ddr5_ckd_slew(spd_info_t *si, uint32_t off,
+    const char *qcka_key, const char *qckb_key)
 {
 	const uint8_t data = si->si_data[off];
 	const uint8_t qcka = SPD_DDR5_UDIMM_CKD_SLEW_CHAQCK_SLEW(data);
 	const uint8_t qckb = SPD_DDR5_UDIMM_CKD_SLEW_CHBQCK_SLEW(data);
 
-	spd_insert_map(si, SPD_KEY_DDR5_CKD_CHAQCK_SLEW, qcka,
+	spd_insert_map(si, qcka_key, qcka,
 	    spd_ddr5_ckd_slew_map, ARRAY_SIZE(spd_ddr5_ckd_slew_map));
-	spd_insert_map(si, SPD_KEY_DDR5_CKD_CHBQCK_SLEW, qckb,
+	spd_insert_map(si, qckb_key, qckb,
 	    spd_ddr5_ckd_slew_map, ARRAY_SIZE(spd_ddr5_ckd_slew_map));
+}
+
+static void
+spd_parse_ddr5_ckd_slew_ckd0(spd_info_t *si, uint32_t off, uint32_t len,
+    const char *key)
+{
+	return (spd_parse_ddr5_ckd_slew(si, off, SPD_KEY_DDR5_CKD_CHAQCK_SLEW,
+	    SPD_KEY_DDR5_CKD_CHBQCK_SLEW));
+}
+
+static void
+spd_parse_ddr5_ckd_slew_ckd1(spd_info_t *si, uint32_t off, uint32_t len,
+    const char *key)
+{
+	return (spd_parse_ddr5_ckd_slew(si, off, SPD_KEY_DDR5_CKD1_CHAQCK_SLEW,
+	    SPD_KEY_DDR5_CKD1_CHBQCK_SLEW));
 }
 
 static const spd_parse_t spd_ddr5_udimm[] = {
@@ -1319,11 +1410,11 @@ static const spd_parse_t spd_ddr5_udimm[] = {
 
 static const spd_parse_t spd_ddr5_udimm_1v1[] = {
 	{ .sp_off = SPD_DDR5_UDIMM_CKD_CFG,
-	    .sp_parse = spd_parse_ddr5_udimm_ckd_cfg },
+	    .sp_parse = spd_parse_ddr5_ckd_cfg_ckd0 },
 	{ .sp_off = SPD_DDR5_UDIMM_CKD_DRV,
-	    .sp_parse = spd_parse_ddr5_udimm_ckd_drv },
+	    .sp_parse = spd_parse_ddr5_ckd_drv_ckd0 },
 	{ .sp_off = SPD_DDR5_UDIMM_CKD_SLEW,
-	    .sp_parse = spd_parse_ddr5_udimm_ckd_slew }
+	    .sp_parse = spd_parse_ddr5_ckd_slew_ckd0 }
 };
 
 /*
@@ -1338,7 +1429,8 @@ static const spd_value_map_t spd_ddr5_rcd_type_map[] = {
 	{ SPD_DDR5_RDIMM_INFO_TYPE_RCD02, SPD_RCD_T_DDR5RCD02, false },
 	{ SPD_DDR5_RDIMM_INFO_TYPE_RCD03, SPD_RCD_T_DDR5RCD03, false },
 	{ SPD_DDR5_RDIMM_INFO_TYPE_RCD04, SPD_RCD_T_DDR5RCD04, false },
-	{ SPD_DDR5_RDIMM_INFO_TYPE_RCD05, SPD_RCD_T_DDR5RCD05, false }
+	{ SPD_DDR5_RDIMM_INFO_TYPE_RCD05, SPD_RCD_T_DDR5RCD05, false },
+	{ SPD_DDR5_RDIMM_INFO_TYPE_RCD06, SPD_RCD_T_DDR5RCD06, false }
 };
 
 static const spd_value_map_t spd_ddr5_db_type_map[] = {
@@ -1572,12 +1664,14 @@ static const spd_parse_t spd_ddr5_lrdimm[] = {
  */
 static const spd_value_map_t spd_ddr5_mrcd_type_map[] = {
 	{ SPD_DDR5_MRDIMM_INFO_TYPE_MRCD01, SPD_MRCD_T_DDR5MRCD01, false },
-	{ SPD_DDR5_MRDIMM_INFO_TYPE_MRCD02, SPD_MRCD_T_DDR5MRCD02, false }
+	{ SPD_DDR5_MRDIMM_INFO_TYPE_MRCD02, SPD_MRCD_T_DDR5MRCD02, false },
+	{ SPD_DDR5_MRDIMM_INFO_TYPE_MRCD03, SPD_MRCD_T_DDR5MRCD03, false }
 };
 
 static const spd_value_map_t spd_ddr5_mdb_type_map[] = {
 	{ SPD_DDR5_MRDIMM_INFO_TYPE_MDB01, SPD_MDB_T_DDR5MDB01, false },
-	{ SPD_DDR5_MRDIMM_INFO_TYPE_MDB02, SPD_MDB_T_DDR5MDB02, false }
+	{ SPD_DDR5_MRDIMM_INFO_TYPE_MDB02, SPD_MDB_T_DDR5MDB02, false },
+	{ SPD_DDR5_MRDIMM_INFO_TYPE_MDB03, SPD_MDB_T_DDR5MDB03, false }
 };
 
 static void
@@ -1883,6 +1977,122 @@ static const spd_parse_t spd_ddr5_camm2[] = {
 	    .sp_parse = spd_parse_ddr5_camm2_ckd1 },
 };
 
+static const spd_parse_t spd_ddr5_camm2_1v1[] = {
+	{ .sp_off = SPD_DDR5_CAMM2_CKD_CFG_CKD0,
+	    .sp_parse = spd_parse_ddr5_ckd_cfg_ckd0 },
+	{ .sp_off = SPD_DDR5_CAMM2_CKD_DRV_CKD0,
+	    .sp_parse = spd_parse_ddr5_ckd_drv_ckd0 },
+	{ .sp_off = SPD_DDR5_CAMM2_CKD_SLEW_CKD0,
+	    .sp_parse = spd_parse_ddr5_ckd_slew_ckd0 },
+	{ .sp_off = SPD_DDR5_CAMM2_CKD_CFG_CKD1,
+	    .sp_parse = spd_parse_ddr5_ckd_cfg_ckd1 },
+	{ .sp_off = SPD_DDR5_CAMM2_CKD_DRV_CKD1,
+	    .sp_parse = spd_parse_ddr5_ckd_drv_ckd1 },
+	{ .sp_off = SPD_DDR5_CAMM2_CKD_SLEW_CKD1,
+	    .sp_parse = spd_parse_ddr5_ckd_slew_ckd1 },
+};
+
+static void
+spd_parse_ddr5_camm2_mod_cap(spd_info_t *si, uint32_t off, uint32_t len,
+    const char *key)
+{
+	const uint8_t data = si->si_data[off];
+	const uint8_t nom = SPD_DDR5_CAMM2_MOD_CAP_VDDQ_NOM(data);
+	if (nom == SPD_DDR5_CAMM2_MOD_CAP_VDDQ_NOM_UNSPEC)
+		return;
+
+	if (nom > SPD_DDR5_CAMM2_MOD_CAP_VDDQ_NOM_MAX) {
+		spd_nvl_err(si, key, SPD_ERROR_NO_XLATE,
+		    "encountered unknown value: 0x%x", nom);
+	}
+
+	uint32_t cap = SPD_DDR5_CAMM2_MOD_CAP_VDDQ_NOM_BASE +
+	    (nom - 1) * SPD_DDR5_CAMM2_MOD_CAP_VDDQ_NOM_STEP;
+	spd_nvl_insert_u32(si, key, cap);
+}
+
+static const spd_parse_t spd_ddr5_camm2_1v2[] = {
+	{ .sp_off = SPD_DDR5_CAMM2_MOD_CAP_VDDQ,
+	    .sp_key = SPD_KEY_DDR5_CAMM2_MOD_CAP,
+	    .sp_parse = spd_parse_ddr5_camm2_mod_cap }
+};
+
+static void
+spd_parse_ddr5_socamm2_vr(spd_info_t *si, uint32_t off, spd_device_t flags,
+    const char *id_key, const char *id_str_key, const char *rev_key,
+    const char *src_key)
+{
+	const uint8_t data = si->si_data[off + 2];
+	spd_vr_rail_source_t src = 0;
+
+	if (!SPD_DDR5_SOCAMM2_SRC_VR_PRES(data))
+		return;
+
+	spd_parse_jedec_id(si, off, 2, id_key);
+	spd_parse_jedec_id_str(si, off, 2, id_str_key);
+	spd_parse_hex_vers(si, off + 3, 1, rev_key);
+	spd_upsert_flag(si, SPD_KEY_DEVS, flags);
+
+	if (SPD_DDR5_SOCAMM2_SRC_VR_VDDQ(data))
+		src |= SPD_VR_SRC_VDDQ;
+	if (SPD_DDR5_SOCAMM2_SRC_VR_VDD2(data))
+		src |= SPD_VR_SRC_VDD2;
+	if (SPD_DDR5_SOCAMM2_SRC_VR_VDD2L(data))
+		src |= SPD_VR_SRC_VDD2L;
+	if (SPD_DDR5_SOCAMM2_SRC_VR_VDD2H(data))
+		src |= SPD_VR_SRC_VDD2H;
+	if (SPD_DDR5_SOCAMM2_SRC_VR_VDD1(data))
+		src |= SPD_VR_SRC_VDD1;
+	spd_nvl_insert_u32(si, src_key, src);
+}
+
+static void
+spd_parse_ddr5_socamm_vr0(spd_info_t *si, uint32_t off, uint32_t len,
+    const char *key)
+{
+	return (spd_parse_ddr5_socamm2_vr(si, off, SPD_DEVICE_VR_0,
+	    SPD_KEY_DEV_VR0_MFG, SPD_KEY_DEV_VR0_MFG_NAME,
+	    SPD_KEY_DEV_VR0_REV, SPD_KEY_DEV_VR0_SRC));
+}
+
+static void
+spd_parse_ddr5_socamm_vr1(spd_info_t *si, uint32_t off, uint32_t len,
+    const char *key)
+{
+	return (spd_parse_ddr5_socamm2_vr(si, off, SPD_DEVICE_VR_1,
+	    SPD_KEY_DEV_VR1_MFG, SPD_KEY_DEV_VR1_MFG_NAME,
+	    SPD_KEY_DEV_VR1_REV, SPD_KEY_DEV_VR1_SRC));
+}
+
+static void
+spd_parse_ddr5_socamm_vr2(spd_info_t *si, uint32_t off, uint32_t len,
+    const char *key)
+{
+	return (spd_parse_ddr5_socamm2_vr(si, off, SPD_DEVICE_VR_2,
+	    SPD_KEY_DEV_VR2_MFG, SPD_KEY_DEV_VR2_MFG_NAME,
+	    SPD_KEY_DEV_VR2_REV, SPD_KEY_DEV_VR2_SRC));
+}
+
+static void
+spd_parse_ddr5_socamm_vr3(spd_info_t *si, uint32_t off, uint32_t len,
+    const char *key)
+{
+	return (spd_parse_ddr5_socamm2_vr(si, off, SPD_DEVICE_VR_3,
+	    SPD_KEY_DEV_VR3_MFG, SPD_KEY_DEV_VR3_MFG_NAME,
+	    SPD_KEY_DEV_VR3_REV, SPD_KEY_DEV_VR3_SRC));
+}
+
+static const spd_parse_t spd_ddr5_socamm2[] = {
+	{ .sp_off = SPD_DDR5_SOCAMM2_MFG_ID0_VR0, .sp_len = 4,
+	    .sp_parse = spd_parse_ddr5_socamm_vr0 },
+	{ .sp_off = SPD_DDR5_SOCAMM2_MFG_ID0_VR1, .sp_len = 4,
+	    .sp_parse = spd_parse_ddr5_socamm_vr1 },
+	{ .sp_off = SPD_DDR5_SOCAMM2_MFG_ID0_VR2, .sp_len = 4,
+	    .sp_parse = spd_parse_ddr5_socamm_vr2 },
+	{ .sp_off = SPD_DDR5_SOCAMM2_MFG_ID0_VR3, .sp_len = 4,
+	    .sp_parse = spd_parse_ddr5_socamm_vr3 }
+};
+
 static void
 spd_parse_ddr5_mod_specific(spd_info_t *si)
 {
@@ -1920,6 +2130,30 @@ spd_parse_ddr5_mod_specific(spd_info_t *si)
 		break;
 	case SPD_MOD_TYPE_CAMM2:
 		spd_parse(si, spd_ddr5_camm2, ARRAY_SIZE(spd_ddr5_camm2));
+		/*
+		 * CAMM2 defines the following in version 1.1 in the DDR5 SPD
+		 * spec that only applies to DDR5 memory. LP5 explicitly does
+		 * not define this.
+		 */
+		if (si->si_dram == SPD_DT_DDR5_SDRAM &&
+		    SPD_DDR5_SPD_REV_ADD(si->si_data[SPD_DDR5_COM_REV]) >= 1) {
+			spd_parse(si, spd_ddr5_camm2_1v1,
+			    ARRAY_SIZE(spd_ddr5_camm2_1v1));
+		}
+
+		/*
+		 * However, the capacitance value is defined in the LP5 spec for
+		 * both LP5 and DDR5 in version 1.2. DDR5 1.4 doesn't contain
+		 * CAMM2 annex 1.2, only 1.1. So we believe LP5 and parse this
+		 * for everything.
+		 */
+		if (SPD_DDR5_SPD_REV_ADD(si->si_data[SPD_DDR5_COM_REV]) >= 2) {
+			spd_parse(si, spd_ddr5_camm2_1v2,
+			    ARRAY_SIZE(spd_ddr5_camm2_1v2));
+		}
+		break;
+	case SPD_MOD_TYPE_SOCAMM2:
+		spd_parse(si, spd_ddr5_socamm2, ARRAY_SIZE(spd_ddr5_socamm2));
 		break;
 	/*
 	 * Soldered DIMMs don't have any data.
@@ -1972,7 +2206,7 @@ spd_parse_ddr5(spd_info_t *si)
 	}
 
 	spd_parse(si, spd_ddr5_base, ARRAY_SIZE(spd_ddr5_base));
-	if (SPD_DDR5_SPD_REV_ADD(si->si_data[SPD_DDR5_COM_REV]) >= 2)
+	if (SPD_DDR5_SPD_REV_ADD(si->si_data[SPD_DDR5_SPD_REV]) >= 2)
 		spd_parse(si, spd_ddr5_base_1v2, ARRAY_SIZE(spd_ddr5_base_1v2));
 	spd_parse_ddr5_common(si);
 }

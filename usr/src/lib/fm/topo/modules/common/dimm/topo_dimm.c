@@ -165,6 +165,8 @@ topo_dimm_rcd2str(uint32_t val)
 		return ("DDR5RCD04");
 	case SPD_RCD_T_DDR5RCD05:
 		return ("DDR5RCD05");
+	case SPD_RCD_T_DDR5RCD06:
+		return ("DDR5RCD06");
 	default:
 		return ("unknown");
 	}
@@ -197,6 +199,8 @@ topo_dimm_mrcd2str(uint32_t val)
 		return ("DDR5MRCD01");
 	case SPD_MRCD_T_DDR5MRCD02:
 		return ("DDR5MRCD02");
+	case SPD_MRCD_T_DDR5MRCD03:
+		return ("DDR5MRCD03");
 	default:
 		return ("unknown");
 	}
@@ -210,6 +214,8 @@ topo_dimm_mdb2str(uint32_t val)
 		return ("DDR5MDB01");
 	case SPD_MDB_T_DDR5MDB02:
 		return ("DDR5MDB02");
+	case SPD_MDB_T_DDR5MDB03:
+		return ("DDR5MDB03");
 	default:
 		return ("unknown");
 	}
@@ -301,6 +307,8 @@ topo_dimm_mod_type2str(spd_module_type_t type)
 		return ("CSODIMM");
 	case SPD_MOD_TYPE_CAMM2:
 		return ("CAMM2");
+	case SPD_MOD_TYPE_SOCAMM2:
+		return ("SOCAMM2");
 	case SPD_MOD_TYPE_LPDIMM:
 		return ("LP-DIMM");
 	case SPD_MOD_TYPE_MICRO_DIMM:

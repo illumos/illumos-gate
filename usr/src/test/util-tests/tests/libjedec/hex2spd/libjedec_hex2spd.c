@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -67,7 +67,8 @@ static const hex2spd_test_t *hex2spd_tests[] = {
 	&micron_lp5,
 	&fake_lp5_camm2,
 	&samsung_ddr3_rdimm,
-	&micron_ddr3_lrdimm
+	&micron_ddr3_lrdimm,
+	&fake_lp5_socamm2
 };
 
 /*

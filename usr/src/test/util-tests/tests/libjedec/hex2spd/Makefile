@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 PROGS = libjedec_hex2spd
@@ -34,7 +34,8 @@ SPD = \
 	lpddr3/NT6CL256T32CQ.spd		\
 	lpddr4/MT53D1024M32D4.spd		\
 	lpddr5/CAMM2.spd			\
-	lpddr5/MT62F4G32D8DV-023.spd
+	lpddr5/MT62F4G32D8DV-023.spd		\
+	lpddr5/SOCAMM2.spd
 SPDDIR = ddr3 ddr4 ddr5 lpddr3 lpddr4 lpddr5
 
 PROGS32 = $(PROGS:%=%.32)

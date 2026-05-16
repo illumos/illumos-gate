@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _LIBJEDEC_HEX2SPD_H
@@ -91,6 +91,7 @@ extern const hex2spd_test_t nanya_lp3;
 extern const hex2spd_test_t micron_lp4;
 extern const hex2spd_test_t micron_lp5;
 extern const hex2spd_test_t fake_lp5_camm2;
+extern const hex2spd_test_t fake_lp5_socamm2;
 
 #ifdef __cplusplus
 }

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -371,6 +371,88 @@ const hex2spd_test_t fake_lp5_camm2 = {
 		.hs_key = SPD_KEY_MOD_NROWS,
 		.hs_type = DATA_TYPE_UINT32,
 		.hs_val = { .hs_u32 = 1 }
+	}, {
+		.hs_key = NULL,
+	} }
+};
+
+/*
+ * This is a derivative of the CAMM2 file so we mostly just check the SOCAMM2
+ * specific annex.
+ */
+const hex2spd_test_t fake_lp5_socamm2 = {
+	.ht_file = "lpddr5/SOCAMM2",
+	.ht_checks = { {
+		.hs_key = SPD_KEY_DRAM_TYPE,
+		.hs_type = DATA_TYPE_UINT32,
+		.hs_val = { .hs_u32 = SPD_DT_LPDDR5X_SDRAM }
+	}, {
+		.hs_key = SPD_KEY_MOD_TYPE,
+		.hs_type = DATA_TYPE_UINT32,
+		.hs_val = { .hs_u32 = SPD_MOD_TYPE_SOCAMM2 }
+	}, {
+		.hs_key = SPD_KEY_REV_ENC,
+		.hs_type = DATA_TYPE_UINT32,
+		.hs_val = { .hs_u32 = 1 }
+	}, {
+		.hs_key = SPD_KEY_REV_ADD,
+		.hs_type = DATA_TYPE_UINT32,
+		.hs_val = { .hs_u32 = 3 }
+	}, {
+		.hs_key = SPD_KEY_MOD_REV_ENC,
+		.hs_type = DATA_TYPE_UINT32,
+		.hs_val = { .hs_u32 = 1 }
+	}, {
+		.hs_key = SPD_KEY_MOD_REV_ADD,
+		.hs_type = DATA_TYPE_UINT32,
+		.hs_val = { .hs_u32 = 0 }
+	}, {
+		.hs_key = SPD_KEY_DEVS,
+		.hs_type = DATA_TYPE_UINT32,
+		.hs_val = { .hs_u32 = SPD_DEVICE_TEMP_1 | SPD_DEVICE_PMIC_0 |
+		    SPD_DEVICE_SPD | SPD_DEVICE_VR_0 | SPD_DEVICE_VR_1 |
+		    SPD_DEVICE_VR_3 }
+	}, {
+		.hs_key = SPD_KEY_DEV_VR0_MFG_NAME,
+		.hs_type = DATA_TYPE_STRING,
+		.hs_val = { .hs_str = "Lattice Semi." }
+	}, {
+		.hs_key = SPD_KEY_DEV_VR0_SRC,
+		.hs_type = DATA_TYPE_UINT32,
+		.hs_val = { .hs_u32 = SPD_VR_SRC_VDD1 }
+	}, {
+		.hs_key = SPD_KEY_DEV_VR0_REV,
+		.hs_type = DATA_TYPE_STRING,
+		.hs_val = { .hs_str = "B.2" }
+	}, {
+		.hs_key = SPD_KEY_DEV_VR1_MFG_NAME,
+		.hs_type = DATA_TYPE_STRING,
+		.hs_val = { .hs_str = "DoD" }
+	}, {
+		.hs_key = SPD_KEY_DEV_VR1_SRC,
+		.hs_type = DATA_TYPE_UINT32,
+		.hs_val = { .hs_u32 = SPD_VR_SRC_VDDQ | SPD_VR_SRC_VDD2 }
+	}, {
+		.hs_key = SPD_KEY_DEV_VR1_REV,
+		.hs_type = DATA_TYPE_STRING,
+		.hs_val = { .hs_str = "D.D" }
+	}, {
+		.hs_key = SPD_KEY_DEV_VR3_MFG_NAME,
+		.hs_type = DATA_TYPE_STRING,
+		.hs_val = { .hs_str = "Marvell" }
+	}, {
+		.hs_key = SPD_KEY_DEV_VR3_SRC,
+		.hs_type = DATA_TYPE_UINT32,
+		.hs_val = { .hs_u32 = SPD_VR_SRC_VDD1 | SPD_VR_SRC_VDD2H |
+		    SPD_VR_SRC_VDDQ }
+	}, {
+		.hs_key = SPD_KEY_DEV_VR3_REV,
+		.hs_type = DATA_TYPE_STRING,
+		.hs_val = { .hs_str = "2.3" }
+	}, {
+		.hs_key = SPD_KEY_MFG_MOD_PN,
+		.hs_type = DATA_TYPE_STRING,
+		.hs_val = { .hs_str = "FAKEDIMM-CAMM2-No, socamm2" }
 	}, {
 		.hs_key = NULL,
 	} }

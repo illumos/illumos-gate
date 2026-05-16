@@ -11,7 +11,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _LIBJEDEC_H
@@ -273,7 +273,8 @@ typedef enum {
 	SPD_MOD_TYPE_CSODIMM,
 	SPD_MOD_TYPE_CAMM2,
 	SPD_MOD_TYPE_LPDIMM,
-	SPD_MOD_TYPE_MICRO_DIMM
+	SPD_MOD_TYPE_MICRO_DIMM,
+	SPD_MOD_TYPE_SOCAMM2
 } spd_module_type_t;
 #define	SPD_KEY_MOD_TYPE	"meta.module-type"	/* uint32_t (enum) */
 typedef enum {
@@ -592,6 +593,7 @@ typedef enum {
 	SPD_FLT_WRSUP_MR15	= 1 << 2
 } spd_fault_t;
 #define	SPD_KEY_DDR5_FLT	"ddr5.fault-handling"	/* uint32_t */
+#define	SPD_KEY_DDR5_PRAC	"ddr5.per-row-act-count"	/* key */
 
 /*
  * DDR5 allows for non-standard core timing options. This is indicated by a
@@ -939,6 +941,32 @@ typedef enum {
 #define	SPD_KEY_DDR5_CKD_CHBQCK_SLEW	"ddr5.ckd.chb-qck_slew"
 
 /*
+ * DDR5/LPDDR5 CAMM2 specific values. There are two groups of additions for
+ * CAMM2. For DDR5 devices, CAMM2 v1.1 adds the same set of clock output devices
+ * that UDIMMs with clocks add. There are two clock drivers present so it uses
+ * the existing values for ckd0 and then a new set for ckd1 to minimize parsing
+ * differences. In CAMM2 Annex version 1.2 the nominal capacitance is defined
+ * for both DDR5 and LPDDR5.
+ */
+#define	SPD_KEY_DDR5_CKD1_CHAQCK0_EN	"ddr5.ckd1.cha-qck0_A-enabled"
+#define	SPD_KEY_DDR5_CKD1_CHAQCK1_EN	"ddr5.ckd1.cha-qck1_A-enabled"
+#define	SPD_KEY_DDR5_CKD1_CHBQCK0_EN	"ddr5.ckd1.chb-qck0_B-enabled"
+#define	SPD_KEY_DDR5_CKD1_CHBQCK1_EN	"ddr5.ckd1.chb-qck1_B-enabled"
+#define	SPD_KEY_DDR5_CKD1_CHAQCK0_DS	"ddr5.ckd1.cha-qck0_A-drive-strength"
+#define	SPD_KEY_DDR5_CKD1_CHAQCK1_DS	"ddr5.ckd1.cha-qck1_A-drive-strength"
+#define	SPD_KEY_DDR5_CKD1_CHBQCK0_DS	"ddr5.ckd1.chb-qck0_B-drive-strength"
+#define	SPD_KEY_DDR5_CKD1_CHBQCK1_DS	"ddr5.ckd1.chb-qck1_B-drive-strength"
+#define	SPD_KEY_DDR5_CKD1_CHAQCK_SLEW	"ddr5.ckd1.cha-qck_slew"
+#define	SPD_KEY_DDR5_CKD1_CHBQCK_SLEW	"ddr5.ckd1.chb-qck_slew"
+
+/*
+ * The module capacitance covers the VDDQ rail. We include the upper bound here.
+ * e.g. a value of 125 usually is that the nominal capacitance is (100, 125].
+ * This is a uint32_t value in uF.
+ */
+#define	SPD_KEY_DDR5_CAMM2_MOD_CAP	"ddr5.camm2.module-vddq-nom-cap"
+
+/*
  * DDR5 MRDIMM specific values. Note, these are only present in MRDIMM v1.1 and
  * therefore may be missing in older revisions. While these values are really
  * similar to the RDIMM variants, because they are taken from the MRCD instead
@@ -1067,7 +1095,11 @@ typedef enum {
 	SPD_DEVICE_MRCD		= 1 << 10,
 	SPD_DEVICE_MDB		= 1 << 11,
 	SPD_DEVICE_DMB		= 1 << 12,
-	SPD_DEVICE_SPD		= 1 << 13
+	SPD_DEVICE_SPD		= 1 << 13,
+	SPD_DEVICE_VR_0		= 1 << 14,
+	SPD_DEVICE_VR_1		= 1 << 15,
+	SPD_DEVICE_VR_2		= 1 << 16,
+	SPD_DEVICE_VR_3		= 1 << 17
 } spd_device_t;
 #define	SPD_KEY_DEVS		"module.devices"	/* uint32_t */
 
@@ -1110,7 +1142,8 @@ typedef enum {
 	SPD_RCD_T_DDR5RCD02,
 	SPD_RCD_T_DDR5RCD03,
 	SPD_RCD_T_DDR5RCD04,
-	SPD_RCD_T_DDR5RCD05
+	SPD_RCD_T_DDR5RCD05,
+	SPD_RCD_T_DDR5RCD06
 } spd_rcd_type_t;
 
 typedef enum {
@@ -1122,7 +1155,7 @@ typedef enum {
 	SPD_DB_T_DDR5DB02,
 	/*
 	 * DDR3 LRDIMMs had a memory buffer that did not have a full
-	 * desgination. We count them here.
+	 * designation. We count them here.
 	 */
 	SPD_DB_T_DDR3MB
 } spd_db_type_t;
@@ -1131,12 +1164,14 @@ typedef enum {
 	/* DDR5 */
 	SPD_MRCD_T_DDR5MRCD01,
 	SPD_MRCD_T_DDR5MRCD02,
+	SPD_MRCD_T_DDR5MRCD03
 } spd_mrcd_type_t;
 
 typedef enum {
 	/* DDR5 */
 	SPD_MDB_T_DDR5MDB01,
-	SPD_MDB_T_DDR5MDB02
+	SPD_MDB_T_DDR5MDB02,
+	SPD_MDB_T_DDR5MDB03
 } spd_mdb_type_t;
 
 typedef enum {
@@ -1210,6 +1245,57 @@ typedef enum {
 #define	SPD_KEY_DEV_SPD_MFG_NAME	"module.spd.mfg-name"	/* string */
 #define	SPD_KEY_DEV_SPD_TYPE	"module.spd.type"	/* uint32_t */
 #define	SPD_KEY_DEV_SPD_REV	"module.spd.revision"	/* string */
+
+/*
+ * Voltage regulators, present on SOCAMM2 devices, do not have a type. However,
+ * they do have a set of rails that they provide for, which the spec calls a
+ * source.
+ */
+typedef enum {
+	SPD_VR_SRC_VDD1		= 1 << 0,
+	SPD_VR_SRC_VDD2H	= 1 << 1,
+	SPD_VR_SRC_VDD2L	= 1 << 2,
+	SPD_VR_SRC_VDD2		= 1 << 3,
+	SPD_VR_SRC_VDDQ		= 1 << 4
+} spd_vr_rail_source_t;
+
+#define	SPD_KEY_DEV_VR0_MFG	"module.vr0.mfg-id"	/* uint32_t [2] */
+#define	SPD_KEY_DEV_VR0_MFG_NAME	"module.vr0.mfg-nam3"	/* string */
+#define	SPD_KEY_DEV_VR0_REV	"module.vr0.revision"	/* string */
+#define	SPD_KEY_DEV_VR0_SRC	"module.vr0.source"	/* uint32_t */
+
+#define	SPD_KEY_DEV_VR1_MFG	"module.vr1.mfg-id"	/* uint32_t [2] */
+#define	SPD_KEY_DEV_VR1_MFG_NAME	"module.vr1.mfg-nam3"	/* string */
+#define	SPD_KEY_DEV_VR1_REV	"module.vr1.revision"	/* string */
+#define	SPD_KEY_DEV_VR1_SRC	"module.vr1.source"	/* uint32_t */
+
+#define	SPD_KEY_DEV_VR2_MFG	"module.vr2.mfg-id"	/* uint32_t [2] */
+#define	SPD_KEY_DEV_VR2_MFG_NAME	"module.vr2.mfg-nam3"	/* string */
+#define	SPD_KEY_DEV_VR2_REV	"module.vr2.revision"	/* string */
+#define	SPD_KEY_DEV_VR2_SRC	"module.vr2.source"	/* uint32_t */
+
+#define	SPD_KEY_DEV_VR3_MFG	"module.vr3.mfg-id"	/* uint32_t [2] */
+#define	SPD_KEY_DEV_VR3_MFG_NAME	"module.vr3.mfg-nam3"	/* string */
+#define	SPD_KEY_DEV_VR3_REV	"module.vr3.revision"	/* string */
+#define	SPD_KEY_DEV_VR3_SRC	"module.vr3.source"	/* uint32_t */
+
+/*
+ * In addition to the primary devices, there is a notion of devices which are
+ * used for support of the device such as fuses or transient voltage
+ * suppression. We use a single enum for each class of such devices where the
+ * enum gives specifics about what it applies to. This was only added in DDR5
+ * SPD version 1.3 and LPDDR version 1.2 so these may not be present.
+ */
+typedef enum {
+	SPD_FUSE_VIN_BULK	= 1 << 0
+} spd_fuse_t;
+#define	SPD_KEY_DEV_FUSE	"module.fuse"		/* uint32_t */
+
+typedef enum {
+	SPD_TVS_VIN_BULK	= 1 << 0,
+	SPD_TVS_VIN_MGMT	= 1 << 1
+} spd_tvs_t;
+#define	SPD_KEY_DEV_TVS		"module.tvs"		/* uint32_t */
 
 /*
  * Module physical dimensions. DRAM modules provide information about their
