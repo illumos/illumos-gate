@@ -16,10 +16,13 @@
 
 include $(SRC)/Makefile.master
 
-TESTSUBDIR = symbols
-PROG = symbols_test
+TESTSUBDIR = c-symbols
+
+include ../Makefile.com
+
 KSHPROG = setup
-SYMTESTS = \
+
+LINKS = \
 	assert_h \
 	ctype_h \
 	dirent_h \
@@ -48,13 +51,23 @@ SYMTESTS = \
 	wchar_h \
 	wctype_h
 
-EXTRAPROG += $(SYMTESTS)
+CMDS =	$(LINKS:%=$(TESTDIR)/%) \
+	$(KSHPROG:%=$(TESTDIR)/%)
 
-include ../Makefile.com
+all: $(KSHPROG)
 
-LDLIBS += -lcustr
-LDLIBS64 += -lcustr
+install:  $(TESTDIR) $(CMDS)
 
-$(SYMTESTS:%=$(TESTDIR)/%): $(TESTDIR)/setup
+clobber: clean
+	-$(RM) $(KSHPROG)
+
+clean:
+
+$(KSHPROG): $(KSHPROG).ksh
+	$(RM) $@
+	$(CP) $(KSHPROG).ksh $(@)
+	$(CHMOD) +x $@
+
+$(LINKS:%=$(TESTDIR)/%): $(TESTDIR)/setup
 	-$(RM) $@
 	$(LN) $(TESTDIR)/setup $@

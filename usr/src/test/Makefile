@@ -23,6 +23,7 @@ SUBDIRS = \
 	bhyve-tests \
 	crypto-tests \
 	elf-tests \
+	header-tests \
 	i2c-tests \
 	libc-tests \
 	libmlrpc-tests \

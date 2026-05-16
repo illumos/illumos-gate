@@ -30,7 +30,7 @@
 #include <libcustr.h>
 #include <sys/wait.h>
 #include <stdbool.h>
-#include "test_common.h"
+#include "hdr_test_common.h"
 
 char *dname;
 char *cfile;
@@ -44,7 +44,7 @@ static int good_count = 0;
 static int fail_count = 0;
 static int full_count = 0;
 static int extra_debug = 0;
-static char *compilation = "compilation.cfg";
+static char *compilation = "c-symbols-env.cfg";
 
 #if defined(_LP64)
 #define	MFLAG "-m64"
@@ -926,6 +926,11 @@ do_compile(test_t t, struct sym_test *st, struct compile_env *cenv, int need)
 	(void) fprintf(logf, "COMMAND: %s\n", cmd);
 	(void) fprintf(logf, "EXPECT: %s\n", need ? "OK" : "FAIL");
 	(void) fclose(logf);
+
+	if (extra_debug) {
+		(void) fprintf(stdout, "=== PROBE: %s / %s ===\n%s\n",
+		    sym_test_name(st), env_name(cenv), sym_test_prog(st));
+	}
 
 	switch (system(cmd)) {
 	case -1:

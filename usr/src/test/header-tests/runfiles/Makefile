@@ -11,12 +11,34 @@
 
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
+# Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 #
 
-.PARALLEL: $(SUBDIRS)
+include $(SRC)/Makefile.master
 
-SUBDIRS = cmd runfiles tests doc
-CHKSUBDIRS = runfiles
+SRCS = default.run
 
-include $(SRC)/test/Makefile.com
+OPTPKG = opt/header-tests
+ROOTOPTPKG = $(ROOT)/$(OPTPKG)
+RUNFILES = $(ROOTOPTPKG)/runfiles
+
+CMDS = $(SRCS:%=$(RUNFILES)/%)
+$(CMDS) := FILEMODE = 0444
+
+all: $(SRCS)
+
+install: $(CMDS)
+
+check:
+	$(CHECK_TEST_RUNFILES) -T $(OPTPKG) $(SRCS)
+
+clean lint clobber:
+
+$(CMDS): $(RUNFILES) $(SRCS)
+
+$(RUNFILES):
+	$(INS.dir)
+
+$(RUNFILES)/%: %
+	$(INS.file)

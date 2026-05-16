@@ -16,7 +16,7 @@
 
 The configuration files in this directory are structured using the
 syntax defined in the ../README file.  They make use of the compilation
-environments declared in ../compilation.cfg, and are processed by the
+environments declared in ../c-symbols-env.cfg, and are processed by the
 symbols test.
 
 We have organized the files by header file, that is the tests for symbols

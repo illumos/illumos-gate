@@ -1,0 +1,67 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2014 Garrett D'Amore <garrett@damore.org>
+# Copyright (c) 2012 by Delphix. All rights reserved.
+#
+
+Header Test Suite README
+
+1. What this Header Test Suite tests
+2. Building and installing this Header Test Suite
+3. Running this Header Test Suite
+4. Test results
+
+--------------------------------------------------------------------------------
+
+1. What this Header Test Suite tests
+
+This Header Test Suite is for testing standards compliance of various
+system header files.
+
+2. Building and installing this Header Test Suite
+
+This Test Suite runs under the testrunner framework (which can be installed
+as pkg:/system/test/testrunner). To build both this Header Test Suite and the
+testrunner without running a full nightly:
+
+	build_machine$ bldenv [-d] <your_env_file>
+	build_machine$ cd $SRC/test
+	build_machine$ dmake install
+	build_machine$ cd $SRC/pkg
+	build_machine$ dmake install
+
+Then set the publisher on the test machine to point to your repository and
+install the Utils Header Test Suite.
+
+	test_machine# pkg install pkg:/system/test/headertest
+
+Note, the framework will be installed automatically, as this test suite
+depends on it.
+
+A C compiler is also required on the test system.
+
+3. Running this Header Test Suite
+
+The pre-requisites for running the this Header Test Suite are:
+	- GCC or Clang compiler installed.
+
+Once the pre-requisites are satisfied, simply run the headertest script:
+
+	test_machine$ /opt/header-tests/bin/headertest
+
+4. Test results
+
+While the Header Test Suite is running, one informational line is printed at
+the end of each test, and a results summary is printed at the end of the run.
+The results summary includes the location of the complete logs, which is of the
+form /var/tmp/test_results/<ISO 8601 date>.
