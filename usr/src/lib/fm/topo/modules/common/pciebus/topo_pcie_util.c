@@ -10,12 +10,13 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <stdbool.h>
 #include <string.h>
 
+#include <sys/debug.h>
 #include <sys/fm/protocol.h>
 #include <fm/topo_mod.h>
 #include <fm/topo_list.h>
@@ -336,4 +337,14 @@ pcie_topo_prop_copy(topo_mod_t *mod, di_node_t did, tnode_t *tn,
 	}
 
 	return (false);
+}
+
+const char *
+pcie_node_nexus_path(const pcie_node_t *node)
+{
+	while (node != NULL && node->pn_type != PCIE_NODE_ROOTNEXUS)
+		node = node->pn_parent;
+	if (node == NULL)
+		return (NULL);
+	return (node->pn_path);
 }

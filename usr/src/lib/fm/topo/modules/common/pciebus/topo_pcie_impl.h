@@ -53,19 +53,13 @@ typedef enum {
 } topo_port_type_t;
 
 typedef struct pcie {
-	di_node_t		tp_devinfo;
 	pcidb_hdl_t		*tp_pcidb_hdl;
-	topo_list_t		tp_rootnexus;
-	bool			tp_enumdone;
-	uint8_t			tp_nchip;
-	nvlist_t		*tp_cpupcidata;
 	void			*tp_privdata;
 } pcie_t;
 
 typedef struct pcie_node {
 	topo_list_t		pn_link;
 
-	pcie_t			*pn_pcie;
 	di_node_t		pn_did;
 	pcie_node_type_t	pn_type;
 	topo_instance_t		pn_inst;
@@ -92,6 +86,16 @@ typedef struct pcie_node {
 	topo_list_t		pn_children;
 	struct pcie_node	*pn_parent;
 } pcie_node_t;
+
+/*
+ * Persistent per-tnode data.
+ */
+typedef struct pcie_tn_data {
+	int		ptd_bus;
+	int		ptd_dev;
+	int		ptd_func;
+	char		*ptd_nexus_path;
+} pcie_tn_data_t;
 
 typedef enum {
 	PCI_LINK_UNKNOWN,
@@ -143,6 +147,7 @@ extern bool topo_pcie_set_link_props(topo_mod_t *, pcie_t *, pcie_node_t *,
 extern const char *pcie_type_name(pcie_node_type_t);
 extern uint_t pcie_speed2gen(int64_t);
 extern const char *pcie_speed2str(int64_t);
+extern const char *pcie_node_nexus_path(const pcie_node_t *);
 
 /* topo_pcie_prop.c */
 
@@ -172,7 +177,7 @@ extern bool pcie_topo_prop_copy(topo_mod_t *, di_node_t, tnode_t *,
 /* topo_pcie_cfgspace.c */
 
 extern topo_pcie_link_status_t topo_pcie_link_status(topo_mod_t *,
-    pcie_node_t *);
+    const char *, int, int, int);
 
 #define	GETCLASS(x)	bitx32((x), 23, 16);
 #define	GETSUBCLASS(x)	bitx32((x), 15, 8);

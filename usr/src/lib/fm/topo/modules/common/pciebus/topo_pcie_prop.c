@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <fcntl.h>
@@ -196,9 +196,15 @@ static bool
 link_state(topo_mod_t *mod, pcie_t *pcie, pcie_node_t *node, tnode_t *tn,
     pcie_prop_t *prop)
 {
+	const char *nexus_path;
 	const char *val;
 
-	switch (topo_pcie_link_status(mod, node)) {
+	nexus_path = pcie_node_nexus_path(node);
+	if (nexus_path == NULL)
+		return (true);
+
+	switch (topo_pcie_link_status(mod, nexus_path,
+	    node->pn_bus, node->pn_dev, node->pn_func)) {
 	case PCI_LINK_UP:
 		val = TOPO_PCIE_LINK_UP_STR;
 		break;
@@ -252,16 +258,30 @@ static int
 topo_pcie_link_unusable(topo_mod_t *mod, tnode_t *tn, topo_version_t ver,
     nvlist_t *in, nvlist_t **out)
 {
-	pcie_node_t *node = topo_node_getspecific(tn);
+	pcie_tn_data_t *data = NULL;
+	tnode_t *ptn;
 	nvlist_t *nvl;
 	uint32_t unusable;
+
+	/*
+	 * The "link" tnode does not carry per-tnode data itself. Find that
+	 * by walking up to the enclosing "function" tnode (parent's parent
+	 * given function -> port -> link).
+	 */
+	for (ptn = topo_node_parent(tn); ptn != NULL;
+	    ptn = topo_node_parent(ptn)) {
+		if ((data = topo_node_getspecific(ptn)) != NULL)
+			break;
+	}
 
 	if (topo_mod_nvalloc(mod, &nvl, NV_UNIQUE_NAME) != 0)
 		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
 
 	unusable = 1;
-	if (node != NULL && topo_pcie_link_status(mod, node) == PCI_LINK_UP)
+	if (data != NULL && topo_pcie_link_status(mod, data->ptd_nexus_path,
+	    data->ptd_bus, data->ptd_dev, data->ptd_func) == PCI_LINK_UP) {
 		unusable = 0;
+	}
 
 	if (nvlist_add_uint32(nvl, TOPO_METH_UNUSABLE_RET, unusable) != 0) {
 		nvlist_free(nvl);

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -28,11 +28,6 @@
  * recursively enumerated to discover bridges, switches, devices, etc. that lie
  * underneath. Platform-specific modules can augment the discovered tree by
  * adding labels or nodes that cannot be discovered, such as re-timers.
- *
- * When this module is first asked to enumerate, it traverses the devinfo tree
- * and builds an interim tree view of the various PCI and PCIe devices found
- * there. This interim tree is used to drive building topology nodes on this
- * and subsequent enumerations.
  */
 
 #include <fcntl.h>
@@ -59,8 +54,15 @@
 
 #include "topo_pcie_impl.h"
 
+typedef struct pcie_enum_state {
+	di_node_t		pes_devinfo;
+	uint8_t			pes_nchip;
+	nvlist_t		*pes_cpupcidata;
+	topo_list_t		pes_rootnexus;
+} pcie_enum_state_t;
+
 typedef struct cbdata {
-	pcie_t			*cbd_pcie;
+	pcie_enum_state_t	*cbd_state;
 	topo_mod_t		*cbd_mod;
 	bool			cbd_fatal;
 } cbdata_t;
@@ -89,7 +91,7 @@ static tnode_t *pcie_topo_add_bridge(topo_mod_t *, pcie_t *, tnode_t *,
     pcie_node_t *);
 
 static void
-pcie_node_print(topo_mod_t *mod, pcie_t *pcie, topo_list_t *list, uint_t indent)
+pcie_node_print(topo_mod_t *mod, topo_list_t *list, uint_t indent)
 {
 	pcie_node_t *node;
 
@@ -109,12 +111,12 @@ pcie_node_print(topo_mod_t *mod, pcie_t *pcie, topo_list_t *list, uint_t indent)
 		    node->pn_drvinst,
 		    node->pn_class, node->pn_subclass, node->pn_intf,
 		    node->pn_path, suffix);
-		pcie_node_print(mod, pcie, &node->pn_children, indent + 4);
+		pcie_node_print(mod, &node->pn_children, indent + 4);
 	}
 }
 
 static void
-pcie_node_free(topo_mod_t *mod, pcie_t *pcie, pcie_node_t *node)
+pcie_node_free(topo_mod_t *mod, pcie_node_t *node)
 {
 	topo_mod_strfree(mod, node->pn_drvname);
 	if (node->pn_path != NULL)
@@ -122,9 +124,23 @@ pcie_node_free(topo_mod_t *mod, pcie_t *pcie, pcie_node_t *node)
 	topo_mod_free(mod, node, sizeof (*node));
 }
 
+static void
+pcie_free_tree(topo_mod_t *mod, pcie_node_t *node)
+{
+	pcie_node_t *child, *nchild;
+
+	for (child = topo_list_next(&node->pn_children); child != NULL;
+	    child = nchild) {
+		nchild = topo_list_next(child);
+		pcie_free_tree(mod, child);
+	}
+
+	pcie_node_free(mod, node);
+}
+
 static pcie_node_t *
-pcie_node_create(topo_mod_t *mod, pcie_t *pcie, di_node_t did,
-    pcie_node_type_t type, pcie_node_t *parent)
+pcie_node_create(topo_mod_t *mod, di_node_t did, pcie_node_type_t type,
+    pcie_node_t *parent)
 {
 	char *drvname;
 	pcie_node_t *node;
@@ -156,12 +172,11 @@ pcie_node_create(topo_mod_t *mod, pcie_t *pcie, di_node_t did,
 
 	if ((node = topo_mod_zalloc(mod, sizeof (*node))) == NULL) {
 		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
-		topo_mod_strfree(mod, node->pn_drvname);
+		topo_mod_strfree(mod, drvname);
 		di_devfs_path_free(path);
 		return (NULL);
 	}
 
-	node->pn_pcie = pcie;
 	node->pn_did = did;
 	node->pn_type = type;
 	node->pn_path = path;
@@ -176,11 +191,50 @@ pcie_node_create(topo_mod_t *mod, pcie_t *pcie, di_node_t did,
 	return (node);
 }
 
+static void
+pcie_tn_data_free(topo_mod_t *mod, pcie_tn_data_t *data)
+{
+	if (data == NULL)
+		return;
+	if (data->ptd_nexus_path != NULL)
+		topo_mod_strfree(mod, data->ptd_nexus_path);
+	topo_mod_free(mod, data, sizeof (*data));
+}
+
+static pcie_tn_data_t *
+pcie_tn_data_create(topo_mod_t *mod, const pcie_node_t *node)
+{
+	pcie_tn_data_t *data;
+	const char *nexus_path;
+
+	if ((data = topo_mod_zalloc(mod, sizeof (*data))) == NULL) {
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
+		return (NULL);
+	}
+
+	data->ptd_bus = node->pn_bus;
+	data->ptd_dev = node->pn_dev;
+	data->ptd_func = node->pn_func;
+
+	nexus_path = pcie_node_nexus_path(node);
+	if (nexus_path != NULL) {
+		data->ptd_nexus_path = topo_mod_strdup(mod, nexus_path);
+		if (data->ptd_nexus_path == NULL) {
+			pcie_tn_data_free(mod, data);
+			(void) topo_mod_seterrno(mod, EMOD_NOMEM);
+			return (NULL);
+		}
+	}
+
+	return (data);
+}
+
 static tnode_t *
 pcie_topo_node_create(topo_mod_t *mod, pcie_t *pcie, tnode_t *parent,
     pcie_node_t *node, const char *name, topo_instance_t inst)
 {
 	nvlist_t *fmri, *auth;
+	pcie_tn_data_t *data = NULL;
 	tnode_t *tn, *dtn;
 
 	topo_mod_dprintf(mod, "topo node create %s=%" PRIu64 " (%s)",
@@ -208,9 +262,16 @@ pcie_topo_node_create(topo_mod_t *mod, pcie_t *pcie, tnode_t *parent,
 		goto error;
 	}
 
-	topo_node_setspecific(tn, (void *)node);
-
 	if (node != NULL) {
+		data = pcie_tn_data_create(mod, node);
+		if (data == NULL) {
+			topo_mod_dprintf(mod,
+			    "failed to allocate per-tnode data: %s",
+			    topo_mod_errmsg(mod));
+			goto error;
+		}
+		topo_node_setspecific(tn, data);
+
 		if (!topo_pcie_set_pci_props(mod, pcie, node, tn))
 			goto error;
 
@@ -232,20 +293,25 @@ pcie_topo_node_create(topo_mod_t *mod, pcie_t *pcie, tnode_t *parent,
 	return (dtn);
 
 error:
-
+	nvlist_free(auth);
 	nvlist_free(fmri);
-	topo_node_unbind(tn);
+	if (tn != NULL) {
+		topo_node_setspecific(tn, NULL);
+		topo_node_unbind(tn);
+	}
+	pcie_tn_data_free(mod, data);
 	return (NULL);
 }
 
 static void
-pcie_topo_node_free(topo_mod_t *mod __unused, tnode_t *tn)
+pcie_topo_node_free(topo_mod_t *mod, tnode_t *tn)
 {
+	pcie_tn_data_free(mod, topo_node_getspecific(tn));
 	topo_node_setspecific(tn, NULL);
 }
 
 static void
-pcie_socket_map(topo_mod_t *mod, pcie_t *pcie, pcie_node_t *node)
+pcie_socket_map(topo_mod_t *mod, pcie_enum_state_t *state, pcie_node_t *node)
 {
 	int32_t *busrange;
 	nvlist_t **dfs;
@@ -255,7 +321,7 @@ pcie_socket_map(topo_mod_t *mod, pcie_t *pcie, pcie_node_t *node)
 
 	node->pn_cpu = 0;
 
-	if (pcie->tp_cpupcidata == NULL)
+	if (state->pes_cpupcidata == NULL)
 		return;
 
 	nval = di_prop_lookup_ints(DDI_DEV_T_ANY, node->pn_did,
@@ -265,7 +331,7 @@ pcie_socket_map(topo_mod_t *mod, pcie_t *pcie, pcie_node_t *node)
 		return;
 	}
 
-	err = nvlist_lookup_nvlist_array(pcie->tp_cpupcidata,
+	err = nvlist_lookup_nvlist_array(state->pes_cpupcidata,
 	    FM_PCI_DATA_DFS, &dfs, &ndfs);
 	if (err != 0 || dfs == NULL) {
 		topo_mod_dprintf(mod, "CPU PCI data does not contain %s",
@@ -302,7 +368,7 @@ pcie_socket_map(topo_mod_t *mod, pcie_t *pcie, pcie_node_t *node)
 }
 
 static bool
-pcie_physcpu_enum(topo_mod_t *mod, pcie_t *pcie)
+pcie_physcpu_enum(topo_mod_t *mod, pcie_enum_state_t *state)
 {
 	fmd_agent_hdl_t *hdl;
 
@@ -312,7 +378,7 @@ pcie_physcpu_enum(topo_mod_t *mod, pcie_t *pcie)
 		return (false);
 	}
 
-	if (fmd_agent_chip_count(hdl, &pcie->tp_nchip) != 0) {
+	if (fmd_agent_chip_count(hdl, &state->pes_nchip) != 0) {
 		topo_mod_dprintf(mod,
 		    "failed to retrieve physical CPU count: %s",
 		    fmd_agent_errmsg(hdl));
@@ -320,7 +386,7 @@ pcie_physcpu_enum(topo_mod_t *mod, pcie_t *pcie)
 		return (false);
 	}
 
-	if (fmd_agent_physcpu_pci(hdl, &pcie->tp_cpupcidata) != 0) {
+	if (fmd_agent_physcpu_pci(hdl, &state->pes_cpupcidata) != 0) {
 		topo_mod_dprintf(mod,
 		    "failed to retrieve physical CPU PCI data: %s",
 		    fmd_agent_errmsg(hdl));
@@ -341,7 +407,7 @@ pcie_rootnexus_enum_cb(di_node_t did, void *arg)
 {
 	cbdata_t *cbd = arg;
 	topo_mod_t *mod = cbd->cbd_mod;
-	pcie_t *pcie = cbd->cbd_pcie;
+	pcie_enum_state_t *state = cbd->cbd_state;
 	char *compat;
 	bool found = false;
 	int *ents, nents;
@@ -372,40 +438,40 @@ pcie_rootnexus_enum_cb(di_node_t did, void *arg)
 	if (!found)
 		return (DI_WALK_CONTINUE);
 
-	pcie_node_t *node = pcie_node_create(mod, pcie, did,
+	pcie_node_t *node = pcie_node_create(mod, did,
 	    PCIE_NODE_ROOTNEXUS, NULL);
 	if (node == NULL) {
 		topo_mod_dprintf(mod,
 		    "failed to create root nexus pcie node: %s",
 		    topo_mod_errmsg(mod));
 		cbd->cbd_fatal = true;
+		return (DI_WALK_TERMINATE);
 	}
 
-	pcie_socket_map(mod, pcie, node);
+	pcie_socket_map(mod, state, node);
 
-	topo_list_append(&pcie->tp_rootnexus, node);
+	topo_list_append(&state->pes_rootnexus, node);
 
 	return (DI_WALK_PRUNECHILD);
 }
 
 static bool
-pcie_rootnexus_enum(topo_mod_t *mod, pcie_t *pcie)
+pcie_rootnexus_enum(topo_mod_t *mod, pcie_enum_state_t *state)
 {
 	cbdata_t cbd = {
-		.cbd_pcie = pcie,
+		.cbd_state = state,
 		.cbd_mod = mod,
 		.cbd_fatal = false
 	};
 
-	(void) di_walk_node(pcie->tp_devinfo, DI_WALK_CLDFIRST,
+	(void) di_walk_node(state->pes_devinfo, DI_WALK_CLDFIRST,
 	    &cbd, pcie_rootnexus_enum_cb);
 
 	return (!cbd.cbd_fatal);
 }
 
 static pcie_node_t *
-pcie_process_node(topo_mod_t *mod, pcie_t *pcie, pcie_node_t *parent,
-    di_node_t did)
+pcie_process_node(topo_mod_t *mod, pcie_node_t *parent, di_node_t did)
 {
 	int nents;
 	int *ents;
@@ -490,7 +556,7 @@ pcie_process_node(topo_mod_t *mod, pcie_t *pcie, pcie_node_t *parent,
 		}
 	}
 
-	node = pcie_node_create(mod, pcie, did, type, parent);
+	node = pcie_node_create(mod, did, type, parent);
 
 	node->pn_class = class;
 	node->pn_subclass = subclass;
@@ -504,7 +570,7 @@ pcie_process_node(topo_mod_t *mod, pcie_t *pcie, pcie_node_t *parent,
 }
 
 static void
-pcie_enum_children(topo_mod_t *mod, pcie_t *pcie, pcie_node_t *parent)
+pcie_enum_children(topo_mod_t *mod, pcie_node_t *parent)
 {
 	di_node_t did;
 
@@ -512,41 +578,69 @@ pcie_enum_children(topo_mod_t *mod, pcie_t *pcie, pcie_node_t *parent)
 	    did = di_sibling_node(did)) {
 		pcie_node_t *node;
 
-		node = pcie_process_node(mod, pcie, parent, did);
+		node = pcie_process_node(mod, parent, did);
 		if (node != NULL)
-			pcie_enum_children(mod, pcie, node);
+			pcie_enum_children(mod, node);
 	}
 }
 
 static void
-pcie_rootnexus_enum_children(topo_mod_t *mod, pcie_t *pcie)
+pcie_rootnexus_enum_children(topo_mod_t *mod, pcie_enum_state_t *state)
 {
 	pcie_node_t *nexus;
 
-	for (nexus = topo_list_next(&pcie->tp_rootnexus); nexus != NULL;
+	for (nexus = topo_list_next(&state->pes_rootnexus); nexus != NULL;
 	    nexus = topo_list_next(nexus)) {
 		topo_mod_dprintf(mod, "enumerate nexus %s", nexus->pn_path);
-		pcie_enum_children(mod, pcie, nexus);
+		pcie_enum_children(mod, nexus);
 	}
 }
 
-static bool
-pcie_gather(topo_mod_t *mod, pcie_t *pcie)
+static void
+pcie_enum_state_init(pcie_enum_state_t *state)
 {
-	if (pcie->tp_enumdone)
-		return (true);
+	bzero(state, sizeof (*state));
+	state->pes_devinfo = DI_NODE_NIL;
+}
 
-	if (!pcie_physcpu_enum(mod, pcie))
+static void
+pcie_enum_state_fini(topo_mod_t *mod, pcie_enum_state_t *state)
+{
+	pcie_node_t *nexus, *nnexus;
+
+	for (nexus = topo_list_next(&state->pes_rootnexus); nexus != NULL;
+	    nexus = nnexus) {
+		nnexus = topo_list_next(nexus);
+		topo_list_delete(&state->pes_rootnexus, nexus);
+		pcie_free_tree(mod, nexus);
+	}
+	nvlist_free(state->pes_cpupcidata);
+	state->pes_cpupcidata = NULL;
+	state->pes_devinfo = DI_NODE_NIL;
+}
+
+/*
+ * Populate the enumeration scratch state: capture the current devinfo handle,
+ * query the physical CPU layout, and build the pcie_node_t tree that mirrors
+ * the PCIe topology beneath each root nexus.
+ */
+static bool
+pcie_gather(topo_mod_t *mod, pcie_enum_state_t *state)
+{
+	if ((state->pes_devinfo = topo_mod_devinfo(mod)) == DI_NODE_NIL) {
+		topo_mod_dprintf(mod, "No devinfo node from framework");
+		return (false);
+	}
+
+	if (!pcie_physcpu_enum(mod, state))
 		return (false);
 
-	if (!pcie_rootnexus_enum(mod, pcie))
+	if (!pcie_rootnexus_enum(mod, state))
 		return (false);
 
-	pcie_rootnexus_enum_children(mod, pcie);
+	pcie_rootnexus_enum_children(mod, state);
 
-	pcie->tp_enumdone = true;
-
-	pcie_node_print(mod, pcie, &pcie->tp_rootnexus, 0);
+	pcie_node_print(mod, &state->pes_rootnexus, 0);
 
 	return (true);
 }
@@ -778,11 +872,19 @@ static int
 pcie_topo_enum_cpu(topo_mod_t *mod, pcie_t *pcie, const pcie_enum_t *pe,
     tnode_t *pnode, tnode_t *tnode, topo_instance_t min, topo_instance_t max)
 {
+	pcie_enum_state_t state;
 	int ret = 0;
 
-	topo_mod_dprintf(mod, "physical CPU count: %u", pcie->tp_nchip);
+	pcie_enum_state_init(&state);
 
-	for (uint_t chipid = 0; chipid < pcie->tp_nchip; chipid++) {
+	if (!pcie_physcpu_enum(mod, &state)) {
+		pcie_enum_state_fini(mod, &state);
+		return (-1);
+	}
+
+	topo_mod_dprintf(mod, "physical CPU count: %u", state.pes_nchip);
+
+	for (uint_t chipid = 0; chipid < state.pes_nchip; chipid++) {
 		tnode_t *cpu;
 
 		if (chipid < min || chipid > max) {
@@ -802,6 +904,7 @@ pcie_topo_enum_cpu(topo_mod_t *mod, pcie_t *pcie, const pcie_enum_t *pe,
 		}
 	}
 
+	pcie_enum_state_fini(mod, &state);
 	return (ret);
 }
 
@@ -810,12 +913,21 @@ pcie_topo_enum_root_complex(topo_mod_t *mod, pcie_t *pcie,
     const pcie_enum_t *pe, tnode_t *pnode, tnode_t *tnode,
     topo_instance_t min, topo_instance_t max)
 {
+	pcie_enum_state_t state;
 	topo_instance_t rcinst, cpuinst;
 	pcie_node_t *rc;
+	int ret = 0;
+
+	pcie_enum_state_init(&state);
+
+	if (!pcie_gather(mod, &state)) {
+		pcie_enum_state_fini(mod, &state);
+		return (-1);
+	}
 
 	cpuinst = topo_node_instance(pnode);
 
-	for (rcinst = min, rc = topo_list_next(&pcie->tp_rootnexus);
+	for (rcinst = min, rc = topo_list_next(&state.pes_rootnexus);
 	    rc != NULL; rc = topo_list_next(rc)) {
 		tnode_t *rcnode;
 		topo_instance_t fninst = 0;
@@ -823,29 +935,36 @@ pcie_topo_enum_root_complex(topo_mod_t *mod, pcie_t *pcie,
 		if (rc->pn_cpu != cpuinst)
 			continue;
 
-		if (rcinst > max)
-			return (-1);
+		if (rcinst > max) {
+			ret = -1;
+			break;
+		}
 
 		rcnode = pcie_topo_node_create(mod, pcie, pnode, rc,
 		    pe->pe_name, rcinst);
 
-		if (rcnode == NULL)
-			return (-1);
+		if (rcnode == NULL) {
+			ret = -1;
+			break;
+		}
 
 		if (!pcie_topo_range_create(mod, rcnode, "function", 0,
 		    topo_list_size(&rc->pn_children))) {
-			return (-1);
+			ret = -1;
+			break;
 		}
 
 		if (!pcie_topo_process_functions(mod, pcie, rcnode, rc,
 		    &fninst)) {
-			return (-1);
+			ret = -1;
+			break;
 		}
 
 		rcinst++;
 	}
 
-	return (0);
+	pcie_enum_state_fini(mod, &state);
+	return (ret);
 }
 
 /*
@@ -922,9 +1041,6 @@ pcie_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	}
 
 	if ((pcie = topo_mod_getspecific(mod)) == NULL)
-		return (-1);
-
-	if (!pcie_gather(mod, pcie))
 		return (-1);
 
 	/*
@@ -1010,40 +1126,13 @@ pcie_get_platdata(const pcie_t *pcie)
 }
 
 static void
-pcie_free_tree(topo_mod_t *mod, pcie_t *pcie, pcie_node_t *node)
-{
-	pcie_node_t *child, *nchild;
-
-	for (child = topo_list_next(&node->pn_children); child != NULL;
-	    child = nchild) {
-		nchild = topo_list_next(child);
-		pcie_free_tree(mod, pcie, child);
-
-	}
-
-	pcie_node_free(mod, pcie, node);
-}
-
-static void
 pcie_free(topo_mod_t *mod, pcie_t *pcie)
 {
-	pcie_node_t *nexus, *nnexus;
-
 	if (pcie == NULL)
 		return;
-	/* The devinfo handle came from fm, don't do anything ourselves. */
-	pcie->tp_devinfo = DI_NODE_NIL;
 
 	if (pcie->tp_pcidb_hdl != NULL)
 		pcidb_close(pcie->tp_pcidb_hdl);
-
-	for (nexus = topo_list_next(&pcie->tp_rootnexus); nexus != NULL;
-	    nexus = nnexus) {
-		nnexus = topo_list_next(nexus);
-		pcie_free_tree(mod, pcie, nexus);
-	}
-
-	nvlist_free(pcie->tp_cpupcidata);
 
 	topo_mod_free(mod, pcie, sizeof (*pcie));
 }
@@ -1057,12 +1146,6 @@ pcie_alloc(topo_mod_t *mod)
 		topo_mod_dprintf(mod,
 		    "Could not allocate memory for pcie_t: %s",
 		    topo_strerror(EMOD_NOMEM));
-		return (NULL);
-	}
-
-	if ((pcie->tp_devinfo = topo_mod_devinfo(mod)) == DI_NODE_NIL) {
-		topo_mod_dprintf(mod, "No devinfo node from framework");
-		pcie_free(mod, pcie);
 		return (NULL);
 	}
 

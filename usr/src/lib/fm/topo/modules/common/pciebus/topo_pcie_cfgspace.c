@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <fcntl.h>
@@ -29,7 +29,7 @@
 #include "topo_pcie_impl.h"
 
 static bool
-read_cfgspace(topo_mod_t *mod, pcie_node_t *node,
+read_cfgspace(topo_mod_t *mod, int bus, int dev, int func,
     int fd, uint32_t off, uint8_t len, void *buf)
 {
 	pcitool_reg_t pci_reg;
@@ -37,9 +37,9 @@ read_cfgspace(topo_mod_t *mod, pcie_node_t *node,
 
 	bzero(&pci_reg, sizeof (pci_reg));
 	pci_reg.user_version = PCITOOL_VERSION;
-	pci_reg.bus_no = node->pn_bus;
-	pci_reg.dev_no = node->pn_dev;
-	pci_reg.func_no = node->pn_func;
+	pci_reg.bus_no = bus;
+	pci_reg.dev_no = dev;
+	pci_reg.func_no = func;
 	pci_reg.barnum = 0;
 	pci_reg.offset = off;
 	pci_reg.acc_attr = PCITOOL_ACC_ATTR_ENDN_LTL;
@@ -90,20 +90,18 @@ read_cfgspace(topo_mod_t *mod, pcie_node_t *node,
 }
 
 static int
-open_nexus(topo_mod_t *mod, pcie_node_t *node)
+open_nexus(topo_mod_t *mod, const char *nexus_path)
 {
 	char nexus_reg[PATH_MAX];
-	pcie_node_t *nexus;
 	int fd;
 
-	for (nexus = node; nexus->pn_type != PCIE_NODE_ROOTNEXUS; nexus =
-	    nexus->pn_parent)
-		;
-
-	VERIFY3P(nexus, !=, NULL);
+	if (nexus_path == NULL) {
+		topo_mod_dprintf(mod, "no nexus path supplied");
+		return (-1);
+	}
 
 	if (snprintf(nexus_reg, sizeof (nexus_reg), "/devices%s:reg",
-	    nexus->pn_path) >= sizeof (nexus_reg)) {
+	    nexus_path) >= sizeof (nexus_reg)) {
 		topo_mod_dprintf(mod,
 		    "failed to construct nexus reg path; overflow");
 		return (-1);
@@ -119,7 +117,8 @@ open_nexus(topo_mod_t *mod, pcie_node_t *node)
 }
 
 topo_pcie_link_status_t
-topo_pcie_link_status(topo_mod_t *mod, pcie_node_t *node)
+topo_pcie_link_status(topo_mod_t *mod, const char *nexus_path,
+    int bus, int dev, int func)
 {
 	int fd;
 	uint8_t hdr, off;
@@ -128,10 +127,11 @@ topo_pcie_link_status(topo_mod_t *mod, pcie_node_t *node)
 	uint_t ncaps;
 	topo_pcie_link_status_t ret = PCI_LINK_UNKNOWN;
 
-	if ((fd = open_nexus(mod, node)) == -1)
+	if ((fd = open_nexus(mod, nexus_path)) == -1)
 		return (ret);
 
-	if (!read_cfgspace(mod, node, fd, PCI_CONF_STAT, 2, &status)) {
+	if (!read_cfgspace(mod, bus, dev, func, fd, PCI_CONF_STAT, 2,
+	    &status)) {
 		topo_mod_dprintf(mod, "failed to read status register");
 		goto out;
 	}
@@ -141,7 +141,8 @@ topo_pcie_link_status(topo_mod_t *mod, pcie_node_t *node)
 		goto out;
 	}
 
-	if (!read_cfgspace(mod, node, fd, PCI_CONF_HEADER, 1, &hdr)) {
+	if (!read_cfgspace(mod, bus, dev, func, fd, PCI_CONF_HEADER, 1,
+	    &hdr)) {
 		topo_mod_dprintf(mod, "failed to read header type");
 		goto out;
 	}
@@ -158,7 +159,7 @@ topo_pcie_link_status(topo_mod_t *mod, pcie_node_t *node)
 		goto out;
 	}
 
-	if (!read_cfgspace(mod, node, fd, cap, 1, &off)) {
+	if (!read_cfgspace(mod, bus, dev, func, fd, cap, 1, &off)) {
 		topo_mod_dprintf(mod, "failed to read capabilities pointer");
 		goto out;
 	}
@@ -168,7 +169,7 @@ topo_pcie_link_status(topo_mod_t *mod, pcie_node_t *node)
 		uint8_t id, nxt;
 
 		off &= PCI_CAP_PTR_MASK;
-		if (!read_cfgspace(mod, node, fd,
+		if (!read_cfgspace(mod, bus, dev, func, fd,
 		    off + PCI_CAP_ID, 1, &id)) {
 			topo_mod_dprintf(mod, "failed to read capability ID");
 			break;
@@ -181,7 +182,7 @@ topo_pcie_link_status(topo_mod_t *mod, pcie_node_t *node)
 			topo_mod_dprintf(mod, "Found PCIe capability at %x",
 			    off);
 
-			if (!read_cfgspace(mod, node, fd,
+			if (!read_cfgspace(mod, bus, dev, func, fd,
 			    off + PCIE_PCIECAP, 2, &pciecap)) {
 				topo_mod_dprintf(mod, "failed to read PCIe "
 				    "capabilities register");
@@ -213,7 +214,7 @@ topo_pcie_link_status(topo_mod_t *mod, pcie_node_t *node)
 				break;
 			}
 
-			if (!read_cfgspace(mod, node, fd,
+			if (!read_cfgspace(mod, bus, dev, func, fd,
 			    off + PCIE_LINKCAP, 4, &linkcap)) {
 				topo_mod_dprintf(mod, "failed to read link "
 				    "capabilities register");
@@ -225,7 +226,7 @@ topo_pcie_link_status(topo_mod_t *mod, pcie_node_t *node)
 				break;
 			}
 
-			if (!read_cfgspace(mod, node, fd,
+			if (!read_cfgspace(mod, bus, dev, func, fd,
 			    off + PCIE_LINKSTS, 2, &status)) {
 				topo_mod_dprintf(mod,
 				    "failed to read link status register");
@@ -239,7 +240,7 @@ topo_pcie_link_status(topo_mod_t *mod, pcie_node_t *node)
 			break;
 		}
 
-		if (!read_cfgspace(mod, node, fd,
+		if (!read_cfgspace(mod, bus, dev, func, fd,
 		    off + PCI_CAP_NEXT_PTR, 1, &nxt)) {
 			topo_mod_dprintf(mod,
 			    "failed to read next capability pointer");

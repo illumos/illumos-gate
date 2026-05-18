@@ -124,29 +124,28 @@ decorate_port(const mod_pcie_privdata_t *pd, topo_mod_t *mod,
 {
 	tnode_t *ptn;
 	const char *label;
-	int *busrange, nval, err;
+	uint32_t *busrange = NULL;
+	uint_t nelem = 0;
+	int err;
 	uint_t secbus;
-	const pcie_node_t *fn;
 
 	ptn = topo_node_parent(tn);
 	if (ptn == NULL || strcmp(topo_node_name(ptn), "link") == 0)
 		return (tn);
 
 	/*
-	 * The parent function node has a pcie_node_t stored via
-	 * topo_node_setspecific(). Retrieve it to access the devinfo node
-	 * and its bus-range property.
+	 * The bus-range property is set on the parent function tnode by
+	 * topo_pcie_set_pci_props() before this decorator runs.
 	 */
-	fn = topo_node_getspecific(ptn);
-	if (fn == NULL || fn->pn_did == DI_NODE_NIL)
+	if (topo_prop_get_uint32_array(ptn, TOPO_PCIE_PGROUP_PCI_CFG,
+	    TOPO_PCIE_PCI_BUS_RANGE, &busrange, &nelem, &err) != 0 ||
+	    nelem < 1) {
+		topo_mod_free(mod, busrange, nelem * sizeof (uint32_t));
 		return (tn);
-
-	nval = di_prop_lookup_ints(DDI_DEV_T_ANY, fn->pn_did,
-	    DI_BUSRANGE, &busrange);
-	if (nval < 1)
-		return (tn);
+	}
 
 	secbus = (uint8_t)busrange[0];
+	topo_mod_free(mod, busrange, nelem * sizeof (uint32_t));
 
 	topo_mod_dprintf(mod,
 	    "decorate port: parent %s%" PRIu64 " secondary bus 0x%02x",
