@@ -45,8 +45,9 @@
 .\" Copyright 2020 RackTop Systems, Inc.
 .\" Copyright 2024 Oxide Computer Company
 .\" Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
+.\" Copyright 2026 H. William Welliver <william@welliver.org>
 .\"
-.Dd September 15, 2024
+.Dd May 17, 2026
 .Dt DLADM 8
 .Os
 .Sh NAME
@@ -218,6 +219,30 @@
 .Cm show-wifi
 .Op Oo Fl p Oc Fl o Ar field Ns Op ,...
 .Op Ar wifi-link
+.\" Simnet
+.Pp
+.Nm
+.Cm create-simnet
+.Op Fl t
+.Op Fl R Ar root-dir
+.Op Fl u Ar address
+.Op Fl m Ar media-type
+.Ar simnet-link
+.Nm
+.Cm modify-simnet
+.Op Fl t
+.Op Fl R Ar root-dir
+.Op Fl p Ar peer
+.Ar simnet-link
+.Nm
+.Cm delete-simnet
+.Op Fl t
+.Op Fl R Ar root-dir
+.Ar simnet-link
+.Nm Cm show-simnet
+.Op Fl P
+.Op Oo Fl p Oc Fl o Ar field Ns Op ,...
+.Op Ar simnet-link
 .\" Ether
 .Pp
 .Nm
@@ -428,6 +453,12 @@ It is a pseudo device that can be treated as if it were an network interface
 card on a machine.
 .It Ar iptun-link
 An IP tunnel link.
+.It Ar simnet-link
+A simnet link.
+Simnets are pseudo network devices which may be connected to one another to
+create virtual point-to-point network connections.
+The resulting simnet devices may be treated as if they were a network
+interface card on a machine.
 .El
 .It Ar dev
 A network device, identified by concatenation of a driver name and an instance
@@ -563,6 +594,11 @@ subcommand displays more detail for this class of datalink.
 A virtual network interface.
 The
 .Cm show-vnic
+subcommand displays more detail for this class of datalink.
+.It Sy simnet
+A pseudo interface used to make point-to-point links in software.
+The
+.Cm show-simnet
 subcommand displays more detail for this class of datalink.
 .It Sy misc
 A generic datalink without any other class-specific properties.
@@ -2225,6 +2261,146 @@ option is required with
 See
 .Sx Parsable Output Format ,
 below.
+.El
+.It Xo
+.Nm Cm create-simnet
+.Op Fl t
+.Op Fl R Ar root-dir
+.Op Fl u Ar address
+.Op Fl m Ar media-type
+.Ar simnet-link
+.Xc
+.Pp
+Create a simnet with the name
+.Ar simnet-link .
+.Pp
+The
+.Cm create-simnet
+subcommand accepts the following options:
+.Bl -tag -width 4n
+.It Fl t , \&-temporary
+Specifies that the simnet is temporary.
+Temporary simnets last until the next reboot.
+.It Xo
+.Fl R Ar root-dir ,
+.Fl \&-root-dir Ns Cm = Ns Ar root-dir
+.Xc
+See
+.Sx Options ,
+above.
+.It Xo
+.Fl u Ar address
+.Xc
+Sets the simnet's MAC address based on the specified value.
+The
+.Ar address
+is interpreted as a locally-administered unicast MAC address.
+.It Xo
+.Fl m Ar media-type ,
+.Fl \&-media Ns Cm = Ns Ar media-type
+.Xc
+Sets the simnet's media type based on the specified value.
+Valid values are
+.Sq Ethernet
+or
+.Sq WiFi .
+.El
+.It Xo
+.Nm Cm modify-simnet
+.Op Fl t
+.Op Fl R Ar root-dir
+.Fl p Ar peer
+.Ar simnet-link
+.Xc
+.Pp
+Modifies the specified simnet by connecting it with a
+.Ar peer
+simnet.
+.Bl -tag -width 4n
+.It Fl t , \&-temporary
+Specifies that the modification is temporary.
+Temporary modifications last until the next reboot.
+.It Xo
+.Fl R Ar root-dir ,
+.Fl \&-root-dir Ns Cm = Ns Ar root-dir
+.Xc
+See
+.Sx Options ,
+above.
+.It Fl p Ar peer
+A different
+.Ar simnet-link
+this
+.Ar simnet
+will be connected to.
+.El
+.It Xo
+.Nm Cm delete-simnet
+.Op Fl t
+.Op Fl R Ar root-dir
+.Ar simnet-link
+.Xc
+.Pp
+Deletes the specified simnet.
+.Bl -tag -width 4n
+.It Fl t , \&-temporary
+Specifies that the deletion is temporary.
+Temporary deletions last until the next reboot.
+.It Xo
+.Fl R Ar root-dir ,
+.Fl \&-root-dir Ns Cm = Ns Ar root-dir
+.Xc
+See
+.Sx Options ,
+above.
+.El
+.It Xo
+.Nm Cm show-simnet
+.Op Fl P
+.Op Oo Fl p Oc Fl o Ar field Ns Op ,...
+.Op Ar simnet-link
+.Xc
+.Pp
+Show simnet configuration information
+.Pq the default
+or statistics, for all simnets, or only the specified
+.Ar simnet-link .
+.Bl -tag -width 4n
+.It Xo
+.Fl o Ar field Ns Oo ,... Oc ,
+.Fl \&-output Ns Cm \&= Ns Ar field Ns Op ,...
+.Xc
+A case-insensitive, comma-separated list of output fields to display.
+The field name must be one of the fields listed below, or the special value
+.Cm all
+to display all fields.
+By default
+.Po without
+.Fl o
+.Pc ,
+.Cm show-simnet
+displays all fields.
+.Bl -tag -width MACADDRESS
+.It Sy LINK
+The name of the simnet.
+.It Sy MEDIA
+The media type of the simnet.
+.It Sy MACADDRESS
+MAC address of the simnet.
+.It Sy OTHERLINK
+Simnet the link is connected to.
+.El
+.It Fl p , \&-parsable
+Display using a stable machine-parsable format.
+The
+.Fl o
+option is required with
+.Fl p .
+See
+.Sx Parsable Output Format ,
+below.
+.It Fl P , \&-persistent
+Display the persistent simnet configuration.
 .El
 .It Xo
 .Nm Cm show-ether
@@ -4186,6 +4362,24 @@ interface.
 See
 .Xr ifconfig 8
 for a description of how IPv6 addresses are configured on 6to4 tunnel links.
+.Pp
+.Sy Example 21
+Creating a virtual point-to-point link using simnets
+.Pp
+The following commands create two simnets connected to each other, resulting in
+a point-to-point link between them.
+.Bd -literal -offset indent
+# dladm create-simnet sim0
+# dladm create-simnet sim1
+# dladm modify-simnet -p sim1 sim0
+# dladm show-simnet
+LINK        MEDIA               MACADDRESS        OTHERLINK
+sim0        Ethernet            be:c2:eb:81:fe:b0 sim1
+sim1        Ethernet            8e:c:0:78:cc:60   sim0
+.Ed
+.Pp
+The resulting interfaces sim0 and sim1 may be configured and used as any other
+.Ar link .
 .Sh INTERFACE STABILITY
 The command line interface of
 .Nm

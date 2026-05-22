@@ -26,7 +26,7 @@
  * Copyright 2020 Peter Tribble.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2021 RackTop Systems, Inc.
- * Copyright 2024 H. William Welliver <william@welliver.org>
+ * Copyright 2024, 2026 H. William Welliver <william@welliver.org>
  * Copyright 2024 Oxide Computer Company
  */
 
@@ -391,10 +391,17 @@ static cmd_t	cmds[] = {
 	    "    delete-etherstub [-t] <link>"				},
 	{ "show-etherstub",	do_show_etherstub,
 	    "    show-etherstub   [-t] [<link>]\n"			},
-	{ "create-simnet",	do_create_simnet,	NULL		},
-	{ "modify-simnet",	do_modify_simnet,	NULL		},
-	{ "delete-simnet",	do_delete_simnet,	NULL		},
-	{ "show-simnet",	do_show_simnet,		NULL		},
+	{ "create-simnet",	do_create_simnet,
+	    "    create-simnet    [-t] [-R <root-dir>] [-m <media-type>]\n"
+	    "\t\t     [-u <address>] <simnet-link>"	},
+	{ "modify-simnet",	do_modify_simnet,
+	    "    modify-simnet    [-t] [-R <root-dir>] [-p <peer>] "
+	    "<simnet-link>"	},
+	{ "delete-simnet",	do_delete_simnet,
+	    "    delete-simnet    [-t] [-R <root-dir>] <simnet-link>"	},
+	{ "show-simnet",	do_show_simnet,
+	    "    show-simnet      [-P] [[-p] -o <field>,...] "
+	    "[<simnet-link>]\n"	},
 	{ "up-simnet",		do_up_simnet,		NULL		},
 	{ "create-bridge",	do_create_bridge,
 	    "    create-bridge    [-R <root-dir>] [-P <protect>] "
