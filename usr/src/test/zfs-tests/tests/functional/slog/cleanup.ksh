@@ -39,10 +39,10 @@ if ! verify_slog_support ; then
 fi
 
 if datasetexists $TESTPOOL ; then
-	log_must zpool destroy -f $TESTPOOL
+	log_must destroy_pool $TESTPOOL
 fi
 if datasetexists $TESTPOOL2 ; then
-	log_must zpool destroy -f $TESTPOOL2
+	log_must destroy_pool $TESTPOOL2
 fi
 if [[ -d $VDIR ]]; then
 	log_must rm -rf $VDIR

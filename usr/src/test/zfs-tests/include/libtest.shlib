@@ -29,6 +29,7 @@
 # Copyright 2020 Joyent, Inc.
 # Copyright (c) 2025, Klara, Inc.
 # Copyright 2024 MNX Cloud, Inc.
+# Copyright 2026 Gordon W. Ross
 #
 
 UNAME=$(uname)
@@ -1237,6 +1238,21 @@ function destroy_pool #pool
 		if poolexists "$pool" ; then
 			mtpt=$(get_prop mountpoint "$pool")
 
+			# Clear any zinject fault handlers before attempting
+			# destroy. Active handlers can cause I/O to hang
+			# indefinitely, blocking zpool destroy.
+			zinject -c all
+
+			# If pool I/O is suspended (e.g. due to injected
+			# errors), clear the error state so destroy can proceed.
+			typeset health=$(zpool list -H -o health $pool \
+			    2>/dev/null)
+			if [[ "$health" == "SUSPENDED" ]]; then
+				log_note "Pool $pool is suspended; clearing" \
+				    "before destroy."
+				zpool clear $pool
+			fi
+
 			# At times, syseventd activity can cause attempts to
 			# destroy a pool to fail with EBUSY. We retry a few
 			# times allowing failures before requiring the destroy
@@ -1254,6 +1270,12 @@ function destroy_pool #pool
 
 			[[ -d $mtpt ]] && \
 				log_must rm -rf $mtpt
+
+			if poolexists "$pool"; then
+				log_note "destroy_pool: pool '$pool' still" \
+				    "exists after destroy"
+				exit $STF_ABORTED
+			fi
 		else
 			log_note "Pool does not exist. ($pool)"
 			return 1
