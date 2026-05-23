@@ -46,7 +46,15 @@ depends on it.
 The pre-requisites for running the ZFS Test Suite are:
 	- root pool about 100GB (some test data is using /var/tmp)
 	- about 8GB RAM
-	- Three scratch disks (15GB, tests with ufs need 512B native or 512e)
+	- Three scratch disks, all the same size. The minimum disk size is
+	  determined by the system's crash dump size (roughly equal to RAM),
+	  plus a small overhead. The zfstest script enforces a floor of 10GB.
+	  For example, a system with 8GB RAM needs disks of at least 10GB;
+	  a system with 16GB RAM needs disks of at least 16GB. Tests with ufs
+	  require 512B native or 512e sector disks. Disks of differing sizes
+	  will cause mirror-related tests (e.g. zpool_scrub, zpool_resilver,
+	  zpool_trim) to fail with "device is too small".  All disks should
+	  present the same block size or some tests will fail.
 	  - Specify the disks you wish to use in the $DISKS variable, as a
 	    space delimited list like this: DISKS='c3t1d0 c3t2d0 c3t3d0'
 	  - Use the '-a' option to the zfstest script and all unused disks on

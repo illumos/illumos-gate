@@ -16,6 +16,7 @@
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 Gordon W. Ross
 #
 
 export LC_ALL=C.UTF-8
@@ -92,6 +93,8 @@ function verify_disks
 	typeset path
 	typeset -lu expected_size
 	typeset -lu size
+	typeset -lu first_size=0
+	typeset first_disk=""
 
 	# Ensure disks are large enough for the tests: no less than 10GB
 	# and large enough for a crash dump plus overheads: the disk partition
@@ -107,7 +110,7 @@ function verify_disks
 	for disk in $DISKS; do
 		case $disk in
 		/*) path=$disk;;
-		*) path=/dev/rdsk/${disk}s0
+		*) path=/dev/rdsk/${disk}
 		esac
 		set -A disksize $(sudo -k prtvtoc $path 2>&1 |
 			awk '$3 == "bytes/sector" ||
@@ -121,6 +124,28 @@ function verify_disks
 		if (( size <  expected_size )); then
 			(( size = expected_size / 1024 / 1024 / 1024 ))
 			fail "$disk is too small, need at least ${size}GB"
+		fi
+
+		if [[ -z $first_disk ]]; then
+			first_disk=$disk
+			first_size=$size
+			first_blocksize=${disksize[0]}
+		else
+			if (( size != first_size )); then
+				echo "Warning: $disk and $first_disk are" \
+				    "different sizes."
+				echo "Tests that mirror disks (e.g." \
+				    "zpool_scrub, zpool_resilver) require all"
+				echo "disks to be the same size and may fail" \
+				    "with 'device is too small'."
+			fi
+			if (( disksize[0] != first_blocksize )); then
+				echo "Warning: $disk and $first_disk have" \
+				    "different block sizes" \
+				    "(${disksize[0]} vs ${first_blocksize})."
+				echo "Some tests require all disks to present" \
+				    "the same block size and may fail."
+			fi
 		fi
 	done
 	return 0

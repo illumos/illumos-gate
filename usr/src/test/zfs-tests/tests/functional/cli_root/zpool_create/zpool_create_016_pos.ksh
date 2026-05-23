@@ -88,7 +88,7 @@ for sdisk in $swap_disks; do
 	log_note "Executing: swap -d $sdisk"
 	swap -d $sdisk >/dev/null 2>&1;
 	if (( $? != 0 )); then
-		log_untested "Unable to delete swap device $sdisk because of" \
+		log_unsupported "Unable to delete swap device $sdisk because of" \
 				"insufficient RAM"
 	fi
 done
