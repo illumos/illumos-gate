@@ -16,6 +16,7 @@
 # Copyright (c) 2017, Chris Fraire <cfraire@me.com>.
 # Copyright 2019 Joyent, Inc.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 Gordon W. Ross
 #
 
 from __future__ import print_function
@@ -52,6 +53,20 @@ KILL = '/usr/bin/kill'
 TRUE = '/usr/bin/true'
 SUDO = '/usr/bin/sudo'
 
+# Exit codes as defined in stf/include/stf.shlib
+STF_PASS        = 0
+STF_FAIL        = 1
+STF_UNRESOLVED  = 2
+STF_NOTINUSE    = 3
+STF_UNSUPPORTED = 4
+STF_UNTESTED    = 5
+STF_UNINITIATED = 6
+STF_NORESULT    = 7
+STF_WARNING     = 8
+STF_TIMED_OUT   = 9
+STF_ABORTED     = 10
+STF_OTHER       = 11
+
 retcode = 0
 
 # Custom class to reopen the log file in case it is forcibly closed by a test.
@@ -81,6 +96,11 @@ class WatchedFileHandlerClosed(WatchedFileHandler):
                 self.stream = self._open()
                 self.tries += 1
 
+
+class RunAborted(Exception):
+    pass
+
+
 class Result(object):
     total = 0
     runresults = {'PASS': 0, 'FAIL': 0, 'SKIP': 0, 'KILLED': 0}
@@ -95,9 +115,9 @@ class Result(object):
 
     def done(self, proc, killed):
         """
-        Finalize the results of this Cmd.
-        Report SKIP for return codes 3,4 (NOTINUSE, UNSUPPORTED)
-        as defined in ../stf/include/stf.shlib
+        Finalize the results of this Cmd, mapping exit codes to a
+        result code, one of: (PASS, FAIL, SKIP, KILLED, ABORTED)
+        and increment one of the four runresults[] counters.
         """
         global retcode
 
@@ -112,9 +132,13 @@ class Result(object):
         elif self.returncode == 0:
             self.result = 'PASS'
             Result.runresults['PASS'] += 1
-        elif self.returncode == 3 or self.returncode == 4:
+        elif self.returncode in (STF_NOTINUSE, STF_UNSUPPORTED):
             self.result = 'SKIP'
             Result.runresults['SKIP'] += 1
+        elif self.returncode == STF_ABORTED:
+            self.result = 'ABORTED'
+            Result.runresults['FAIL'] += 1
+            retcode = 1
         elif self.returncode != 0:
             self.result = 'FAIL'
             Result.runresults['FAIL'] += 1
@@ -193,13 +217,17 @@ User: %s
     def kill_cmd(self, proc):
         """
         Kill a running command due to timeout, or ^C from the keyboard. If
-        sudo is required, this user was verified previously.
+        sudo is required, this user was verified previously. We kill the
+        entire process group so that SIGTERM reaches the test script and
+        its children (e.g. when launched via sudo), allowing EXIT traps
+        and cleanup functions to run.
         """
         self.killed = True
         do_sudo = len(self.user) != 0
         signal = '-TERM'
 
-        cmd = [SUDO, KILL, signal, str(proc.pid)]
+        # Negative PID sends signal to the entire process group.
+        cmd = [SUDO, KILL, signal, '-%s' % str(proc.pid)]
         if not do_sudo:
             del cmd[0]
 
@@ -264,7 +292,7 @@ User: %s
         try:
             self.result.starttime = time()
             proc = Popen(privcmd, stdout=PIPE, stderr=PIPE, stdin=PIPE,
-                         universal_newlines=True)
+                         universal_newlines=True, start_new_session=True)
             proc.stdin.close()
 
             # Allow a special timeout value of 0 to mean infinity
@@ -275,7 +303,7 @@ User: %s
             self.result.stdout, self.result.stderr = self.collect_output(proc)
         except KeyboardInterrupt:
             self.kill_cmd(proc)
-            fail('\nRun terminated at user request.')
+            raise
         finally:
             t.cancel()
 
@@ -433,10 +461,16 @@ Tags: %s
             test.skip()
 
         test.log(logger, options)
+        if test.result.result == 'ABORTED':
+            raise RunAborted('test %s' % test.pathname)
 
         if len(posttest.pathname):
+            logger.debug('Running post cleanup: %s' % posttest.pathname)
             posttest.run(options)
             posttest.log(logger, options)
+            if posttest.result.result == 'ABORTED':
+                raise RunAborted(
+                    'post cleanup for %s' % self.pathname)
 
 
 class TestGroup(Test):
@@ -533,21 +567,37 @@ Tags: %s
             cont = pretest.result.result == 'PASS'
             pretest.log(logger, options)
 
-        for fname in self.tests:
-            test = Cmd(os.path.join(self.pathname, fname),
-                       outputdir=os.path.join(self.outputdir, fname),
-                       timeout=self.timeout, user=self.user,
-                       identifier=self.identifier)
-            if cont:
-                test.run(options)
-            else:
-                test.skip()
+        try:
+            for fname in self.tests:
+                test = Cmd(os.path.join(self.pathname, fname),
+                           outputdir=os.path.join(self.outputdir, fname),
+                           timeout=self.timeout, user=self.user,
+                           identifier=self.identifier)
+                if cont:
+                    test.run(options)
+                else:
+                    test.skip()
 
-            test.log(logger, options)
+                test.log(logger, options)
+                if test.result.result == 'ABORTED':
+                    raise RunAborted('test %s' % test.pathname)
+        except KeyboardInterrupt:
+            # Run the post (cleanup) script even when interrupted, in case
+            # the test's own EXIT trap did not clean up (e.g. pools, zinject).
+            if len(posttest.pathname):
+                print('\nInterrupted, running cleanup...',
+                      flush=True)
+                posttest.run(options)
+                posttest.log(logger, options)
+            raise
 
         if len(posttest.pathname):
+            logger.debug('Running post cleanup: %s' % posttest.pathname)
             posttest.run(options)
             posttest.log(logger, options)
+            if posttest.result.result == 'ABORTED':
+                raise RunAborted(
+                    'post cleanup for %s' % self.pathname)
 
 
 class TestRun(object):
@@ -827,10 +877,21 @@ class TestRun(object):
                 os.chdir(self.outputdir)
             except OSError:
                 fail('Could not change to directory %s' % self.outputdir)
+
+            uname = Popen(['uname', '-a'], stdout=PIPE, stderr=PIPE,
+                          universal_newlines=True)
+            out, _ = uname.communicate()
+            self.logger.debug('Test system: %s' % out.strip())
+
         for test in sorted(self.tests.keys()):
             self.tests[test].run(self.logger, options)
-        for testgroup in sorted(self.testgroups.keys()):
-            self.testgroups[testgroup].run(self.logger, options)
+        try:
+            for testgroup in sorted(self.testgroups.keys()):
+                self.testgroups[testgroup].run(self.logger, options)
+        except KeyboardInterrupt:
+            fail('\nRun terminated at user request.')
+        except RunAborted as e:
+            fail('\nRun aborted: %s' % e)
 
     def summary(self):
         if Result.total == 0:
