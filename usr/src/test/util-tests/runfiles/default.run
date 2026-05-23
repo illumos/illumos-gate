@@ -15,6 +15,7 @@
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 Hans Rosenfeld
 #
 
 [DEFAULT]
@@ -30,13 +31,19 @@ outputdir = /var/tmp/test_results
 [/opt/util-tests/tests/iconv_test]
 [/opt/util-tests/tests/printf_test]
 
-[/opt/util-tests/tests/allowed-ips]
+[/opt/util-tests/tests/dladm/allowed-ips]
 user = root
 
-[/opt/util-tests/tests/set-linkprop]
+[/opt/util-tests/tests/dladm/create-vnic]
 user = root
 
-[/opt/util-tests/tests/show-class-confusion]
+[/opt/util-tests/tests/dladm/set-linkprop]
+user = root
+
+[/opt/util-tests/tests/dladm/show-class-confusion]
+user = root
+
+[/opt/util-tests/tests/dladm/show-overlay-exit]
 user = root
 
 [/opt/util-tests/tests/libsff/libsff]
@@ -50,9 +57,6 @@ user = root
 [/opt/util-tests/tests/libjedec_hex2spd.64]
 [/opt/util-tests/tests/smbios.32]
 [/opt/util-tests/tests/smbios.64]
-
-[/opt/util-tests/tests/show-overlay-exit]
-user = root
 
 #
 # The sleep tests require destructive DTrace. Therefore they must be run

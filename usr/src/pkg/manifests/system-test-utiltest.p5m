@@ -17,6 +17,7 @@
 # Copyright 2017 Jason King.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2026 Oxide Computer Company
+# Copyright 2026 Hans Rosenfeld
 #
 
 set name=pkg.fmri value=pkg:/system/test/utiltest@$(PKGVERS)
@@ -33,7 +34,6 @@ file path=opt/util-tests/bin/utiltest mode=0555
 dir  path=opt/util-tests/runfiles
 file path=opt/util-tests/runfiles/default.run mode=0444
 dir  path=opt/util-tests/tests
-file path=opt/util-tests/tests/allowed-ips mode=0555
 dir  path=opt/util-tests/tests/ar
 file path=opt/util-tests/tests/ar/ar_test0.o mode=0444
 file path=opt/util-tests/tests/ar/ar_test1.o mode=0444
@@ -1378,6 +1378,12 @@ file path=opt/util-tests/tests/dis/risc-v/tst.supervisor.s mode=0444
 dir  path=opt/util-tests/tests/dis/sparc
 file path=opt/util-tests/tests/dis/sparc/tst.regs.out mode=0444
 file path=opt/util-tests/tests/dis/sparc/tst.regs.s mode=0444
+dir  path=opt/util-tests/tests/dladm
+file path=opt/util-tests/tests/dladm/allowed-ips mode=0555
+file path=opt/util-tests/tests/dladm/create-vnic mode=0555
+file path=opt/util-tests/tests/dladm/set-linkprop mode=0555
+file path=opt/util-tests/tests/dladm/show-class-confusion mode=0555
+file path=opt/util-tests/tests/dladm/show-overlay-exit mode=0555
 dir  path=opt/util-tests/tests/du
 file path=opt/util-tests/tests/du/du.kshlib mode=0555
 file path=opt/util-tests/tests/du/dutest mode=0555
@@ -1933,9 +1939,6 @@ file path=opt/util-tests/tests/sed/regress.multitest.out/9.7 mode=0444
 file path=opt/util-tests/tests/sed/regress.multitest.out/9.8 mode=0444
 file path=opt/util-tests/tests/sed/regress.multitest.out/9.9 mode=0444
 file path=opt/util-tests/tests/sed/sed_addr mode=0555
-file path=opt/util-tests/tests/set-linkprop mode=0555
-file path=opt/util-tests/tests/show-class-confusion mode=0555
-file path=opt/util-tests/tests/show-overlay-exit mode=0555
 dir  path=opt/util-tests/tests/sleep
 file path=opt/util-tests/tests/sleep/sleep.awk mode=0444
 file path=opt/util-tests/tests/sleep/sleep.d mode=0444

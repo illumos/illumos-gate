@@ -11,13 +11,19 @@
 
 #
 # Copyright 2017 Joyent, Inc.
+# Copyright 2026 Hans Rosenfeld
 #
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
-ROOTOPTPKG = $(ROOT)/opt/util-tests/tests
-PROG = allowed-ips set-linkprop show-overlay-exit show-class-confusion
+ROOTOPTPKG = $(ROOT)/opt/util-tests/tests/dladm
+
+PROG =	allowed-ips \
+	create-vnic \
+	set-linkprop \
+	show-class-confusion \
+	show-overlay-exit
 
 ROOTPROG = $(PROG:%=$(ROOTOPTPKG)/%)
 
