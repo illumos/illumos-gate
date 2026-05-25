@@ -11,300 +11,301 @@
 .\"
 .\" Copyright (c) 2012 by Delphix. All rights reserved.
 .\"
-.TH run 1 "23 Sep 2012"
-.SH NAME
-run \- find, execute, and log the results of tests
-.SH SYNOPSIS
-.LP
-.nf
-\fBrun\fR [\fB-dgq] [\fB-o\fR \fIoutputdir\fR] [\fB-pP\fR \fIscript\fR] [\fB-t\fR \fIseconds\fR] [\fB-uxX\fR \fIusername\fR]
-    \fIpathname\fR ...
-.fi
-
-.LP
-.nf
-\fBrun\fR \fB-w\fR \fIrunfile\fR [\fB-gq\fR] [\fB-o\fR \fIoutputdir\fR] [\fB-pP\fR \fIscript\fR] [\fB-t\fR \fIseconds\fR]
-    [\fB-uxX\fR \fIusername\fR] \fIpathname\fR ...
-.fi
-
-.LP
-.nf
-\fBrun\fR \fB-c\fR \fIrunfile\fR [\fB-dq\fR]
-.fi
-
-.LP
-.nf
-\fBrun\fR [\fB-h\fR]
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBrun\fR command has three basic modes of operation. With neither the
-\fB-c\fR nor the \fB-w\fR option, \fBrun\fR processes the arguments provided on
-the command line, adding them to the list for this run. If a specified
-\fIpathname\fR is an executable file, it is added as a test. If a specified
-\fIpathname\fR is a directory, the behavior depends upon the \fB-g\fR option.
-If \fB-g\fR is specified, the directory is treated as a test group. See the
-section on "Test Groups" below. Without the \fB-g\fR option, \fBrun\fR simply
-descends into the directory looking for executable files. The tests are then
-executed, and the results are logged.
-
-With the \fB-w\fR option, \fBrun\fR finds tests in the manner described above.
-Rather than executing the tests and logging the results, the test configuration
-is stored in a \fIrunfile\fR which can be used in future invocations, or edited
-to modify which tests are executed and which options are applied. Options
-included on the command line with \fB-w\fR become defaults in the
-\fIrunfile\fR.
-
-With the \fB-c\fR option, \fBrun\fR parses a \fIrunfile\fR, which can specify a
-series of tests and test groups to be executed. The tests are then executed,
-and the results are logged.
-.sp
-.SS "Test Groups"
-.sp
-.LP
+.Dd May 24, 2026
+.Dt RUN 1
+.Os
+.Sh NAME
+.Nm run
+.Nd find, execute, and log the results of tests
+.Sh SYNOPSIS
+.Nm
+.Op Fl dgq
+.Op Fl i Ar testdir
+.Op Fl o Ar outputdir
+.Op Fl p Ar script
+.Op Fl P Ar script
+.Op Fl T Ar tags
+.Op Fl t Ar seconds
+.Op Fl u Ar username
+.Op Fl x Ar username
+.Op Fl X Ar username
+.Ar pathname ...
+.Nm
+.Fl w Ar runfile
+.Op Fl gq
+.Op Fl i Ar testdir
+.Op Fl o Ar outputdir
+.Op Fl p Ar script
+.Op Fl P Ar script
+.Op Fl T Ar tags
+.Op Fl t Ar seconds
+.Op Fl u Ar username
+.Op Fl x Ar username
+.Op Fl X Ar username
+.Ar pathname ...
+.Nm
+.Fl c Ar runfile Ns Op , Ns Ar runfile Ns No ...
+.Op Fl dq
+.Nm
+.Fl l Ar logfile
+.Op Fl dgq
+.Op Fl i Ar testdir
+.Op Fl o Ar outputdir
+.Op Fl p Ar script
+.Op Fl P Ar script
+.Op Fl t Ar seconds
+.Op Fl u Ar username
+.Op Fl x Ar username
+.Op Fl X Ar username
+.Nm
+.Op Fl h
+.Sh DESCRIPTION
+The
+.Nm
+command has four basic modes of operation.
+With none of the
+.Fl c ,
+.Fl l ,
+or
+.Fl w
+options,
+.Nm
+processes the arguments provided on the command line, adding them to the list
+for this run.
+If a specified
+.Ar pathname
+is an executable file, it is added as a test.
+If a specified
+.Ar pathname
+is a directory, the behavior depends upon the
+.Fl g
+option.
+If
+.Fl g
+is specified, the directory is treated as a test group.
+See the section on
+.Sx Test Groups
+below.
+Without the
+.Fl g
+option,
+.Nm
+simply descends into the directory looking for executable files.
+The tests are then executed, and the results are logged.
+.Pp
+With the
+.Fl w
+option,
+.Nm
+finds tests in the manner described above.
+Rather than executing the tests and logging the results, the test
+configuration is stored in a
+.Ar runfile
+which can be used in future invocations, or edited to modify which tests are
+executed and which options are applied.
+Options included on the command line with
+.Fl w
+become defaults in the
+.Ar runfile .
+.Pp
+With the
+.Fl c
+option,
+.Nm
+parses one or more
+.Ar runfile Ns s,
+which can specify a series of tests and test groups to be executed.
+The tests are then executed, and the results are logged.
+.Pp
+With the
+.Fl l
+option,
+.Nm
+reads a log file produced by a previous invocation and re-executes only the
+tests that failed.
+This is useful for iterating on a failing subset without re-running the entire
+test suite.
+.Ss Test Groups
 A test group is comprised of a set of executable files, all of which exist in
-one directory. The options specified on the command line or in a \fIrunfile\fR
-apply to individual tests in the group. The exception is options pertaining to
-pre and post scripts, which act on all tests as a group. Rather than running
-before and after each test, these scripts are run only once each at the start
-and end of the test group.
-.SS "Test Execution"
-.sp
-.LP
+one directory.
+The options specified on the command line or in a
+.Ar runfile
+apply to individual tests in the group.
+The exception is options pertaining to pre and post scripts, which act on all
+tests as a group.
+Rather than running before and after each test, these scripts are run only
+once each at the start and end of the test group.
+.Ss Test Execution
 The specified tests run serially, and are typically assigned results according
-to exit values. Tests that exit zero and non-zero are marked "PASS" and "FAIL"
-respectively. When a pre script fails for a test group, only the post script is
-executed, and the remaining tests are marked "SKIPPED." Any test that exceeds
-its \fItimeout\fR is terminated, and marked "KILLED."
-
-By default, tests are executed with the credentials of the \fBrun\fR script.
-Executing tests with other credentials is done via \fBsudo\fR(8), which must
-be configured to allow execution without prompting for a password. Environment
-variables from the calling shell are available to individual tests. During test
-execution, the working directory is changed to \fIoutputdir\fR.
-.SS "Output Logging"
-.sp
-.LP
-By default, \fBrun\fR will print one line on standard output at the conclusion
-of each test indicating the test name, result and elapsed time. Additionally,
-for each invocation of \fBrun\fR, a directory is created using the ISO 8601
-date format. Within this directory is a file named \fIlog\fR containing all the
-test output with timestamps, and a directory for each test. Within the test
-directories, there is one file each for standard output, standard error and
-merged output. The default location for the \fIoutputdir\fR is
-\fI/var/tmp/test_results\fR.
-.SS "Runfiles"
-.sp
-.LP
-The \fIrunfile\fR is an ini style configuration file that describes a test run.
-The file has one section named "DEFAULT," which contains configuration option
-names and their values in "name = value" format. The values in this section
-apply to all the subsequent sections, unless they are also specified there, in
-which case the default is overridden. The remaining section names are the
-absolute pathnames of files and direcotries, describing tests and test groups
-respectively. The legal option names are:
-.sp
-.ne 2
-.na
-\fBoutputdir\fR = \fIpathname\fR
-.ad
-.sp .6
-.RS 4n
+to exit values.
+Tests that exit zero and non-zero are marked
+.Qq PASS
+and
+.Qq FAIL
+respectively.
+When a pre script fails for a test group, only the post script is executed,
+and the remaining tests are marked
+.Qq SKIPPED .
+Any test that exceeds its
+.Ar timeout
+is terminated, and marked
+.Qq KILLED .
+.Pp
+By default, tests are executed with the credentials of the
+.Nm
+script.
+Executing tests with other credentials is done via
+.Xr sudo 8 ,
+which must be configured to allow execution without prompting for a password.
+Environment variables from the calling shell are available to individual tests.
+During test execution, the working directory is changed to
+.Ar outputdir .
+.Ss Output Logging
+By default,
+.Nm
+will print one line on standard output at the conclusion of each test
+indicating the test name, result and elapsed time.
+Additionally, for each invocation of
+.Nm ,
+a directory is created using the ISO 8601 date format.
+Within this directory is a file named
+.Pa log
+containing all the test output with timestamps, and a directory for each test.
+Within the test directories, there is one file each for standard output,
+standard error and merged output.
+The default location for the
+.Ar outputdir
+is
+.Pa /var/tmp/test_results .
+.Ss Runfiles
+The
+.Ar runfile
+is an ini style configuration file that describes a test run.
+The file has one section named
+.Qq DEFAULT ,
+which contains configuration option names and their values in
+.Qq name = value
+format.
+The values in this section apply to all the subsequent sections, unless they
+are also specified there, in which case the default is overridden.
+The remaining section names are the absolute pathnames of files and
+directories, describing tests and test groups respectively.
+The legal option names are:
+.Bl -tag -width "post_user"
+.It Cm outputdir No = Ar pathname
 The name of the directory that holds test logs.
-.RE
-.sp
-.ne 2
-.na
-\fBpre\fR = \fIscript\fR
-.ad
-.sp .6
-.RS 4n
-Run \fIscript\fR prior to the test or test group.
-.RE
-.sp
-.ne 2
-.na
-\fBpre_user\fR = \fIusername\fR
-.ad
-.sp .6
-.RS 4n
-Execute the pre script as \fIusername\fR.
-.RE
-.sp
-.ne 2
-.na
-\fBpost\fR = \fIscript\fR
-.ad
-.sp .6
-.RS 4n
-Run \fIscript\fR after the test or test group.
-.RE
-.sp
-.ne 2
-.na
-\fBpost_user\fR = \fIusername\fR
-.ad
-.sp .6
-.RS 4n
-Execute the post script as \fIusername\fR.
-.RE
-.sp
-.ne 2
-.na
-\fBquiet\fR = [\fITrue\fR|\fIFalse\fR]
-.ad
-.sp .6
-.RS 4n
+.It Cm pre No = Ar script
+Run
+.Ar script
+prior to the test or test group.
+.It Cm pre_user No = Ar username
+Execute the pre script as
+.Ar username .
+.It Cm post No = Ar script
+Run
+.Ar script
+after the test or test group.
+.It Cm post_user No = Ar username
+Execute the post script as
+.Ar username .
+.It Cm quiet No = Cm True Ns | Ns Cm False
 If set to True, only the results summary is printed to standard out.
-.RE
-.sp
-.ne 2
-.na
-\fBtests\fR = [\fI'filename'\fR [,...]]
-.ad
-.sp .6
-.RS 4n
-Specify a list of \fIfilenames\fR for this test group. Only the basename of the
-absolute path is required. This option is only valid for test groups, and each
-\fIfilename\fR must be single quoted.
-.RE
-.sp
-.ne 2
-.na
-\fBtimeout\fR = \fIn\fR
-.ad
-.sp .6
-.RS 4n
-A timeout value of \fIn\fR seconds.
-.RE
-.sp
-.ne 2
-.na
-\fBuser\fR = \fIusername\fR
-.ad
-.sp .6
-.RS 4n
-Execute the test or test group as \fIusername\fR.
-.RE
-
-.SH OPTIONS
-.sp
-.LP
-The following options are available for the \fBrun\fR command.
-.sp
-.ne 2
-.na
-\fB-c\fR \fIrunfile\fR
-.ad
-.RS 6n
-Specify a \fIrunfile\fR to be consumed by the run command.
-.RE
-
-.ne 2
-.na
-\fB-d\fR
-.ad
-.RS 6n
-Dry run mode. Execute no tests, but print a description of each test that would
-have been run.
-.RE
-
-.ne 2
-.na
-\fB-g\fR
-.ad
-.RS 6n
+.It Cm tests No = No [\(aq Ns Ar filename Ns No \(aq No [, ...]]
+Specify a list of
+.Ar filenames
+for this test group.
+Only the basename of the absolute path is required.
+This option is only valid for test groups, and each
+.Ar filename
+must be single quoted.
+.It Cm timeout No = Ar n
+A timeout value of
+.Ar n
+seconds.
+.It Cm user No = Ar username
+Execute the test or test group as
+.Ar username .
+.El
+.Sh OPTIONS
+The following options are available for the
+.Nm
+command.
+.Bl -tag -width Ds
+.It Fl c Ar runfile Ns Op , Ns Ar runfile No ...
+Specify one or more
+.Ar runfile Ns s
+.Pq comma-separated
+defining tests and configuration.
+.It Fl d
+Dry run mode.
+Execute no tests, but print a description of each test that would have been
+run.
+.It Fl g
 Create test groups from any directories found while searching for tests.
-.RE
-
-.ne 2
-.na
-\fB-o\fR \fIoutputdir\fR
-.ad
-.RS 6n
+.It Fl h
+Print a usage summary and exit.
+.It Fl i Ar testdir
+Specify the directory from which tests are found when no
+.Ar pathname
+arguments are given.
+.It Fl l Ar logfile
+Read
+.Ar logfile
+from a previous run and re-execute only the tests that failed.
+.It Fl o Ar outputdir
 Specify the directory in which to write test results.
-.RE
-
-.ne 2
-.na
-\fB-p\fR \fIscript\fR
-.ad
-.RS 6n
-Run \fIscript\fR prior to any test or test group.
-.RE
-
-.ne 2
-.na
-\fB-P\fR \fIscript\fR
-.ad
-.RS 6n
-Run \fIscript\fR after any test or test group.
-.RE
-
-.ne 2
-.na
-\fB-q\fR
-.ad
-.RS 6n
-Print only the results sumary to the standard output.
-.RE
-
-.ne 2
-.na
-\fB-t\fR \fIn\fR
-.ad
-.RS 6n
-Specify a timeout value of \fIn\fR seconds per test.
-.RE
-
-.ne 2
-.na
-\fB-u\fR \fIusername\fR
-.ad
-.RS 6n
-Execute tests or test groups as \fIusername\fR.
-.RE
-
-.ne 2
-.na
-\fB-w\fR \fIrunfile\fR
-.ad
-.RS 6n
-Specify the name of the \fIrunfile\fR to create.
-.RE
-
-.ne 2
-.na
-\fB-x\fR \fIusername\fR
-.ad
-.RS 6n
-Execute the pre script as \fIusername\fR.
-.RE
-
-.ne 2
-.na
-\fB-X\fR \fIusername\fR
-.ad
-.RS 6n
-Execute the post script as \fIusername\fR.
-.RE
-
-.SH EXAMPLES
-.LP
-\fBExample 1\fR Running ad-hoc tests.
-.sp
-.LP
-This example demonstrates the simplest invocation of \fBrun\fR.
-
-.sp
-.in +2
-.nf
-% \fBrun my-tests\fR
-Test: /home/jkennedy/my-tests/test-01                    [00:02] [PASS]
-Test: /home/jkennedy/my-tests/test-02                    [00:04] [PASS]
-Test: /home/jkennedy/my-tests/test-03                    [00:01] [PASS]
+.It Fl p Ar script
+Run
+.Ar script
+prior to any test or test group.
+.It Fl P Ar script
+Run
+.Ar script
+after any test or test group.
+.It Fl q
+Print only the results summary to the standard output.
+.It Fl t Ar n
+Specify a timeout value of
+.Ar n
+seconds per test.
+.It Fl T Ar tags
+Execute only test groups whose tags match the comma-separated list of
+.Ar tags .
+.It Fl u Ar username
+Execute tests or test groups as
+.Ar username .
+.It Fl w Ar runfile
+Specify the name of the
+.Ar runfile
+to create.
+.It Fl x Ar username
+Execute the pre script as
+.Ar username .
+.It Fl X Ar username
+Execute the post script as
+.Ar username .
+.El
+.Sh EXIT STATUS
+.Bl -tag -width Ds
+.It 0
+All tests passed.
+.It 1
+One or more tests failed or an error occurred.
+.It 2
+One or more tests were killed due to exceeding the timeout.
+.El
+.Sh EXAMPLES
+.Bl -enum
+.It
+Running ad-hoc tests.
+.Pp
+This example demonstrates the simplest invocation of
+.Nm .
+.Bd -literal
+% run my-tests
+Test: /home/jkennedy/my-tests/test-01  [00:02] [PASS]
+Test: /home/jkennedy/my-tests/test-02  [00:04] [PASS]
+Test: /home/jkennedy/my-tests/test-03  [00:01] [PASS]
 
 Results Summary
 PASS       3
@@ -312,20 +313,18 @@ PASS       3
 Running Time:   00:00:07
 Percent passed: 100.0%
 Log directory:  /var/tmp/test_results/20120923T180654
-.fi
-.in -2
-
-.LP
-\fBExample 2\fR Creating a \fIrunfile\fR for future use.
-.sp
-.LP
-This example demonstrates creating a \fIrunfile\fR with non default options.
-
-.sp
-.in +2
-.nf
-% \fBrun -p setup -x root -g -w new-tests.run new-tests\fR
-% \fBcat new-tests.run\fR
+.Ed
+.It
+Creating a
+.Ar runfile
+for future use.
+.Pp
+This example demonstrates creating a
+.Ar runfile
+with non default options.
+.Bd -literal
+% run -p setup -x root -g -w new-tests.run new-tests
+% cat new-tests.run
 [DEFAULT]
 pre = setup
 post_user =
@@ -338,33 +337,7 @@ outputdir = /var/tmp/test_results
 
 [/home/jkennedy/new-tests]
 tests = ['test-01', 'test-02', 'test-03']
-.fi
-.in -2
-
-.SH EXIT STATUS
-.sp
-.LP
-The following exit values are returned:
-.sp
-.ne 2
-.na
-\fB\fB0\fR\fR
-.ad
-.sp .6
-.RS 4n
-Successful completion.
-.RE
-.sp
-.ne 2
-.na
-\fB\fB1\fR\fR
-.ad
-.sp .6
-.RS 4n
-An error occurred.
-.RE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBsudo\fR(8)
+.Ed
+.El
+.Sh SEE ALSO
+.Xr sudo 8
