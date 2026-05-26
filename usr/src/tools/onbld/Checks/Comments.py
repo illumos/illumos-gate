@@ -72,6 +72,7 @@ def comchk(comments, check_db=True, output=sys.stderr, bugs=None):
 	bugnospcre = re.compile(r'^(\d{2,7})([^ ].*)')
 	ignorere = re.compile(r'^(' +
                               r'Portions contributed by|' +
+                              r'Imported[ -]from|' +
                               r'Contributed by|' +
                               r'Reviewed[ -]by|' +
                               r'Approved[ -]by|' +
