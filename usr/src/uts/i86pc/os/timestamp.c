@@ -26,6 +26,7 @@
  * Copyright 2012 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2014, 2016 by Delphix. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2026 Bill Sommerfeld <sommerfeld@hamachi.org>
  */
 
 #include <sys/types.h>
@@ -1105,8 +1106,8 @@ tsc_calibrate(void)
 			VERIFY3U(tsc_freq, >, 0);
 
 			cmn_err(CE_CONT,
-			    "?TSC calibrated using %s; freq is %lu MHz\n",
-			    tsccpp[i]->tscc_source, tsc_freq / 1000000);
+			    "?TSC calibrated using %s; freq is %lu Hz\n",
+			    tsccpp[i]->tscc_source, tsc_freq);
 
 			/*
 			 * Note that tsccpp is just a (sorted) array of

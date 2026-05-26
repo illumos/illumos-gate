@@ -11,20 +11,38 @@
 
 /*
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2026 Bill Sommerfeld <sommerfeld@hamachi.org>
  */
 
 #include <sys/tsc.h>
 #include <sys/prom_debug.h>
 #include <sys/hpet.h>
 #include <sys/clock.h>
+#include <sys/sysmacros.h>
 
 /*
- * The amount of time (in microseconds) between tsc samples. This is
- * somewhat arbitrary, but seems reasonable. A frequency of 1GHz is
- * 1,000,000,000 ticks / sec (10^9). 100us is 10^(-6) * 10^2 => 10^(-4), so
- * 100us would represent 10^5 (100,000) ticks.
+ * The amount of time (in microseconds) between tsc samples. This needs to be
+ * long enough to allow the ratio between the TSC and the HPET to be
+ * accurately measured.
+ *
+ * The HPET spec cautions that "[w]ithin any 100-microsecond period,
+ * the timer is permitted to report a time that is up to 2 ticks too
+ * early or too late.".  Worst case measurement error would occur when
+ * it reads 2 ticks early at one end and 2 ticks late at the other.
+ *
+ * A 100us measurement baseline produced frequency error well in
+ * excess of 200ppm with large boot-to-boot variance, which together
+ * rendered the ntp.drift file useless; it could take the better part
+ * of a day for ntpd to find the new frequency correction after boot.
+ * A longer baseline of 10ms permits a more accurate measurement of
+ * the ratio between the clocks.
+ *
+ * The HPET is specified to run at 10MHz or faster, so each tick is no more
+ * than 100ns; over 10ms this implies a measurement error of no more than
+ * 400ns/10ms or 40ppm on the HPET side.  Observed behavior is is somewhat
+ * better than this.
  */
-#define	HPET_SAMPLE_INTERVAL_US (100)
+#define	HPET_SAMPLE_INTERVAL_US (10000)
 
 /*
  * The same as above, but in nanoseconds (for ease in converting to HPET
@@ -35,13 +53,9 @@
 /* The amount of HPET sample ticks to wait */
 #define	HPET_SAMPLE_TICKS (HRTIME_TO_HPET_TICKS(HPET_SAMPLE_INTERVAL_NS))
 
-#define	TSC_NUM_SAMPLES 10
-
 static boolean_t
 tsc_calibrate_hpet(uint64_t *freqp)
 {
-	uint64_t hpet_sum = 0;
-	uint64_t tsc_sum = 0;
 	uint_t i;
 
 	PRM_POINT("Attempting to use HPET for TSC calibration...");
@@ -52,22 +66,47 @@ tsc_calibrate_hpet(uint64_t *freqp)
 	/*
 	 * The expansion of HPET_SAMPLE_TICKS (specifically
 	 * HRTIME_TO_HPET_TICKS) uses the HPET period to calculate the number
-	 * of HPET ticks for the given time period. Therefore, we cannot
-	 * set hpet_num_ticks until after the early HPET initialization has
-	 * been performed by hpet_early_init() (and the HPET period is known).
+	 * of HPET ticks for the given time period. Therefore, we cannot set
+	 * hpet_num_ticks until after the early HPET initialization has been
+	 * performed by hpet_early_init() (and the HPET period is known).
+	 *
+	 * For safety, cap hpet_num_ticks to no more than 1<<30; we are
+	 * unlikely to see this on real hardware (this would about 107 seconds
+	 * at the slowest possible HPET frequency of 10MHz or about 1 second
+	 * for a hypothetical fast HPET clocked at 1GHz).
 	 */
-	const uint64_t hpet_num_ticks = HPET_SAMPLE_TICKS;
+	const uint64_t hpet_num_ticks = MIN(HPET_SAMPLE_TICKS, 1 << 30);
 
-	for (i = 0; i < TSC_NUM_SAMPLES; i++) {
-		uint64_t hpet_now, hpet_end;
-		uint64_t tsc_start, tsc_end;
+	uint32_t hpet_start, hpet_now;
+	uint64_t tsc_start, tsc_end;
 
-		hpet_now = hpet_read_timer();
-		hpet_end = hpet_now + hpet_num_ticks;
+	/*
+	 * Do a short dry run to warm up caches, then run the full 10ms
+	 * duration calibration.
+	 */
+	for (i = 0; i < 2; i++) {
+		uint64_t hpet_limit = (i == 0) ? 100 : hpet_num_ticks;
 
+		hpet_start = hpet_read_timer_32();
 		tsc_start = tsc_read();
-		while (hpet_now < hpet_end)
-			hpet_now = hpet_read_timer();
+
+		/*
+		 * Loop until the HPET timer advances at least hpet_limit
+		 * ticks.
+		 *
+		 * We use only the low order 32 bits of the HPET counter to
+		 * avoid inconsistent read issues during calibration (see
+		 * section 2.4.7 of revision 1.0a of the HPET specification).
+		 *
+		 * This is safe because arithmetic on uint32_t has defined
+		 * behavior (results modulo 2^32) on under/overflow.  As long
+		 * as the delta between two back-to-back reads of the HPET in
+		 * this loop is small relative to 2^32, the difference will
+		 * exceed hpet_limit before we wrap a second time.
+		 */
+		do {
+			hpet_now = hpet_read_timer_32();
+		} while ((hpet_now - hpet_start) < hpet_limit);
 
 		tsc_end = tsc_read();
 
@@ -76,25 +115,24 @@ tsc_calibrate_hpet(uint64_t *freqp)
 		 * hosed.
 		 */
 		VERIFY3P(tsc_end, >, tsc_start);
-
-		tsc_sum += tsc_end - tsc_start;
-
-		/*
-		 * We likely did not end exactly HPET_SAMPLE_TICKS after
-		 * we started, so save the actual amount.
-		 */
-		hpet_sum += hpet_num_ticks + hpet_now - hpet_end;
 	}
-
-	uint64_t hpet_avg = hpet_sum / TSC_NUM_SAMPLES;
-	uint64_t tsc_avg = tsc_sum / TSC_NUM_SAMPLES;
-	uint64_t hpet_ns = hpet_avg * hpet_info.period / HPET_FEMTO_TO_NANO;
+	/*
+	 * We use the actual hpet difference rather than the nominal
+	 * duration of hpet_num_ticks as back-to-back reads of the hpet
+	 * typically differ by more than a few ticks.
+	 */
+	uint64_t tsc_ticks = tsc_end - tsc_start;
+	uint64_t hpet_ticks = hpet_now - hpet_start;
+	uint64_t hpet_ns = hpet_ticks * hpet_info.period / HPET_FEMTO_TO_NANO;
 
 	PRM_POINT("HPET calibration complete");
 
-	*freqp = tsc_avg * NANOSEC / hpet_ns;
+	*freqp = tsc_ticks * NANOSEC / hpet_ns;
 	PRM_DEBUG(*freqp);
 
+	cmn_err(CE_CONT, "?TSC calibration: "
+	    "%lu tsc ticks, %lu hpet ticks, %lu hpet ns\n",
+	    tsc_ticks, hpet_ticks, hpet_ns);
 	return (B_TRUE);
 }
 

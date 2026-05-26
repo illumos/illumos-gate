@@ -22,6 +22,7 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2024 Oxide Computer Company
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2026 Bill Sommerfeld <sommerfeld@hamachi.org>
  */
 
 #include <sys/hpet_acpi.h>
@@ -54,6 +55,7 @@ static void *hpet_memory_map(ACPI_TABLE_HPET *hpet_table);
 static int hpet_start_main_counter(hpet_info_t *hip);
 static int hpet_stop_main_counter(hpet_info_t *hip);
 static uint64_t hpet_read_main_counter_value(hpet_info_t *hip);
+static uint32_t hpet_read_main_counter_value_32(hpet_info_t *hip);
 static uint64_t hpet_set_leg_rt_cnf(hpet_info_t *hip, uint32_t new_value);
 static uint64_t hpet_read_gen_cap(hpet_info_t *hip);
 static uint64_t hpet_read_gen_config(hpet_info_t *hip);
@@ -555,10 +557,10 @@ hpet_timer_is_readable(void)
 	return ((hpet.supported >= HPET_TIMER_SUPPORT) ? B_TRUE : B_FALSE);
 }
 
-uint64_t
-hpet_read_timer(void)
+uint32_t
+hpet_read_timer_32(void)
 {
-	return (hpet_read_main_counter_value(&hpet_info));
+	return (hpet_read_main_counter_value_32(&hpet_info));
 }
 
 /*
@@ -642,9 +644,9 @@ hpet_convert_timer_N_config(uint64_t conf)
 static uint64_t
 hpet_read_main_counter_value(hpet_info_t *hip)
 {
-	uint64_t	value;
-	uint32_t	*counter;
-	uint32_t	high1, high2, low;
+	uint64_t		value;
+	volatile uint32_t	*counter;
+	uint32_t		high1, high2, low;
 
 	counter = (uint32_t *)HPET_MAIN_COUNTER_ADDRESS(hip->logical_address);
 
@@ -671,6 +673,20 @@ hpet_read_main_counter_value(hpet_info_t *hip)
 	value = ((uint64_t)high1 << 32) | low;
 	hip->main_counter_value = value;
 	return (value);
+}
+
+/*
+ * When calibrating other timers against the HPET we need only look at
+ * the low 32 bits, avoiding the caveats about 64-bit value tearing
+ * internal to the hardware.
+ */
+static uint32_t
+hpet_read_main_counter_value_32(hpet_info_t *hip)
+{
+	volatile uint32_t	*counter;
+	counter = (uint32_t *)HPET_MAIN_COUNTER_ADDRESS(hip->logical_address);
+
+	return (*counter);
 }
 
 static void
