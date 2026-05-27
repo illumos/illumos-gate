@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 RackTop Systems, Inc.
  */
 
 /*
@@ -278,7 +279,7 @@ tem_initialized(tem_vt_state_t tem_arg)
 }
 
 tem_vt_state_t
-tem_init(cred_t *credp, queue_t *rq)
+tem_init(cred_t *credp)
 {
 	struct tem_vt_state *ptem;
 
@@ -290,7 +291,6 @@ tem_init(cred_t *credp, queue_t *rq)
 
 	ptem->tvs_isactive = B_FALSE;
 	ptem->tvs_fbmode = KD_TEXT;
-	ptem->tvs_queue = rq;
 
 	/*
 	 * A tem is regarded as initialized only after tem_internal_init(),
@@ -315,6 +315,17 @@ tem_init(cred_t *credp, queue_t *rq)
 	mutex_exit(&tems.ts_lock);
 
 	return ((tem_vt_state_t)ptem);
+}
+
+void
+tem_init_q(tem_vt_state_t arg, queue_t *rq)
+{
+	struct tem_vt_state *tem = (struct tem_vt_state *)arg;
+
+	mutex_enter(&tem->tvs_lock);
+	ASSERT3P(tem->tvs_queue, ==, NULL);
+	tem->tvs_queue = rq;
+	mutex_exit(&tem->tvs_lock);
 }
 
 /*
@@ -374,6 +385,16 @@ tem_destroy(tem_vt_state_t tem_arg, cred_t *credp)
 	mutex_exit(&tems.ts_lock);
 
 	kmem_free(tem, sizeof (struct tem_vt_state));
+}
+
+void
+tem_clean(tem_vt_state_t tem_arg)
+{
+	struct tem_vt_state *tem = (struct tem_vt_state *)tem_arg;
+
+	mutex_enter(&tem->tvs_lock);
+	tem->tvs_queue = NULL;
+	mutex_exit(&tem->tvs_lock);
 }
 
 static int

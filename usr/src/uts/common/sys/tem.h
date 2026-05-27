@@ -22,6 +22,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 RackTop Systems, Inc.
  */
 
 #ifndef	_SYS_TEM_H
@@ -45,7 +46,7 @@ typedef	struct __tem_vt_state *tem_vt_state_t;
 
 boolean_t tem_initialized(tem_vt_state_t);
 
-tem_vt_state_t tem_init(cred_t *, queue_t *);
+tem_vt_state_t tem_init(cred_t *);
 
 void	tem_destroy(tem_vt_state_t, cred_t *);
 
@@ -66,6 +67,10 @@ void	tem_switch(tem_vt_state_t, tem_vt_state_t, cred_t *);
 uchar_t	tem_get_fbmode(tem_vt_state_t);
 
 void	tem_set_fbmode(tem_vt_state_t, uchar_t, cred_t *);
+
+void	tem_clean(tem_vt_state_t);
+
+void	tem_init_q(tem_vt_state_t, queue_t *);
 
 #endif /* _KERNEL */
 
