@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -48,7 +49,7 @@
 
 /* clobbers %rdx, %rcx, returns addr in %rax, CPU ID in %rbx */
 #define	GET_CPUSAVE_ADDR \
-	movzbq	%gs:CPU_ID, %rbx;		\
+	movl	%gs:CPU_ID, %ebx;		\
 	movq	%rbx, %rax;			\
 	movq	$KRS_SIZE, %rcx;		\
 	mulq	%rcx;				\
