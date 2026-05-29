@@ -31,6 +31,7 @@ extern "C" {
 #endif
 
 #include <tzfile.h>
+#include <stdio_tag.h>
 #include <sys/types.h>
 #include <nfs/nfs_log.h>
 #include "../lib/nfslog_config.h"
@@ -78,7 +79,7 @@ struct nfsl_prog_disp {
 
 struct nfsl_log_file {
 	char	*path;		/* pathname of file */
-	FILE	*fp;		/* file pointer */
+	__FILE	*fp;		/* file pointer */
 	char	*buf;		/* buffer where output queued before print */
 	int	bufoffset;	/* current offset in (memory) buffer */
 	struct nfsl_log_file	*next;	/* next file in list */

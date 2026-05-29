@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>

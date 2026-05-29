@@ -46,6 +46,7 @@
 #include <string.h>
 #include <netinet/tcp.h>
 #include <malloc.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include "nfs_tbind.h"
 #include <nfs/nfs.h>

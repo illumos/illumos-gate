@@ -32,6 +32,7 @@
 #endif /* RPC_XDR */
 
 #if RPC_HDR
+%#include <stdio_tag.h>
 %#ifndef _DB_VERS_H
 %#define _DB_VERS_H
 #endif /* RPC_HDR */
@@ -94,7 +95,7 @@ struct vers {
 %  bool_t earlier_than( vers *other );
 %
 %/* Print the value of this 'vers' to specified file. */
-%  void print( FILE *file );
+%  void print( __FILE *file );
 %
 %/* Zero out this vers. */
 %  void zero();

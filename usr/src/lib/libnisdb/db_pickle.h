@@ -29,6 +29,7 @@
 #ifndef PICKLE_H
 #define	PICKLE_H
 
+#include <stdio_tag.h>
 #include "nisdb_rw.h"
 
 /*
@@ -47,7 +48,7 @@ typedef void* pptr;		/* pickle pointer */
 
 class pickle_file {
     protected:
-	FILE *file;		/* file handle */
+	__FILE *file;		/* file handle */
 	pickle_mode mode;
 	XDR xdr;
 	char *filename;

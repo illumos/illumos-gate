@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  */
 
+#include <stdio.h>
 #include <strings.h>
 #include <rpc/rpc.h>
 #include <stdlib.h>

@@ -38,6 +38,7 @@
 #include <sys/kstat.h>
 #include <sys/time.h>
 #include <door.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>

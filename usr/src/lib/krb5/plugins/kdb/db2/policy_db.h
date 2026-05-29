@@ -12,6 +12,7 @@
 #define __ADB_H__
 
 #include <sys/types.h>
+#include <stdio_tag.h>
 #include <errno.h>
 #include <krb5.h>
 #include <kdb.h>
@@ -50,7 +51,7 @@ typedef	long		osa_adb_ret_t;
 
 
 typedef struct _osa_adb_db_lock_ent_t {
-     FILE     *lockfile;
+     __FILE     *lockfile;
      char     *filename;
      int      refcnt, lockmode, lockcnt;
      krb5_context context;

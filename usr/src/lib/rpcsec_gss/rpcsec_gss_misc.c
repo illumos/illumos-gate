@@ -32,6 +32,7 @@
  * 1.10 1994/10/27 12:39:23 jik Exp $
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <gssapi/gssapi.h>
 #include <rpc/rpc.h>

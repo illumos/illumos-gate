@@ -26,6 +26,7 @@
  *	All Rights Reserved.
  */
 
+#include <stdio.h>
 #include <string.h>
 #include "db_headers.h"
 #include "db_scheme.h"

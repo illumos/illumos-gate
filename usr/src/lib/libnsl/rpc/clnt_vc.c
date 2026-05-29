@@ -64,6 +64,7 @@
 #include <sys/mkdev.h>
 #include <sys/poll.h>
 #include <syslog.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <netinet/tcp.h>
