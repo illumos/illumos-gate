@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -165,9 +165,16 @@
  * logically do the following:
  *
  *  o Remove the dip from the list of ksensor dips and set the flag that
- *    indicates that it's been removed.
+ *    indicates that it's been removed. Once we get this callback we must no
+ *    longer trust the actual dip that is present in it. We leave ksdip_dip set
+ *    to its old address for debugging purposes.
  *  o Remove all of the sensors from the global avl to make sure that new
  *    threads cannot look it up.
+ *  o Add the dip to list of dead ksensor dips so that way any sensors that
+ *    remain on it can be denotified if we end up in a race condition and the
+ *    registered ksensor is removed prior to us cleaning it up. If we did not do
+ *    this, the minor node would outlast the ksensor_t, which is not our intent.
+ *    The ksensor_t should always outlive the minor.
  *
  * Then, after the taskq is dispatched, we do the following in taskq context:
  *
@@ -317,6 +324,7 @@ typedef struct {
 static kmutex_t ksensor_g_mutex;
 static id_space_t *ksensor_ids;
 static list_t ksensor_dips;
+static list_t ksensor_dead_dips;
 static avl_tree_t ksensor_avl;
 static dev_info_t *ksensor_cb_dip;
 static ksensor_create_f ksensor_cb_create;
@@ -385,6 +393,18 @@ ksensor_free_dip(ksensor_dip_t *ksdip)
 }
 
 static void
+ksensor_denotify(ksensor_t *sensor)
+{
+	mutex_enter(&sensor->ksensor_mutex);
+	if ((sensor->ksensor_flags & KSENSOR_F_NOTIFIED) != 0) {
+		VERIFY3P(ksensor_cb_remove, !=, NULL);
+		ksensor_cb_remove(sensor->ksensor_id, sensor->ksensor_name);
+		sensor->ksensor_flags &= ~KSENSOR_F_NOTIFIED;
+	}
+	mutex_exit(&sensor->ksensor_mutex);
+}
+
+static void
 ksensor_dip_unbind_taskq(void *arg)
 {
 	ksensor_dip_t *k = arg;
@@ -392,19 +412,15 @@ ksensor_dip_unbind_taskq(void *arg)
 
 	/*
 	 * First notify an attached driver that the nodes are going away
-	 * before we block and wait on them.
+	 * before we block and wait on them. Now that this is done, it's safe to
+	 * remove it from the dead list.
 	 */
 	mutex_enter(&ksensor_g_mutex);
 	for (sensor = list_head(&k->ksdip_sensors); sensor != NULL;
 	    sensor = list_next(&k->ksdip_sensors, sensor)) {
-		mutex_enter(&sensor->ksensor_mutex);
-		if (sensor->ksensor_flags & KSENSOR_F_NOTIFIED) {
-			ksensor_cb_remove(sensor->ksensor_id,
-			    sensor->ksensor_name);
-			sensor->ksensor_flags &= ~KSENSOR_F_NOTIFIED;
-		}
-		mutex_exit(&sensor->ksensor_mutex);
+		ksensor_denotify(sensor);
 	}
+	list_remove(&ksensor_dead_dips, k);
 	mutex_exit(&ksensor_g_mutex);
 
 	/*
@@ -437,6 +453,7 @@ ksensor_dip_unbind_cb(void *arg, dev_info_t *dip)
 	 */
 	mutex_enter(&ksensor_g_mutex);
 	list_remove(&ksensor_dips, k);
+	list_insert_head(&ksensor_dead_dips, k);
 	k->ksdip_flags |= KSENSOR_DIP_F_REMOVED;
 	for (sensor = list_head(&k->ksdip_sensors); sensor != NULL;
 	    sensor = list_next(&k->ksdip_sensors, sensor)) {
@@ -780,18 +797,22 @@ ksensor_op_scalar(id_t id, sensor_ioctl_scalar_t *scalar)
 void
 ksensor_unregister(dev_info_t *reg_dip)
 {
-	ksensor_t *sensor;
-
 	mutex_enter(&ksensor_g_mutex);
 	if (ksensor_cb_dip != reg_dip) {
 		dev_err(reg_dip, CE_PANIC, "asked to unregister illegal dip");
 	}
 
-	for (sensor = avl_first(&ksensor_avl); sensor != NULL; sensor =
-	    AVL_NEXT(&ksensor_avl, sensor)) {
-		mutex_enter(&sensor->ksensor_mutex);
-		sensor->ksensor_flags &= ~KSENSOR_F_NOTIFIED;
-		mutex_exit(&sensor->ksensor_mutex);
+	for (ksensor_t *sensor = avl_first(&ksensor_avl); sensor != NULL;
+	    sensor = AVL_NEXT(&ksensor_avl, sensor)) {
+		ksensor_denotify(sensor);
+	}
+
+	for (ksensor_dip_t *k = list_head(&ksensor_dead_dips); k != NULL;
+	    k = list_next(&ksensor_dead_dips, k)) {
+		for (ksensor_t *sensor = list_head(&k->ksdip_sensors); sensor !=
+		    NULL; sensor = list_next(&k->ksdip_sensors, sensor)) {
+			ksensor_denotify(sensor);
+		}
 	}
 
 	ksensor_cb_dip = NULL;
@@ -805,6 +826,12 @@ ksensor_register(dev_info_t *reg_dip, ksensor_create_f create,
     ksensor_remove_f remove)
 {
 	ksensor_t *sensor;
+
+	if (create == NULL || remove == NULL) {
+		dev_err(reg_dip, CE_WARN, "kernel sensor registration "
+		    "requires both a create and removal callback");
+		return (EINVAL);
+	}
 
 	mutex_enter(&ksensor_g_mutex);
 	if (ksensor_cb_dip != NULL) {
@@ -862,6 +889,8 @@ ksensor_init(void)
 {
 	mutex_init(&ksensor_g_mutex, NULL, MUTEX_DRIVER, NULL);
 	list_create(&ksensor_dips, sizeof (ksensor_dip_t),
+	    offsetof(ksensor_dip_t, ksdip_link));
+	list_create(&ksensor_dead_dips, sizeof (ksensor_dip_t),
 	    offsetof(ksensor_dip_t, ksdip_link));
 	ksensor_ids = id_space_create("ksensor", 1, L_MAXMIN32);
 	avl_create(&ksensor_avl, ksensor_avl_compare, sizeof (ksensor_t),
