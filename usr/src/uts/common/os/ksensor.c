@@ -546,8 +546,8 @@ ksensor_create(dev_info_t *dip, const ksensor_ops_t *ops, void *arg,
 
 	sensor->ksensor_flags |= KSENSOR_F_VALID;
 
-	if (ksensor_cb_create != NULL) {
-
+	if ((sensor->ksensor_flags & KSENSOR_F_NOTIFIED) == 0 &&
+	    ksensor_cb_create != NULL)  {
 		if (ksensor_cb_create(sensor->ksensor_id, sensor->ksensor_class,
 		    sensor->ksensor_name) == 0) {
 			sensor->ksensor_flags |= KSENSOR_F_NOTIFIED;
