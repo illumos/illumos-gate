@@ -186,37 +186,57 @@
  * Accessing a Sensor
  * ------------------
  *
- * Access to a particular sensor is serialized in the system. In addition to
- * that, a number of steps are required to access one that is not unlike
- * accessing a character device. When a given sensor is held the KSENSOR_F_BUSY
- * flag is set in the ksensor_flags member. In addition, as part of taking a
- * hold a number of side effects occur that ensure that the sensor provider's
- * dev_info_t is considered busy and can't be detached.
+ * Sensors are intended to be accessed through the traditional character
+ * operations: open(9E), close(9E), and ioctl(9E). Providers assume that only a
+ * single callback for a given sensor will be called at once. For example, if
+ * two threads have the same temperature sensor and are both issuing an ioctl
+ * for the current temperature, the provider will only get one call at a time.
+ * However, providers with multiple sensors cannot assume any relationship
+ * between their sensors.
  *
- * To obtain a hold on a sensor the following logical steps are required (see
- * ksensor_hold_by_id() for the implementation):
+ * Because we may have to reattach a driver to access a sensor, the broader
+ * access logic is split into two different parts:
  *
- *  1. Map the minor to the ksensor_t via the avl tree
- *  2. Check that the ksensor's dip is valid
- *  3. If the sensor is busy, wait until it is no longer so, and restart from
- *     the top. Otherwise, mark the sensor as busy.
- *  4. Enter the parent and place a hold on the sensor provider's dip.
- *  5. Once again check if the dip is removed or not because we have to drop
- *     locks during that operation.
- *  6. Check if the ksensor has the valid flag set. If not, attempt to configure
- *     the dip.
- *  7. Assuming the sensor is now valid, we can return it.
+ * 1. Calling open(9E) and therefore ksensor_op_open() is the main thing that
+ *    causes us to go through and verify that the sensor is still valid and that
+ *    the provider is attached. Between an open() and close() there will always
+ *    be a hold on the driver, just like happens normally for a character device
+ *    driver.
  *
- * After this point, the sensor is considered valid for use. Once the consumer
- * is finished with the sensor, it should be released by calling
- * ksensor_release().
+ *    Only one caller to open(9E) of a particular sensor is allowed to be doing
+ *    this at a time. This is managed by the KSENSOR_F_META_WORK flag. To obtain
+ *    a hold on a sensor, the following logical steps are required. See
+ *    ksensor_op_open() for the implementation:
  *
- * An important aspect of the above scheme is that the KSENSOR_F_BUSY flag is
- * required to progress through the validation and holding of the device. This
- * makes sure that only one thread is attempting to attach it at a given time. A
- * reasonable future optimization would be to amortize this cost in open(9E)
- * and close(9E) of the minor and to bump a count as it being referenced as long
- * as it is open.
+ *    1. Map the minor to the ksensor_t via the avl tree.
+ *    2. Check that the ksensor's dip is valid.
+ *    3. If the sensor is already performing meta work, wait until it is no
+ *       longer so, and restart from the top. Otherwise, mark that it is now
+ *       doing so.
+ *    4. Enter the parent and place a hold on the sensor provider's dip.
+ *    5. Once again check if the dip is removed or not because we have to drop
+ *       locks during that operation.
+ *    6. Check if the ksensor has the valid flag set. If not, attempt to
+ *       configure the dip.
+ *    7. Assuming the sensor is now valid, the sensor is now usable.
+ *
+ *    When subsequent open(9E) calls are made and they see that both the
+ *    KSENSOR_F_VALID and KSENSOR_F_HELD flags are set, then all of this can be
+ *    bypassed.
+ *
+ *    The KSENSOR_F_HELD flag will remain until someone calls close(9E) occurs.
+ *    This will cause KSENSOR_F_HELD to be removed and remove the NDI hold on
+ *    the underlying provider. Only at this point will any other detach activity
+ *    on the provider be allowed to continue.
+ *
+ * 2. When the other operations are called, e.g. ksensor_op_kind() and
+ *    ksensor_op_scalar(), then we provide the actual per-operation
+ *    serialization. Because the ksensor has been opened, we don't have to worry
+ *    about the complex dance we did in step (1). Effectively we manage this
+ *    with a flag, KSENSOR_F_OP, and a cv, ksensor_op_cv. The use of the flag
+ *    and cv allows a user to interrupt the operation with a signal if required.
+ *    The general logic for this is taken care of by ksensor_op_acquire() and
+ *    ksensor_op_release().
  *
  * -----------------------------
  * Character Device Registration
@@ -286,15 +306,29 @@ typedef enum {
 	 */
 	KSENSOR_F_VALID		= 1 << 1,
 	/*
-	 * Indicates that a client has a hold on the sensor for some purpose.
-	 * This must be set before trying to get an NDI hold. Once this is set
-	 * and a NDI hold is in place, it is safe to use the operations vector
-	 * and argument.
+	 * This flag is used to synchronize the act of holding and/or
+	 * potentially attaching a given sensor. There can only be one of these
+	 * active at a time for a sensor. While multiple sensor can share the
+	 * same underlying ksensor_dip_t which is what we try to attach, it's
+	 * ultimately simpler for us to track this and the hold on a per-sensor
+	 * basis.
 	 */
-	KSENSOR_F_BUSY		= 1 << 2,
+	KSENSOR_F_META_WORK	= 1 << 2,
+	/*
+	 * Indicates that an NDI hold is present on the dip from this sensor.
+	 */
+	KSENSOR_F_HELD		= 1 << 3,
+	/*
+	 * Indicates that an active op is going on.
+	 */
+	KSENSOR_F_OP		= 1 << 4
 } ksensor_flags_t;
 
 typedef enum {
+	/*
+	 * Indicates that the dip this references has been removed from the
+	 * system and we have been notified through its unbind callback.
+	 */
 	KSENSOR_DIP_F_REMOVED	= 1 << 0
 } ksensor_dip_flags_t;
 
@@ -308,7 +342,9 @@ typedef struct {
 
 typedef struct {
 	kmutex_t ksensor_mutex;
-	kcondvar_t ksensor_cv;
+	kcondvar_t ksensor_meta_cv;
+	kcondvar_t ksensor_op_cv;
+	uintptr_t ksensor_op_thr;
 	ksensor_flags_t ksensor_flags;
 	list_node_t ksensor_dip_list;
 	avl_node_t ksensor_id_avl;
@@ -381,6 +417,8 @@ ksensor_free_sensor(ksensor_t *sensor)
 	strfree(sensor->ksensor_name);
 	strfree(sensor->ksensor_class);
 	id_free(ksensor_ids, sensor->ksensor_id);
+	cv_destroy(&sensor->ksensor_op_cv);
+	cv_destroy(&sensor->ksensor_meta_cv);
 	mutex_destroy(&sensor->ksensor_mutex);
 	kmem_free(sensor, sizeof (ksensor_t));
 }
@@ -429,9 +467,10 @@ ksensor_dip_unbind_taskq(void *arg)
 	 */
 	while ((sensor = list_remove_head(&k->ksdip_sensors)) != NULL) {
 		mutex_enter(&sensor->ksensor_mutex);
-		while ((sensor->ksensor_flags & KSENSOR_F_BUSY) != 0 ||
+		while ((sensor->ksensor_flags & KSENSOR_F_META_WORK) != 0 ||
 		    sensor->ksensor_nwaiters > 0) {
-			cv_wait(&sensor->ksensor_cv, &sensor->ksensor_mutex);
+			cv_wait(&sensor->ksensor_meta_cv,
+			    &sensor->ksensor_mutex);
 		}
 		mutex_exit(&sensor->ksensor_mutex);
 		ksensor_free_sensor(sensor);
@@ -534,6 +573,9 @@ ksensor_create(dev_info_t *dip, const ksensor_ops_t *ops, void *arg,
 		sensor->ksensor_arg = arg;
 	} else {
 		sensor = kmem_zalloc(sizeof (ksensor_t), KM_SLEEP);
+		mutex_init(&sensor->ksensor_mutex, NULL, MUTEX_DRIVER, NULL);
+		cv_init(&sensor->ksensor_meta_cv, NULL, CV_DRIVER, NULL);
+		cv_init(&sensor->ksensor_op_cv, NULL, CV_DRIVER, NULL);
 		sensor->ksensor_ksdip = ksdip;
 		sensor->ksensor_name = ddi_strdup(name, KM_SLEEP);
 		sensor->ksensor_class = ddi_strdup(class, KM_SLEEP);
@@ -653,6 +695,16 @@ ksensor_remove(dev_info_t *dip, id_t id)
 }
 
 static void
+ksensor_release_meta(ksensor_t *sensor)
+{
+	mutex_enter(&sensor->ksensor_mutex);
+	VERIFY(sensor->ksensor_flags & KSENSOR_F_META_WORK);
+	sensor->ksensor_flags &= ~KSENSOR_F_META_WORK;
+	cv_broadcast(&sensor->ksensor_meta_cv);
+	mutex_exit(&sensor->ksensor_mutex);
+}
+
+static void
 ksensor_release(ksensor_t *sensor)
 {
 	dev_info_t *pdip;
@@ -660,49 +712,75 @@ ksensor_release(ksensor_t *sensor)
 	ddi_release_devi(sensor->ksensor_ksdip->ksdip_dip);
 
 	mutex_enter(&sensor->ksensor_mutex);
-	sensor->ksensor_flags &= ~KSENSOR_F_BUSY;
-	cv_broadcast(&sensor->ksensor_cv);
+	VERIFY(sensor->ksensor_flags & KSENSOR_F_HELD);
+	sensor->ksensor_flags &= ~KSENSOR_F_HELD;
 	mutex_exit(&sensor->ksensor_mutex);
 }
 
-static int
-ksensor_hold_by_id(id_t id, ksensor_t **outp)
+int
+ksensor_op_open(id_t id)
 {
-	ksensor_t *sensor;
-	dev_info_t *pdip;
-
 restart:
 	mutex_enter(&ksensor_g_mutex);
-	sensor = ksensor_find_by_id(id);
+	ksensor_t *sensor = ksensor_find_by_id(id);
+
+	/*
+	 * If this ID doesn't exist or the dip has been removed on this, then
+	 * this there is nothing else we can do.
+	 */
 	if (sensor == NULL) {
 		mutex_exit(&ksensor_g_mutex);
-		*outp = NULL;
 		return (ESTALE);
 	}
 
 	if ((sensor->ksensor_ksdip->ksdip_flags & KSENSOR_DIP_F_REMOVED) != 0) {
 		mutex_exit(&ksensor_g_mutex);
-		*outp = NULL;
 		return (ESTALE);
 	}
 
+	/*
+	 * If the ksensor is considered valid and there's an existing hold on
+	 * it, then that means this ksensor is guaranteeing that its dip will
+	 * not disappear. We don't need to track the reference count on this
+	 * minor as the kernel is kindly going that for us.
+	 */
 	mutex_enter(&sensor->ksensor_mutex);
-	if ((sensor->ksensor_flags & KSENSOR_F_BUSY) != 0) {
+	if ((sensor->ksensor_flags & (KSENSOR_F_VALID | KSENSOR_F_HELD)) ==
+	    (KSENSOR_F_VALID | KSENSOR_F_HELD)) {
+		mutex_exit(&sensor->ksensor_mutex);
+		mutex_exit(&ksensor_g_mutex);
+		return (0);
+	}
+
+	/*
+	 * At this point, the ksensor is either not valid or not held. While the
+	 * kernel guarantees open(9E) and close(9E) exclusion, it does not
+	 * guarantee that only one open(9E) is going on at a time. We need to
+	 * ensure that only one entity is acting on the ksensor at any given
+	 * time. Note, while doing this we drop all the locks. If we have to do
+	 * this, then we will end up restarting the entire loop due to dropping
+	 * the global lock.
+	 */
+	if ((sensor->ksensor_flags & KSENSOR_F_META_WORK) != 0) {
 		mutex_exit(&ksensor_g_mutex);
 		sensor->ksensor_nwaiters++;
-		while ((sensor->ksensor_flags & KSENSOR_F_BUSY) != 0) {
-			int cv = cv_wait_sig(&sensor->ksensor_cv,
+		while ((sensor->ksensor_flags & KSENSOR_F_META_WORK) != 0) {
+			int cv = cv_wait_sig(&sensor->ksensor_meta_cv,
 			    &sensor->ksensor_mutex);
 			if (cv == 0) {
 				sensor->ksensor_nwaiters--;
-				cv_broadcast(&sensor->ksensor_cv);
+				cv_broadcast(&sensor->ksensor_meta_cv);
 				mutex_exit(&sensor->ksensor_mutex);
-				*outp = NULL;
 				return (EINTR);
 			}
 		}
+
+		/*
+		 * We're not longer waiting; however, because we dropped the
+		 * global mutex we have to start over at the top.
+		 */
 		sensor->ksensor_nwaiters--;
-		cv_broadcast(&sensor->ksensor_cv);
+		cv_broadcast(&sensor->ksensor_meta_cv);
 		mutex_exit(&sensor->ksensor_mutex);
 		goto restart;
 	}
@@ -711,8 +789,8 @@ restart:
 	 * We have obtained ownership of the sensor. At this point, we should
 	 * check to see if it's valid or not.
 	 */
-	sensor->ksensor_flags |= KSENSOR_F_BUSY;
-	pdip = ddi_get_parent(sensor->ksensor_ksdip->ksdip_dip);
+	sensor->ksensor_flags |= KSENSOR_F_META_WORK;
+	dev_info_t *pdip = ddi_get_parent(sensor->ksensor_ksdip->ksdip_dip);
 	mutex_exit(&sensor->ksensor_mutex);
 	mutex_exit(&ksensor_g_mutex);
 
@@ -725,16 +803,25 @@ restart:
 
 	/*
 	 * Now that we have an NDI hold, check if it's valid or not. It may have
-	 * become invalid while we were waiting due to a race.
+	 * become invalid while we were waiting due to a race. We must set the
+	 * flag indicating that we have a hold on it. This is what allows us to
+	 * use ksensor_release().
 	 */
 	mutex_enter(&ksensor_g_mutex);
+	mutex_enter(&sensor->ksensor_mutex);
+	sensor->ksensor_flags |= KSENSOR_F_HELD;
 	if ((sensor->ksensor_ksdip->ksdip_flags & KSENSOR_DIP_F_REMOVED) != 0) {
 		mutex_exit(&ksensor_g_mutex);
 		ksensor_release(sensor);
+		ksensor_release_meta(sensor);
 		return (ESTALE);
 	}
 
-	mutex_enter(&sensor->ksensor_mutex);
+	/*
+	 * This sensor isn't valid. Try to prod it via the NDI to see if it
+	 * should be. This needs to happen if an instance gets detached for
+	 * example.
+	 */
 	if ((sensor->ksensor_flags & KSENSOR_F_VALID) == 0) {
 		mutex_exit(&sensor->ksensor_mutex);
 		mutex_exit(&ksensor_g_mutex);
@@ -752,28 +839,105 @@ restart:
 			mutex_exit(&sensor->ksensor_mutex);
 			mutex_exit(&ksensor_g_mutex);
 			ksensor_release(sensor);
+			ksensor_release_meta(sensor);
 			return (ESTALE);
 		}
 	}
+
+	VERIFY(sensor->ksensor_flags & KSENSOR_F_META_WORK);
+	VERIFY(sensor->ksensor_flags & KSENSOR_F_HELD);
+	VERIFY(sensor->ksensor_flags & KSENSOR_F_VALID);
+
 	mutex_exit(&sensor->ksensor_mutex);
 	mutex_exit(&ksensor_g_mutex);
-	*outp = sensor;
+	ksensor_release_meta(sensor);
 
 	return (0);
 }
 
 int
-ksensor_op_kind(id_t id, sensor_ioctl_kind_t *kind)
+ksensor_op_close(id_t id)
 {
-	int ret;
-	ksensor_t *sensor;
-
-	if ((ret = ksensor_hold_by_id(id, &sensor)) != 0) {
-		return (ret);
+	mutex_enter(&ksensor_g_mutex);
+	ksensor_t *sensor = ksensor_find_by_id(id);
+	if (sensor == NULL) {
+		mutex_exit(&ksensor_g_mutex);
+		return (ENOENT);
 	}
 
-	ret = sensor->ksensor_ops->kso_kind(sensor->ksensor_arg, kind);
+	mutex_enter(&sensor->ksensor_mutex);
+	VERIFY(sensor->ksensor_flags & KSENSOR_F_VALID);
+	VERIFY(sensor->ksensor_flags & KSENSOR_F_HELD);
+	VERIFY0(sensor->ksensor_flags & KSENSOR_F_META_WORK);
+
+	/*
+	 * The system guarantees that open(9E) and close(9E) will not happen at
+	 * the same time, so it's safe for us to drop these and know that we
+	 * can't get another open until we return.
+	 */
+	mutex_exit(&sensor->ksensor_mutex);
+	mutex_exit(&ksensor_g_mutex);
+
 	ksensor_release(sensor);
+	return (0);
+}
+
+/*
+ * Obtain a ksensor that should already have been held by a call to
+ * ksensor_op_open().
+ */
+static ksensor_t *
+ksensor_op_acquire(id_t id)
+{
+	mutex_enter(&ksensor_g_mutex);
+	ksensor_t *sensor = ksensor_find_by_id(id);
+	VERIFY3P(sensor, !=, NULL);
+	mutex_enter(&sensor->ksensor_mutex);
+	mutex_exit(&ksensor_g_mutex);
+	VERIFY(sensor->ksensor_flags & KSENSOR_F_VALID);
+	VERIFY(sensor->ksensor_flags & KSENSOR_F_HELD);
+
+	/*
+	 * Serialize access to the ksensor for operations. Providers expect to
+	 * only have a single operation called at once per sensor.
+	 */
+	while ((sensor->ksensor_flags & KSENSOR_F_OP) != 0) {
+		int cv = cv_wait_sig(&sensor->ksensor_op_cv,
+		    &sensor->ksensor_mutex);
+		if (cv == 0) {
+			mutex_exit(&sensor->ksensor_mutex);
+			return (NULL);
+		}
+	}
+	sensor->ksensor_flags |= KSENSOR_F_OP;
+	sensor->ksensor_op_thr = (uintptr_t)curthread;
+	mutex_exit(&sensor->ksensor_mutex);
+
+	return (sensor);
+}
+
+static void
+ksensor_op_release(ksensor_t *sensor)
+{
+	mutex_enter(&sensor->ksensor_mutex);
+	VERIFY3U(sensor->ksensor_op_thr, ==, curthread);
+	VERIFY(sensor->ksensor_flags & KSENSOR_F_OP);
+	sensor->ksensor_flags &= ~KSENSOR_F_OP;
+	sensor->ksensor_op_thr = 0;
+	cv_signal(&sensor->ksensor_op_cv);
+	mutex_exit(&sensor->ksensor_mutex);
+}
+
+int
+ksensor_op_kind(id_t id, sensor_ioctl_kind_t *kind)
+{
+	ksensor_t *sensor = ksensor_op_acquire(id);
+	if (sensor == NULL) {
+		return (EINTR);
+	}
+
+	int ret = sensor->ksensor_ops->kso_kind(sensor->ksensor_arg, kind);
+	ksensor_op_release(sensor);
 
 	return (ret);
 }
@@ -781,15 +945,13 @@ ksensor_op_kind(id_t id, sensor_ioctl_kind_t *kind)
 int
 ksensor_op_scalar(id_t id, sensor_ioctl_scalar_t *scalar)
 {
-	int ret;
-	ksensor_t *sensor;
-
-	if ((ret = ksensor_hold_by_id(id, &sensor)) != 0) {
-		return (ret);
+	ksensor_t *sensor = ksensor_op_acquire(id);
+	if (sensor == NULL) {
+		return (EINTR);
 	}
 
-	ret = sensor->ksensor_ops->kso_scalar(sensor->ksensor_arg, scalar);
-	ksensor_release(sensor);
+	int ret = sensor->ksensor_ops->kso_scalar(sensor->ksensor_arg, scalar);
+	ksensor_op_release(sensor);
 
 	return (ret);
 }

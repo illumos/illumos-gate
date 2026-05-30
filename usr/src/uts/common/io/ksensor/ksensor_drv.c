@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -69,7 +69,7 @@ ksensor_open(dev_t *devp, int flags, int otype, cred_t *credp)
 		return (EINVAL);
 	}
 
-	return (0);
+	return (ksensor_op_open((id_t)getminor(*devp)));
 }
 
 static int
@@ -130,7 +130,11 @@ ksensor_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 static int
 ksensor_close(dev_t dev, int flags, int otype, cred_t *credp)
 {
-	return (0);
+	if (otype != OTYP_CHR) {
+		return (EINVAL);
+	}
+
+	return (ksensor_op_close((id_t)getminor(dev)));
 }
 
 static int

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SYS_KSENSOR_IMPL_H
@@ -34,8 +34,10 @@ extern void ksensor_init(void);
 /*
  * Operations vectors.
  */
+extern int ksensor_op_open(id_t);
 extern int ksensor_op_kind(id_t, sensor_ioctl_kind_t *);
 extern int ksensor_op_scalar(id_t, sensor_ioctl_scalar_t *);
+extern int ksensor_op_close(id_t);
 
 /*
  * Registration callbacks.
