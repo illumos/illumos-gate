@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019, Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -91,4 +91,31 @@ sensor_link(di_minor_t minor, di_node_t node)
 static devfsadm_create_t sensor_create_cbt[] = {
 	{ NULL, "ddi_sensor", NULL, TYPE_PARTIAL, ILEVEL_0, sensor_link }
 };
+
+/*
+ * Sensor drivers use a few level of classes. The removal logic in devfsadm
+ * looks for the various '/' characters to know how to recurse through the tree.
+ * We declare a few levels of these to cover the various cases that should
+ * exist. This includes trying to acount for things like:
+ *
+ *   - /dev/sensors/temperature/cpu/<sensor>
+ *   - /dev/sensors/test/<sensor>
+ *   - /dev/sensors/(pci|i2c)/<device>/<sensor>
+ *
+ * We add extra levels here mostly as insurance for future development.
+ */
+static devfsadm_remove_t sensor_remove_cbt[] = {
+	{ "ddi_sensor", "^sensors/.+$", RM_POST | RM_HOT | RM_ALWAYS,
+	    ILEVEL_0, devfsadm_rm_all },
+	{ "ddi_sensor", "^sensors/.+/.+$", RM_POST | RM_HOT | RM_ALWAYS,
+	    ILEVEL_0, devfsadm_rm_all },
+	{ "ddi_sensor", "^sensors/.+/.+/.+$", RM_POST | RM_HOT | RM_ALWAYS,
+	    ILEVEL_0, devfsadm_rm_all },
+	{ "ddi_sensor", "^sensors/.+/.+/.+/.+$", RM_POST | RM_HOT | RM_ALWAYS,
+	    ILEVEL_0, devfsadm_rm_all },
+	{ "ddi_sensor", "^sensors/.+/.+/.+/.+/.+$", RM_POST | RM_HOT |
+	    RM_ALWAYS, ILEVEL_0, devfsadm_rm_all },
+};
+
 DEVFSADM_CREATE_INIT_V0(sensor_create_cbt);
+DEVFSADM_REMOVE_INIT_V0(sensor_remove_cbt);
