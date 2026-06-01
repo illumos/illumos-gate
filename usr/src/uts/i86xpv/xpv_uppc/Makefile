@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2026 Shardul Bankar
 #
 #	This makefile drives the production of the xpv_uppc mach
 #	kernel module.
@@ -63,7 +64,6 @@ DEBUG_DEFS	+= $(DEBUG_FLGS)
 CERRWARN	+= -_gcc=-Wno-unused-function
 
 # needs work
-$(OBJS_DIR)/psm_common.o := SMOFF += deref_check
 
 #
 #

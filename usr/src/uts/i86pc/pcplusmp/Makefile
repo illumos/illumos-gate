@@ -26,6 +26,7 @@
 #
 # Copyright (c) 2019, Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 Shardul Bankar
 #
 
 #
@@ -67,7 +68,6 @@ $(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)
 LDFLAGS		+= -N misc/acpica
 
 # needs work
-$(OBJS_DIR)/psm_common.o := SMOFF += deref_check
 
 #
 #	Default build targets.

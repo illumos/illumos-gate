@@ -24,6 +24,7 @@
 # Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2019, Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 Shardul Bankar
 #
 #	This makefile drives the production of the apix "mach"
 #	kernel module.
@@ -63,7 +64,6 @@ $(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)
 LDFLAGS		+= -N misc/acpica
 
 # needs work
-$(OBJS_DIR)/psm_common.o := SMOFF += deref_check
 
 #
 #	Default build targets.

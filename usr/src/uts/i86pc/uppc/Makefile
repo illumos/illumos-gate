@@ -25,6 +25,7 @@
 #
 # Copyright (c) 2018, Joyent, Inc.
 # Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 Shardul Bankar
 #
 #	This makefile drives the production of the uppc mach
 #	kernel module.
@@ -63,7 +64,6 @@ DEBUG_FLGS	=
 DEBUG_DEFS	+= $(DEBUG_FLGS)
 
 # needs work
-$(OBJS_DIR)/psm_common.o := SMOFF += deref_check
 
 #
 # Depends on ACPI CA interpreter
