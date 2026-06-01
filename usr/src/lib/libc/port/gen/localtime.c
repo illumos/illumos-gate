@@ -115,7 +115,14 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <stdbool.h>
+#include <sys/debug.h>
 #include <tzint.h>
+
+/*
+ * A context's private abbreviation storage must be able to hold any
+ * abbreviation drawn from a zone's character buffer.
+ */
+CTASSERT(TZC_ABBR_MAX >= TZ_MAX_CHARS);
 
 /* JAN_01_1902 cast to (int) - negative number of seconds from 1970 */
 #define	JAN_01_1902		(int)0x8017E880
@@ -1057,7 +1064,15 @@ out:
 static void
 get_zone_default_context(tzinfo_ctx_t *ctx)
 {
-	const char	*newtzname[2];
+	if (lclzonep == NULL) {
+		ctx->tzc_timezone = 0;
+		ctx->tzc_altzone = 0;
+		ctx->tzc_tzname[0] = _tz_gmt;
+		ctx->tzc_tzname[1] = _tz_spaces;
+		ctx->tzc_daylight = 0;
+		ctx->tzc_is_in_dst = 0;
+		return;
+	}
 
 	/* Retrieve suitable defaults for this zone */
 	ctx->tzc_altzone = lclzonep->default_altzone;
@@ -1082,6 +1097,16 @@ get_zone_context(time_t t, tzinfo_ctx_t *ctx)
 	ttinfo_t	*ttisp, *std, *alt;
 
 	/*
+	 * With no zone state loaded there is nothing to search; defer to the
+	 * default context handling, which produces a suitable GMT context for
+	 * a NULL zone.
+	 */
+	if (lclzonep == NULL) {
+		get_zone_default_context(ctx);
+		return;
+	}
+
+	/*
 	 * In general the 'daylight' global is expected to have been set prior
 	 * to a call to get the context. This is potentially overridden if there
 	 * is no timezone pointer. As such, we always set this based on the
@@ -1092,8 +1117,8 @@ get_zone_context(time_t t, tzinfo_ctx_t *ctx)
 	ctx->tzc_tzname[1] = _tz_spaces;
 	ctx->tzc_daylight = daylight;
 
-	/* If state data not loaded or TZ busted, just use GMT */
-	if (lclzonep == NULL || curr_zonerules == ZONERULES_INVALID) {
+	/* If the TZ is invalid, just use GMT */
+	if (curr_zonerules == ZONERULES_INVALID) {
 		ctx->tzc_timezone = 0;
 		ctx->tzc_altzone = 0;
 		ctx->tzc_daylight = 0;
@@ -1223,6 +1248,7 @@ tzinfo_tm_to_ctx(const struct tm *tmp, tzinfo_ctx_t *ctx)
 {
 	long long t;
 	struct tm tm = *tmp;
+	void *defer_free;
 
 	lmutex_lock(&_time_lock);
 
@@ -1262,17 +1288,47 @@ tzinfo_tm_to_ctx(const struct tm *tmp, tzinfo_ctx_t *ctx)
 		t += SECSPERDAY * __yday_to_month[tm.tm_mon];
 
 	/*
+	 * Ensure that the local zone data is current before we use it.
+	 * ltzset_u() checks the reload counter and rebuilds lclzonep if
+	 * necessary; _time_lock must be held until we have finished
+	 * consuming lclzonep below.
+	 *
+	 * The time_t we pass only determines to which time the global zone
+	 * state is refreshed as a side effect and does not affect the
+	 * context we're computing. We pass the current time so that the
+	 * global state stays consistent with an ordinary tzset() rather
+	 * than whatever time we're dealing with here.
+	 */
+	defer_free = ltzset_u(time(NULL));
+
+	/*
 	 * See if this fits in a time_t for this data model. If not, just use
 	 * the zone defaults.
 	 */
-	if (t > LONG_MAX) {
+	if (t > LONG_MAX)
 		get_zone_default_context(ctx);
-		lmutex_unlock(&_time_lock);
-		return;
+	else
+		get_zone_context(t, ctx);
+
+	/*
+	 * The above may have pointed tzc_tzname[] at abbreviations owned by
+	 * lclzonep, whose storage can be freed by a subsequent zone reload.
+	 * Our caller consumes the context without _time_lock held, so copy
+	 * any such names into the context's own storage now, while lclzonep
+	 * is still valid.
+	 */
+	for (uint_t i = 0; i < 2; i++) {
+		const char *nm = ctx->tzc_tzname[i];
+
+		if (nm != _tz_gmt && nm != _tz_spaces) {
+			(void) strlcpy(ctx->tzc_namebuf[i], nm,
+			    sizeof (ctx->tzc_namebuf[i]));
+			ctx->tzc_tzname[i] = ctx->tzc_namebuf[i];
+		}
 	}
 
-	get_zone_context(t, ctx);
 	lmutex_unlock(&_time_lock);
+	free(defer_free);
 }
 
 /*
@@ -2480,6 +2536,15 @@ purge_zone_cache(void)
 
 	/* We'll reload system TZ as well */
 	systemTZ = NULL;
+
+	/*
+	 * lclzonep refers to one of the state_t's we are about to free. Drop
+	 * the reference (and invalidate the zone) before we release the lock
+	 * so that a consumer which acquires _time_lock during the free below
+	 * can't de-reference freed memory.
+	 */
+	lclzonep = NULL;
+	curr_zonerules = ZONERULES_INVALID;
 
 	/*
 	 * Hash table has been cleared, and all elements are detached from

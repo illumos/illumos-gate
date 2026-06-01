@@ -27,11 +27,20 @@ extern "C" {
 #endif
 
 /*
+ * The maximum length, including the terminating NUL, of a single time zone
+ * abbreviation. We carry our own definition here so that consumers of
+ * tzinfo_ctx_t need not pull in <tzfile.h>; localtime.c asserts that the two
+ * agree.
+ */
+#define	TZC_ABBR_MAX	50
+
+/*
  * This represents the global state that is normally associated with calling
  * tzset().
  */
 typedef struct tzinfo_ctx {
 	const char *tzc_tzname[2];
+	char tzc_namebuf[2][TZC_ABBR_MAX];
 	long tzc_timezone;
 	long tzc_altzone;
 	int tzc_daylight;
