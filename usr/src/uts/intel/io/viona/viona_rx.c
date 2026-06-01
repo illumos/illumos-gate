@@ -492,6 +492,7 @@ viona_rx_common(viona_vring_t *ring, mblk_t *mp, boolean_t is_loopback)
 	    (link->l_features & VIRTIO_NET_F_MRG_RXBUF) != 0;
 
 	size_t cnt_accept = 0, size_accept = 0, cnt_drop = 0;
+	boolean_t pushed_frames = B_FALSE;
 
 	while (mp != NULL) {
 		mblk_t *next = mp->b_next;
@@ -716,6 +717,12 @@ viona_rx_common(viona_vring_t *ring, mblk_t *mp, boolean_t is_loopback)
 		}
 
 		/*
+		 * The viona_recv_x functions touch the used/avail rings in all
+		 * cases except ENOSPC.
+		 */
+		pushed_frames = pushed_frames || (err != ENOSPC);
+
+		/*
 		 * The VLAN padding mblk is meant for continual reuse, so
 		 * remove it from the chain to prevent it from being freed.
 		 *
@@ -769,7 +776,15 @@ pad_drop:
 	}
 
 	membar_enter();
-	viona_intr_ring(ring, B_FALSE);
+
+	/*
+	 * We should only notify the guest if we have modified the used/avail
+	 * rings. Some error conditions will have pushed a truncated packet,
+	 * some will have been caught before we vq_popchain.
+	 */
+	if (pushed_frames) {
+		viona_intr_ring(ring, B_FALSE);
+	}
 
 	/* Free successfully received frames */
 	if (mprx != NULL) {
