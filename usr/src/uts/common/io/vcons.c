@@ -344,6 +344,12 @@ vt_open(minor_t minor, queue_t *rq, cred_t *crp)
 	if (pvc == NULL)
 		return (ENXIO);
 
+	/* Re-open (qreopen): already attached, nothing to do. */
+	if (rq->q_ptr != NULL) {
+		ASSERT3P(rq->q_ptr, ==, pvc);
+		return (0);
+	}
+
 	mutex_enter(&vc_lock);
 	mutex_enter(&pvc->vc_state_lock);
 
