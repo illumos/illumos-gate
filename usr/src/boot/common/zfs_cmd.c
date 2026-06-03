@@ -36,7 +36,7 @@
 #include "libzfs.h"
 
 COMMAND_SET(lszfs, "lszfs", "list child datasets of a zfs dataset",
-	    command_lszfs);
+    command_lszfs);
 
 static int
 command_lszfs(int argc, char *argv[])
@@ -59,9 +59,9 @@ command_lszfs(int argc, char *argv[])
 uint64_t
 ldi_get_size(void *priv)
 {
-	int fd = (uintptr_t) priv;
+	int fd = (uintptr_t)priv;
 	uint64_t size;
 
-	ioctl(fd, DIOCGMEDIASIZE, &size);
+	(void) ioctl(fd, DIOCGMEDIASIZE, &size);
 	return (size);
 }

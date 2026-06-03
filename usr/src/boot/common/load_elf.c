@@ -102,7 +102,7 @@ __elfN(load_elf_header)(char *filename, elf_file_t ef)
 		return (errno);
 	ef->firstpage = malloc(PAGE_SIZE);
 	if (ef->firstpage == NULL) {
-		close(ef->fd);
+		(void) close(ef->fd);
 		return (ENOMEM);
 	}
 	bytes_read = read(ef->fd, ef->firstpage, PAGE_SIZE);
@@ -135,7 +135,7 @@ error:
 		ef->firstpage = NULL;
 	}
 	if (ef->fd != -1) {
-		close(ef->fd);
+		(void) close(ef->fd);
 		ef->fd = -1;
 	}
 	return (err);
@@ -296,7 +296,7 @@ out:
 	if (ef.firstpage)
 		free(ef.firstpage);
 	if (ef.fd != -1)
-		close(ef.fd);
+		(void) close(ef.fd);
 	return (err);
 }
 
@@ -449,11 +449,11 @@ __elfN(loadimage)(struct preloaded_file *fp, elf_file_t ef, uint64_t off)
 		if (ef->firstlen > phdr[i].p_offset) {
 			fpcopy = ef->firstlen - phdr[i].p_offset;
 			if (ehdr->e_ident[EI_OSABI] == ELFOSABI_SOLARIS) {
-				archsw.arch_copyin(ef->firstpage +
+				(void) archsw.arch_copyin(ef->firstpage +
 				    phdr[i].p_offset,
 				    phdr[i].p_paddr + off, fpcopy);
 			} else {
-				archsw.arch_copyin(ef->firstpage +
+				(void) archsw.arch_copyin(ef->firstpage +
 				    phdr[i].p_offset,
 				    phdr[i].p_vaddr + off, fpcopy);
 			}
@@ -631,7 +631,7 @@ __elfN(loadimage)(struct preloaded_file *fp, elf_file_t ef, uint64_t off)
 #endif
 
 		size = shdr[i].sh_size;
-		archsw.arch_copyin(&size, lastaddr, sizeof (size));
+		(void) archsw.arch_copyin(&size, lastaddr, sizeof (size));
 		lastaddr += sizeof (size);
 
 #ifdef ELF_VERBOSE
@@ -705,9 +705,11 @@ nosyms:
 	if (dp == NULL)
 		goto out;
 	if (ehdr->e_ident[EI_OSABI] == ELFOSABI_SOLARIS)
-		archsw.arch_copyout(php->p_paddr + off, dp, php->p_filesz);
+		(void) archsw.arch_copyout(php->p_paddr + off, dp,
+		    php->p_filesz);
 	else
-		archsw.arch_copyout(php->p_vaddr + off, dp, php->p_filesz);
+		(void) archsw.arch_copyout(php->p_vaddr + off, dp,
+		    php->p_filesz);
 
 	ef->strsz = 0;
 	for (i = 0; i < ndp; i++) {
@@ -750,8 +752,8 @@ nosyms:
 	if (ef->hashtab == NULL || ef->symtab == NULL ||
 	    ef->strtab == NULL || ef->strsz == 0)
 		goto out;
-	COPYOUT(ef->hashtab, &ef->nbuckets, sizeof (ef->nbuckets));
-	COPYOUT(ef->hashtab + 1, &ef->nchains, sizeof (ef->nchains));
+	(void) COPYOUT(ef->hashtab, &ef->nbuckets, sizeof (ef->nbuckets));
+	(void) COPYOUT(ef->hashtab + 1, &ef->nchains, sizeof (ef->nchains));
 	ef->buckets = ef->hashtab + 2;
 	ef->chains = ef->buckets + ef->nbuckets;
 
@@ -936,7 +938,7 @@ out:
 	if (ef.firstpage != NULL)
 		free(ef.firstpage);
 	if (ef.fd != -1)
-		close(ef.fd);
+		(void) close(ef.fd);
 	return (err);
 }
 
@@ -959,14 +961,14 @@ __elfN(parse_modmetadata)(struct preloaded_file *fp, elf_file_t ef,
 	modcnt = 0;
 	p = p_start;
 	while (p < p_end) {
-		COPYOUT(p, &v, sizeof (v));
+		(void) COPYOUT(p, &v, sizeof (v));
 		error = __elfN(reloc_ptr)(fp, ef, p, &v, sizeof (v));
 		if (error == EOPNOTSUPP)
 			v += ef->off;
 		else if (error != 0)
 			return (error);
 #if (defined(__i386__) || defined(__powerpc__)) && __ELF_WORD_SIZE == 64
-		COPYOUT(v, &md64, sizeof (md64));
+		(void) COPYOUT(v, &md64, sizeof (md64));
 		error = __elfN(reloc_ptr)(fp, ef, v, &md64, sizeof (md64));
 		if (error == EOPNOTSUPP) {
 			md64.md_cval += ef->off;
@@ -978,7 +980,7 @@ __elfN(parse_modmetadata)(struct preloaded_file *fp, elf_file_t ef,
 		md.md_cval = (const char *)(uintptr_t)md64.md_cval;
 		md.md_data = (void *)(uintptr_t)md64.md_data;
 #elif defined(__amd64__) && __ELF_WORD_SIZE == 32
-		COPYOUT(v, &md32, sizeof (md32));
+		(void) COPYOUT(v, &md32, sizeof (md32));
 		error = __elfN(reloc_ptr)(fp, ef, v, &md32, sizeof (md32));
 		if (error == EOPNOTSUPP) {
 			md32.md_cval += ef->off;
@@ -990,7 +992,7 @@ __elfN(parse_modmetadata)(struct preloaded_file *fp, elf_file_t ef,
 		md.md_cval = (const char *)(uintptr_t)md32.md_cval;
 		md.md_data = (void *)(uintptr_t)md32.md_data;
 #else
-		COPYOUT(v, &md, sizeof (md));
+		(void) COPYOUT(v, &md, sizeof (md));
 		error = __elfN(reloc_ptr)(fp, ef, v, &md, sizeof (md));
 		if (error == EOPNOTSUPP) {
 			md.md_cval += ef->off;
@@ -1009,7 +1011,7 @@ __elfN(parse_modmetadata)(struct preloaded_file *fp, elf_file_t ef,
 			mdepend = malloc(minfolen);
 			if (mdepend == NULL)
 				return (ENOMEM);
-			COPYOUT((vm_offset_t)md.md_data, mdepend,
+			(void) COPYOUT((vm_offset_t)md.md_data, mdepend,
 			    sizeof (*mdepend));
 			strcpy((char *)(mdepend + 1), s);
 			free(s);
@@ -1019,7 +1021,8 @@ __elfN(parse_modmetadata)(struct preloaded_file *fp, elf_file_t ef,
 			break;
 		case MDT_VERSION:
 			s = strdupout((vm_offset_t)md.md_cval);
-			COPYOUT((vm_offset_t)md.md_data, &mver, sizeof (mver));
+			(void) COPYOUT((vm_offset_t)md.md_data, &mver,
+			    sizeof (mver));
 			file_addmodule(fp, s, mver.mv_version, NULL);
 			free(s);
 			modcnt++;
@@ -1063,7 +1066,8 @@ __elfN(lookup_symbol)(struct preloaded_file *fp __unused, elf_file_t ef,
 	unsigned long hash;
 
 	hash = elf_hash(name);
-	COPYOUT(&ef->buckets[hash % ef->nbuckets], &symnum, sizeof (symnum));
+	(void) COPYOUT(&ef->buckets[hash % ef->nbuckets], &symnum,
+	    sizeof (symnum));
 
 	while (symnum != STN_UNDEF) {
 		if (symnum >= ef->nchains) {
@@ -1071,7 +1075,7 @@ __elfN(lookup_symbol)(struct preloaded_file *fp __unused, elf_file_t ef,
 			return (ENOENT);
 		}
 
-		COPYOUT(ef->symtab + symnum, &sym, sizeof (sym));
+		(void) COPYOUT(ef->symtab + symnum, &sym, sizeof (sym));
 		if (sym.st_name == 0) {
 			printf(__elfN(bad_symtable));
 			return (ENOENT);
@@ -1089,7 +1093,7 @@ __elfN(lookup_symbol)(struct preloaded_file *fp __unused, elf_file_t ef,
 			return (ENOENT);
 		}
 		free(strp);
-		COPYOUT(&ef->chains[symnum], &symnum, sizeof (symnum));
+		(void) COPYOUT(&ef->chains[symnum], &symnum, sizeof (symnum));
 	}
 	return (ENOENT);
 }
@@ -1118,7 +1122,7 @@ __elfN(reloc_ptr)(struct preloaded_file *mp __unused, elf_file_t ef,
 		return (EOPNOTSUPP);
 
 	for (n = 0; n < ef->relsz / sizeof (r); n++) {
-		COPYOUT(ef->rel + n, &r, sizeof (r));
+		(void) COPYOUT(ef->rel + n, &r, sizeof (r));
 
 		error = __elfN(reloc)(ef, __elfN(symaddr), &r, ELF_RELOC_REL,
 		    ef->off, p, val, len);
@@ -1126,7 +1130,7 @@ __elfN(reloc_ptr)(struct preloaded_file *mp __unused, elf_file_t ef,
 			return (error);
 	}
 	for (n = 0; n < ef->relasz / sizeof (a); n++) {
-		COPYOUT(ef->rela + n, &a, sizeof (a));
+		(void) COPYOUT(ef->rela + n, &a, sizeof (a));
 
 		error = __elfN(reloc)(ef, __elfN(symaddr), &a, ELF_RELOC_RELA,
 		    ef->off, p, val, len);

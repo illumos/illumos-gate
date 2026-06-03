@@ -178,7 +178,8 @@ void linenoiseSetMultiLine(int ml) {
 }
 
 /* Clear the screen. Used to handle ctrl+l */
-void linenoiseClearScreen(void) {
+void linenoiseClearScreen(void)
+{
     if (put_bytes("\x1b[H\x1b[J", 6) <= 0) {
         /* nothing to do, just to avoid warning. */
     }
@@ -195,8 +196,9 @@ getColumns(void)
 
 /* Beep, used for completion when there is nothing to complete or when all
  * the choices were already shown. */
-static void linenoiseBeep(void) {
-    put_bytes("\x7", 1);
+static void linenoiseBeep(void)
+{
+    (void) put_bytes("\x7", 1);
 }
 
 /* ============================== Completion ================================ */
@@ -353,18 +355,18 @@ static void refreshSingleLine(struct linenoiseState *l) {
 
     abInit(&ab);
     /* Cursor to left edge */
-    snprintf(seq,64,"\r");
+    (void) snprintf(seq,64,"\r");
     abAppend(&ab,seq,strlen(seq));
     /* Write the prompt and the current buffer content */
     abAppend(&ab,l->prompt,strlen(l->prompt));
     abAppend(&ab,buf,len);
     /* Erase to right */
-    snprintf(seq,64,"\x1b[K");
+    (void) snprintf(seq,64,"\x1b[K");
     abAppend(&ab,seq,strlen(seq));
     /* Move cursor to original position. */
-    snprintf(seq,64,"\r\x1b[%dC", (int)(pos+plen));
+    (void) snprintf(seq,64,"\r\x1b[%dC", (int)(pos+plen));
     abAppend(&ab,seq,strlen(seq));
-    put_bytes(ab.b, ab.len);
+    (void) put_bytes(ab.b, ab.len);
 
     abFree(&ab);
 }
@@ -391,18 +393,18 @@ static void refreshMultiLine(struct linenoiseState *l) {
      * going to the last row. */
     abInit(&ab);
     if (old_rows-rpos > 0) {
-        snprintf(seq,64,"\x1b[%dB", old_rows-rpos);
+        (void) snprintf(seq,64,"\x1b[%dB", old_rows-rpos);
         abAppend(&ab,seq,strlen(seq));
     }
 
     /* Now for every row clear it, go up. */
     for (j = 0; j < old_rows-1; j++) {
-        snprintf(seq,64,"\r\x1b[0K\x1b[1A");
+        (void) snprintf(seq,64,"\r\x1b[0K\x1b[1A");
         abAppend(&ab,seq,strlen(seq));
     }
 
     /* Clean the top line. */
-    snprintf(seq,64,"\r\x1b[0K");
+    (void) snprintf(seq,64,"\r\x1b[0K");
     abAppend(&ab,seq,strlen(seq));
 
     /* Write the prompt and the current buffer content */
@@ -416,7 +418,7 @@ static void refreshMultiLine(struct linenoiseState *l) {
         (l->pos+plen) % l->cols == 0)
     {
         abAppend(&ab,"\n",1);
-        snprintf(seq,64,"\r");
+        (void) snprintf(seq,64,"\r");
         abAppend(&ab,seq,strlen(seq));
         rows++;
         if (rows > (int)l->maxrows) l->maxrows = rows;
@@ -427,21 +429,21 @@ static void refreshMultiLine(struct linenoiseState *l) {
 
     /* Go up till we reach the expected positon. */
     if (rows-rpos2 > 0) {
-        snprintf(seq,64,"\x1b[%dA", rows-rpos2);
+        (void) snprintf(seq,64,"\x1b[%dA", rows-rpos2);
         abAppend(&ab,seq,strlen(seq));
     }
 
     /* Set column. */
     col = (plen+(int)l->pos) % (int)l->cols;
     if (col)
-        snprintf(seq,64,"\r\x1b[%dC", col);
+        (void) snprintf(seq,64,"\r\x1b[%dC", col);
     else
-        snprintf(seq,64,"\r");
+        (void) snprintf(seq,64,"\r");
     abAppend(&ab,seq,strlen(seq));
 
     l->oldpos = l->pos;
 
-    put_bytes(ab.b, ab.len);
+    (void) put_bytes(ab.b, ab.len);
     abFree(&ab);
 }
 
@@ -540,7 +542,8 @@ linenoiseEditHistoryNext(struct linenoiseState *l, int dir) {
             l->history_index = history_len-1;
             return;
         }
-        strncpy(l->buf,history[history_len - 1 - l->history_index],l->buflen);
+        (void) strncpy(l->buf, history[history_len - 1 - l->history_index],
+	    l->buflen);
         l->buf[l->buflen-1] = '\0';
         l->len = l->pos = strlen(l->buf);
         refreshLine(l);
@@ -618,7 +621,7 @@ static int linenoiseEdit(char *buf, size_t buflen, const char *prompt)
 
     /* The latest history entry is always our current buffer, that
      * initially is just an empty string. */
-    linenoiseHistoryAdd("");
+    (void) linenoiseHistoryAdd("");
 
     printf ("%s", prompt);
     while(1) {

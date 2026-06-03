@@ -63,7 +63,7 @@ command_boot(int argc, char *argv[])
 
 		/* XXX maybe we should discard everything and start again? */
 		if (file_findfile(NULL, NULL) != NULL) {
-			snprintf(command_errbuf, sizeof (command_errbuf),
+			(void) snprintf(command_errbuf, sizeof (command_errbuf),
 			    "can't boot '%s', kernel module already loaded",
 			    argv[1]);
 			return (CMD_ERROR);
@@ -107,7 +107,7 @@ command_boot(int argc, char *argv[])
 		return (CMD_ERROR);
 
 	/* Call the exec handler from the loader matching the kernel */
-	file_formats[fp->f_loader]->l_exec(fp);
+	(void) file_formats[fp->f_loader]->l_exec(fp);
 	return (CMD_ERROR);
 }
 
@@ -134,7 +134,7 @@ command_autoboot(int argc, char *argv[])
 	case 2:
 		howlong = strtol(argv[1], &cp, 0);
 		if (*cp != 0) {
-			snprintf(command_errbuf, sizeof (command_errbuf),
+			(void) snprintf(command_errbuf, sizeof (command_errbuf),
 			    "bad delay '%s'", argv[1]);
 			return (CMD_ERROR);
 		}
@@ -162,7 +162,7 @@ autoboot_maybe(void)
 		return;
 	cp = getenv("autoboot_delay");
 	if ((autoboot_tried == 0) && ((cp == NULL) || strcasecmp(cp, "NO")))
-		autoboot(-1, NULL);		/* try to boot automatically */
+		(void) autoboot(-1, NULL);	/* try to boot automatically */
 }
 
 int
@@ -189,7 +189,7 @@ autoboot(int timeout, char *prompt)
 	fp = file_findfile(NULL, NULL);
 	if (fp == NULL) {
 		/* no preloaded files, run command start to load all */
-		bf_run("start");
+		(void) bf_run("start");
 		fp = file_findfile(NULL, NULL);
 		if (fp == NULL) { /* still nothing? can't boot */
 			command_errmsg = "no valid kernel found";
@@ -277,7 +277,7 @@ getbootfile(int try)
 			len = strlen(spec);
 		}
 		name = malloc(len + 1);
-		strncpy(name, spec, len);
+		(void) strncpy(name, spec, len);
 		name[len] = 0;
 	}
 	if (name && name[0] == 0) {
@@ -307,7 +307,7 @@ getrootmount(char *rootdev)
 		return (0);
 
 	error = 1;
-	sprintf(lbuf, "%s/etc/fstab", rootdev);
+	(void) snprintf(lbuf, sizeof (lbuf), "%s/etc/fstab", rootdev);
 	if ((fd = open(lbuf, O_RDONLY)) < 0)
 		goto notfound;
 
@@ -367,8 +367,8 @@ getrootmount(char *rootdev)
 		 * Build the <fstype>:<device> and save it in
 		 * vfs.root.mountfrom
 		 */
-		sprintf(lbuf, "%s:%s", fstyp, dev);
-		setenv("vfs.root.mountfrom", lbuf, 0);
+		(void) snprintf(lbuf, sizeof (lbuf), "%s:%s", fstyp, dev);
+		(void) setenv("vfs.root.mountfrom", lbuf, 0);
 
 		/*
 		 * Don't override vfs.root.mountfrom.options if it is
@@ -376,13 +376,13 @@ getrootmount(char *rootdev)
 		 */
 		if (getenv("vfs.root.mountfrom.options") == NULL) {
 			/* save mount options */
-			setenv("vfs.root.mountfrom.options", options, 0);
+			(void) setenv("vfs.root.mountfrom.options", options, 0);
 		}
 		free(options);
 		error = 0;
 		break;
 	}
-	close(fd);
+	(void) close(fd);
 	free(dev);
 	free(fstyp);
 
@@ -394,7 +394,7 @@ notfound:
 		if (currdev != NULL && strncmp("zfs:", currdev, 4) == 0) {
 			cp = strdup(currdev);
 			cp[strlen(cp) - 1] = '\0';
-			setenv("vfs.root.mountfrom", cp, 0);
+			(void) setenv("vfs.root.mountfrom", cp, 0);
 			error = 0;
 			free(cp);
 		}

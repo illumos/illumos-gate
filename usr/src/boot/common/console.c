@@ -135,7 +135,7 @@ cons_probe(void)
 
 	/* Build list of consoles */
 	consoles = NULL;
-	for (cons = 0;; cons++) {
+	for (cons = 0; ; cons++) {
 		if (ct_list[cons].ct_dev != NULL) {
 			cons_add_dev(ct_list[cons].ct_dev);
 			continue;
@@ -421,7 +421,7 @@ cons_change(const char *string, char **list)
 		cons = cons_find(curpos);
 		if (cons >= 0) {
 			consoles[cons]->c_flags |= C_ACTIVEIN | C_ACTIVEOUT;
-			consoles[cons]->c_init(consoles[cons], 0);
+			(void) consoles[cons]->c_init(consoles[cons], 0);
 			if ((consoles[cons]->c_flags &
 			    (C_ACTIVEIN | C_ACTIVEOUT)) ==
 			    (C_ACTIVEIN | C_ACTIVEOUT)) {
@@ -449,7 +449,7 @@ cons_change(const char *string, char **list)
 		 */
 		for (cons = 0; consoles[cons] != NULL; cons++) {
 			consoles[cons]->c_flags |= C_ACTIVEIN | C_ACTIVEOUT;
-			consoles[cons]->c_init(consoles[cons], 0);
+			(void) consoles[cons]->c_init(consoles[cons], 0);
 			if ((consoles[cons]->c_flags &
 			    (C_ACTIVEIN | C_ACTIVEOUT)) ==
 			    (C_ACTIVEIN | C_ACTIVEOUT)) {

@@ -39,11 +39,12 @@
 
 #ifdef BOOT_FORTH
 #include "ficl.h"
-#define	RETURN(x)	ficlStackPushInteger(ficlVmGetDataStack(bf_vm),!x); return(x)
+#define	RETURN(x)	\
+	ficlStackPushInteger(ficlVmGetDataStack(bf_vm), !x); return (x)
 
 extern ficlVm *bf_vm;
 #else
-#define	RETURN(x)	return(x)
+#define	RETURN(x)	return (x)
 #endif
 
 #include "linenoise/linenoise.h"
@@ -61,30 +62,31 @@ static int	perform(int argc, char *argv[]);
 int
 perform(int argc, char *argv[])
 {
-    int				result;
-    struct bootblk_command	**cmdp;
-    bootblk_cmd_t		*cmd;
+	int			result;
+	struct bootblk_command	**cmdp;
+	bootblk_cmd_t		*cmd;
 
-    if (argc < 1)
-	return(CMD_OK);
+	if (argc < 1)
+		return (CMD_OK);
 
-    /* set return defaults; a successful command will override these */
-    command_errmsg = command_errbuf;
-    strcpy(command_errbuf, "no error message");
-    cmd = NULL;
-    result = CMD_ERROR;
+	/* set return defaults; a successful command will override these */
+	command_errmsg = command_errbuf;
+	strcpy(command_errbuf, "no error message");
+	cmd = NULL;
+	result = CMD_ERROR;
 
-    /* search the command set for the command */
-    SET_FOREACH(cmdp, Xcommand_set) {
-	if (((*cmdp)->c_name != NULL) && !strcmp(argv[0], (*cmdp)->c_name))
-	    cmd = (*cmdp)->c_fn;
-    }
-    if (cmd != NULL) {
-	result = (cmd)(argc, argv);
-    } else {
-	command_errmsg = "unknown command";
-    }
-    RETURN(result);
+	/* search the command set for the command */
+	SET_FOREACH(cmdp, Xcommand_set) {
+		if (((*cmdp)->c_name != NULL) &&
+		    strcmp(argv[0], (*cmdp)->c_name) == 0)
+			cmd = (*cmdp)->c_fn;
+	}
+	if (cmd != NULL) {
+		result = (cmd)(argc, argv);
+	} else {
+		command_errmsg = "unknown command";
+	}
+	RETURN(result);
 }
 #endif	/* ! BOOT_FORTH */
 
@@ -94,38 +96,39 @@ perform(int argc, char *argv[])
 void
 interact(const char *rc)
 {
-    char *input = NULL;
+	char *input = NULL;
 
-    bf_init((rc) ? "" : NULL);
+	bf_init((rc) ? "" : NULL);
 
-    if (rc == NULL) {
-	/* Read our default configuration. */
-	include("/boot/loader.rc");
-    } else if (*rc != '\0')
-	include(rc);
+	if (rc == NULL) {
+		/* Read our default configuration. */
+		(void) include("/boot/loader.rc");
+	} else if (*rc != '\0')
+		(void) include(rc);
 
-    printf("\n");
+	printf("\n");
 
-    /*
-     * Before interacting, we might want to autoboot.
-     */
-    autoboot_maybe();
+	/*
+	 * Before interacting, we might want to autoboot.
+	 */
+	autoboot_maybe();
 
-    /*
-     * Not autobooting, go manual
-     */
-    printf("\nType '?' for a list of commands, 'help' for more detailed help.\n");
-    if (getenv("prompt") == NULL)
-	setenv("prompt", "${interpret}", 1);
-    if (getenv("interpret") == NULL)
-        setenv("interpret", "ok", 1);
+	/*
+	 * Not autobooting, go manual
+	 */
+	printf("\nType '?' for a list of commands, "
+	    "'help' for more detailed help.\n");
+	if (getenv("prompt") == NULL)
+		(void) setenv("prompt", "${interpret}", 1);
+	if (getenv("interpret") == NULL)
+		(void) setenv("interpret", "ok", 1);
 
-    while ((input = linenoise(prompt())) != NULL) {
-	bf_vm->sourceId.i = 0;
-	bf_run(input);
-	linenoiseHistoryAdd(input);
-	free(input);
-    }
+	while ((input = linenoise(prompt())) != NULL) {
+		bf_vm->sourceId.i = 0;
+		(void) bf_run(input);
+		(void) linenoiseHistoryAdd(input);
+		free(input);
+	}
 }
 
 /*
@@ -142,26 +145,26 @@ COMMAND_SET(include, "include", "read commands from a file", command_include);
 static int
 command_include(int argc, char *argv[])
 {
-    int		i;
-    int		res;
-    char	**argvbuf;
+	int	i;
+	int	res;
+	char	**argvbuf;
 
-    /*
-     * Since argv is static, we need to save it here.
-     */
-    argvbuf = (char**) calloc((u_int)argc, sizeof(char*));
-    for (i = 0; i < argc; i++)
-	argvbuf[i] = strdup(argv[i]);
+	/*
+	 * Since argv is static, we need to save it here.
+	 */
+	argvbuf = calloc((uint_t)argc, sizeof (char *));
+	for (i = 0; i < argc; i++)
+		argvbuf[i] = strdup(argv[i]);
 
-    res=CMD_OK;
-    for (i = 1; (i < argc) && (res == CMD_OK); i++)
-	res = include(argvbuf[i]);
+	res = CMD_OK;
+	for (i = 1; (i < argc) && (res == CMD_OK); i++)
+		res = include(argvbuf[i]);
 
-    for (i = 0; i < argc; i++)
-	free(argvbuf[i]);
-    free(argvbuf);
+	for (i = 0; i < argc; i++)
+		free(argvbuf[i]);
+	free(argvbuf);
 
-    return(res);
+	return (res);
 }
 
 COMMAND_SET(sifting, "sifting", "find words", command_sifting);
@@ -184,9 +187,9 @@ command_sifting(int argc, char *argv[])
  */
 struct includeline
 {
-    struct includeline  *next;
-    int                 line;
-    char                text[0];
+	struct includeline	*next;
+	int			line;
+	char			text[0];
 };
 
 /*
@@ -197,90 +200,94 @@ struct includeline
 int
 include(const char *filename)
 {
-    struct includeline  *script, *se, *sp;
-    int res = CMD_OK;
-    int	prevsrcid, fd, line;
-    char *cp, input[256];		/* big enough? */
+	struct includeline  *script, *se, *sp;
+	int res = CMD_OK;
+	int	prevsrcid, fd, line;
+	char *cp, input[256];		/* big enough? */
 
-    if (((fd = open(filename, O_RDONLY)) == -1)) {
-	snprintf(command_errbuf, sizeof (command_errbuf), "can't open '%s': %s",
-	    filename, strerror(errno));
-	return(CMD_ERROR);
-    }
-    /*
-     * Read the script into memory.
-     */
-    script = se = NULL;
-    line = 0;
-
-    while (fgetstr(input, sizeof(input), fd) >= 0) {
-	line++;
-	cp = input;
-	/* Allocate script line structure and copy line, flags */
-	if (*cp == '\0')
-		continue;       /* ignore empty line, save memory */
-	if (cp[0] == '\\' && cp[1] == ' ')
-		continue;	/* ignore comment */
-
-	sp = malloc(sizeof(struct includeline) + strlen(cp) + 1);
-	/* On malloc failure (it happens!), free as much as possible and exit */
-	if (sp == NULL) {
-		while (script != NULL) {
-			se = script;
-			script = script->next;
-			free(se);
-		}
-		snprintf(command_errbuf, sizeof (command_errbuf),
-		    "file '%s' line %d: memory allocation failure - aborting",
-		    filename, line);
-		close(fd);
+	if (((fd = open(filename, O_RDONLY)) == -1)) {
+		(void) snprintf(command_errbuf, sizeof (command_errbuf),
+		    "can't open '%s': %s", filename, strerror(errno));
 		return (CMD_ERROR);
 	}
-	strcpy(sp->text, cp);
-	sp->line = line;
-	sp->next = NULL;
+	/*
+	 * Read the script into memory.
+	 */
+	script = se = NULL;
+	line = 0;
 
-	if (script == NULL) {
-		script = sp;
-	} else {
-		se->next = sp;
+	while (fgetstr(input, sizeof (input), fd) >= 0) {
+		line++;
+		cp = input;
+		/* Allocate script line structure and copy line, flags */
+		if (*cp == '\0')
+			continue;	/* ignore empty line, save memory */
+		if (cp[0] == '\\' && cp[1] == ' ')
+			continue;	/* ignore comment */
+
+		sp = malloc(sizeof (struct includeline) + strlen(cp) + 1);
+		/*
+		 * On malloc failure (it happens!), free as much as possible
+		 * and exit
+		 */
+		if (sp == NULL) {
+			while (script != NULL) {
+				se = script;
+				script = script->next;
+				free(se);
+			}
+			(void) snprintf(command_errbuf, sizeof (command_errbuf),
+			    "file '%s' line %d: memory allocation failure - "
+			    "aborting",
+			    filename, line);
+			(void) close(fd);
+			return (CMD_ERROR);
+		}
+		(void) strcpy(sp->text, cp);
+		sp->line = line;
+		sp->next = NULL;
+		if (script == NULL) {
+			script = sp;
+		} else {
+			se->next = sp;
+		}
+		se = sp;
 	}
-	se = sp;
-    }
-    close(fd);
+	(void) close(fd);
 
-    /*
-     * Execute the script
-     */
+	/*
+	 * Execute the script
+	 */
 
-    prevsrcid = bf_vm->sourceId.i;
-    bf_vm->sourceId.i = fd+1;	/* 0 is user input device */
+	prevsrcid = bf_vm->sourceId.i;
+	bf_vm->sourceId.i = fd+1;	/* 0 is user input device */
 
-    res = CMD_OK;
+	res = CMD_OK;
 
-    for (sp = script; sp != NULL; sp = sp->next) {
-	res = bf_run(sp->text);
-	if (res != FICL_VM_STATUS_OUT_OF_TEXT) {
-		snprintf(command_errbuf, sizeof (command_errbuf),
-		    "Error while including %s, in the line %d:\n%s",
-		    filename, sp->line, sp->text);
-		res = CMD_ERROR;
-		break;
-	} else
-		res = CMD_OK;
-    }
+	for (sp = script; sp != NULL; sp = sp->next) {
+		res = bf_run(sp->text);
+		if (res != FICL_VM_STATUS_OUT_OF_TEXT) {
+			(void) snprintf(command_errbuf, sizeof (command_errbuf),
+			    "Error while including %s, in the line %d:\n%s",
+			    filename, sp->line, sp->text);
+			res = CMD_ERROR;
+			break;
+		} else {
+			res = CMD_OK;
+		}
+	}
 
-    bf_vm->sourceId.i = -1;
-    (void) bf_run("");
-    bf_vm->sourceId.i = prevsrcid;
+	bf_vm->sourceId.i = -1;
+	(void) bf_run("");
+	bf_vm->sourceId.i = prevsrcid;
 
-    while(script != NULL) {
-	se = script;
-	script = script->next;
-	free(se);
-    }
+	while (script != NULL) {
+		se = script;
+		script = script->next;
+		free(se);
+	}
 
-    return(res);
+	return (res);
 }
 
 /*
@@ -290,32 +297,32 @@ include(const char *filename)
 static char *
 prompt(void)
 {
-    static char promptbuf[20];	/* probably too large, but well... */
-    char	*pr, *p, *cp, *ev;
-    int n = 0;
+	static char promptbuf[20];	/* probably too large, but well... */
+	char	*pr, *p, *cp, *ev;
+	int n = 0;
 
-    if ((cp = getenv("prompt")) == NULL)
-	cp = (char *)(uintptr_t)">";
-    pr = p = strdup(cp);
+	if ((cp = getenv("prompt")) == NULL)
+		cp = (char *)(uintptr_t)">";
+	pr = p = strdup(cp);
 
-    while (*p != 0) {
-	if ((*p == '$') && (*(p+1) == '{')) {
-	    for (cp = p + 2; (*cp != 0) && (*cp != '}'); cp++)
-		;
-	    *cp = 0;
-	    ev = getenv(p + 2);
+	while (*p != 0) {
+		if ((*p == '$') && (*(p+1) == '{')) {
+			for (cp = p + 2; (*cp != 0) && (*cp != '}'); cp++)
+				;
+			*cp = 0;
+			ev = getenv(p + 2);
 
-	    if (ev != NULL)
-		n = sprintf(promptbuf+n, "%s", ev);
-	    p = cp + 1;
-	    continue;
+			if (ev != NULL)
+				n = sprintf(promptbuf+n, "%s", ev);
+			p = cp + 1;
+			continue;
+		}
+		promptbuf[n++] = *p;
+		p++;
 	}
-	promptbuf[n++] = *p;
-	p++;
-    }
-    if (promptbuf[n - 1] != ' ')
-	promptbuf[n++] = ' ';
-    promptbuf[n] = '\0';
-    free(pr);
-    return (promptbuf);
+	if (promptbuf[n - 1] != ' ')
+		promptbuf[n++] = ' ';
+	promptbuf[n] = '\0';
+	free(pr);
+	return (promptbuf);
 }

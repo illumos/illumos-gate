@@ -74,7 +74,7 @@ display_size(uint64_t size, uint_t sectorsize)
 		size /= 1024;
 		unit = 'M';
 	}
-	snprintf(buf, sizeof (buf), "%4" PRIu64 "%cB", size, unit);
+	(void) snprintf(buf, sizeof (buf), "%4" PRIu64 "%cB", size, unit);
 	return (buf);
 }
 
@@ -117,7 +117,7 @@ ptable_print(void *arg, const char *pname, const struct ptable_entry *part)
 	od = (struct open_disk *)pa->dev->dd.d_opendata;
 	sectsize = od->sectorsize;
 	partsize = part->end - part->start + 1;
-	snprintf(line, sizeof (line), "  %s%s: %s", pa->prefix, pname,
+	(void) snprintf(line, sizeof (line), "  %s%s: %s", pa->prefix, pname,
 	    parttype2str(part->type));
 	if (pager_output(line))
 		return (1);
@@ -125,9 +125,9 @@ ptable_print(void *arg, const char *pname, const struct ptable_entry *part)
 	if (pa->verbose) {
 		/* Emit extra tab when the line is shorter than 3 tab stops */
 		if (strlen(line) < 24)
-			(void) pager_output("\t");
+			(void)  pager_output("\t");
 
-		snprintf(line, sizeof (line), "\t%s",
+		(void) snprintf(line, sizeof (line), "\t%s",
 		    display_size(partsize, sectsize));
 		if (pager_output(line))
 			return (1);
@@ -144,7 +144,7 @@ ptable_print(void *arg, const char *pname, const struct ptable_entry *part)
 		if (disk_open(&dev, partsize, sectsize) == 0) {
 			table = ptable_open(&dev, partsize, sectsize, ptblread);
 			if (table != NULL) {
-				snprintf(line, sizeof (line), "  %s%s",
+				(void) snprintf(line, sizeof (line), "  %s%s",
 				    pa->prefix, pname);
 				bsd.dev = &dev;
 				bsd.prefix = line;
@@ -152,7 +152,7 @@ ptable_print(void *arg, const char *pname, const struct ptable_entry *part)
 				res = ptable_iterate(table, &bsd, ptable_print);
 				ptable_close(table);
 			}
-			disk_close(&dev);
+			(void) disk_close(&dev);
 		}
 	}
 
@@ -251,7 +251,7 @@ disk_open(struct disk_devdesc *dev, uint64_t mediasize, uint_t sectorsize)
 	 * While we are reading disk metadata, make sure we do it relative
 	 * to the start of the disk
 	 */
-	memcpy(&partdev, dev, sizeof(partdev));
+	memcpy(&partdev, dev, sizeof (partdev));
 	partdev.d_offset = 0;
 	partdev.d_slice = D_SLICENONE;
 	partdev.d_partition = D_PARTNONE;
@@ -401,7 +401,7 @@ disk_fmtdev(struct disk_devdesc *dev)
 	if (dev->d_slice > D_SLICENONE) {
 #ifdef LOADER_GPT_SUPPORT
 		if (dev->d_partition == D_PARTISGPT) {
-			sprintf(cp, "p%d:", dev->d_slice);
+			(void) sprintf(cp, "p%d:", dev->d_slice);
 			return (buf);
 		} else
 #endif
@@ -411,7 +411,7 @@ disk_fmtdev(struct disk_devdesc *dev)
 	}
 	if (dev->d_partition > D_PARTNONE)
 		cp += sprintf(cp, "%c", dev->d_partition + 'a');
-	strcat(cp, ":");
+	(void) strcat(cp, ":");
 	return (buf);
 }
 

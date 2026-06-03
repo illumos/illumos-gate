@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 2004 Ian Dowse <iedowse@freebsd.org>
  * Copyright (c) 1998 Michael Smith <msmith@freebsd.org>
  * Copyright (c) 1998 Peter Wemm <peter@freebsd.org>
@@ -27,7 +27,6 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/exec.h>
@@ -37,18 +36,18 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 #include <machine/elf.h>
 #include <stand.h>
-#define FREEBSD_ELF
+#define	FREEBSD_ELF
 #include <link.h>
 
 #include "bootstrap.h"
 
-#define COPYOUT(s,d,l)	archsw.arch_copyout((vm_offset_t)(s), d, l)
+#define	COPYOUT(s, d, l)	archsw.arch_copyout((vm_offset_t)(s), d, l)
 
 #if defined(__i386__) && __ELF_WORD_SIZE == 64
 #undef ELF_TARG_CLASS
 #undef ELF_TARG_MACH
-#define ELF_TARG_CLASS  ELFCLASS64
-#define ELF_TARG_MACH   EM_X86_64
+#define	ELF_TARG_CLASS  ELFCLASS64
+#define	ELF_TARG_MACH   EM_X86_64
 #endif
 
 typedef struct elf_file {
@@ -63,7 +62,7 @@ typedef struct elf_file {
 } *elf_file_t;
 
 static int __elfN(obj_loadimage)(struct preloaded_file *mp, elf_file_t ef,
-    u_int64_t loadaddr);
+    uint64_t loadaddr);
 static int __elfN(obj_lookup_set)(struct preloaded_file *mp, elf_file_t ef,
     const char *name, Elf_Addr *startp, Elf_Addr *stopp, int *countp);
 static int __elfN(obj_reloc_ptr)(struct preloaded_file *mp, elf_file_t ef,
@@ -81,7 +80,7 @@ const char	*__elfN(obj_moduletype) = "elf obj module";
  * will be saved in (result).
  */
 int
-__elfN(obj_loadfile)(char *filename, u_int64_t dest,
+__elfN(obj_loadfile)(char *filename, uint64_t dest,
     struct preloaded_file **result)
 {
 	struct preloaded_file *fp, *kfp;
@@ -91,19 +90,19 @@ __elfN(obj_loadfile)(char *filename, u_int64_t dest,
 	ssize_t bytes_read;
 
 	fp = NULL;
-	bzero(&ef, sizeof(struct elf_file));
+	bzero(&ef, sizeof (struct elf_file));
 
 	/*
 	 * Open the image, read and validate the ELF header
 	 */
 	if (filename == NULL)	/* can't handle nameless */
-		return(EFTYPE);
+		return (EFTYPE);
 	if ((ef.fd = open(filename, O_RDONLY)) == -1)
-		return(errno);
+		return (errno);
 
 	hdr = &ef.hdr;
-	bytes_read = read(ef.fd, hdr, sizeof(*hdr));
-	if (bytes_read != sizeof(*hdr)) {
+	bytes_read = read(ef.fd, hdr, sizeof (*hdr));
+	if (bytes_read != sizeof (*hdr)) {
 		err = EFTYPE;	/* could be EIO, but may be small file */
 		goto oerr;
 	}
@@ -124,7 +123,7 @@ __elfN(obj_loadfile)(char *filename, u_int64_t dest,
 	}
 
 	if (hdr->e_shnum * hdr->e_shentsize == 0 || hdr->e_shoff == 0 ||
-	    hdr->e_shentsize != sizeof(Elf_Shdr)) {
+	    hdr->e_shentsize != sizeof (Elf_Shdr)) {
 		err = EFTYPE;
 		goto oerr;
 	}
@@ -162,7 +161,7 @@ __elfN(obj_loadfile)(char *filename, u_int64_t dest,
 		goto ioerr;
 
 	/* save exec header as metadata */
-	file_addmetadata(fp, MODINFOMD_ELFHDR, sizeof(*hdr), hdr);
+	file_addmetadata(fp, MODINFOMD_ELFHDR, sizeof (*hdr), hdr);
 
 	/* Load OK, return module pointer */
 	*result = (struct preloaded_file *)fp;
@@ -174,11 +173,11 @@ ioerr:
 oerr:
 	file_discard(fp);
 out:
-	close(ef.fd);
+	(void) close(ef.fd);
 	if (ef.e_shdr != NULL)
 		free(ef.e_shdr);
 
-	return(err);
+	return (err);
 }
 
 /*
@@ -186,7 +185,7 @@ out:
  * the Elf header, load the image at (off)
  */
 static int
-__elfN(obj_loadimage)(struct preloaded_file *fp, elf_file_t ef, u_int64_t off)
+__elfN(obj_loadimage)(struct preloaded_file *fp, elf_file_t ef, uint64_t off)
 {
 	Elf_Ehdr *hdr;
 	Elf_Shdr *shdr, *cshdr, *lshdr;
@@ -288,8 +287,7 @@ __elfN(obj_loadimage)(struct preloaded_file *fp, elf_file_t ef, u_int64_t off)
 	kern_bzero(firstaddr, lastaddr - firstaddr);
 
 	/* Figure section with the lowest file offset we haven't loaded yet. */
-	for (cshdr = NULL; /* none */; /* none */)
-	{
+	for (cshdr = NULL; /* none */; /* none */) {
 		/*
 		 * Find next section to load. The complexity of this loop is
 		 * O(n^2), but with  the number of sections being typically
@@ -331,19 +329,19 @@ __elfN(obj_loadimage)(struct preloaded_file *fp, elf_file_t ef, u_int64_t off)
 	ret = lastaddr - firstaddr;
 	fp->f_addr = firstaddr;
 
-	printf("size 0x%lx at 0x%lx", (u_long)ret, (u_long)firstaddr);
+	printf("size 0x%lx at 0x%lx", (ulong_t)ret, (ulong_t)firstaddr);
 
 out:
 	printf("\n");
-	return ret;
+	return (ret);
 }
 
 #if defined(__i386__) && __ELF_WORD_SIZE == 64
 struct mod_metadata64 {
 	int		md_version;	/* structure version MDTV_* */
 	int		md_type;	/* type of entry MDT_* */
-	u_int64_t	md_data;	/* specific data */
-	u_int64_t	md_cval;	/* common string label */
+	uint64_t	md_data;	/* specific data */
+	uint64_t	md_cval;	/* common string label */
 };
 #endif
 
@@ -362,17 +360,17 @@ __elfN(obj_parse_modmetadata)(struct preloaded_file *fp, elf_file_t ef)
 
 	if (__elfN(obj_lookup_set)(fp, ef, "modmetadata_set", &p, &p_stop,
 	    &modcnt) != 0)
-		return 0;
+		return (0);
 
 	modcnt = 0;
 	while (p < p_stop) {
-		COPYOUT(p, &v, sizeof(v));
-		error = __elfN(obj_reloc_ptr)(fp, ef, p, &v, sizeof(v));
+		(void) COPYOUT(p, &v, sizeof (v));
+		error = __elfN(obj_reloc_ptr)(fp, ef, p, &v, sizeof (v));
 		if (error != 0)
 			return (error);
 #if defined(__i386__) && __ELF_WORD_SIZE == 64
-		COPYOUT(v, &md64, sizeof(md64));
-		error = __elfN(obj_reloc_ptr)(fp, ef, v, &md64, sizeof(md64));
+		(void) COPYOUT(v, &md64, sizeof (md64));
+		error = __elfN(obj_reloc_ptr)(fp, ef, v, &md64, sizeof (md64));
 		if (error != 0)
 			return (error);
 		md.md_version = md64.md_version;
@@ -380,22 +378,22 @@ __elfN(obj_parse_modmetadata)(struct preloaded_file *fp, elf_file_t ef)
 		md.md_cval = (const char *)(uintptr_t)md64.md_cval;
 		md.md_data = (void *)(uintptr_t)md64.md_data;
 #else
-		COPYOUT(v, &md, sizeof(md));
-		error = __elfN(obj_reloc_ptr)(fp, ef, v, &md, sizeof(md));
+		(void) COPYOUT(v, &md, sizeof (md));
+		error = __elfN(obj_reloc_ptr)(fp, ef, v, &md, sizeof (md));
 		if (error != 0)
 			return (error);
 #endif
-		p += sizeof(Elf_Addr);
-		switch(md.md_type) {
+		p += sizeof (Elf_Addr);
+		switch (md.md_type) {
 		case MDT_DEPEND:
 			s = strdupout((vm_offset_t)md.md_cval);
-			minfolen = sizeof(*mdepend) + strlen(s) + 1;
+			minfolen = sizeof (*mdepend) + strlen(s) + 1;
 			mdepend = malloc(minfolen);
 			if (mdepend == NULL)
-				return ENOMEM;
-			COPYOUT((vm_offset_t)md.md_data, mdepend,
-			    sizeof(*mdepend));
-			strcpy((char*)(mdepend + 1), s);
+				return (ENOMEM);
+			(void) COPYOUT((vm_offset_t)md.md_data, mdepend,
+			    sizeof (*mdepend));
+			(void) strcpy((char *)(mdepend + 1), s);
 			free(s);
 			file_addmetadata(fp, MODINFOMD_DEPLIST, minfolen,
 			    mdepend);
@@ -403,8 +401,9 @@ __elfN(obj_parse_modmetadata)(struct preloaded_file *fp, elf_file_t ef)
 			break;
 		case MDT_VERSION:
 			s = strdupout((vm_offset_t)md.md_cval);
-			COPYOUT((vm_offset_t)md.md_data, &mver, sizeof(mver));
-			file_addmodule(fp, s, mver.mv_version, NULL);
+			(void) COPYOUT((vm_offset_t)md.md_data, &mver,
+			    sizeof (mver));
+			(void) file_addmodule(fp, s, mver.mv_version, NULL);
 			free(s);
 			modcnt++;
 			break;
@@ -416,12 +415,12 @@ __elfN(obj_parse_modmetadata)(struct preloaded_file *fp, elf_file_t ef)
 			break;
 		}
 	}
-	return 0;
+	return (0);
 }
 
 static int
 __elfN(obj_lookup_set)(struct preloaded_file *fp __unused, elf_file_t ef,
-    const char* name, Elf_Addr *startp, Elf_Addr *stopp, int *countp)
+    const char *name, Elf_Addr *startp, Elf_Addr *stopp, int *countp)
 {
 	Elf_Ehdr *hdr;
 	Elf_Shdr *shdr;
@@ -442,7 +441,7 @@ __elfN(obj_lookup_set)(struct preloaded_file *fp __unused, elf_file_t ef,
 		if (strncmp(p, "set_", 4) == 0 && strcmp(p + 4, name) == 0) {
 			*startp = shdr[i].sh_addr;
 			*stopp = shdr[i].sh_addr +  shdr[i].sh_size;
-			*countp = (*stopp - *startp) / sizeof(Elf_Addr);
+			*countp = (*stopp - *startp) / sizeof (Elf_Addr);
 			free(p);
 			return (0);
 		}
@@ -458,8 +457,8 @@ __elfN(obj_lookup_set)(struct preloaded_file *fp __unused, elf_file_t ef,
  * the image in-place, because this is done by kern_linker later on.
  */
 static int
-__elfN(obj_reloc_ptr)(struct preloaded_file *mp, elf_file_t ef, Elf_Addr p,
-    void *val, size_t len)
+__elfN(obj_reloc_ptr)(struct preloaded_file *mp __unused, elf_file_t ef,
+    Elf_Addr p, void *val, size_t len)
 {
 	Elf_Ehdr *hdr;
 	Elf_Shdr *shdr;
@@ -469,7 +468,6 @@ __elfN(obj_reloc_ptr)(struct preloaded_file *mp, elf_file_t ef, Elf_Addr p,
 	Elf_Rel r, *rbase;
 	int error, i, j, nrel, nrela;
 
-	(void)mp;
 	hdr = &ef->hdr;
 	shdr = ef->e_shdr;
 
@@ -487,9 +485,9 @@ __elfN(obj_reloc_ptr)(struct preloaded_file *mp, elf_file_t ef, Elf_Addr p,
 		case SHT_RELA:
 			abase = (Elf_Rela *)(intptr_t)shdr[i].sh_addr;
 
-			nrela = shdr[i].sh_size / sizeof(Elf_Rela);
+			nrela = shdr[i].sh_size / sizeof (Elf_Rela);
 			for (j = 0; j < nrela; j++) {
-				COPYOUT(abase + j, &a, sizeof(a));
+				(void) COPYOUT(abase + j, &a, sizeof (a));
 
 				error = __elfN(reloc)(ef, __elfN(obj_symaddr),
 				    &a, ELF_RELOC_RELA, base, off, val, len);
@@ -500,9 +498,9 @@ __elfN(obj_reloc_ptr)(struct preloaded_file *mp, elf_file_t ef, Elf_Addr p,
 		case SHT_REL:
 			rbase = (Elf_Rel *)(intptr_t)shdr[i].sh_addr;
 
-			nrel = shdr[i].sh_size / sizeof(Elf_Rel);
+			nrel = shdr[i].sh_size / sizeof (Elf_Rel);
 			for (j = 0; j < nrel; j++) {
-				COPYOUT(rbase + j, &r, sizeof(r));
+				(void) COPYOUT(rbase + j, &r, sizeof (r));
 
 				error = __elfN(reloc)(ef, __elfN(obj_symaddr),
 				    &r, ELF_RELOC_REL, base, off, val, len);
@@ -522,10 +520,10 @@ __elfN(obj_symaddr)(struct elf_file *ef, Elf_Size symidx)
 	Elf_Sym sym;
 	Elf_Addr base;
 
-	if (symidx >= ef->e_shdr[ef->symtabindex].sh_size / sizeof(Elf_Sym))
+	if (symidx >= ef->e_shdr[ef->symtabindex].sh_size / sizeof (Elf_Sym))
 		return (0);
-	COPYOUT(ef->e_shdr[ef->symtabindex].sh_addr + symidx * sizeof(Elf_Sym),
-	    &sym, sizeof(sym));
+	(void) COPYOUT(ef->e_shdr[ef->symtabindex].sh_addr +
+	    symidx * sizeof (Elf_Sym), &sym, sizeof (sym));
 	if (sym.st_shndx == SHN_UNDEF || sym.st_shndx >= ef->hdr.e_shnum)
 		return (0);
 	base = ef->e_shdr[sym.st_shndx].sh_addr;

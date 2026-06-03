@@ -108,19 +108,19 @@ help_emitsummary(char *topic, char *subtopic, char *desc)
 {
 	int	i;
 
-	pager_output("    ");
-	pager_output(topic);
+	(void) pager_output("    ");
+	(void) pager_output(topic);
 	i = strlen(topic);
 	if (subtopic != NULL) {
-		pager_output(" ");
-		pager_output(subtopic);
+		(void) pager_output(" ");
+		(void) pager_output(subtopic);
 		i += strlen(subtopic) + 1;
 	}
 	if (desc != NULL) {
 		do {
-			pager_output(" ");
+			(void) pager_output(" ");
 		} while (i++ < 30);
-		pager_output(desc);
+		(void) pager_output(desc);
 	}
 	return (pager_output("\n"));
 }
@@ -134,7 +134,8 @@ command_help(int argc, char *argv[])
 	char	*topic, *subtopic, *t, *s, *d;
 
 	/* page the help text from our load path */
-	snprintf(buf, sizeof (buf), "%s/boot/loader.help", getenv("loaddev"));
+	(void) snprintf(buf, sizeof (buf), "%s/boot/loader.help",
+	    getenv("loaddev"));
 	if ((hfd = open(buf, O_RDONLY)) < 0) {
 		printf("Verbose help not available, "
 		    "use '?' to list commands\n");
@@ -155,7 +156,7 @@ command_help(int argc, char *argv[])
 		break;
 	default:
 		command_errmsg = "usage is 'help <topic> [<subtopic>]";
-		close(hfd);
+		(void) close(hfd);
 		return (CMD_ERROR);
 	}
 
@@ -206,9 +207,9 @@ command_help(int argc, char *argv[])
 	free(s);
 	free(d);
 	pager_close();
-	close(hfd);
+	(void) close(hfd);
 	if (!matched) {
-		snprintf(command_errbuf, sizeof (command_errbuf),
+		(void) snprintf(command_errbuf, sizeof (command_errbuf),
 		    "no help available for '%s'", topic);
 		free(topic);
 		free(subtopic);
@@ -235,10 +236,10 @@ command_commandlist(int argc __unused, char *argv[] __unused)
 		if (res)
 			break;
 		if ((*cmdp)->c_name != NULL && (*cmdp)->c_desc != NULL) {
-			snprintf(name, sizeof (name),"  %-15s  ",
+			(void) snprintf(name, sizeof (name), "  %-15s  ",
 			    (*cmdp)->c_name);
-			pager_output(name);
-			pager_output((*cmdp)->c_desc);
+			(void) pager_output(name);
+			(void) pager_output((*cmdp)->c_desc);
 			res = pager_output("\n");
 		}
 	}
@@ -265,11 +266,11 @@ command_show(int argc, char *argv[])
 		 */
 		pager_open();
 		for (ev = environ; ev != NULL; ev = ev->ev_next) {
-			pager_output(ev->ev_name);
+			(void) pager_output(ev->ev_name);
 			cp = getenv(ev->ev_name);
 			if (cp != NULL) {
-				pager_output("=");
-				pager_output(cp);
+				(void) pager_output("=");
+				(void) pager_output(cp);
 			}
 			if (pager_output("\n"))
 				break;
@@ -279,7 +280,7 @@ command_show(int argc, char *argv[])
 		if ((cp = getenv(argv[1])) != NULL) {
 			printf("%s\n", cp);
 		} else {
-			snprintf(command_errbuf, sizeof (command_errbuf),
+			(void) snprintf(command_errbuf, sizeof (command_errbuf),
 			    "variable '%s' not found", argv[1]);
 			return (CMD_ERROR);
 		}
@@ -408,7 +409,7 @@ command_read(int argc, char *argv[])
 		case 't':
 			timeout = strtol(optarg, &cp, 0);
 			if (cp == optarg) {
-				snprintf(command_errbuf,
+				(void) snprintf(command_errbuf,
 				    sizeof (command_errbuf),
 				    "bad timeout '%s'", optarg);
 				return (CMD_ERROR);
@@ -435,7 +436,7 @@ command_read(int argc, char *argv[])
 	ngets(buf, sizeof (buf));
 
 	if (name != NULL)
-		setenv(name, buf, 1);
+		(void) setenv(name, buf, 1);
 	return (CMD_OK);
 }
 
@@ -454,14 +455,14 @@ command_more(int argc, char *argv[])
 	res = 0;
 	pager_open();
 	for (i = 1; (i < argc) && (res == 0); i++) {
-		snprintf(line, sizeof (line), "*** FILE %s BEGIN ***\n",
+		(void) snprintf(line, sizeof (line), "*** FILE %s BEGIN ***\n",
 		    argv[i]);
 		if (pager_output(line))
 			break;
 		res = page_file(argv[i]);
 		if (!res) {
-			snprintf(line, sizeof (line), "*** FILE %s END ***\n",
-			    argv[i]);
+			(void) snprintf(line, sizeof (line),
+			    "*** FILE %s END ***\n", argv[i]);
 			res = pager_output(line);
 		}
 	}
@@ -481,7 +482,7 @@ page_file(char *filename)
 	result = pager_file(filename);
 
 	if (result == -1) {
-		snprintf(command_errbuf, sizeof (command_errbuf),
+		(void) snprintf(command_errbuf, sizeof (command_errbuf),
 		    "error showing %s", filename);
 	}
 
@@ -522,7 +523,7 @@ command_lsdev(int argc, char *argv[])
 			if (devsw[i]->dv_print(verbose))
 				break;
 		} else {
-			snprintf(line, sizeof (line), "%s: (unknown)\n",
+			(void) snprintf(line, sizeof (line), "%s: (unknown)\n",
 			    devsw[i]->dv_name);
 			if (pager_output(line))
 				break;

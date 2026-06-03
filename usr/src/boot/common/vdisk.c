@@ -388,7 +388,7 @@ vdisk_print(int verbose)
 			if ((ret = pager_output("\n")) != 0)
 				break;
 		}
-		snprintf(line, sizeof (line),
+		(void) snprintf(line, sizeof (line),
 		    "    %s%d", vdisk_dev.dv_name, vd->vdisk_unit);
 		printf("%s:    %" PRIu64 " X %u blocks", line,
 		    vd->vdisk_size / vd->vdisk_sectorsz,
@@ -404,7 +404,7 @@ vdisk_print(int verbose)
 		ret = disk_open(&vd_dev, vd->vdisk_size, vd->vdisk_sectorsz);
 		if (ret == 0) {
 			ret = disk_print(&vd_dev, line, verbose);
-			disk_close(&vd_dev);
+			(void) disk_close(&vd_dev);
 			if (ret != 0)
 				break;
 		} else {

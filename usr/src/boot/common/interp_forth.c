@@ -107,7 +107,7 @@ bf_command(ficlVm *vm)
 			len += ficlStackFetch(stack, i * 2).i + 1;
 		}
 		line = malloc(strlen(name) + len + 1);
-		strcpy(line, name);
+		(void) strcpy(line, name);
 
 		if (nstrings)
 			for (i = 0; i < nstrings; i++) {
@@ -115,8 +115,8 @@ bf_command(ficlVm *vm)
 
 				len = ficlStackPopInteger(stack);
 				cp = ficlStackPopPointer(stack);
-				strcat(line, " ");
-				strncat(line, cp, len);
+				(void) strcat(line, " ");
+				(void) strncat(line, cp, len);
 			}
 	} else {
 		/* Get remainder of invocation */
@@ -128,10 +128,10 @@ bf_command(ficlVm *vm)
 			len++;
 
 		line = malloc(strlen(name) + len + 2);
-		strcpy(line, name);
+		(void) strcpy(line, name);
 		if (len > 0) {
-			strcat(line, " ");
-			strncat(line, tail, len);
+			(void) strcat(line, " ");
+			(void) strncat(line, tail, len);
 			ficlVmUpdateTib(vm, tail + len);
 		}
 	}
@@ -290,13 +290,14 @@ bf_init(char *rc)
 	/* make all commands appear as Forth words */
 	dict = ficlSystemGetDictionary(bf_sys);
 	SET_FOREACH(cmdp, Xcommand_set) {
-		ficlDictionaryAppendPrimitive(dict, (char *)(*cmdp)->c_name,
-		    bf_command, FICL_WORD_DEFAULT);
+		(void) ficlDictionaryAppendPrimitive(dict,
+		    (char *)(*cmdp)->c_name, bf_command, FICL_WORD_DEFAULT);
 		rv = ficlVmEvaluate(bf_vm, "forth definitions builtins");
 		if (rv != FICL_VM_STATUS_OUT_OF_TEXT) {
 			panic("error interpreting forth: %d", rv);
 		}
-		sprintf(create_buf, "builtin: %s", (*cmdp)->c_name);
+		(void) snprintf(create_buf, sizeof (create_buf),
+		    "builtin: %s", (*cmdp)->c_name);
 		rv = ficlVmEvaluate(bf_vm, create_buf);
 		if (rv != FICL_VM_STATUS_OUT_OF_TEXT) {
 			panic("error interpreting forth: %d", rv);
@@ -316,7 +317,7 @@ bf_init(char *rc)
 	 * version
 	 */
 	env = ficlSystemGetEnvironment(bf_sys);
-	ficlDictionarySetConstant(env, "loader_version", bootprog_rev);
+	(void) ficlDictionarySetConstant(env, "loader_version", bootprog_rev);
 
 	/* try to load and run init file if present */
 	if (rc == NULL)
@@ -325,7 +326,7 @@ bf_init(char *rc)
 		fd = open(rc, O_RDONLY);
 		if (fd != -1) {
 			(void) ficlExecFD(bf_vm, fd);
-			close(fd);
+			(void) close(fd);
 		}
 	}
 }
@@ -367,8 +368,8 @@ bf_run(char *line)
 
 	/* bye is same as reboot and will behave depending on platform */
 	if (result == FICL_VM_STATUS_USER_EXIT)
-		bf_run("reboot");
-	setenv("interpret", bf_vm->state ? "" : "ok", 1);
+		(void) bf_run("reboot");
+	(void) setenv("interpret", bf_vm->state ? "" : "ok", 1);
 
 	return (result);
 }

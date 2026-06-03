@@ -44,12 +44,6 @@
 
 #include "bootstrap.h"
 
-#if defined(EFI)
-#define	PTOV(pa)	((void *)pa)
-#else
-#include "../i386/btx/lib/btxv86.h"
-#endif
-
 #define	MDIR_REMOVED	0x0001
 #define	MDIR_NOHINTS	0x0002
 
@@ -278,7 +272,7 @@ command_lsmod(int argc, char *argv[])
 		}
 
 		if (hash == 1) {
-			void *ptr = PTOV(fp->f_addr);
+			void *ptr = ptov(fp->f_addr);
 
 			(void) pager_output("  hash: ");
 			sha1(ptr, fp->f_size, (uint8_t *)lbuf);
@@ -503,7 +497,7 @@ build_environment_module(void)
 
 	laddr = bi_copyenv(loadaddr);
 	/* Looks OK so far; populate control structure */
-	module_hash(fp, PTOV(loadaddr), laddr - loadaddr);
+	module_hash(fp, ptov(loadaddr), laddr - loadaddr);
 	fp->f_loader = -1;
 	fp->f_addr = loadaddr;
 	fp->f_size = laddr - loadaddr;
@@ -620,7 +614,7 @@ build_font_module(void)
 	laddr += archsw.arch_copyin(fd->vf_bytes, laddr, fi.fi_bitmap_size);
 
 	/* Looks OK so far; populate control structure */
-	module_hash(fp, PTOV(loadaddr), laddr - loadaddr);
+	module_hash(fp, ptov(loadaddr), laddr - loadaddr);
 	fp->f_loader = -1;
 	fp->f_addr = loadaddr;
 	fp->f_size = laddr - loadaddr;
@@ -1248,13 +1242,10 @@ moduledir_fullpath(struct moduledir *mdp, const char *fname)
 {
 	char *cp;
 
-	cp = malloc(strlen(mdp->d_path) + strlen(fname) + 2);
-	if (cp == NULL)
-		return (NULL);
-	strcpy(cp, mdp->d_path);
-	strcat(cp, "/");
-	strcat(cp, fname);
-	return (cp);
+	if (asprintf(&cp, "%s/%s", mdp->d_path, fname) > 0)
+		return (cp);
+
+	return (NULL);
 }
 
 /*

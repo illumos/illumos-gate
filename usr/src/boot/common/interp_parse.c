@@ -165,7 +165,8 @@ parse(int *argc, char ***argv, char *str)
 			if ((val = variable_lookup(p)) != NULL) {
 				size_t len = strlen(val);
 
-				strncpy(buf + i, val, PARSE_BUFSIZE - (i + 1));
+				(void) strncpy(buf + i, val,
+				    PARSE_BUFSIZE - (i + 1));
 				i += min(len, PARSE_BUFSIZE - 1);
 			}
 			*q = tmp;	/* restore value */

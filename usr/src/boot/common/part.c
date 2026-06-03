@@ -1037,26 +1037,26 @@ ptable_iterate(const struct ptable *table, void *arg, ptable_iterate_t *iter)
 	STAILQ_FOREACH(entry, &table->entries, entry) {
 #ifdef LOADER_MBR_SUPPORT
 		if (table->type == PTABLE_MBR)
-			sprintf(name, "s%d", entry->part.index);
+			(void) sprintf(name, "s%d", entry->part.index);
 		else
 #endif
 #ifdef LOADER_GPT_SUPPORT
 		if (table->type == PTABLE_GPT)
-			sprintf(name, "p%d", entry->part.index);
+			(void) sprintf(name, "p%d", entry->part.index);
 		else
 #endif
 #ifdef LOADER_VTOC8_SUPPORT
 		if (table->type == PTABLE_VTOC8)
-			sprintf(name, "%c", (uint8_t)'a' +
+			(void) sprintf(name, "%c", (uint8_t)'a' +
 			    entry->part.index);
 		else
 #endif
 		if (table->type == PTABLE_VTOC)
-			sprintf(name, "%c", (uint8_t)'a' +
+			(void) sprintf(name, "%c", (uint8_t)'a' +
 			    entry->part.index);
 		else
 		if (table->type == PTABLE_BSD)
-			sprintf(name, "%c", (uint8_t)'a' +
+			(void) sprintf(name, "%c", (uint8_t)'a' +
 			    entry->part.index);
 		ret = iter(arg, name, &entry->part);
 		if (ret != 0)
