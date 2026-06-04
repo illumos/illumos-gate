@@ -1297,10 +1297,10 @@ sub _capacity_update
 
 		$c1->{CAPACITY}->{$shname1} = $max_rate if
 		  !$c1->{CAPACITY}->{$shname1} ||
-		    !$c1->{CAPACITY}->{$shname1} < $max_rate;
+		    $c1->{CAPACITY}->{$shname1} < $max_rate;
 		$c2->{CAPACITY}->{$shname2} = $max_rate if
 		  !$c2->{CAPACITY}->{$shname2} ||
-		    !$c2->{CAPACITY}->{$shname2} < $max_rate;
+		    $c2->{CAPACITY}->{$shname2} < $max_rate;
 	}
 }
 
@@ -1423,7 +1423,7 @@ sub _set_intersect
 sub _expand
 {
 	# Skip the first argument if it is the object reference
-	shift if ref $@[0] eq 'HASH';
+	shift if ref $_[0];
 
 	my $arg = shift;
 
@@ -1464,7 +1464,7 @@ sub _collapse
 	my $result = '';
 	my $end = $start;	# Initial range consists of the first element
 	foreach my $el (@args) {
-		if (!$el =~ /^\d+$/) {
+		if ($el !~ /^\d+$/) {
 			$result = "$result $el";
 			$end = $el;
 		} elsif ($el == ($end + 1)) {
@@ -1519,7 +1519,7 @@ sub _relationship_order
 #
 # Get software load for each CPU from kstats
 # Argument: kstat reference
-# Returns: reference to the hash with 
+# Returns: reference to the hash with
 # cpu_idle, cpu_user, cpu_sys keys.
 #
 sub _get_sw_cpu_load
@@ -1604,7 +1604,7 @@ __END__
 #   CAPACITY		Estimate of capacity for each sharing
 #   PGTREE		The PG tree. See below for the tree representation.
 #
-#   PG_MODULE 		Module name for the PG kstats. It is either 'pg' for
+#   PG_MODULE		Module name for the PG kstats. It is either 'pg' for
 #			 old style kstats, or 'pg_hw_perf' for new style kstats.
 #
 #   MAX_FREQUENCY	Maximum CPU frequency
