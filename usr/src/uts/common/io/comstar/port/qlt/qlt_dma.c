@@ -667,7 +667,7 @@ qlt_dma_setup_dbuf(fct_local_port_t *port, stmf_data_buf_t *dbuf,
 	size_t			qsize;
 
 	/*
-	 * psuedo code:
+	 * pseudo code:
 	 * get dma handle list from cache - one per sglist entry
 	 * foreach sglist entry
 	 *	bind dma handle to sglist vaddr

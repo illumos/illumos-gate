@@ -265,7 +265,7 @@ sbdp_inject_error(const char *func_name, uint_t entry)
 	case SBDP_IE_RANDOM:
 		/*
 		 * Since we usually only need a binary type of return
-		 * value, use lbolt to generate the psuedo random
+		 * value, use lbolt to generate the pseudo random
 		 * response.
 		 */
 		value = (-(int)(ddi_get_lbolt() % 2));

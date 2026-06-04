@@ -57,7 +57,7 @@
  * head of the linked list and %edi is the amount that we have to adjust the
  * total amount cached by the thread.
  *
- * Each block of assembly has psuedocode that describes its purpose.
+ * Each block of assembly has pseudocode that describes its purpose.
  */
 
 /*

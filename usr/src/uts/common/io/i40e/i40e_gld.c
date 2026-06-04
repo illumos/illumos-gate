@@ -771,7 +771,7 @@ i40e_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 			/*
 			 * Note, saying we have no groups, but some
 			 * number of rings indicates to MAC that it
-			 * should create psuedo-groups with one for
+			 * should create pseudo-groups with one for
 			 * each TX ring. This may not be the long term
 			 * behavior we want, but it'll work for now.
 			 */

@@ -311,7 +311,7 @@ gem_dump_packet(struct gem_dev *dp, char *title, mblk_t *mp,
 
 	iphlen = (p[0] & 0xf) * 4;
 
-	/* cksum for psuedo header */
+	/* cksum for pseudo header */
 	cksum = *(uint16_t *)&p[12];
 	cksum += *(uint16_t *)&p[14];
 	cksum += *(uint16_t *)&p[16];

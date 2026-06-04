@@ -1807,7 +1807,7 @@ tcp_verify_cksum(mblk_t *mp)
 	len = ntohs(iph->ip_len);
 
 	/*
-	 * Calculate the TCP checksum.  Need to include the psuedo header,
+	 * Calculate the TCP checksum.  Need to include the pseudo header,
 	 * which is similar to the real IP header starting at the TTL field.
 	 */
 	iph->ip_sum = htons(len - IP_SIMPLE_HDR_LENGTH);
@@ -6217,7 +6217,7 @@ tcp_set_cksum(mblk_t *mp)
 	tcph = (tcpha_t *)(iph + 1);
 	len = ntohs(iph->ip_len);
 	/*
-	 * Calculate the TCP checksum.  Need to include the psuedo header,
+	 * Calculate the TCP checksum.  Need to include the pseudo header,
 	 * which is similar to the real IP header starting at the TTL field.
 	 */
 	iph->ip_sum = htons(len - IP_SIMPLE_HDR_LENGTH);

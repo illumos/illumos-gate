@@ -2211,7 +2211,7 @@ soft_gen_hmac_key(uchar_t *pPIN, soft_object_t **key, CK_BYTE **saltdata)
 }
 
 /*
- * The token session is just a psuedo session (a place holder)
+ * The token session is just a pseudo session (a place holder)
  * to hold some information during encryption/decryption and
  * sign/verify operations when writing/reading the keystore
  * token object.

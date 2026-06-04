@@ -1356,7 +1356,7 @@ ibd_hash_by_id(void *hash_data, mod_hash_key_t key)
 	/*
 	 * If the input address is 4 byte aligned, we can just dereference
 	 * it. This is most common, since IP will send in a 4 byte aligned
-	 * IP header, which implies the 24 byte IPoIB psuedo header will be
+	 * IP header, which implies the 24 byte IPoIB pseudo header will be
 	 * 4 byte aligned too.
 	 */
 	if ((ptraddr & 3) == 0)

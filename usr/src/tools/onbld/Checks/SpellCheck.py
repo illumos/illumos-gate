@@ -164,6 +164,7 @@ misspellings = {
 	'pavillion': 'pavilion',
 	'peice': 'piece',
 	'persistant': 'persistent',
+	'pesudo': 'pseudo',
 	'politican': 'politician',
 	'posession': 'possession',
 	'possiblity': 'possibility',

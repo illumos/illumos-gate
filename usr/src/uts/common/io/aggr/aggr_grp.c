@@ -975,7 +975,7 @@ aggr_add_pseudo_tx_group(aggr_port_t *port, aggr_pseudo_tx_group_t *tx_grp,
 
 	/*
 	 * Even if the underlying NIC does not have TX rings, we
-	 * still make a psuedo TX ring for that NIC with NULL as
+	 * still make a pseudo TX ring for that NIC with NULL as
 	 * the ring handle.
 	 */
 	if (hw_rh_cnt == 0)

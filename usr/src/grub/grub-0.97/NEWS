@@ -186,7 +186,7 @@ New in 0.5.96 - 2000-10-04:
 * The command-line interface is switched to single-line editing mode.
 * Only for developers: the configure script accepts
   `--enable-serial-speed-simulation', which is useful when you want to
-  simulate the speed of a serial device on a psuedo terminal.
+  simulate the speed of a serial device on a pseudo terminal.
 * Also only for developers: you can specify an optional argument to the
   option `--hold' for the grub shell. The argument means how many
   seconds the grub shell should wait until diving into the main routine.

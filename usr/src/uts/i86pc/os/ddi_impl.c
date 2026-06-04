@@ -2083,7 +2083,7 @@ get_console_font(void)
  *
  * Trying to assemble root file system drivers as we are booting from
  * devconf will fail if the kernel driver is basing its name_addr's on the
- * psuedo-node device info while the bootpath passed up from bootconf is using
+ * pseudo-node device info while the bootpath passed up from bootconf is using
  * reality-based name_addrs.  We help the boot along in this case by
  * looking at the pre-bootconf bootpath and determining if we would have
  * successfully matched if that had been the bootpath we had chosen.

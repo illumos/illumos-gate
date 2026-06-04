@@ -167,13 +167,13 @@ struct hv_tsb_block {
 	or	ttarget, scr1, ttarget
 
 /*
- * Synthesize/get data/instruction psuedo tag access register values
+ * Synthesize/get data/instruction pseudo tag access register values
  * from the MMU fault area (context is 0 for kernel, 1 for invalid, 2 for user)
  *
  * In:
  *   dtagacc, itagacc, scr1, scr2 = scratch registers
  * Out:
- *   dtagacc = MMU data tag access register value w/psuedo-context
+ *   dtagacc = MMU data tag access register value w/pseudo-context
  *   itagacc = MMU instruction tag access register value w/pseudo-context
  */
 #define	GET_MMU_BOTH_TAGACC(dtagacc, itagacc, scr1, scr2)	\

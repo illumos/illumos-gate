@@ -34,7 +34,7 @@ extern "C" {
 
 /*
  * The ptem data structure used to define the global data
- * for the psuedo terminal emulation streams module
+ * for the pseudo terminal emulation streams module
  */
 struct ptem {
 	tcflag_t cflags;	/* copy of c_cflags */

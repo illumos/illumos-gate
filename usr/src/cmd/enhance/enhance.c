@@ -496,7 +496,7 @@ static int pty_stop_parent(int waserr, int cntrl, GetLine *gl, char *rbuff)
 
 /*.......................................................................
  * Run the user's program, with its stdin and stdout connected to the
- * subsidiary end of the psuedo-terminal.
+ * subsidiary end of the pseudo-terminal.
  *
  * Input:
  *  prog  const char *   The name of this program.

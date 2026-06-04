@@ -845,7 +845,7 @@ setalarm(void)
 	 * transmit faster than this.
 	 */
 
-	/* Open ft psuedo-device - we need our own copy. */
+	/* Open ft pseudo-device - we need our own copy. */
 	if (ftfd == 0) {
 		strcpy(ftname, "/dev/ft0");
 		while (ftfd <= 0 && ftname[7] <= '~') {

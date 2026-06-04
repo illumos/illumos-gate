@@ -442,7 +442,7 @@ struct pcfs {
 #define	PCFS_NOCHK		0x800	/* don't resync fat on error */
 #define	PCFS_BOOTPART		0x1000	/* boot partition type */
 #define	PCFS_HIDDEN		0x2000	/* show hidden files */
-#define	PCFS_PCMCIA_NO_CIS	0x4000	/* PCMCIA psuedo floppy */
+#define	PCFS_PCMCIA_NO_CIS	0x4000	/* PCMCIA pseudo floppy */
 #define	PCFS_FOLDCASE		0x8000	/* fold filenames to lowercase */
 #define	PCFS_FSINFO_OK		0x10000	/* valid FAT32 fsinfo sector */
 #define	PCFS_IRRECOV		0x20000	/* FS was messed with during write */

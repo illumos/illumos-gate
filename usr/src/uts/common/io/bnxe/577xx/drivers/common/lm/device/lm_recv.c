@@ -744,7 +744,7 @@ encap_pkt_parsing(struct _lm_device_t *pdev,
                   lm_packet_t         *pkt)
 {
     u16_t tmp, inner_ip_hdr_len, tcp_length;
-    u32_t psuedo_cksum;
+    u32_t pseudo_cksum;
     u8_t *hdr;
 
     // encapsulated packet:
@@ -826,7 +826,7 @@ encap_pkt_parsing(struct _lm_device_t *pdev,
         // check if protocol field is tcp
         if (hdr[9] == 0x06)
         {
-            // create the psuedo header
+            // create the pseudo header
 /* | Bit offset | 0-7    |    8-15  |    16-31   |
    |     0      |    Source address              |
    |    32      |  Destination address           |
@@ -834,12 +834,12 @@ encap_pkt_parsing(struct _lm_device_t *pdev,
 
             // adding 1 byte of zeros + protocol to the sum
             // and adding source and destination address
-            psuedo_cksum = calc_cksum((u16_t*)&hdr[12], 8, 0x06);
+            pseudo_cksum = calc_cksum((u16_t*)&hdr[12], 8, 0x06);
             // calculate the tcp length
             mm_memcpy(&tmp, &hdr[2], sizeof(u16_t));
             tcp_length = NTOH16(tmp) - inner_ip_hdr_len;
             // the TCP length field is the length of the TCP header and data (measured in octets).
-            psuedo_cksum += tcp_length;
+            pseudo_cksum += tcp_length;
         }
         else
         {
@@ -854,7 +854,7 @@ encap_pkt_parsing(struct _lm_device_t *pdev,
         if (hdr[6] == 0x06)
         {
             // tcp over ipv6
-            // create the psuedo header
+            // create the pseudo header
 /* | Bit offset | 0-7 | 8-15 | 16-23 |  24-31     |
    |     0      |     Source address              |
    |    32      |                                 |
@@ -869,13 +869,13 @@ encap_pkt_parsing(struct _lm_device_t *pdev,
 
             // adding 3 byte of zeros + protocol to the sum
             // and adding source and destination address
-            psuedo_cksum = calc_cksum((u16_t*)&hdr[8], 32, 0x06);
+            pseudo_cksum = calc_cksum((u16_t*)&hdr[8], 32, 0x06);
             // calculate the tcp length
             // in the ip header: the size of the payload in octets, including any extension headers
             mm_memcpy(&tmp, &hdr[4], sizeof(u16_t));
             // reduce the length of the extension headers
             tcp_length = NTOH16(tmp) - (inner_ip_hdr_len - 40);
-            psuedo_cksum += tcp_length;
+            pseudo_cksum += tcp_length;
         }
         else
         {
@@ -894,7 +894,7 @@ encap_pkt_parsing(struct _lm_device_t *pdev,
     SET_FLAGS(pkt->l2pkt_rx_info->flags, LM_RX_FLAG_IS_TCP_SEGMENT);
     // claculate the checksum of the rest of the packet
     // validate the checksum
-    if (validate_cksum(calc_cksum((u16_t*)hdr, tcp_length, psuedo_cksum)))
+    if (validate_cksum(calc_cksum((u16_t*)hdr, tcp_length, pseudo_cksum)))
     {
         SET_FLAGS(pkt->l2pkt_rx_info->flags, LM_RX_FLAG_TCP_CKSUM_IS_GOOD);
         RESET_FLAGS(pkt->l2pkt_rx_info->flags, LM_RX_FLAG_TCP_CKSUM_IS_BAD);

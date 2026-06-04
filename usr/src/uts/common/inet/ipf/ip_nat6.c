@@ -2580,7 +2580,7 @@ u_32_t nflags;
 		 * See IP_CKSUM_RECV().
 		 * Adjustment data should be the inverse of the IP address
 		 * changes, because db_cksum16 is supposed to be the complement
-		 * of the pesudo header.
+		 * of the pseudo header.
 		 */
 		csump = &fin->fin_m->b_datap->db_cksum16;
 		if (nat->nat_dir == NAT_OUTBOUND)

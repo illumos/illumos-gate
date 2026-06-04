@@ -976,10 +976,10 @@ i2c_nex_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 		 * We need to check if we're a child of pseudo. If so, we won't
 		 * get an instance number assigned to us due to the logic of how
 		 * instance assignment works. Once something is a child of
-		 * pseudo, the system expects psuedo to take charge of assigning
+		 * pseudo, the system expects pseudo to take charge of assigning
 		 * instances. This means that we have to basically do the same
 		 * thing that pseudonex_auto_assign() does. We can't really ask
-		 * psuedo to do this as it would want to name our child and we
+		 * pseudo to do this as it would want to name our child and we
 		 * can't assume that the path between us and pseudo will keep
 		 * calling all the way up to pseudo. This is unfortunate, but
 		 * not as unfortunate as instance -1! This uses the same logic

@@ -1618,7 +1618,7 @@ lookup:
 		 * otherwise calculate it.
 		 */
 		if (sp->s_rx_prefix_size != 0) {
-			hash = efx_psuedo_hdr_hash_get(sp->s_enp,
+			hash = efx_pseudo_hdr_hash_get(sp->s_enp,
 			    EFX_RX_HASHALG_TOEPLITZ,
 			    DB_BASE(mp));
 		} else {
@@ -1749,9 +1749,9 @@ sfxge_rx_qcomplete(sfxge_rxq_t *srp, boolean_t eop)
 		    sp->s_rx_buffer_size, DDI_DMA_SYNC_FORKERNEL);
 		ASSERT3P(rc, ==, DDI_SUCCESS);
 
-		/* Read the length from the psuedo header if required */
+		/* Read the length from the pseudo header if required */
 		if (srpp->srp_flags & EFX_PKT_PREFIX_LEN) {
-			rc = efx_psuedo_hdr_pkt_length_get(sp->s_enp,
+			rc = efx_pseudo_hdr_pkt_length_get(sp->s_enp,
 			    mp->b_rptr,
 			    &srpp->srp_size);
 			ASSERT3P(rc, ==, 0);

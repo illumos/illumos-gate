@@ -537,7 +537,7 @@ efx_rx_qdestroy(
 }
 
 	__checkReturn	efx_rc_t
-efx_psuedo_hdr_pkt_length_get(
+efx_pseudo_hdr_pkt_length_get(
 	__in		efx_nic_t *enp,
 	__in		uint8_t *buffer,
 	__out		uint16_t *lengthp)
@@ -549,7 +549,7 @@ efx_psuedo_hdr_pkt_length_get(
 
 #if EFSYS_OPT_RX_SCALE
 	__checkReturn	uint32_t
-efx_psuedo_hdr_hash_get(
+efx_pseudo_hdr_hash_get(
 	__in		efx_nic_t *enp,
 	__in		efx_rx_hash_alg_t func,
 	__in		uint8_t *buffer)
@@ -940,11 +940,11 @@ fail1:
 #endif
 
 /*
- * Falcon/Siena psuedo-header
+ * Falcon/Siena pseudo-header
  * --------------------------
  *
  * Receive packets are prefixed by an optional 16 byte pseudo-header.
- * The psuedo-header is a byte array of one of the forms:
+ * The pseudo-header is a byte array of one of the forms:
  *
  *  0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
  * xx.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx.xx.TT.TT.TT.TT

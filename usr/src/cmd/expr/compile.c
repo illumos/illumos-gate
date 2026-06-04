@@ -53,7 +53,7 @@
 #include <regexpr.h>
 
 /*
- * psuedo compile/step/advance global variables
+ * pseudo compile/step/advance global variables
  */
 extern int nbra;
 extern char *locs;		/* for stopping execess recursion */

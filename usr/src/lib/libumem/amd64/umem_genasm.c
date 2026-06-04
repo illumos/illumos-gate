@@ -59,7 +59,7 @@
  * head of the linked list and %r8 is the amount that we have to adjust the
  * thread's cached amount by.
  *
- * Each block of assembly has psuedocode that describes its purpose.
+ * Each block of assembly has pseudocode that describes its purpose.
  */
 
 /*

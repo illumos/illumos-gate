@@ -85,7 +85,7 @@ static	int	*maxifbraces;		/* maximum brace count within #if */
 static	int	*preifbraces;		/* brace count before #if */
 static	int	parens;			/* unmatched left parenthesis count */
 static	BOOL	ppdefine;		/* preprocessor define statement */
-static	BOOL	psuedoelif;		/* psuedo-#elif */
+static	BOOL	pseudoelif;		/* pseudo-#elif */
 static	BOOL	oldtype;		/* next identifier is an old type */
 static	BOOL	rules;			/* lex/yacc rules */
 static	BOOL	sdl;			/* SDL file */
@@ -202,14 +202,14 @@ number		\.?[0-9][.0-9a-fA-FlLuUxX]*
 			if (elseelif == YES) {
 				goto endif;
 			}
-			psuedoelif = YES;
+			pseudoelif = YES;
 			goto more;
 			/* NOTREACHED */
 		}
 \#[ \t]*ifn?(def)?	{ /* #if, #ifdef or #ifndef */
 			elseelif = NO;
-			if (psuedoelif == YES) {
-				psuedoelif = NO;
+			if (pseudoelif == YES) {
+				pseudoelif = NO;
 				goto elif;
 			}
 			/*
@@ -771,7 +771,7 @@ initscanner(char *srcfile)
 	localdef = NO;		/* function/block local definition */
 	parens = 0;		/* unmatched left parenthesis count */
 	ppdefine = NO;		/* preprocessor define statement */
-	psuedoelif = NO;	/* psuedo-#elif */
+	pseudoelif = NO;	/* pseudo-#elif */
 	oldtype = NO;		/* next identifier is an old type */
 	rules = NO;		/* lex/yacc rules */
 	sdl = NO;		/* SDL file */

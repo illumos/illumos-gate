@@ -217,7 +217,7 @@ static devfsadm_create_t misc_cbt[] = {
 	{ "pseudo", "ddi_pseudo", "ktest",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, minor_name
 	},
-	{ "psuedo", DDI_NT_EEPROM, "eedev",
+	{ "pseudo", DDI_NT_EEPROM, "eedev",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, eeprom_create
 	}
 };
@@ -262,7 +262,7 @@ static devfsadm_remove_t misc_remove_cbt[] = {
 	{ "9p", "^9p/[0-9]+$",
 	    RM_PRE | RM_HOT | RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
 	},
-	{ "pesudo", "^eeprom/.*$",
+	{ "pseudo", "^eeprom/.*$",
 	    RM_PRE | RM_HOT | RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
 	},
 };

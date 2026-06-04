@@ -369,7 +369,7 @@ _nss_files_hash_destroy(files_hash_t *fhp)
  * other than the nscd; the consumption of swap space and memory is otherwise
  * unacceptable when the nscd is killed w/ a large passwd file (4M) active.
  * See 4031930 for details.
- * So we just use this psuedo function to enable the hashing feature.  Since
+ * So we just use this pseudo function to enable the hashing feature.  Since
  * this function name is private, we just create a function w/ the name
  *  __nss_use_files_hash in the nscd itself and everyone else uses the old
  * interface.

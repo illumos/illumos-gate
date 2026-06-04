@@ -1054,7 +1054,7 @@ reparse_kderef(const char *svc_type, const char *svc_data, char *buf,
 
 /*
  * This routine is used to create a single vfs_t that is used globally in the
- * system for a psuedo-file system that does not actually ever "mount", like
+ * system for a pseudo-file system that does not actually ever "mount", like
  * sockfs or fifofs. This constructs a single vfs_t that will not be
  * accidentally freed nor will it end up on a zone's list of file systems.
  * Please do not add new file systems that need to use this. The kmem_zalloc

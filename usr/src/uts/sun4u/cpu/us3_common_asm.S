@@ -392,7 +392,7 @@
  * vac_flushpage(pfnum, color)
  *	Flush 1 8k page of the D-$ with physical page = pfnum
  *	Algorithm:
- *		The cheetah dcache is a 64k psuedo 4 way accaociative cache.
+ *		The cheetah dcache is a 64k pseudo 4 way accaociative cache.
  *		It is virtual indexed, physically tagged cache.
  */
 	.seg	".data"

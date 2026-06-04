@@ -285,7 +285,7 @@ main(int ac, char *av[])
 }
 
 /*
- * This routine sets up the boolean psuedo-functions which work
+ * This routine sets up the boolean pseudo-functions which work
  * by seting boolean flags dependent upon the corresponding character
  * Every char which is NOT in that string is not a white char.  Therefore,
  * all of the array "_wht" is set to FALSE, and then the elements
@@ -1377,7 +1377,7 @@ parseargs(int ac, char **av)
 	int a;			/* used to parse combined arguments	*/
 	int fflag;		/* 1 = we're only parsing filenames	*/
 	size_t sz;		/* size of the argument			*/
-	size_t mav_sz;		/* size of our psuedo argument space	*/
+	size_t mav_sz;		/* size of our pseudo argument space	*/
 
 	i = mac = fflag = 0;	/* proper initializations */
 

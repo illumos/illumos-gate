@@ -60,7 +60,7 @@
  *     always unused that you have read permission on to sleep on.
  *
  * (3) Install the ft (fast timer) device in your kernel.
- *     This is a psuedo-device to which an ioctl will wait n ticks
+ *     This is a pseudo-device to which an ioctl will wait n ticks
  *     and then send you an alarm.
  *
  * (4) Install the nap system call in your kernel.
