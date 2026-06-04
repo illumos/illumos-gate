@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
- * Copyright 2017 RackTop Systems.
+ * Copyright 2017-2026 RackTop Systems.
  */
 
 #include <sys/sdt.h>
@@ -302,20 +302,19 @@ sess_chan_limits(rfs4_session_t *sp)
 	if (sp->cn_attrs.ca_maxrequests > rfs4_max_slots) {
 		sp->cn_attrs.ca_maxrequests = rfs4_max_slots;
 	}
-
-	if (sp->cn_back_attrs.ca_maxrequests < 1 ||
-	    sp->cn_back_attrs.ca_maxrequests > rfs4_back_max_slots) {
-		/*
-		 * RFC 5661 doesn't specify what error should be return,
-		 * only says that requested ca_maxrequests for back
-		 * channel can not be changed.
-		 * Linux accepts whatever number client sends for back channel
-		 * check_backchannel_attrs() in linux source.
-		 * But since we do a mem alloc on this number
-		 * we cannot accept a arbit large number.
-		 */
+	if (sp->cn_back_attrs.ca_maxrequests < 1) {
 		return (NFS4ERR_INVAL);
 	}
+
+	/*
+	 * RFC 5661 requires the server to preserve the client's
+	 * backchannel ca_maxrequests value in CREATE_SESSION.
+	 * However, we are not obligated to USE all the slots
+	 * the client offers, so limit what we will use here
+	 * to the lesser of our MAX or the client's.
+	 */
+	sp->sn_bc.maxreqs = MIN(sp->cn_back_attrs.ca_maxrequests,
+	    rfs4_back_max_slots);
 
 	if (sp->cn_attrs.ca_maxrequestsize < NFS4_MIN_COMPOUND_REQSZ)
 		return (NFS4ERR_TOOSMALL);
@@ -670,8 +669,7 @@ rfs4_session_create(rfs4_entry_t u_entry, void *arg)
 		 */
 		bsdp = CTOBSD(ocp);
 		ASSERT(bsdp != NULL);
-		slot_table_create(&bsdp->bsd_stok,
-		    sp->cn_back_attrs.ca_maxrequests);
+		slot_table_create(&bsdp->bsd_stok, sp->sn_bc.maxreqs);
 		sp->sn_csflags |= CREATE_SESSION4_FLAG_CONN_BACK_CHAN;
 		sp->sn_back = ocp;
 	} else {

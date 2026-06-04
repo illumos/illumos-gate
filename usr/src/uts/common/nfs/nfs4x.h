@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2017 RackTop Systems.
+ * Copyright 2017-2026 RackTop Systems.
  */
 
 #ifndef _NFS4X_H
@@ -214,6 +214,7 @@ typedef struct rfs4_session {
 		uint32_t	pngcnt;		/* conn pings outstanding */
 		uint32_t	paths;		/* callback paths verified */
 		uint32_t	progno;		/* cb_program number */
+		uint32_t	maxreqs;	/* internal callback slots */
 		csa_sec_parms_t	secprms;	/* csa_sec_params */
 		uint32_t	failed:1;	/* TRUE if no cb path avail */
 		uint32_t	pnginprog:1;

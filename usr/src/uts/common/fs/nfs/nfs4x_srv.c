@@ -23,7 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
- * Copyright 2017 RackTop Systems.
+ * Copyright 2017-2026 RackTop Systems.
  */
 
 #include <rpc/types.h>
@@ -1279,7 +1279,7 @@ rfs4x_bc_setup(rfs4_session_t *sp)
 	bcp->cn_dir |= CDFS4_BACK;
 	bsdp = CTOBSD(bcp);
 	ASSERT(bsdp != NULL);
-	slot_table_create(&bsdp->bsd_stok, sp->cn_back_attrs.ca_maxrequests);
+	slot_table_create(&bsdp->bsd_stok, sp->sn_bc.maxreqs);
 	rw_exit(&bcp->cn_lock);
 
 	/*
