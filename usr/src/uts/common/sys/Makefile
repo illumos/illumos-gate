@@ -214,6 +214,7 @@ CHKHDRS=			\
 	dumphdr.h		\
 	edonr.h			\
 	efi_partition.h		\
+	efiio.h			\
 	elf.h			\
 	elf_386.h		\
 	elf_SPARC.h		\

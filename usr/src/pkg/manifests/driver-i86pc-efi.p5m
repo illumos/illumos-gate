@@ -1,0 +1,38 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+#
+# Copyright 2026 Argo Technology East
+#
+
+#
+# The default for payload-bearing actions in this package is to appear in the
+# global zone only.  See the include file for greater detail, as well as
+# information about overriding the defaults.
+#
+<include global_zone_only_component>
+set name=pkg.fmri value=pkg:/driver/i86pc/efi@$(PKGVERS)
+set name=pkg.summary value="UEFI Runtime Services driver"
+set name=pkg.description value="UEFI Runtime Services pseudo-driver"
+set name=info.classification value=org.opensolaris.category.2008:System/Hardware
+set name=variant.arch value=i386
+dir  path=platform group=sys
+dir  path=platform/i86pc group=sys
+dir  path=platform/i86pc/kernel group=sys
+dir  path=platform/i86pc/kernel/drv group=sys
+dir  path=platform/i86pc/kernel/drv/$(ARCH64) group=sys
+file path=platform/i86pc/kernel/drv/$(ARCH64)/efi group=sys
+file path=platform/i86pc/kernel/drv/efi.conf group=sys
+dir  path=usr/share/man
+dir  path=usr/share/man/man4d
+file path=usr/share/man/man4d/efi.4d
+driver name=efi perms="* 0600 root sys" devlink=type=ddi_pseudo;name=efi\t\M0
+license lic_CDDL license=lic_CDDL

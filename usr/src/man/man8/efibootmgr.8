@@ -1,0 +1,234 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\" Copyright 2026 Argo Technology East
+.\"
+.Dd June 9, 2026
+.Dt EFIBOOTMGR 8
+.Os
+.Sh NAME
+.Nm efibootmgr
+.Nd inspect and modify the UEFI Boot Manager
+.Sh SYNOPSIS
+.Nm
+.Op Fl v
+.Nm
+.Fl c
+.Fl d Ar disk
+.Fl l Ar loader
+.Op Fl p Ar partnum
+.Op Fl L Ar label
+.Nm
+.Fl B
+.Fl b Ar NNNN
+.Nm
+.Fl o Ar bootorder | Fl O
+.Nm
+.Fl n Ar NNNN | Fl N
+.Nm
+.Fl t Ar seconds | Fl T
+.Nm
+.Brq Fl a | Fl A
+.Fl b Ar NNNN
+.Nm
+.Fl f | Fl F
+.Sh DESCRIPTION
+The
+.Nm
+utility displays and updates the boot configuration held by the UEFI
+firmware in non-volatile RAM.
+The configuration is a set of UEFI variables in the global namespace,
+.Pq Sy 8be4df61-93ca-11d2-aa0d-00e098032b8c ,
+the most important of which are:
+.Bl -tag -width BootCurrent
+.It Sy BootOrder
+The sequence in which the firmware tries the boot entries below.
+.It Sy Boot Ns Ar NNNN
+An individual boot entry, where
+.Ar NNNN
+is a four-hex-digit identifier.
+Each one names a description and a UEFI device path that points to a
+loader.
+.It Sy BootCurrent
+The entry the firmware actually used on the current boot.
+Read-only from the operating system's perspective.
+.It Sy BootNext
+An override that, when present, makes the firmware boot the named entry
+once and then revert to
+.Sy BootOrder .
+.It Sy Timeout
+How many seconds the firmware shows its menu before booting
+.Sy BootOrder Ns Bq 0 .
+.El
+.Pp
+Without a mutating option, or when
+.Fl v
+is given,
+.Nm
+prints the current state of these variables, one per line, with each
+.Sy Boot Ns Ar NNNN
+rendered on its own line.
+A mutating invocation is otherwise silent on success;
+.Fl c
+reports the number of the entry it created.
+.Pp
+All operations require the kernel
+.Xr efi 4D
+driver and the
+.Sy PRIV_SYS_CONFIG
+privilege.
+.Sh OPTIONS
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl a | Fl A
+Set
+.Pq Fl a
+or clear
+.Pq Fl A
+the
+.Sy LOAD_OPTION_ACTIVE
+bit on the entry selected with
+.Fl b .
+Inactive entries are skipped by the boot manager.
+.It Fl b Ar NNNN
+Boot entry to operate on, in hexadecimal.
+Used together with
+.Fl a , Fl A ,
+or
+.Fl B .
+.It Fl B
+Delete the
+.Sy Boot Ns Ar NNNN
+entry selected with
+.Fl b
+and remove its number from
+.Sy BootOrder .
+.It Fl c
+Create a new
+.Sy Boot Ns Ar NNNN
+entry.
+The lowest unused number is allocated, the entry is set active, and its
+number is prepended to
+.Sy BootOrder .
+Requires
+.Fl d
+and
+.Fl l ;
+the EFI System Partition is located automatically
+.Pq see Fl p .
+.It Fl d Ar disk
+Disk whose GPT is read to locate the partition.
+Either a full
+.Pa /dev/rdsk
+path, or a disk name such as
+.Ar c0t0d0 ,
+which is resolved to its whole-disk raw device.
+.It Fl f | Fl F
+Set
+.Pq Fl f
+or clear
+.Pq Fl F
+the
+.Sy BOOT_TO_FW_UI
+bit in
+.Sy OsIndications .
+After
+.Fl f ,
+the next reboot drops into the firmware setup UI instead of running the
+boot manager, so that
+.Ql efibootmgr -f
+followed by a reboot is the equivalent of the Linux command
+.Ql systemctl reboot \-\-firmware-setup .
+The firmware must advertise support via
+.Sy OsIndicationsSupported ;
+if it does not,
+.Fl f
+fails.
+.It Fl l Ar loader
+UEFI loader path inside the ESP, relative to its root.
+Both
+.Sq /
+and
+.Sq \e
+are accepted as separators, so for example
+.Ar /EFI/illumos/loader64.efi
+names the loader.
+A path written with backslashes must be quoted to survive the shell.
+.It Fl L Ar label
+Human-readable label for the new entry.
+The default is
+.Sy illumos .
+.It Fl n Ar NNNN
+Set
+.Sy BootNext
+to the given entry.
+The firmware boots it once and then returns to
+.Sy BootOrder .
+.It Fl N
+Delete
+.Sy BootNext .
+.It Fl o Ar bootorder
+Set
+.Sy BootOrder .
+.Ar bootorder
+is a comma-separated list of boot entry numbers in hexadecimal, for
+example
+.Ar 0001,0000,0002 .
+.It Fl O
+Delete
+.Sy BootOrder .
+.It Fl p Ar partnum
+Slice number of the EFI System Partition on
+.Ar disk ,
+numbered from 0 as elsewhere in illumos.
+This option is normally unnecessary:
+.Nm
+uses the disk's EFI System Partition, which is the partition the firmware
+boots.
+Give
+.Fl p
+only to choose between several EFI System Partitions on one disk.
+.It Fl t Ar seconds
+Set
+.Sy Timeout .
+.It Fl T
+Delete
+.Sy Timeout .
+.It Fl v
+When listing, also print the EFI device path of every entry.
+.El
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/efi
+UEFI Runtime Services driver.
+.El
+.Sh EXIT STATUS
+.Bl -tag -width Ds
+.It 0
+Successful completion.
+.It 1
+A runtime error occurred, such as a firmware or driver failure.
+.It 2
+Invalid command-line options were specified.
+.El
+.Sh INTERFACE STABILITY
+The command line interface of
+.Nm
+is
+.Sy Committed .
+The output of
+.Nm
+is
+.Sy Not-an-Interface
+and may change at any time.
+.Sh SEE ALSO
+.Xr efi 4D ,
+.Xr bootadm 8 ,
+.Xr installboot 8

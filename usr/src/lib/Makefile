@@ -124,6 +124,7 @@ SUBDIRS +=				\
 	libdtrace_jni	\
 	libdwarf	\
 	libefi		\
+	libefivar	\
 	libelfsign	\
 	libeti		\
 	libexacct	\
@@ -618,6 +619,7 @@ libdtrace:	libproc libgen libctf libmapmalloc
 libdtrace_jni:	libuutil libdtrace
 libdwarf:	../cmd/sgs/libelf
 libefi:		libuuid libsmbios
+libefivar:	libuuid
 libelfsign:	libcryptoutil libkmf ../cmd/sgs/libelf
 libeti:		libcurses
 libexacct/demo:	libexacct libproject

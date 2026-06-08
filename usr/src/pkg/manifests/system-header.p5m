@@ -851,6 +851,7 @@ file path=usr/include/sys/ecppsys.h
 file path=usr/include/sys/ecppvar.h
 file path=usr/include/sys/edonr.h
 file path=usr/include/sys/efi_partition.h
+file path=usr/include/sys/efiio.h
 file path=usr/include/sys/elf.h
 file path=usr/include/sys/elf_386.h
 file path=usr/include/sys/elf_SPARC.h

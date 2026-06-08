@@ -44,6 +44,7 @@
 #include <sys/multiboot.h>
 #include <sys/multiboot2.h>
 #include <sys/multiboot2_impl.h>
+#include <sys/efi.h>
 #include <sys/bootvfs.h>
 #include <sys/bootprops.h>
 #include <sys/varargs.h>
@@ -2956,6 +2957,82 @@ build_firmware_properties(struct xboot_info *xbp)
 			    (uint64_t)(uintptr_t)xbp->bi_uefi_systab);
 		if (kbm_debug)
 			bop_printf(NULL, "32-bit UEFI detected.\n");
+	}
+
+	/*
+	 * If the loader handed us a multiboot2 EFI memory map tag, expose
+	 * the descriptor array as a kernel property so a driver can find
+	 * the EfiRuntimeServicesCode/Data ranges from a running system.
+	 * The map is only available on UEFI boots, but the multiboot2 tag
+	 * lookup is harmless on other paths.
+	 */
+	if (xbp->bi_mb_version == 2 && xbp->bi_mb_info != NULL) {
+		multiboot2_info_header_t *mbi = xbp->bi_mb_info;
+		multiboot_tag_efi_mmap_t *mmap_tagp;
+
+		mmap_tagp = dboot_multiboot2_find_tag(mbi,
+		    MULTIBOOT_TAG_TYPE_EFI_MMAP);
+		if (mmap_tagp != NULL &&
+		    mmap_tagp->mb_descr_vers == EFI_MEMORY_DESCRIPTOR_VERSION) {
+			uint32_t descsize = mmap_tagp->mb_descr_size;
+			int mmap_len = (int)(mmap_tagp->mb_size -
+			    offsetof(multiboot_tag_efi_mmap_t, mb_efi_mmap));
+			caddr_t buf = NULL;
+			int out_len = 0;
+
+			/*
+			 * Filter to descriptors with EFI_MEMORY_RUNTIME set:
+			 * servers can report several hundred descriptors and
+			 * the driver only needs the runtime-service ranges.
+			 * Count them first and size the buffer to hold the
+			 * complete runtime map -- dropping a descriptor would
+			 * leave a runtime region unmapped and fault on
+			 * firmware access.
+			 */
+			if (mmap_len > 0 && descsize >=
+			    sizeof (EFI_MEMORY_DESCRIPTOR) &&
+			    (mmap_len % (int)descsize) == 0) {
+				int off, nrt = 0;
+
+				for (off = 0; off < mmap_len;
+				    off += descsize) {
+					EFI_MEMORY_DESCRIPTOR *d =
+					    (EFI_MEMORY_DESCRIPTOR *)
+					    (mmap_tagp->mb_efi_mmap + off);
+					if ((d->Attribute &
+					    EFI_MEMORY_RUNTIME) != 0)
+						nrt++;
+				}
+				if (nrt > 0) {
+					buf = do_bsys_alloc(NULL, NULL,
+					    P2ROUNDUP((size_t)nrt *
+					    descsize, MMU_PAGESIZE),
+					    MMU_PAGESIZE);
+				}
+			}
+			if (buf != NULL) {
+				int off;
+
+				for (off = 0; off < mmap_len;
+				    off += descsize) {
+					EFI_MEMORY_DESCRIPTOR *d =
+					    (EFI_MEMORY_DESCRIPTOR *)
+					    (mmap_tagp->mb_efi_mmap + off);
+					if ((d->Attribute &
+					    EFI_MEMORY_RUNTIME) == 0)
+						continue;
+					bcopy(d, buf + out_len, descsize);
+					out_len += descsize;
+				}
+			}
+
+			if (out_len > 0) {
+				bsetprop(DDI_PROP_TYPE_BYTE,
+				    "efi-mmap", strlen("efi-mmap"),
+				    buf, out_len);
+				bsetprop32("efi-mmap-descsize", descsize);
+			}
+		}
 	}
 
 	if (xbp->bi_smbios != NULL &&

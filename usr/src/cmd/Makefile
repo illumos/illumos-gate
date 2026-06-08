@@ -150,6 +150,7 @@ COMMON_SUBDIRS=		\
 	echo		\
 	ed		\
 	eeprom		\
+	efibootmgr	\
 	eject		\
 	emul64ioctl	\
 	enhance		\

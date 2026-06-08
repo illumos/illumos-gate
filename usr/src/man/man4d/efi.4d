@@ -1,0 +1,68 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\" Copyright 2026 Argo Technology East
+.\"
+.Dd June 9, 2026
+.Dt EFI 4D
+.Os
+.Sh NAME
+.Nm efi
+.Nd UEFI Runtime Services driver
+.Sh SYNOPSIS
+.Pa /dev/efi
+.Sh DESCRIPTION
+The
+.Nm
+driver gives privileged user processes access to the UEFI variable
+Runtime Services
+.Pq GetVariable, GetNextVariableName and SetVariable
+on systems booted from UEFI firmware.
+It is the kernel component behind
+.Xr efibootmgr 8 ,
+which reaches it through the
+.Sy libefivar
+library.
+.Pp
+The driver attaches only on
+.Sy i86pc
+systems booted from 64-bit UEFI firmware, where the boot loader has
+published the firmware's system table and memory map as the
+.Sy efi-systab
+and
+.Sy efi-mmap
+properties.
+On a system booted through legacy BIOS, or one whose firmware is 32-bit,
+the driver does not attach and
+.Pa /dev/efi
+is absent.
+.Pp
+All operations require the
+.Sy PRIV_SYS_CONFIG
+privilege.
+Reading UEFI variables is privileged because some of them hold sensitive
+data such as Secure Boot keys.
+.Sh FILES
+.Bl -tag -width Pa
+.It Pa /dev/efi
+Character device providing access to UEFI Runtime Services.
+.El
+.Sh INTERFACE STABILITY
+The
+.Pa /dev/efi
+ioctl interface is
+.Sy Private .
+.Sh SEE ALSO
+.Xr efibootmgr 8
+.Rs
+.%Q Unified EFI Forum
+.%B Unified Extensible Firmware Interface (UEFI) Specification
+.%U https://uefi.org/specifications
+.Re

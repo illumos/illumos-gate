@@ -120,6 +120,7 @@ _MANFILES=	6to4relay.8		\
 		editmap.8		\
 		edquota.8		\
 		eeprom.8		\
+		efibootmgr.8		\
 		embedded_su.8		\
 		etrn.8			\
 		fcinfo.8		\

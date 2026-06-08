@@ -192,6 +192,7 @@ i386_MANFILES=	ahci.4d		\
 		cpqary3.4d	\
 		dnet.4d		\
 		ecpp.4d		\
+		efi.4d		\
 		elxl.4d		\
 		i40e.4d		\
 		imc.4d		\

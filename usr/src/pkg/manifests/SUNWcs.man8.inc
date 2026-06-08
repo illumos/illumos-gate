@@ -83,6 +83,7 @@ file path=usr/share/man/man8/drvconfig.8
 file path=usr/share/man/man8/dumpadm.8
 file path=usr/share/man/man8/edquota.8
 file path=usr/share/man/man8/eeprom.8
+file path=usr/share/man/man8/efibootmgr.8
 file path=usr/share/man/man8/embedded_su.8
 file path=usr/share/man/man8/fdetach.8
 file path=usr/share/man/man8/fdisk.8

@@ -223,5 +223,6 @@ license usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode \
     license=usr/src/uts/common/sys/THIRDPARTYLICENSE.unicode
 $(i386_ONLY)license usr/src/uts/intel/THIRDPARTYLICENSE \
     license=usr/src/uts/intel/THIRDPARTYLICENSE
+$(i386_ONLY)depend type=require fmri=driver/i86pc/efi
 $(i386_ONLY)depend type=require fmri=system/microcode/amd
 $(i386_ONLY)depend type=require fmri=system/microcode/intel

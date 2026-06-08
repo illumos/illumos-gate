@@ -1327,6 +1327,7 @@ hardlink path=usr/sbin/drvconfig target=./devfsadm
 file path=usr/sbin/dumpadm mode=0555
 link path=usr/sbin/edquota target=../lib/fs/ufs/edquota
 file path=usr/sbin/eeprom group=sys mode=2555
+file path=usr/sbin/efibootmgr mode=0555
 link path=usr/sbin/fdisk target=../../sbin/fdisk
 file path=usr/sbin/ff mode=0555
 link path=usr/sbin/fiocompress target=../../sbin/fiocompress
