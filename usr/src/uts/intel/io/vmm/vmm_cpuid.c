@@ -40,7 +40,7 @@
 /*
  * Copyright 2014 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -132,6 +132,7 @@
 #define	CPUID_8000_0008	(0x80000008)
 #define	CPUID_8000_001D	(0x8000001D)
 #define	CPUID_8000_001E	(0x8000001E)
+#define	CPUID_8000_0020	(0x80000020)
 
 #define	CPUID_VM_HIGH	0x40000000
 
@@ -779,6 +780,24 @@ legacy_emulate_cpuid(struct vm *vm, int vcpu_id, uint32_t *eax, uint32_t *ebx,
 			 * XXX Bhyve topology cannot yet represent >1 node per
 			 * processor.
 			 */
+			regs[2] = 0;
+			regs[3] = 0;
+			break;
+
+		case CPUID_8000_0020:
+			/*
+			 * AMD "PQOS Extended Features", the counterpart to the
+			 * architectural Resource Director Technology leaves
+			 * (0xF and 0x10) which are masked below. As with
+			 * those, exposing memory-bandwidth/cache QoS
+			 * monitoring and enforcement to the guest is not
+			 * sensible.
+			 */
+			if (!vmm_is_svm() || CPUID_TO_FAMILY(cpu_id) < 0x17)
+				goto default_leaf;
+
+			regs[0] = 0;
+			regs[1] = 0;
 			regs[2] = 0;
 			regs[3] = 0;
 			break;
