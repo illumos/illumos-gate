@@ -3146,6 +3146,7 @@ rfs4_deleg_state_create(rfs4_entry_t u_entry, void *argp)
 	dsp->rds_finfo = fp;
 	dsp->rds_client = cp;
 	dsp->rds_dtype = OPEN_DELEGATE_NONE;
+	bzero(dsp->rds_cbsessid, sizeof (sessionid4));
 
 	dsp->rds_time_granted = gethrestime_sec();	/* observability */
 	dsp->rds_time_revoked = 0;

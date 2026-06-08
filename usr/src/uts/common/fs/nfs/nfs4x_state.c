@@ -130,19 +130,6 @@ rfs4x_findsession_by_id(sessionid4 sessid)
 	return (sp);
 }
 
-rfs4_session_t *
-rfs4x_findsession_by_clid(clientid4 clid)
-{
-	rfs4_session_t	*sp;
-	bool_t		create = FALSE;
-	nfs4_srv_t *nsrv4 = nfs4_get_srv();
-
-	sp = (rfs4_session_t *)rfs4_dbsearch(nsrv4->rfs4_session_clid_idx,
-	    &clid, &create, NULL, RFS4_DBS_VALID);
-
-	return (sp);
-}
-
 /*
  * A clientid can have multiple sessions associated with it. Hence,
  * performing a raw 'mds_findsession' (even for a create) might

@@ -70,10 +70,16 @@ static	void		rfs41_revoke_deleg(rfs4_deleg_state_t *);
 static	void		rfs4_revoke_file(rfs4_file_t *);
 static	void		rfs4_cb_chflush(rfs4_cbinfo_t *);
 static rfs4_deleg_state_t *rfs4_deleg_state(rfs4_state_t *,
-    open_delegation_type4, int *);
+    rfs4_session_t *, open_delegation_type4, int *);
 static CLIENT *rfs4x_cb_chinit(rfs4_session_t *);
 int rfs4x_cbrecall_no_session = 0;
 int rfs4x_cbgetattr_no_session = 0;
+
+static inline bool_t
+rfs4_session_has_backchannel(rfs4_session_t *sp)
+{
+	return (sp != NULL && SN_CB_CHAN_EST(sp) && SN_CB_CHAN_OK(sp));
+}
 
 /*
  * Convert a universal address to an transport specific
@@ -935,6 +941,7 @@ rfs4_vop_getattr(vnode_t *vp, vattr_t *vap, int flag, cred_t *cr)
  * now, just call the VOP_GETATTR().  If the NFSv4 server is enhanced
  * in the future to provide space guarantees for write delegations
  * then this call site should be expanded to interact with the client.
+ * Only 4.x clients see delegated attributes, via rfs4_cb_getattr.
  */
 int
 rfs4_delegated_getattr(vnode_t *vp, vattr_t *vap, int flag, cred_t *cr)
@@ -1004,6 +1011,58 @@ rfs4x_cb_freech(rfs4_session_t *sp, CLIENT *ch)
 	if (ch->cl_auth)
 		auth_destroy(ch->cl_auth);
 	clnt_destroy(ch);
+}
+
+rfs4_session_t *
+rfs4x_find_cbsession_by_deleg(rfs4_deleg_state_t *dsp)
+{
+	rfs4_session_t		*sp;
+	rfs4_client_t		*cp;
+
+	sp = rfs4x_findsession_by_id(dsp->rds_cbsessid);
+	if (rfs4_session_has_backchannel(sp)) {
+		/* hold given to caller */
+		return (sp);
+	}
+	if (sp != NULL) {
+		rfs4x_session_rele(sp);
+		sp = NULL;
+	}
+
+	/*
+	 * The session recorded in the delegation is no longer usable
+	 * for back-channel calls.  If the client reconnected, there
+	 * may be another session we could use.  For delegation recall
+	 * that may avoid blocking a conflicting open while an entire
+	 * lease period expires.
+	 */
+	cp = dsp->rds_client;
+
+	rfs4_dbe_lock(cp->rc_dbe);
+	for (sp = list_head(&cp->rc_sessions); sp != NULL;
+	    sp = list_next(&cp->rc_sessions, sp)) {
+		rfs4x_session_hold(sp);
+		rfs4_dbe_lock(sp->sn_dbe);
+		if (!rfs4_dbe_is_invalid(sp->sn_dbe) &&
+		    rfs4_session_has_backchannel(sp)) {
+			rfs4_dbe_unlock(sp->sn_dbe);
+			break;
+		}
+		rfs4_dbe_unlock(sp->sn_dbe);
+		rfs4x_session_rele(sp);
+	}
+	rfs4_dbe_unlock(cp->rc_dbe);
+
+	if (sp != NULL) {
+		rfs4_dbe_lock(dsp->rds_dbe);
+		if (!rfs4_dbe_is_invalid(dsp->rds_dbe)) {
+			bcopy(sp->sn_sessid, dsp->rds_cbsessid,
+			    sizeof (sessionid4));
+		}
+		rfs4_dbe_unlock(dsp->rds_dbe);
+	}
+
+	return (sp);
 }
 
 bool_t
@@ -1155,17 +1214,17 @@ rfs4x_do_cb_recall(rfs4_deleg_state_t *dsp, bool_t trunc)
 	int			retried = 0;
 	rfs4_session_t		*sp;
 
-	sp = rfs4x_findsession_by_clid(dsp->rds_client->rc_clientid);
-	ASSERT(sp != NULL);
+	sp = rfs4x_find_cbsession_by_deleg(dsp);
 	if (sp == NULL) {
 		/*
-		 * this shouldn't ever happen.  if it does, just
-		 * increment a counter for now and return.
+		 * The recorded callback session is gone or no longer
+		 * has a usable backchannel.  Let the delegation time out.
 		 */
 		rfs4x_cbrecall_no_session++;
-		cmn_err(CE_WARN, "rfs4x_do_cb_recall: no session\n");
+		DTRACE_PROBE1(no__cb__deleg, rfs4_deleg_state_t, dsp);
 		return;
 	}
+
 	/*
 	 * set up the compound args
 	 */
@@ -1527,15 +1586,14 @@ rfs4x_do_cb_getattr(rfs4_deleg_state_t *dsp,
 	bitmap4			attrmask;
 	bitmap4			ret = 0;
 
-	sp = rfs4x_findsession_by_clid(dsp->rds_client->rc_clientid);
-	ASSERT(sp != NULL);
+	sp = rfs4x_find_cbsession_by_deleg(dsp);
 	if (sp == NULL) {
 		/*
-		 * this shouldn't ever happen.  if it does, just
-		 * increment a counter for now and return.
+		 * The recorded callback session is gone or no longer
+		 * has a usable backchannel.  Just use local attrs.
 		 */
 		rfs4x_cbgetattr_no_session++;
-		cmn_err(CE_WARN, "rfs4x_do_cb_getattr: no session\n");
+		DTRACE_PROBE1(no__cb__deleg, rfs4_deleg_state_t, dsp);
 		return (0);
 	}
 
@@ -2038,7 +2096,7 @@ rfs4_delegation_policy(nfs4_srv_t *nsrv4, open_delegation_type4 dtype,
  */
 rfs4_deleg_state_t *
 rfs4_grant_delegation(delegreq_t dreq, rfs4_state_t *sp,
-    int *recall, bool_t is_reclaim)
+    rfs4_session_t *sessp, int *recall, bool_t is_reclaim)
 {
 	nfs4_srv_t *nsrv4;
 	rfs4_file_t *fp = sp->rs_finfo;
@@ -2094,12 +2152,12 @@ rfs4_grant_delegation(delegreq_t dreq, rfs4_state_t *sp,
 		 * may be granted.
 		 */
 		if (cp->rc_minorversion != 0) {
-			cb_ok = rfs4x_cbcheck(sp);
+			cb_ok = rfs4_session_has_backchannel(sessp);
 		} else {
-			cb_ok = rfs4_cbcheck(sp);
+			cb_ok = (rfs4_cbcheck(sp) == CB_OK);
 		}
 		if (!cb_ok) {
-			cmn_err(CE_WARN, "rfs4_grant_delegation: no cb\n");
+			DTRACE_PROBE1(no__cb__state, rfs4_state_t *, sp);
 			return (NULL);
 		}
 
@@ -2176,7 +2234,7 @@ rfs4_grant_delegation(delegreq_t dreq, rfs4_state_t *sp,
 	}
 
 	/* set the delegation for the state */
-	return (rfs4_deleg_state(sp, dtype, recall));
+	return (rfs4_deleg_state(sp, sessp, dtype, recall));
 }
 
 void
@@ -2371,7 +2429,8 @@ rfs4_clear_dont_grant(rfs4_file_t *fp)
  * locks on sp and sp->rs_finfo are assumed.
  */
 static rfs4_deleg_state_t *
-rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
+rfs4_deleg_state(rfs4_state_t *sp, rfs4_session_t *sessp,
+    open_delegation_type4 dtype, int *recall)
 {
 	rfs4_file_t *fp = sp->rs_finfo;
 	bool_t create = TRUE;
@@ -2539,6 +2598,11 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 	list_insert_tail(&fp->rf_delegstatelist, dsp);
 
 	dsp->rds_dtype = fp->rf_dinfo.rd_dtype = dtype;
+	/* sessp may be NULL for v4.0 */
+	if (sessp != NULL) {
+		bcopy(sessp->sn_sessid, dsp->rds_cbsessid,
+		    sizeof (sessionid4));
+	}
 
 	/* Update delegation stats for this file */
 	fp->rf_dinfo.rd_time_lastgrant = gethrestime_sec();

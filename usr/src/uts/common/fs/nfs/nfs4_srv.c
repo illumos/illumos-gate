@@ -7314,7 +7314,7 @@ again:
 	 * as required by RFC 7530 §16.16.3 / RFC 5661 §18.16.3.
 	 */
 
-	dsp = rfs4_grant_delegation(dreq, sp, &recall, is_reclaim);
+	dsp = rfs4_grant_delegation(dreq, sp, cs->sp, &recall, is_reclaim);
 
 	cs->deleg = (fp->rf_dinfo.rd_dtype == OPEN_DELEGATE_WRITE);
 
