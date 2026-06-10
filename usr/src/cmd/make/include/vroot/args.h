@@ -23,12 +23,16 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
 
 #ifndef _ARGS_H_
 #define	_ARGS_H_
 
 #include <sys/syscall.h>
 #include <errno.h>
+#include <spawn.h>
 #include <sys/time.h>
 #include <sys/param.h>
 #include <stdio.h>
@@ -56,9 +60,6 @@ union Args {
 		int mode;
 	} creat;
 	struct {
-		char **argv; char **environ;
-	} execve;
-	struct {
 		struct stat *buffer;
 	} lstat;
 	struct {
@@ -73,6 +74,10 @@ union Args {
 	struct {
 		char *buffer; int buffer_size;
 	} readlink;
+	struct {
+		char **argv; char **environ;
+		posix_spawnattr_t *attr; pid_t pid;
+	} spawn;
 	struct {
 		struct stat *buffer;
 	} stat;

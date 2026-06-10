@@ -23,28 +23,46 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
 
 #include <unistd.h>
-
-extern int execve (const char *path, char *const argv[], char *const envp[]);
+#include <spawn.h>
 
 #include <vroot/vroot.h>
 #include <vroot/args.h>
 
-static int	execve_thunk(char *path)
+/*
+ * Try to spawn one candidate path. Returning 1 stops the path search,
+ * either because the command has been spawned or because the error
+ * needs to be dealt with by the caller. Returning 0 moves on to the
+ * next candidate.
+ */
+static int spawn_thunk(char *path)
 {
-	execve(path, vroot_args.execve.argv, vroot_args.execve.environ);
+	int err = posix_spawn(&vroot_args.spawn.pid, path, NULL,
+	    vroot_args.spawn.attr, vroot_args.spawn.argv,
+	    vroot_args.spawn.environ);
+
+	if (err == 0)
+		return (1);
+	vroot_args.spawn.pid = -1;
+	errno = err;
 	switch (errno) {
 		case ETXTBSY:
-		case ENOEXEC: return 1;
-		default: return 0;
+		case ENOEXEC: return (1);
+		default: return (0);
 	}
 }
 
-int	execve_vroot(char *path, char **argv, char **environ, pathpt vroot_path, pathpt vroot_vroot)
+pid_t spawn_vroot(char *path, char **argv, char **environ,
+    posix_spawnattr_t *attr, pathpt vroot_path, pathpt vroot_vroot)
 {
-	vroot_args.execve.argv= argv;
-	vroot_args.execve.environ= environ;
-	translate_with_thunk(path, execve_thunk, vroot_path, vroot_vroot, rw_read);
-	return(-1);
+	vroot_args.spawn.argv = argv;
+	vroot_args.spawn.environ = environ;
+	vroot_args.spawn.attr = attr;
+	vroot_args.spawn.pid = -1;
+	translate_with_thunk(path, spawn_thunk, vroot_path, vroot_vroot, rw_read);
+	return (vroot_args.spawn.pid);
 }

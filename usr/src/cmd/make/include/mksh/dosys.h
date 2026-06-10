@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #ifndef _MKSH_DOSYS_H
 #define	_MKSH_DOSYS_H
 
@@ -30,8 +34,8 @@
 #include <vroot/vroot.h>
 
 extern Boolean	await(Boolean, Boolean, Name, wchar_t *, pid_t, void *, int);
-extern int	doexec(wchar_t *, Boolean, char *, char *, pathpt, int);
-extern int	doshell(wchar_t *, Boolean, char *, char *, int);
+extern pid_t	doexec(wchar_t *, Boolean, char *, char *, pathpt, int);
+extern pid_t	doshell(wchar_t *, Boolean, char *, char *, int);
 extern void	redirect_io(char *, char *);
 extern void	sh_command2string(String, String);
 

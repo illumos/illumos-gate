@@ -23,12 +23,17 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
 
 #ifndef _VROOT_H_
 #define	_VROOT_H_
 
 #include <stdio.h>
 #include <nl_types.h>
+#include <spawn.h>
+#include <sys/types.h>
 
 #define	VROOT_DEFAULT ((pathpt)-1)
 
@@ -52,7 +57,8 @@ extern	void		set_path_style(int);
 
 extern	int		access_vroot(char *, int, pathpt, pathpt);
 
-extern	int		execve_vroot(char *, char **, char **, pathpt, pathpt);
+extern	pid_t		spawn_vroot(char *, char **, char **,
+	posix_spawnattr_t *, pathpt, pathpt);
 
 extern	int		lstat_vroot(char *, struct stat *, pathpt, pathpt);
 extern	int		stat_vroot(char *, struct stat *, pathpt, pathpt);

@@ -26,6 +26,7 @@
 /*
  * Copyright 2015, Joyent, Inc.
  * Copyright 2019 RackTop Systems.
+ * Copyright 2026 Oxide Computer Company
  */
 
 
@@ -47,7 +48,8 @@
 #include <mksh/dosys.h>
 #include <mksh/macro.h>		/* getvar() */
 #include <mksh/misc.h>		/* getmem(), fatal_mksh(), errmsg() */
-#include <sys/signal.h>		/* SIG_DFL */
+#include <sched.h>		/* sched_getparam() */
+#include <spawn.h>		/* posix_spawn() */
 #include <sys/stat.h>		/* open() */
 #include <sys/wait.h>		/* wait() */
 #include <ulimit.h>		/* ulimit() */
@@ -66,7 +68,8 @@
 /*
  * File table of contents
  */
-static Boolean	exec_vp(char *name, char **argv, char **envp, Boolean ignore_error, pathpt vroot_path);
+static posix_spawnattr_t *nice_attr(posix_spawnattr_t *attr, int nice_prio);
+static pid_t	spawn_vp(char *name, char **argv, char **envp, posix_spawnattr_t *attr, Boolean ignore_error, pathpt vroot_path);
 
 /*
  * Workaround for NFS bug. Sometimes, when running 'open' on a remote
@@ -129,6 +132,57 @@ redirect_io(char *stdout_file, char *stderr_file)
 }
 
 /*
+ *	nice_attr(attr, nice_prio)
+ *
+ *	Initialise spawn attributes that have the same effect as running
+ *	the child under "nice -<nice_prio>". The child starts at a
+ *	scheduling priority nice_prio below this process's current
+ *	priority, clamped to the range of its scheduling class.
+ *
+ *	Return value:
+ *				attr, initialised, or NULL if the current
+ *				scheduling parameters could not be determined,
+ *				in which case the child is spawned with the
+ *				priority it would inherit anyway.
+ *
+ *	Parameters:
+ *		attr		The spawn attributes to initialise
+ *		nice_prio	The priority decrement to apply
+ */
+static posix_spawnattr_t *
+nice_attr(posix_spawnattr_t *attr, int nice_prio)
+{
+	struct sched_param param;
+	int policy, prio_min, prio_max;
+
+	if ((policy = sched_getscheduler(0)) == -1 ||
+	    sched_getparam(0, &param) != 0) {
+		return (NULL);
+	}
+
+	prio_min = sched_get_priority_min(policy);
+	prio_max = sched_get_priority_max(policy);
+	if (prio_min == -1 || prio_max == -1)
+		return (NULL);
+
+	param.sched_priority -= nice_prio;
+	if (param.sched_priority < prio_min)
+		param.sched_priority = prio_min;
+	else if (param.sched_priority > prio_max)
+		param.sched_priority = prio_max;
+
+	if (posix_spawnattr_init(attr) != 0)
+		return (NULL);
+	if (posix_spawnattr_setflags(attr, POSIX_SPAWN_SETSCHEDPARAM) != 0 ||
+	    posix_spawnattr_setschedparam(attr, &param) != 0) {
+		(void) posix_spawnattr_destroy(attr);
+		return (NULL);
+	}
+
+	return (attr);
+}
+
+/*
  *	doshell(command, ignore_error)
  *
  *	Used to run command lines that include shell meta-characters.
@@ -145,14 +199,16 @@ redirect_io(char *stdout_file, char *stderr_file)
  *		filter_stderr	If -X is on we redirect stderr
  *		shell_name	The Name "SHELL", used to get the path to shell
  */
-int
+pid_t
 doshell(wchar_t *command, Boolean ignore_error, char *stdout_file, char *stderr_file, int nice_prio)
 {
-	char			*argv[6];
+	char			*argv[4];
 	int			argv_index = 0;
+	posix_spawnattr_t	attr;
+	posix_spawnattr_t	*attrp = NULL;
 	int			cmd_argv_index;
+	int			err;
 	int			length;
-	char			nice_prio_buf[MAXPATHLEN];
 	Name			shell = getvar(shell_name);
 	char			*shellname;
 	char			*tmp_mbs_buffer;
@@ -167,16 +223,6 @@ doshell(wchar_t *command, Boolean ignore_error, char *stdout_file, char *stderr_
 		shellname++;
 	}
 
-	/*
-	 * Only prepend the /usr/bin/nice command to the original command
-	 * if the nice priority, nice_prio, is NOT zero (0).
-	 * Nice priorities can be a positive or a negative number.
-	 */
-	if (nice_prio != 0) {
-		argv[argv_index++] = (char *)"nice";
-		(void) sprintf(nice_prio_buf, "-%d", nice_prio);
-		argv[argv_index++] = strdup(nice_prio_buf);
-	}
 	argv[argv_index++] = shellname;
 	argv[argv_index++] = (char*)(ignore_error ? "-c" : "-ce");
 	if ((length = wcslen(command)) >= MAXPATHLEN) {
@@ -192,69 +238,73 @@ doshell(wchar_t *command, Boolean ignore_error, char *stdout_file, char *stderr_
 	}
 	argv[argv_index] = NULL;
 	(void) fflush(stdout);
-	if ((childPid = fork()) == 0) {
-		enable_interrupt((void (*) (int)) SIG_DFL);
-#if 0
-		if (filter_stderr) {
-			redirect_stderr();
-		}
-#endif
-		if (nice_prio != 0) {
-			(void) execve("/usr/bin/nice", argv, environ);
-			fatal_mksh(gettext("Could not load `/usr/bin/nice': %s"),
-			      errmsg(errno));
-		} else {
-			(void) execve(shell->string_mb, argv, environ);
-			fatal_mksh(gettext("Could not load Shell from `%s': %s"),
-			      shell->string_mb,
-			      errmsg(errno));
-		}
+
+	if (nice_prio != 0)
+		attrp = nice_attr(&attr, nice_prio);
+
+	/*
+	 * The child needs no special signal handling. exec() resets any
+	 * signals that make catches (such as its interrupt handlers) to
+	 * the default, and dispositions that were ignored when make
+	 * started have been left untouched.
+	 */
+	err = posix_spawn(&childPid, shell->string_mb, NULL, attrp,
+	    argv, environ);
+	if (err != 0) {
+		(void) fprintf(stderr,
+		    gettext("Could not load Shell from `%s': %s\n"),
+		    shell->string_mb,
+		    errmsg(err));
+		childPid = -1;
 	}
-	if (childPid  == -1) {
-		fatal_mksh(gettext("fork failed: %s"),
-		      errmsg(errno));
-	}
+	if (attrp != NULL)
+		(void) posix_spawnattr_destroy(attrp);
 	retmem_mb(argv[cmd_argv_index]);
-	return childPid;
+	return (childPid);
 }
 
 /*
- *	exec_vp(name, argv, envp, ignore_error)
+ *	spawn_vp(name, argv, envp, attr, ignore_error)
  *
- *	Like execve, but does path search.
+ *	Like posix_spawn, but does path search.
  *	This starts command when make invokes it directly (without a shell).
  *
  *	Return value:
- *				Returns false if the exec failed
+ *				The pid of the process, or -1 on failure
  *
  *	Parameters:
  *		name		The name of the command to run
  *		argv		Arguments for the command
  *		envp		The environment for it
+ *		attr		Spawn attributes for it, may be NULL
  *		ignore_error	Should we abort on error?
  *
  *	Global variables used:
  *		shell_name	The Name "SHELL", used to get the path to shell
  *		vroot_path	The path used by the vroot package
  */
-static Boolean
-exec_vp(char *name, char **argv, char **envp, Boolean ignore_error, pathpt vroot_path)
+static pid_t
+spawn_vp(char *name, char **argv, char **envp, posix_spawnattr_t *attr, Boolean ignore_error, pathpt vroot_path)
 {
 	Name			shell = getvar(shell_name);
 	char			*shellname;
 	char			*shargv[4];
 	Name			tmp_shell;
+	pid_t			pid;
 
 	if (IS_EQUAL(shell->string_mb, "")) {
 		shell = shell_name;
 	}
 
 	for (int i = 0; i < 5; i++) {
-		(void) execve_vroot(name,
-				    argv + 1,
-				    envp,
-				    vroot_path,
-				    VROOT_DEFAULT);
+		pid = spawn_vroot(name,
+				  argv + 1,
+				  envp,
+				  attr,
+				  vroot_path,
+				  VROOT_DEFAULT);
+		if (pid >= 0)
+			return (pid);
 		switch (errno) {
 		case ENOEXEC:
 		case ENOENT:
@@ -273,12 +323,12 @@ exec_vp(char *name, char **argv, char **envp, Boolean ignore_error, pathpt vroot
 			if (IS_EQUAL(tmp_shell->string_mb, "")) {
 				tmp_shell = shell_name;
 			}
-			(void) execve_vroot(tmp_shell->string_mb,
+			return (spawn_vroot(tmp_shell->string_mb,
 					    shargv,
 					    envp,
+					    attr,
 					    vroot_path,
-					    VROOT_DEFAULT);
-			return failed;
+					    VROOT_DEFAULT));
 		case ETXTBSY:
 			/*
 			 * The program is busy (debugged?).
@@ -288,10 +338,10 @@ exec_vp(char *name, char **argv, char **envp, Boolean ignore_error, pathpt vroot
 		case EAGAIN:
 			break;
 		default:
-			return failed;
+			return (-1);
 		}
 	}
-	return failed;
+	return (-1);
 }
 
 /*
@@ -310,37 +360,26 @@ exec_vp(char *name, char **argv, char **envp, Boolean ignore_error, pathpt vroot
  *	Global variables used:
  *		filter_stderr	If -X is on we redirect stderr
  */
-int
+pid_t
 doexec(wchar_t *command, Boolean ignore_error, char *stdout_file, char *stderr_file, pathpt vroot_path, int nice_prio)
 {
 	int			arg_count = 5;
 	char			**argv;
+	posix_spawnattr_t	attr;
+	posix_spawnattr_t	*attrp = NULL;
 	int			length;
-	char			nice_prio_buf[MAXPATHLEN];
 	char			**p;
 	wchar_t			*q;
 	wchar_t			*t;
 	char			*tmp_mbs_buffer;
 
-	/*
-	 * Only prepend the /usr/bin/nice command to the original command
-	 * if the nice priority, nice_prio, is NOT zero (0).
-	 * Nice priorities can be a positive or a negative number.
-	 */
-	if (nice_prio != 0) {
-		arg_count += 2;
-	}
 	for (t = command; *t != (int) nul_char; t++) {
 		if (iswspace(*t)) {
 			arg_count++;
 		}
 	}
 	argv = (char **)alloca(arg_count * (sizeof(char *)));
-	/*
-	 * Reserve argv[0] for sh in case of exec_vp failure.
-	 * Don't worry about prepending /usr/bin/nice command to argv[0].
-	 * In fact, doing it may cause the sh command to fail!
-	 */
+	/* Reserve argv[0] for sh in case of spawn_vp failure */
 	p = &argv[1];
 	if ((length = wcslen(command)) >= MAXPATHLEN) {
 		tmp_mbs_buffer = getmem((length * MB_LEN_MAX) + 1);
@@ -352,11 +391,6 @@ doexec(wchar_t *command, Boolean ignore_error, char *stdout_file, char *stderr_f
 		argv[0] = strdup(mbs_buffer);
 	}
 
-	if (nice_prio != 0) {
-		*p++ = strdup("/usr/bin/nice");
-		(void) sprintf(nice_prio_buf, "-%d", nice_prio);
-		*p++ = strdup(nice_prio_buf);
-	}
 	/* Build list of argument words. */
 	for (t = command; *t;) {
 		if (p >= &argv[arg_count]) {
@@ -385,26 +419,23 @@ doexec(wchar_t *command, Boolean ignore_error, char *stdout_file, char *stderr_f
 	}
 	*p = NULL;
 
-	/* Then exec the command with that argument list. */
+	/* Then spawn the command with that argument list. */
 	(void) fflush(stdout);
-	if ((childPid = fork()) == 0) {
-		enable_interrupt((void (*) (int)) SIG_DFL);
-#if 0
-		if (filter_stderr) {
-			redirect_stderr();
-		}
-#endif
-		(void) exec_vp(argv[1], argv, environ, ignore_error, vroot_path);
-		fatal_mksh(gettext("Cannot load command `%s': %s"), argv[1], errmsg(errno));
+	if (nice_prio != 0)
+		attrp = nice_attr(&attr, nice_prio);
+	childPid = spawn_vp(argv[1], argv, environ, attrp, ignore_error,
+	    vroot_path);
+	if (childPid == -1) {
+		(void) fprintf(stderr,
+		    gettext("Cannot load command `%s': %s\n"),
+		    argv[1], errmsg(errno));
 	}
-	if (childPid  == -1) {
-		fatal_mksh(gettext("fork failed: %s"),
-		      errmsg(errno));
-	}
+	if (attrp != NULL)
+		(void) posix_spawnattr_destroy(attrp);
 	for (int i = 0; argv[i] != NULL; i++) {
 		retmem_mb(argv[i]);
 	}
-	return childPid;
+	return (childPid);
 }
 
 /*
@@ -422,7 +453,7 @@ doexec(wchar_t *command, Boolean ignore_error, char *stdout_file, char *stderr_f
  *		target		The target we are building, for error msgs
  *		command		The command we ran, for error msgs
  *		running_pid	The pid of the process we are waiting for
- *		
+ *
  *	Static variables used:
  *		filter_file	The fd for the filter file
  *		filter_file_name The name of the filter file
@@ -442,36 +473,49 @@ await(Boolean ignore_error, Boolean silent_error, Name target, wchar_t *command,
 	struct stat		stat_buff;
 	int			termination_signal;
 
-	while ((pid = wait(&status)) != running_pid) {
-		if (pid == -1) {
-			fatal_mksh(gettext("wait() failed: %s"), errmsg(errno));
+	if (running_pid < 0) {
+		/*
+		 * The command could not be spawned and an error will
+		 * already have been printed. Report it as a command that
+		 * failed.
+		 */
+		exit_status = 1;
+		termination_signal = 0;
+		core_dumped = 0;
+	} else {
+		while ((pid = wait(&status)) != running_pid) {
+			if (pid == -1) {
+				fatal_mksh(gettext("wait() failed: %s"),
+				    errmsg(errno));
+			}
 		}
+		(void) fflush(stdout);
+		(void) fflush(stderr);
+
+		if (status == 0) {
+
+#ifdef PRINT_EXIT_STATUS
+			warning_mksh("I'm in await(), and status is 0.");
+#endif
+
+			return (succeeded);
+		}
+
+#ifdef PRINT_EXIT_STATUS
+		warning_mksh("I'm in await(), and status is *NOT* 0.");
+#endif
+
+
+		exit_status = WEXITSTATUS(status);
+
+#ifdef PRINT_EXIT_STATUS
+		warning_mksh("I'm in await(), and exit_status is %d.",
+		    exit_status);
+#endif
+
+		termination_signal = WTERMSIG(status);
+		core_dumped = WCOREDUMP(status);
 	}
-	(void) fflush(stdout);
-	(void) fflush(stderr);
-
-        if (status == 0) {
-
-#ifdef PRINT_EXIT_STATUS
-		warning_mksh("I'm in await(), and status is 0.");
-#endif
-
-                return succeeded;
-	}
-
-#ifdef PRINT_EXIT_STATUS
-	warning_mksh("I'm in await(), and status is *NOT* 0.");
-#endif
-
-
-        exit_status = WEXITSTATUS(status);
-
-#ifdef PRINT_EXIT_STATUS
-	warning_mksh("I'm in await(), and exit_status is %d.", exit_status);
-#endif
-
-        termination_signal = WTERMSIG(status);
-        core_dumped = WCOREDUMP(status);
 
 	/*
 	 * If the child returned an error, we now try to print a
@@ -517,7 +561,7 @@ await(Boolean ignore_error, Boolean silent_error, Name target, wchar_t *command,
  *	Parameters:
  *		command		The command to run
  *		destination	Where to deposit the output from the command
- *		
+ *
  *	Static variables used:
  *
  *	Global variables used:
@@ -555,7 +599,7 @@ sh_command2string(String command, String destination)
 	if (command_generated_output){
 		if ( *(destination->text.p-1) == (int) space_char) {
 			* (-- destination->text.p) = '\0';
-		} 
+		}
 	} else {
 		/*
 		 * If the command didn't generate any output,
@@ -563,7 +607,7 @@ sh_command2string(String command, String destination)
 		 */
 		*(destination->text.p) = '\0';
 	}
-			
+
 	status = pclose(fd);
 	if (status != 0) {
 		WCSTOMBS(mbs_buffer, command->buffer.start);
