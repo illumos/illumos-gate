@@ -44,6 +44,9 @@ user = root
 [/opt/os-tests/tests/clock_gettime.32]
 [/opt/os-tests/tests/clock_gettime.64]
 
+[/opt/os-tests/tests/close_range.32]
+[/opt/os-tests/tests/close_range.64]
+
 [/opt/os-tests/tests/statvfs.32]
 [/opt/os-tests/tests/statvfs.64]
 [/opt/os-tests/tests/syncfs.32]

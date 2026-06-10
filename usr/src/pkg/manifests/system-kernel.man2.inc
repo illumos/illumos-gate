@@ -17,7 +17,7 @@
 # Copyright 2017 Peter Tribble
 # Copyright 2018, Joyent, Inc.
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2024 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 file path=usr/share/man/man2/Intro.2
@@ -54,6 +54,7 @@ file path=usr/share/man/man2/chmod.2
 file path=usr/share/man/man2/chown.2
 file path=usr/share/man/man2/chroot.2
 file path=usr/share/man/man2/close.2
+file path=usr/share/man/man2/close_range.2
 file path=usr/share/man/man2/creat.2
 file path=usr/share/man/man2/dup.2
 file path=usr/share/man/man2/exec.2

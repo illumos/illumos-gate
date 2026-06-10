@@ -370,6 +370,7 @@
 317:AUE_AUDITON_SETKAUDIT:auditon(2) - set kernel audit characteristics:as
 318:AUE_AUDITON_OTHER:auditon(2) - other event:aa
 319:AUE_SPAWN:spawn(2):ps,ex
+320:AUE_CLOSERANGE:close_range(2):cl
 #
 # user level audit events
 #	2048 -  6143	Reserved

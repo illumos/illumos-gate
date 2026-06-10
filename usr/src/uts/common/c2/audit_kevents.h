@@ -357,9 +357,10 @@ extern "C" {
 #define	AUE_AUDITON_SETKAUDIT	317	/* =as */
 #define	AUE_AUDITON_OTHER	318	/* =aa */
 #define	AUE_SPAWN		319	/* =ps,ex spawn(2) */
+#define	AUE_CLOSERANGE		320	/* =cl close_range(2) */
 
 /* NOTE: update MAX_KEVENTS below if events are added. */
-#define	MAX_KEVENTS		319
+#define	MAX_KEVENTS		320
 
 #ifdef __cplusplus
 }

@@ -25,7 +25,7 @@
 #
 # Copyright 2012 DEY Storage Systems, Inc.  All rights reserved.
 # Copyright (c) 2018 Joyent, Inc.
-# Copyright 2024 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 @ MSG_NT_PRSTATUS		"[ NT_PRSTATUS ]"
@@ -675,7 +675,8 @@
 @ MSG_SYS_PGRPSYS_ALT			"pgrpsys"
 @ MSG_SYS_UUCOPYSTR			"[ uucopystr ]"			# 40
 @ MSG_SYS_UUCOPYSTR_ALT			"uucopystr"
-@ MSG_SYS_41				"41"				# 41 (u)
+@ MSG_SYS_CLOSE_RANGE			"[ close_range ]"		# 41
+@ MSG_SYS_CLOSE_RANGE_ALT		"close_range"
 @ MSG_SYS_PIPE				"[ pipe ]"			# 42
 @ MSG_SYS_PIPE_ALT			"pipe"
 @ MSG_SYS_TIMES				"[ times ]"			# 43

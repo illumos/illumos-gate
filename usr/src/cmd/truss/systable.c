@@ -261,7 +261,7 @@ const struct systable systable[] = {
 {"fstatfs",	4, DEC, NOV, DEC, HEX, DEC, DEC},		/*  38 */
 {"pgrpsys",	3, DEC, NOV, DEC, DEC, DEC},			/*  39 */
 {"uucopystr",	3, DEC, NOV, STG, RST, UNS},			/*  40 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"close_range",	3, DEC, NOV, UNS, UNS, CRF},			/*  41 */
 {"pipe",	2, DEC, NOV, PFD, PIP},				/*  42 */
 {"times",	1, DEC, NOV, HEX},				/*  43 */
 {"profil",	4, DEC, NOV, HEX, UNS, HEX, OCT},		/*  44 */

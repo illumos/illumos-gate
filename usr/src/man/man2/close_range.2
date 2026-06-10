@@ -1,0 +1,133 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2026 Oxide Computer Company
+.\"
+.Dd June 10, 2026
+.Dt CLOSE_RANGE 2
+.Os
+.Sh NAME
+.Nm close_range
+.Nd close or modify a range of file descriptors
+.Sh SYNOPSIS
+.In unistd.h
+.Ft int
+.Fo close_range
+.Fa "unsigned int low"
+.Fa "unsigned int high"
+.Fa "int flags"
+.Fc
+.Sh DESCRIPTION
+The
+.Nm
+function acts on every open file descriptor of the calling process in
+the inclusive range
+.Fa low
+to
+.Fa high .
+With a
+.Fa flags
+argument of zero, each such descriptor is closed, as if by
+.Xr close 2 .
+.Pp
+The range may extend beyond the highest open file descriptor, and file
+descriptors within the range that are not open are ignored; it is not
+an error for the range to contain no open file descriptors at all.
+A
+.Fa high
+value of
+.Dv UINT_MAX
+acts on every open file descriptor at or above
+.Fa low .
+.Pp
+The following values may be bitwise-ORed together in the
+.Fa flags
+argument to modify the behaviour of the function:
+.Bl -tag -width Dv
+.It Dv CLOSE_RANGE_CLOEXEC
+Rather than closing the file descriptors in the range, set the
+.Dv FD_CLOEXEC
+flag on each of them, causing them to be closed by any subsequent
+.Xr exec 2 .
+.It Dv CLOSE_RANGE_CLOFORK
+Rather than closing the file descriptors in the range, set the
+.Dv FD_CLOFORK
+flag on each of them, causing them to not be inherited by any
+subsequently created child process.
+.El
+.Pp
+The descriptor flags are described further in
+.Xr fcntl 2 .
+.Pp
+Errors encountered while closing individual file descriptors within the
+range are ignored.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Nm
+function returns
+.Sy 0 .
+Otherwise,
+.Sy -1
+is returned and
+.Va errno
+is set to indicate the error.
+.Sh EXAMPLES
+.Sy Example 1
+Emulating
+.Xr close 2 .
+.Pp
+A range containing a single file descriptor closes just that descriptor.
+Unlike
+.Xr close 2 ,
+any error from the underlying close operation is ignored:
+.Bd -literal -offset indent
+(void) close_range(fd, fd, 0);
+.Ed
+.Pp
+.Sy Example 2
+Closing every file descriptor at or above a given value.
+.Pp
+The following call closes all open file descriptors other than the
+standard input, output and error streams, the equivalent of
+.Xr closefrom 3C
+with a
+.Fa lowfd
+argument of 3:
+.Bd -literal -offset indent
+(void) close_range(3, UINT_MAX, 0);
+.Ed
+.Sh ERRORS
+The
+.Nm
+function will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+.Fa low
+is greater than
+.Fa high ,
+or
+.Fa flags
+contains an unsupported value.
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy Async-Signal-Safe
+.Sh SEE ALSO
+.Xr close 2 ,
+.Xr exec 2 ,
+.Xr fcntl 2 ,
+.Xr fork 2 ,
+.Xr closefrom 3C
+.Sh STANDARDS
+The
+.Fn close_range
+function is not part of any current standard.

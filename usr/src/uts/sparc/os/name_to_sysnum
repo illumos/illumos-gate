@@ -37,6 +37,7 @@ kill			37
 fstatfs			38
 setpgrp			39
 uucopystr		40
+close_range		41
 pipe			42
 times			43
 profil			44

@@ -71,6 +71,7 @@ int	chown(char *, uid_t, gid_t);
 int	chroot(char *);
 int	cladm(int, int, void *);
 int	close(int);
+int	close_range(uint_t, uint_t, int);
 int	exece(const char *, const char **, const char **, int);
 int	faccessat(int, char *, int, int);
 int	fchmodat(int, char *, int, int);
@@ -484,7 +485,7 @@ struct sysent sysent[NSYSCALL] =
 			SYSENT_CI("fstatfs",	fstatfs32,	4)),
 	/* 39 */ SYSENT_CI("setpgrp",		setpgrp,	3),
 	/* 40 */ SYSENT_CI("uucopystr",		uucopystr,	3),
-	/* 41 */ SYSENT_LOADABLE(),			/* (was dup) */
+	/* 41 */ SYSENT_CI("close_range",	close_range,	3),
 	/* 42 */ SYSENT_LOADABLE(),			/* pipe */
 	/* 43 */ SYSENT_CL("times",		times,		1),
 	/* 44 */ SYSENT_CI("prof",		profil,		4),
@@ -859,7 +860,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 38 */ SYSENT_CI("fstatfs",		fstatfs32,	4),
 	/* 39 */ SYSENT_CI("setpgrp",		setpgrp,	3),
 	/* 40 */ SYSENT_CI("uucopystr",		uucopystr,	3),
-	/* 41 */ SYSENT_LOADABLE32(),			/* (was dup) */
+	/* 41 */ SYSENT_CI("close_range",	close_range,	3),
 	/* 42 */ SYSENT_LOADABLE32(),			/* pipe */
 	/* 43 */ SYSENT_CI("times",		times32,	1),
 	/* 44 */ SYSENT_CI("prof",		profil,		4),

@@ -68,6 +68,7 @@ SUBDIRS =       \
 
 PROGS = \
 	clock_gettime \
+	close_range \
 	eventfd \
 	fifo-tvnsec \
 	odirectory \
@@ -91,6 +92,9 @@ clock_gettime.32 :=	LDLIBS += -lproc
 clock_gettime.32 :=	CSTD = $(CSTD_GNU99)
 clock_gettime.64 :=	LDLIBS64 += -lproc
 clock_gettime.64 :=	CSTD = $(CSTD_GNU99)
+
+close_range.32 :=	CSTD = $(CSTD_GNU17)
+close_range.64 :=	CSTD = $(CSTD_GNU17)
 
 fifo-tvnsec.32 :=	CSTD = $(CSTD_GNU99)
 fifo-tvnsec.64 :=	CSTD = $(CSTD_GNU99)

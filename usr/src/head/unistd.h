@@ -31,6 +31,7 @@
 /*	  All Rights Reserved	*/
 
 /* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
+/* Copyright 2026 Oxide Computer Company */
 
 #ifndef _UNISTD_H
 #define	_UNISTD_H
@@ -254,6 +255,9 @@ extern int chown(const char *, uid_t, gid_t);
 extern int chroot(const char *);
 #endif /* !defined(_POSIX_C_SOURCE) || defined(_XOPEN_SOURCE))... */
 extern int close(int);
+#if !defined(_STRICT_POSIX)
+extern int close_range(unsigned int, unsigned int, int);
+#endif /* !defined(_STRICT_POSIX) */
 #if defined(_XPG4) || defined(__EXTENSIONS__)
 extern size_t confstr(int, char *, size_t);
 extern char *crypt(const char *, const char *);

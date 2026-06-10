@@ -158,7 +158,7 @@ static const char *const systable[] = {
 	"fstatfs",		/* 38 */
 	"pgrpsys",		/* 39 */
 	"uucopystr",		/* 40 */
-	NULL,			/* 41 */
+	"close_range",		/* 41 */
 	"pipe",			/* 42 */
 	"times",		/* 43 */
 	"profil",		/* 44 */

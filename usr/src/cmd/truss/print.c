@@ -23,7 +23,7 @@
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2022 Garrett D'Amore
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -3177,6 +3177,31 @@ prt_fds(private_t *pri, int raw, long val)
 	}
 }
 
+void
+prt_crf(private_t *pri, int raw, long val)
+{
+	int first = 1;
+
+	if (val == 0) {
+		outstring(pri, "0");
+		return;
+	}
+	if (raw != 0 ||
+	    (val & ~(CLOSE_RANGE_CLOEXEC | CLOSE_RANGE_CLOFORK)) != 0) {
+		prt_hex(pri, 0, val);
+		return;
+	}
+
+	if (val & CLOSE_RANGE_CLOEXEC) {
+		outstring(pri, "|CLOSE_RANGE_CLOEXEC" + first);
+		first = 0;
+	}
+	if (val & CLOSE_RANGE_CLOFORK) {
+		outstring(pri, "|CLOSE_RANGE_CLOFORK" + first);
+		first = 0;
+	}
+}
+
 /*
  * Array of pointers to print functions, one for each format.
  */
@@ -3289,5 +3314,6 @@ void (* const Print[])() = {
 	prt_ffd,	/* FFD -- print fcntl() F_SETFD flags */
 	prt_srf,	/* SRF -- print send*()/recv*() flags */
 	prt_fds,	/* FDS -- print fdsync() flags */
+	prt_crf,	/* CRF -- print close_range() flags */
 	prt_dec,	/* HID -- hidden argument, make this the last one */
 };

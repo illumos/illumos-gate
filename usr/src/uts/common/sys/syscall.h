@@ -98,6 +98,7 @@ extern "C" {
 	 *	setpgid(pid,pgid) :: syscall(39,5,pid,pgid)
 	 */
 #define	SYS_uucopystr	40
+#define	SYS_close_range	41
 #define	SYS_pipe	42
 #define	SYS_times	43
 #define	SYS_profil	44

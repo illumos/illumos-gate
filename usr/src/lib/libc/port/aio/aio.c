@@ -31,6 +31,7 @@
 #include "libc.h"
 #include "asyncio.h"
 #include <atomic.h>
+#include <stdbool.h>
 #include <sys/param.h>
 #include <sys/file.h>
 #include <sys/port.h>
@@ -49,7 +50,8 @@ extern int _port_dispatch(int, int, int, int, uintptr_t, void *);
 
 static int _aio_fsync_del(aio_worker_t *, aio_req_t *);
 static void _aiodone(aio_req_t *, ssize_t, int);
-static void _aio_cancel_work(aio_worker_t *, int, int *, int *);
+static bool aiocancel_range(int, int, int *, int *);
+static void _aio_cancel_work(aio_worker_t *, int, int, int *, int *);
 static void _aio_finish_request(aio_worker_t *, ssize_t, int);
 
 /*
@@ -252,6 +254,37 @@ _aio_close(int fd)
 	 */
 	if (_kaio_supported != NULL)
 		CLEAR_KAIO_SUPPORTED(fd);
+}
+
+/*
+ * Called from close_range() before every file descriptor in the range
+ * [low, high] is closed en masse. This is the range equivalent of
+ * _aio_close().
+ */
+void
+_aio_closerange(int low, int high)
+{
+	int canceled = 0;
+	int done = 0;
+
+	if (low < 0)
+		low = 0;
+
+	if (__uaio_ok != 0)
+		(void) aiocancel_range(low, high, &canceled, &done);
+
+	/*
+	 * The kaio support bit array only covers file descriptors below
+	 * MAX_KAIO_FDS, so the sweep is bounded regardless of how large
+	 * the range is.
+	 */
+	if (_kaio_supported != NULL) {
+		int maxfd, fd;
+
+		maxfd = (high >= MAX_KAIO_FDS) ? MAX_KAIO_FDS - 1 : high;
+		for (fd = low; fd <= maxfd; fd++)
+			CLEAR_KAIO_SUPPORTED(fd);
+	}
 }
 
 /*
@@ -680,26 +713,27 @@ _aio_get_timedelta(timespec_t *end, timespec_t *wait)
 }
 
 /*
- * If closing by file descriptor: we will simply cancel all the outstanding
- * aio`s and return.  Those aio's in question will have either noticed the
- * cancellation notice before, during, or after initiating io.
+ * Cancel all outstanding user-level aio requests against file descriptors
+ * in the inclusive range [low, high]; a low bound of INT_MIN cancels
+ * every request regardless of its descriptor. The counts of cancelled
+ * and already-completed requests found in the workers' queues are added
+ * to *canceled and *done. Returns false, without examining the queues,
+ * if the process has no outstanding requests at all.
  */
-int
-aiocancel_all(int fd)
+static bool
+aiocancel_range(int low, int high, int *canceled, int *done)
 {
 	aio_req_t *reqp;
 	aio_req_t **reqpp, *last;
 	aio_worker_t *first;
 	aio_worker_t *next;
-	int canceled = 0;
-	int done = 0;
-	int cancelall = 0;
+	bool cancelall;
 
 	sig_mutex_lock(&__aio_mutex);
 
 	if (_aio_outstand_cnt == 0) {
 		sig_mutex_unlock(&__aio_mutex);
-		return (AIO_ALLDONE);
+		return (false);
 	}
 
 	/*
@@ -708,19 +742,18 @@ aiocancel_all(int fd)
 	first = __nextworker_rw;
 	next = first;
 	do {
-		_aio_cancel_work(next, fd, &canceled, &done);
+		_aio_cancel_work(next, low, high, canceled, done);
 	} while ((next = next->work_forw) != first);
 
 	/*
 	 * finally, check if there are requests on the done queue that
 	 * should be canceled.
 	 */
-	if (fd < 0)
-		cancelall = 1;
+	cancelall = (low == INT_MIN && high == INT_MAX);
 	reqpp = &_aio_done_tail;
 	last = _aio_done_tail;
 	while ((reqp = *reqpp) != NULL) {
-		if (cancelall || reqp->req_args.fd == fd) {
+		if (reqp->req_args.fd >= low && reqp->req_args.fd <= high) {
 			*reqpp = reqp->req_next;
 			if (last == reqp) {
 				last = reqp->req_next;
@@ -745,23 +778,47 @@ aiocancel_all(int fd)
 	}
 	sig_mutex_unlock(&__aio_mutex);
 
+	return (true);
+}
+
+/*
+ * If closing by file descriptor: we will simply cancel all the outstanding
+ * aio`s and return.  Those aio's in question will have either noticed the
+ * cancellation notice before, during, or after initiating io.
+ */
+int
+aiocancel_all(int fd)
+{
+	int canceled = 0;
+	int done = 0;
+	int low, high;
+
+	if (fd < 0) {
+		low = INT_MIN;
+		high = INT_MAX;
+	} else {
+		low = high = fd;
+	}
+
+	if (!aiocancel_range(low, high, &canceled, &done))
+		return (AIO_ALLDONE);
+
 	if (canceled && done == 0)
 		return (AIO_CANCELED);
 	else if (done && canceled == 0)
 		return (AIO_ALLDONE);
-	else if ((canceled + done == 0) && KAIO_SUPPORTED(fd))
+	else if (canceled + done == 0 && KAIO_SUPPORTED(fd))
 		return ((int)_kaio(AIOCANCEL, fd, NULL));
 	return (AIO_NOTCANCELED);
 }
 
 /*
- * Cancel requests from a given work queue.  If the file descriptor
- * parameter, fd, is non-negative, then only cancel those requests
- * in this queue that are to this file descriptor.  If the fd
- * parameter is -1, then cancel all requests.
+ * Cancel requests from a given work queue. Only those requests against
+ * file descriptors in the inclusive range [low, high] are cancelled.
  */
 static void
-_aio_cancel_work(aio_worker_t *aiowp, int fd, int *canceled, int *done)
+_aio_cancel_work(aio_worker_t *aiowp, int low, int high, int *canceled,
+    int *done)
 {
 	aio_req_t *reqp;
 
@@ -771,7 +828,7 @@ _aio_cancel_work(aio_worker_t *aiowp, int fd, int *canceled, int *done)
 	 */
 	reqp = aiowp->work_tail1;
 	while (reqp != NULL) {
-		if (fd < 0 || reqp->req_args.fd == fd) {
+		if (reqp->req_args.fd >= low && reqp->req_args.fd <= high) {
 			if (_aio_cancel_req(aiowp, reqp, canceled, done)) {
 				/*
 				 * Callers locks were dropped.
@@ -789,8 +846,9 @@ _aio_cancel_work(aio_worker_t *aiowp, int fd, int *canceled, int *done)
 	 * only be one inprogress request that should be canceled.
 	 */
 	if ((reqp = aiowp->work_req) != NULL &&
-	    (fd < 0 || reqp->req_args.fd == fd))
+	    reqp->req_args.fd >= low && reqp->req_args.fd <= high) {
 		(void) _aio_cancel_req(aiowp, reqp, canceled, done);
+	}
 	sig_mutex_unlock(&aiowp->work_qlock1);
 }
 

@@ -1115,32 +1115,40 @@ fdup2(int ofd, int nfd)
 }
 
 /*
- * Close all open file descriptors at or above lowfd. This is used to apply
- * spawn(2) closefrom file actions in a spawned child which is still
- * single-threaded.
+ * Close every open file descriptor in the range [low, high] or, if fdflags
+ * is non-zero, set those descriptor flags (FD_CLOEXEC and/or FD_CLOFORK) on
+ * each of them instead. Errors from individual closes are deliberately
+ * ignored.
  */
 void
-closefrom_all(int lowfd)
+fdcloserange(int low, int high, int fdflags)
 {
 	uf_info_t *fip = P_FINFO(curproc);
 	int fd, nfiles;
 
-	if (lowfd < 0)
-		lowfd = 0;
+	ASSERT0((fdflags & ~(FD_CLOEXEC | FD_CLOFORK)));
+
+	if (low < 0)
+		low = 0;
 
 	mutex_enter(&fip->fi_lock);
 	nfiles = fip->fi_nfiles;
 	mutex_exit(&fip->fi_lock);
 
-	for (fd = lowfd; fd < nfiles; fd++) {
+	if (high >= nfiles)
+		high = nfiles - 1;
+
+	for (fd = low; fd <= high; fd++) {
 		uf_entry_t *ufp;
 		bool isopen;
 
 		UF_ENTER(ufp, fip, fd);
 		isopen = ufp->uf_file != NULL;
+		if (isopen && fdflags != 0)
+			ufp->uf_flag |= fdflags;
 		UF_EXIT(ufp);
 
-		if (isopen)
+		if (isopen && fdflags == 0)
 			(void) closeandsetf(fd, NULL);
 	}
 }

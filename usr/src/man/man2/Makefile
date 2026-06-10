@@ -16,6 +16,7 @@
 # Copyright (c) 2018, Joyent, Inc.  All rights reserved.
 # Copyright 2017 Peter Tribble
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 Oxide Computer Company
 #
 
 include		$(SRC)/Makefile.master
@@ -45,6 +46,7 @@ MANFILES=	Intro.2			\
 		chown.2			\
 		chroot.2		\
 		close.2			\
+		close_range.2		\
 		creat.2			\
 		dup.2			\
 		exec.2			\

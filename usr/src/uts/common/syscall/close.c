@@ -25,14 +25,16 @@
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
 
 #include <sys/param.h>
 #include <sys/isa_defs.h>
@@ -40,7 +42,9 @@
 #include <sys/sysmacros.h>
 #include <sys/systm.h>
 #include <sys/errno.h>
+#include <sys/fcntl.h>
 #include <sys/file.h>
+#include <sys/unistd.h>
 #include <sys/debug.h>
 
 /*
@@ -54,5 +58,31 @@ close(int fdes)
 
 	if ((error = closeandsetf(fdes, NULL)) != 0)
 		return (set_errno(error));
+	return (0);
+}
+
+/*
+ * Close, or set descriptor flags on, every open file descriptor in the
+ * range [low, high]. The range may extend beyond the highest open descriptor,
+ * and errors from closing individual descriptors are ignored.
+ */
+int
+close_range(uint_t low, uint_t high, int flags)
+{
+	int fdflags = 0;
+
+	if (low > high)
+		return (set_errno(EINVAL));
+	if ((flags & ~(CLOSE_RANGE_CLOEXEC | CLOSE_RANGE_CLOFORK)) != 0)
+		return (set_errno(EINVAL));
+
+	if (flags & CLOSE_RANGE_CLOEXEC)
+		fdflags |= FD_CLOEXEC;
+	if (flags & CLOSE_RANGE_CLOFORK)
+		fdflags |= FD_CLOFORK;
+
+	fdcloserange((int)MIN(low, INT_MAX), (int)MIN(high, INT_MAX),
+	    fdflags);
+
 	return (0);
 }

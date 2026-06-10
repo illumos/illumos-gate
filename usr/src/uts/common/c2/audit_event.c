@@ -131,6 +131,7 @@ static void	aus_umount2(struct t_audit_data *);
 static void	aus_msgsys(struct t_audit_data *);
 static void	aus_semsys(struct t_audit_data *);
 static void	aus_close(struct t_audit_data *);
+static void	aus_close_range(struct t_audit_data *);
 static void	aus_fstatfs(struct t_audit_data *);
 static void	aus_setgid(struct t_audit_data *);
 static void	aus_setpgrp(struct t_audit_data *);
@@ -288,7 +289,7 @@ aui_setpgrp,	AUE_SETPGRP,	aus_setpgrp,	/* 39 setpgrp */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 40 uucopystr */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 41 (loadable) was dup */
+aui_null,	AUE_CLOSERANGE,	aus_close_range, /* 41 close_range */
 		auf_null,	0,
 aui_null,	AUE_PIPE,	aus_null,	/* 42 (loadable) pipe */
 		auf_null,	0,
@@ -2049,6 +2050,22 @@ aus_close(struct t_audit_data *tad)
 
 	/* decrement file descriptor reference count */
 	releasef(fd);
+}
+
+static void
+aus_close_range(struct t_audit_data *tad __unused)
+{
+	klwp_t *clwp = ttolwp(curthread);
+
+	struct a {
+		long	low;
+		long	high;
+		long	flags;
+	} *uap = (struct a *)clwp->lwp_ap;
+
+	au_uwrite(au_to_arg32(1, "low fd", (uint32_t)uap->low));
+	au_uwrite(au_to_arg32(2, "high fd", (uint32_t)uap->high));
+	au_uwrite(au_to_arg32(3, "flags", (uint32_t)uap->flags));
 }
 
 /*ARGSUSED*/

@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015, Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -148,7 +148,8 @@ extern "C" {
 #define	FFD	105		/* fcntl F_SETFD flags */
 #define	SRF	106		/* send*(), recv() flags */
 #define	FDS	107		/* fdsync flags */
-#define	HID	108		/* hidden argument, don't print */
+#define	CRF	108		/* close_range flags */
+#define	HID	109		/* hidden argument, don't print */
 				/* make sure HID is always the last member */
 
 /*

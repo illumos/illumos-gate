@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #ifndef	_ASYNCIO_H
 #define	_ASYNCIO_H
 
@@ -271,6 +275,8 @@ extern int _aio_rw64(aiocb64_t *, aio_lio_t *, aio_worker_t **, int, int);
 extern int _aio_create_worker(aio_req_t *, int);
 extern int _aio_cancel_req(aio_worker_t *, aio_req_t *, int *, int *);
 extern int aiocancel_all(int);
+extern void _aio_close(int);
+extern void _aio_closerange(int, int);
 extern void aio_panic(const char *) __NORETURN;
 extern aio_req_t *_aio_hash_find(aio_result_t *);
 extern aio_req_t *_aio_hash_del(aio_result_t *);

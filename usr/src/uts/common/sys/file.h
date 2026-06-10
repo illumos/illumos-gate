@@ -229,7 +229,7 @@ extern int fassign(struct vnode **, int, int *);
 extern void fcnt_add(struct uf_info *, int);
 extern int fdup2(int, int);
 extern void fd_too_big(struct proc *);
-extern void closefrom_all(int);
+extern void fdcloserange(int, int, int);
 extern void close_exec(struct uf_info *);
 extern void clear_stale_fd(void);
 extern void clear_active_fd(int);

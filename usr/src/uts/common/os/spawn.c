@@ -501,7 +501,7 @@ spawn_factions_apply(const kspawn_param_t *ksp)
 			err = fdup2(kfa->kfa_filedes, kfa->kfa_newfiledes);
 			break;
 		case FA_CLOSEFROM:
-			closefrom_all(kfa->kfa_filedes);
+			fdcloserange(kfa->kfa_filedes, INT_MAX, 0);
 			break;
 		case FA_CHDIR:
 			err = kchdir((const char *)kfa->kfa_path);
