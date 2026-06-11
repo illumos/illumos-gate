@@ -23,7 +23,8 @@ SRCS =	default.run \
 	just-smbutil.run \
 	perf-regression.run
 
-ROOTOPTPKG = $(ROOT)/opt/smbclient-tests
+OPTPKG = opt/smbclient-tests
+ROOTOPTPKG = $(ROOT)/$(OPTPKG)
 RUNFILES = $(ROOTOPTPKG)/runfiles
 
 CMDS = $(SRCS:%=$(RUNFILES)/%)
@@ -32,6 +33,9 @@ $(CMDS) := FILEMODE = 0444
 all: $(SRCS)
 
 install: $(CMDS)
+
+check:
+	$(CHECK_TEST_RUNFILES) -T $(OPTPKG) $(SRCS)
 
 clean lint clobber:
 

@@ -16,7 +16,11 @@
 
 include $(SRC)/Makefile.master
 
-ROOTOPTPKG = $(ROOT)/opt/zfs-tests
+OPTPKG = opt/zfs-tests
+ROOTOPTPKG = $(ROOT)/$(OPTPKG)
 TARGETDIR = $(ROOTOPTPKG)/runfiles
 
 include $(SRC)/test/zfs-tests/Makefile.com
+
+check:
+	$(CHECK_TEST_RUNFILES) -T $(OPTPKG) $(FILES)

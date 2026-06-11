@@ -18,7 +18,8 @@ include $(SRC)/Makefile.master
 RUNFILES = \
 	default.run
 
-ROOTOPTPKG = $(ROOT)/opt/libproc-tests
+OPTPKG = opt/libproc-tests
+ROOTOPTPKG = $(ROOT)/$(OPTPKG)
 ROOTRUNDIR = $(ROOTOPTPKG)/runfiles
 
 ROOTRUNFILES = $(RUNFILES:%=$(ROOTRUNDIR)/%)
@@ -27,6 +28,9 @@ $(ROOTRUNFILES) := FILEMODE = 0444
 all: $(SRCS)
 
 install: $(ROOTRUNFILES)
+
+check:
+	$(CHECK_TEST_RUNFILES) -T $(OPTPKG) $(RUNFILES)
 
 clean:
 

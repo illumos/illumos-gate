@@ -77,6 +77,7 @@ file path=opt/onbld/bin/build_cscope mode=0555
 file path=opt/onbld/bin/cddlchk mode=0555 \
     pkg.depend.bypass-generate=.*(?:Checks|onbld|Cddl).*
 file path=opt/onbld/bin/check_rtime mode=0555
+file path=opt/onbld/bin/check_test_runfiles mode=0555
 file path=opt/onbld/bin/checkpaths mode=0555
 file path=opt/onbld/bin/copyrightchk mode=0555 \
     pkg.depend.bypass-generate=.*(?:Checks|onbld|Copyright).*

@@ -17,10 +17,12 @@ all     :=      TARGET = all
 install :=      TARGET = install
 clean   :=      TARGET = clean
 clobber :=      TARGET = clobber
+check   :=      TARGET = check
 
 .KEEP_STATE:
 
 all clean clobber install: $(SUBDIRS)
+check: $(CHKSUBDIRS)
 
 $(SUBDIRS): FRC
 	cd $@; pwd; $(MAKE) $(TARGET)

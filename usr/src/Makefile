@@ -73,6 +73,9 @@ CHKMFSTSUBDIRS=	cmd
 # And man page formats
 CHKMANSUBDIRS = man
 
+# And test runfiles
+CHKTESTSUBDIRS = test
+
 MSGSUBDIRS=	cmd ucbcmd lib data
 
 all :=			TARGET= all
@@ -222,7 +225,7 @@ cmdheaders: FRC
 
 FRC:
 
-check:	$(CHKHDRSUBDIRS) $(CHKMFSTSUBDIRS) $(CHKMANSUBDIRS)
+check:	$(CHKHDRSUBDIRS) $(CHKMFSTSUBDIRS) $(CHKMANSUBDIRS) $(CHKTESTSUBDIRS)
 
 #
 # Cross-reference customization: skip all of the subdirectories that

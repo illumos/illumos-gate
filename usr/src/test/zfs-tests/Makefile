@@ -16,5 +16,6 @@
 .PARALLEL: $(SUBDIRS)
 
 SUBDIRS:sh = find ./* -maxdepth 0 -type d
+CHKSUBDIRS = runfiles
 
 include $(SRC)/test/Makefile.com

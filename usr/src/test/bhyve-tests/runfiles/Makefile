@@ -17,7 +17,8 @@ include $(SRC)/Makefile.master
 
 SRCS = default.run
 
-ROOTOPTPKG = $(ROOT)/opt/bhyve-tests
+OPTPKG = opt/bhyve-tests
+ROOTOPTPKG = $(ROOT)/$(OPTPKG)
 RUNFILES = $(ROOTOPTPKG)/runfiles
 
 OUTPUTS = $(SRCS:%=$(RUNFILES)/%)
@@ -26,6 +27,9 @@ $(OUTPUTS) := FILEMODE = 0444
 all: $(SRCS)
 
 install: $(OUTPUTS)
+
+check:
+	$(CHECK_TEST_RUNFILES) -T $(OPTPKG) $(SRCS)
 
 clean lint clobber:
 

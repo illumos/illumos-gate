@@ -19,7 +19,8 @@ include $(SRC)/Makefile.master
 
 SRCS = default.run
 
-ROOTOPTPKG = $(ROOT)/opt/os-tests
+OPTPKG = opt/os-tests
+ROOTOPTPKG = $(ROOT)/$(OPTPKG)
 RUNFILES = $(ROOTOPTPKG)/runfiles
 
 CMDS = $(SRCS:%=$(RUNFILES)/%)
@@ -30,6 +31,9 @@ all: $(SRCS)
 install: $(CMDS)
 
 clean lint clobber:
+
+check:
+	$(CHECK_TEST_RUNFILES) -T $(OPTPKG) $(SRCS)
 
 $(CMDS): $(RUNFILES) $(SRCS)
 

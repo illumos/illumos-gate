@@ -17,7 +17,8 @@ include $(SRC)/Makefile.master
 
 RUNFILES = default.run
 
-ROOTOPTPKG = $(ROOT)/opt/i2c-tests
+OPTPKG = opt/i2c-tests
+ROOTOPTPKG = $(ROOT)/$(OPTPKG)
 ROOTRUNDIR = $(ROOTOPTPKG)/runfiles
 
 ROOTRUNFILES = $(RUNFILES:%=$(ROOTRUNDIR)/%)
@@ -26,6 +27,9 @@ $(ROOTRUNFILES) := FILEMODE = 0444
 all: $(SRCS)
 
 install: $(ROOTRUNFILES)
+
+check:
+	$(CHECK_TEST_RUNFILES) -T $(OPTPKG) $(RUNFILES)
 
 clean:
 

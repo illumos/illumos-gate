@@ -16,5 +16,6 @@
 .PARALLEL: $(SUBDIRS)
 
 SUBDIRS = cmd runfiles tests doc
+CHKSUBDIRS = runfiles
 
 include $(SRC)/test/Makefile.com

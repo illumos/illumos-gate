@@ -15,7 +15,8 @@
 include $(SRC)/Makefile.master
 
 SRCS = default.run
-ROOTOPTPKG = $(ROOT)/opt/libsec-tests
+OPTPKG = opt/libsec-tests
+ROOTOPTPKG = $(ROOT)/$(OPTPKG)
 RUNFILES = $(ROOTOPTPKG)/runfiles
 CMDS = $(SRCS:%=$(RUNFILES)/%)
 $(CMDS) := FILEMODE = 0444
@@ -25,6 +26,9 @@ include $(SRC)/test/Makefile.com
 all: $(SRCS)
 
 install: $(CMDS)
+
+check:
+	$(CHECK_TEST_RUNFILES) -T $(OPTPKG) $(SRCS)
 
 clobber: clean
 	$(RM) $(CMDS)
