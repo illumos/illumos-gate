@@ -16,6 +16,7 @@
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2026 Oxide Computer Company
 # Copyright 2022 MNX Cloud, Inc.
+# Copyright 2026 Edgecast Cloud LLC.
 #
 
 [DEFAULT]
@@ -28,7 +29,9 @@ outputdir = /var/tmp/test_results
 
 [/opt/os-tests/tests/poll_test]
 user = root
-tests = ['poll_test', 'epoll_test']
+
+[/opt/os-tests/tests/epoll_test]
+user = root
 
 [/opt/os-tests/tests/eventfd.32]
 [/opt/os-tests/tests/eventfd.64]
@@ -218,7 +221,7 @@ tests = ['hexdump_basic.32', 'hexdump_basic.64']
 [/opt/os-tests/tests/ilstr]
 tests = ['ilstr_basic.32', 'ilstr_basic.64']
 
-[/opt/os-tests/tests/execve]
+[/opt/os-tests/tests/execvpe]
 tests = ['execvpe-test.32', 'execvpe-test.64']
 
 [/opt/os-tests/tests/minttl]

@@ -14,11 +14,11 @@
 #
 
 [DEFAULT]
-pre = setup
+pre =
 quiet = False
 pre_user = root
 timeout = 0
-post = cleanup
+post =
 outputdir = /var/tmp/test_results
 
 [/opt/smbclient-tests/tests/performance/filebench]

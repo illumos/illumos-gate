@@ -11,6 +11,7 @@
 
 #
 # Copyright 2025 Oxide Computer Company
+# Copyright 2026 Edgecast Cloud LLC.
 #
 
 #
@@ -42,12 +43,12 @@ tests = [
 	'nsmgmt.32',
 	'nsmgmt.64',
 	'version.32',
-	'version.64'
+	'version.64',
 	'vuc.32',
 	'vuc.64'
 	]
 
-[/opt/nvme-tests/tests/ioctl]
+[/opt/nvme-tests/tests/libnvme]
 tests = [
 	'sctostr.32',
 	'sctostr.64'
