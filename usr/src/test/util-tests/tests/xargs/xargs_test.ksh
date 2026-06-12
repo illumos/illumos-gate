@@ -14,6 +14,7 @@
 #
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright (c) 2017, Joyent, Inc.
+# Copyright 2026 Oxide Computer Company
 #
 
 XARGS=${XARGS:=/usr/bin/xargs}
@@ -32,7 +33,7 @@ test_fail() {
 }
 
 checkrv() {
-	if [[ $? -ne 0 ]]; then
+	if (( $? != 0 )); then
 		test_fail $1 "exit failure"
 	fi
 }
@@ -247,7 +248,7 @@ test19() {
 	t=test19
 	test_start $t "bad -P option (negative value)"
 	$XARGS -P -3 </dev/null 2>/dev/null
-	if [[ $? -eq 2 ]]; then
+	if (( $? == 2 )); then
 		test_pass $t
 	else
 		test_fail $t
@@ -258,7 +259,7 @@ test20() {
 	t=test20
 	test_start $t "bad -P option (bad string)"
 	$XARGS -P as3f </dev/null 2>/dev/null
-	if [[ $? -eq 2 ]]; then
+	if (( $? == 2 )); then
 		test_pass $t
 	else
 		test_fail $t
@@ -269,11 +270,53 @@ test21() {
 	t=test21
 	test_start $t "bad -P option (extraneous characters)"
 	$XARGS -P 2c </dev/null 2>/dev/null
-	if [[ $? -eq 2 ]]; then
+	if (( $? == 2 )); then
 		test_pass $t
 	else
 		test_fail $t
 	fi
+}
+
+test22() {
+	t=test22
+	test_start $t "missing utility exits 127 and stops processing input"
+	err=$(printf "a\nb\nc" | $XARGS -n1 /nonexistent/utility \
+	    2>&1 >/dev/null)
+	rv=$?
+	if (( rv != 127 )); then
+		test_fail $t "exit status $rv != 127"
+	fi
+	lines=$(print -r -- "$err" | wc -l)
+	if (( lines != 1 )); then
+		test_fail $t "expected a single diagnostic, got [$err]"
+	fi
+	test_pass $t
+}
+
+test23() {
+	t=test23
+	test_start $t "non-executable utility exits 126"
+	tf=/var/tmp/xargstest.$$
+	print '#!/bin/sh' > $tf
+	chmod 0644 $tf
+	printf "a" | $XARGS $tf >/dev/null 2>&1
+	rv=$?
+	rm -f $tf
+	if (( rv != 126 )); then
+		test_fail $t "exit status $rv != 126"
+	fi
+	test_pass $t
+}
+
+test24() {
+	t=test24
+	test_start $t "process creation failure exits 123"
+	printf "a" | ppriv -e -s A-proc_fork $XARGS echo >/dev/null 2>&1
+	rv=$?
+	if (( rv != 123 )); then
+		test_fail $t "exit status $rv != 123"
+	fi
+	test_pass $t
 }
 
 test1
@@ -297,3 +340,6 @@ test18
 test19
 test20
 test21
+test22
+test23
+test24

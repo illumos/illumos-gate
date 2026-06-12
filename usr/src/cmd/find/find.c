@@ -24,6 +24,7 @@
  * Copyright (c) 2013 Andrew Stormont.  All rights reserved.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
+ * Copyright 2026 Oxide Computer Company
  */
 
 
@@ -41,6 +42,7 @@
  */
 
 #include <stdio.h>
+#include <err.h>
 #include <errno.h>
 #include <pwd.h>
 #include <grp.h>
@@ -50,6 +52,7 @@
 #include <sys/acl.h>
 #include <aclutils.h>
 #include <limits.h>
+#include <spawn.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <locale.h>
@@ -75,7 +78,6 @@
 #define	LINEBUF_SIZE		LINE_MAX	/* input or output lines */
 #define	REMOTE_FS		"/etc/dfs/fstypes"
 #define	N_FSTYPES		20
-#define	SHELL_MAXARGS		253	/* see doexec() for description */
 
 /*
  * This is the list of operations
@@ -225,7 +227,6 @@ static int		list(const char *, const struct stat *);
 static char		*getgroup(gid_t);
 static FILE		*cmdopen(char *, char **, char *, FILE *);
 static int		cmdclose(FILE *);
-static char		*getshell(void);
 static void		init_remote_fs(void);
 static char		*getname(uid_t);
 static int		readmode(const char *);
@@ -783,6 +784,8 @@ compile(char **argv, struct Node *np, int *actionp)
 			}
 
 			np->first.l = (long)cmdopen("cpio", com, "w", fd);
+			if (np->first.l == 0)
+				err(1, gettext("cannot run cpio"));
 			(void) fclose(fd);
 			walkflags |= FTW_DEPTH;
 			np->action = CPIO;
@@ -1312,11 +1315,9 @@ doexec(const char *name, char *argv[], int *exitcode)
 {
 	char *cp;
 	char **av = argv;
-	char *newargs[1 + SHELL_MAXARGS + 1];
 	int dummyseen = 0;
-	int i, j, status, rc, r = 0;
-	int exit_status = 0;
-	pid_t pid, pid1;
+	int err, rc, r = 0;
+	pid_t pid;
 
 	(void) fflush(stdout);	  /* to flush possible `-print' */
 	if (name) {
@@ -1331,14 +1332,13 @@ doexec(const char *name, char *argv[], int *exitcode)
 	if (argv[0] == NULL)    /* null command line */
 		return (r);
 
-	if ((pid = fork()) == -1) {
-		/* fork failed */
-		if (exitcode != NULL)
-			*exitcode = 1;
-		return (0);
-	}
-	if (pid != 0) {
-		/* parent */
+	if ((err = posix_spawnp(&pid, argv[0], NULL, NULL, argv,
+	    environ)) != 0) {
+		/* The command could not be invoked */
+		warnc(err, gettext("cannot execute %s"), argv[0]);
+		error = 1;
+		r = 1;
+	} else {
 		do {
 			/* wait for child to exit */
 			if ((rc = wait(&r)) == -1 && errno != EINTR) {
@@ -1350,67 +1350,6 @@ doexec(const char *name, char *argv[], int *exitcode)
 				return (0);
 			}
 		} while (rc != pid);
-	} else {
-		/* child */
-		(void) execvp(argv[0], argv);
-		if (errno != E2BIG)
-			exit(1);
-
-		/*
-		 * We are in a situation where argv[0] points to a
-		 * script without the interpreter line, e.g. #!/bin/sh.
-		 * execvp() will execute either /usr/bin/sh or
-		 * /usr/xpg4/bin/sh against the script, and you will be
-		 * limited to SHELL_MAXARGS arguments. If you try to
-		 * pass more than SHELL_MAXARGS arguments, execvp()
-		 * fails with E2BIG.
-		 * See usr/src/lib/libc/port/gen/execvp.c.
-		 *
-		 * In this situation, process the argument list by
-		 * packets of SHELL_MAXARGS arguments with respect of
-		 * the following rules:
-		 * 1. the invocations have to complete before find exits
-		 * 2. only one invocation can be running at a time
-		 */
-
-		i = 1;
-		newargs[0] = argv[0];
-
-		while (argv[i]) {
-			j = 1;
-			while (j <= SHELL_MAXARGS && argv[i]) {
-				newargs[j++] = argv[i++];
-			}
-			newargs[j] = NULL;
-
-			if ((pid1 = fork()) == -1) {
-				/* fork failed */
-				exit(1);
-			}
-			if (pid1 == 0) {
-				/* child */
-				(void) execvp(newargs[0], newargs);
-				exit(1);
-			}
-
-			status = 0;
-
-			do {
-				/* wait for the child to exit */
-				if ((rc = wait(&status)) == -1 &&
-				    errno != EINTR) {
-					(void) fprintf(stderr,
-					    gettext("wait failed %s"),
-					    strerror(errno));
-					exit(1);
-				}
-			} while (rc != pid1);
-
-			if (status)
-				exit_status = 1;
-		}
-		/* all the invocations have completed */
-		exit(exit_status);
 	}
 
 	if (name && dummyseen) {
@@ -1521,7 +1460,7 @@ varargs(char **com)
 
 /*
  * filter command support
- * fork and exec cmd(argv) according to mode:
+ * spawn cmd(argv) according to mode:
  *
  *	"r"	with fp as stdin of cmd (default stdin), cmd stdout returned
  *	"w"	with fp as stdout of cmd (default stdout), cmd stdin returned
@@ -1539,10 +1478,12 @@ static struct			/* info for each cmdopen()		*/
 static FILE *
 cmdopen(char *cmd, char **argv, char *mode, FILE *fp)
 {
+	posix_spawn_file_actions_t fact;
 	int	proc;
 	int	cmdfd;
 	int	usrfd;
-	int		pio[2];
+	int	err;
+	int	pio[2];
 
 	switch (*mode) {
 	case 'r':
@@ -1566,49 +1507,46 @@ cmdopen(char *cmd, char **argv, char *mode, FILE *fp)
 	if (pipe(pio))
 		return (0);
 
-	switch (cmdproc[proc].pid = fork()) {
-	case -1:
-		return (0);
-	case 0:
-		if (fp && fileno(fp) != usrfd) {
-			(void) close(usrfd);
-			if (dup2(fileno(fp), usrfd) != usrfd)
-				_exit(CMDERR);
-			(void) close(fileno(fp));
-		}
-		(void) close(cmdfd);
-		if (dup2(pio[cmdfd], cmdfd) != cmdfd)
-			_exit(CMDERR);
-		(void) close(pio[cmdfd]);
-		(void) close(pio[usrfd]);
-		(void) execvp(cmd, argv);
-		if (errno == ENOEXEC) {
-			char	**p;
-			char		**v;
-
-			/*
-			 * assume cmd is a shell script
-			 */
-
-			p = argv;
-			while (*p++)
-				;
-			if (v = malloc((p - argv + 1) * sizeof (char **))) {
-				p = v;
-				*p++ = cmd;
-				if (*argv)
-					argv++;
-				while (*p++ = *argv++)
-					;
-				(void) execv(getshell(), v);
+	if ((err = posix_spawn_file_actions_init(&fact)) == 0) {
+		if (fp != NULL && fileno(fp) != usrfd) {
+			if ((err = posix_spawn_file_actions_adddup2(&fact,
+			    fileno(fp), usrfd)) == 0) {
+				err = posix_spawn_file_actions_addclose(
+				    &fact, fileno(fp));
 			}
 		}
-		_exit(CMDERR);
-		/*NOTREACHED*/
-	default:
-		(void) close(pio[cmdfd]);
-		return (cmdproc[proc].fp = fdopen(pio[usrfd], mode));
+		if (err == 0) {
+			err = posix_spawn_file_actions_adddup2(&fact,
+			    pio[cmdfd], cmdfd);
+		}
+		if (err == 0) {
+			err = posix_spawn_file_actions_addclose(&fact,
+			    pio[cmdfd]);
+		}
+		if (err == 0) {
+			err = posix_spawn_file_actions_addclose(&fact,
+			    pio[usrfd]);
+		}
+		if (err == 0) {
+			/*
+			 * A command which is executable but not in a
+			 * recognised format is run as a shell script.
+			 */
+			err = posix_spawnp(&cmdproc[proc].pid, cmd, &fact,
+			    NULL, argv, environ);
+		}
+		(void) posix_spawn_file_actions_destroy(&fact);
 	}
+
+	if (err != 0) {
+		(void) close(pio[0]);
+		(void) close(pio[1]);
+		errno = err;
+		return (0);
+	}
+
+	(void) close(pio[cmdfd]);
+	return (cmdproc[proc].fp = fdopen(pio[usrfd], mode));
 }
 
 /*
@@ -1641,42 +1579,6 @@ cmdclose(FILE *fp)
 	else
 		status = -1;
 	return (status);
-}
-
-/*
- * return pointer to the full path name of the shell
- *
- * SHELL is read from the environment and must start with /
- *
- * if set-uid or set-gid then the executable and its containing
- * directory must not be writable by the real user
- *
- * /usr/bin/sh is returned by default
- */
-
-char *
-getshell(void)
-{
-	char	*s;
-	char	*sh;
-	uid_t	u;
-	int	j;
-
-	if (((sh = getenv("SHELL")) != 0) && *sh == '/') {
-		if (u = getuid()) {
-			if ((u != geteuid() || getgid() != getegid()) &&
-			    access(sh, 2) == 0)
-				goto defshell;
-			s = strrchr(sh, '/');
-			*s = 0;
-			j = access(sh, 2);
-			*s = '/';
-			if (!j) goto defshell;
-		}
-		return (sh);
-	}
-defshell:
-	return ("/usr/bin/sh");
 }
 
 /*

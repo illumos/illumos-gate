@@ -13,6 +13,7 @@
 #
 # Copyright 2020 Joyent, Inc.
 # Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
+# Copyright 2026 Oxide Computer Company
 #
 
 #
@@ -43,6 +44,72 @@ testfind "./.2," $find_prog . -path \"*2\"
 testfind "./.2,./.2/1,./.2/c," $find_prog . -path \"*2*\"
 
 cd -
+rm -rf $find_dir
+
+# Tests for the handling of a failure to run the command given to -exec, or
+# the cpio child process backing -cpio.
+
+find_dir=/var/tmp/findtest.$$.dir
+mkdir -p $find_dir
+touch $find_dir/f
+
+cmd="$find_prog $find_dir -exec /nonexistent/utility {} \;"
+echo "TEST: $cmd"
+out=$($find_prog $find_dir -exec /nonexistent/utility {} \; 2>&1 >/dev/null)
+rv=$?
+(( rv == 1 )) && [[ "$out" == *"cannot execute"* ]] || {
+	echo "TEST FAILED: $cmd" >&2
+	echo "expected exit 1 and a diagnostic, got $rv [$out]" >&2
+	find_exit=1
+}
+
+cmd="$find_prog $find_dir -exec /nonexistent/utility {} +"
+echo "TEST: $cmd"
+out=$($find_prog $find_dir -exec /nonexistent/utility {} + 2>&1 >/dev/null)
+rv=$?
+(( rv == 3 )) && [[ "$out" == *"cannot execute"* ]] || {
+	echo "TEST FAILED: $cmd" >&2
+	echo "expected exit 3 and a diagnostic, got $rv [$out]" >&2
+	find_exit=1
+}
+
+cmd="PATH=/nonexistent $find_prog $find_dir -cpio $find_dir/archive"
+echo "TEST: $cmd"
+out=$(PATH=/nonexistent $find_prog $find_dir -cpio $find_dir/archive \
+    2>&1 >/dev/null)
+rv=$?
+(( rv == 1 )) && [[ "$out" == *"cannot run cpio"* ]] || {
+	echo "TEST FAILED: $cmd" >&2
+	echo "expected exit 1 and a diagnostic, got $rv [$out]" >&2
+	find_exit=1
+}
+
+# A script without an interpreter line is executed by the shell, and is
+# invoked once regardless of the number of arguments.
+mkdir $find_dir/many
+i=1
+files=
+while ((i <= 300)); do
+	files="$files $find_dir/many/x$i"
+	((i++))
+done
+touch $files
+script=$find_dir/script
+count=$find_dir/count
+print "echo run >> $count" > $script
+chmod 0755 $script
+
+cmd="$find_prog $find_dir/many -type f -exec $script {} +"
+echo "TEST: $cmd"
+$find_prog $find_dir/many -type f -exec $script {} + >/dev/null 2>&1
+rv=$?
+runs=$(wc -l < $count)
+(( rv == 0 && runs == 1 )) || {
+	echo "TEST FAILED: $cmd" >&2
+	echo "expected exit 0 and one invocation, got $rv and [$runs]" >&2
+	find_exit=1
+}
+
 rm -rf $find_dir
 
 # Regression test for bug 15353:
