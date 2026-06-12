@@ -24,19 +24,66 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #include <mdb/mdb_shell.h>
 #include <mdb/mdb_lex.h>
 
-/*ARGSUSED*/
 void
-mdb_shell_exec(char *cmd)
+mdb_shell_exec(char *cmd __unused)
 {
 	yyperror("shell escape facility not available in kmdb\n");
 }
 
-/*ARGSUSED*/
 void
-mdb_shell_pipe(char *cmd)
+mdb_shell_pipe(char *cmd __unused)
+{
+	yyperror("shell pipe facility not available in kmdb\n");
+}
+
+void
+mdb_shell_source(char *cmd __unused)
+{
+	yyperror("shell escape facility not available in kmdb\n");
+}
+
+void
+mdb_shell_pipe_source(char *cmd __unused)
+{
+	yyperror("shell pipe facility not available in kmdb\n");
+}
+
+void
+mdb_shell_source_run(void)
+{
+}
+
+void
+mdb_shell_source_discard(void)
+{
+}
+
+int
+mdb_shell_filter(const char *cmd __unused)
+{
+	yyperror("shell pipe facility not available in kmdb\n");
+	return (-1);
+}
+
+void
+mdb_shell_filter_pump(int fd __unused, mdb_iob_t *iob __unused)
+{
+}
+
+void
+mdb_shell_filter_close(int fd __unused)
+{
+}
+
+void
+mdb_shell_producer(struct mdb_cmd *cp __unused)
 {
 	yyperror("shell pipe facility not available in kmdb\n");
 }

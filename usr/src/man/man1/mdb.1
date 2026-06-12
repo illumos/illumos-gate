@@ -16,9 +16,9 @@
 .\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright (c) 2019, Joyent, Inc. All Rights Reserved.
 .\" Copyright (c) 2014, 2017 by Delphix. All rights reserved.
-.\" Copyright 2025 Oxide Computer Company
+.\" Copyright 2026 Oxide Computer Company
 .\"
-.Dd March 23, 2025
+.Dd June 19, 2026
 .Dt MDB 1
 .Os
 .Sh NAME
@@ -225,6 +225,10 @@ below.
 Once the left-hand dcmd is complete, its processed output is used as input for
 the next dcmd in the pipeline.
 If any dcmd does not return a successful exit status, the pipeline is aborted.
+A quote-delimited shell escape can also form a stage of a pipeline, as
+described under
+.Sx Shell Escapes
+below.
 .Pp
 An
 .Em expression
@@ -247,6 +251,8 @@ and send the standard output of the last dcmd in the
 pipeline to an external process created by executing
 .Sq $ Ns Ev SHELL \&-c
 followed by the string formed by concatenating the words after the ! character.
+The !< character sequence can be used in place of ! to additionally evaluate
+the output of the external process as debugger commands.
 For more details, refer to
 .Sx Shell Escapes
 below.
@@ -284,6 +290,15 @@ If the command begins with the ! character, no dcmds are executed and the
 debugger simply executes
 .Sq $ Ns Ev SHELL \&-c
 followed by the string formed by concatenating the words after the ! character.
+.It !< Ar word No \&... Op \&;
+If the command begins with the !< character sequence, the debugger executes
+.Sq $ Ns Ev SHELL \&-c
+as for \&!, and the standard output of the external process is then evaluated by
+the debugger as a series of commands, as if it were a macro file sourced with
+.Ic $< .
+For more details, refer to
+.Sx Shell Escapes
+below.
 .El
 .Ss Comments
 A word beginning with
@@ -455,7 +470,7 @@ If the
 .Ev SHELL
 environment variable is set,
 .Nm
-forks and execs this program for shell escapes; otherwise
+executes this program for shell escapes; otherwise
 .Pa /bin/sh
 is used.
 The shell is invoked with the
@@ -468,12 +483,55 @@ semicolon
 and NEWLINE.
 Once a shell escape is detected, the remaining characters up to the next
 semicolon or NEWLINE are passed as is to the shell.
-The output of shell commands can not be piped to
-.Nm
-dcmds.
 Commands executed by a shell escape have their output sent directly to the
 terminal, not to
 .Nm .
+.Pp
+If the first non-blank character following \&! is a single or double quote,
+the shell command is instead the quote-delimited string, and normal command
+parsing resumes after the closing quote.
+Within single quotes the command is otherwise passed to the shell verbatim;
+within double quotes, C language escape sequences are processed as for any
+other string.
+In either case the sequence \e\&' is replaced by a literal single quote, so
+that the command can itself contain single quotes.
+A quote-delimited shell command can contain semicolons, and can be followed by
+the | character to form a stage of a dcmd pipeline: the output of the
+preceding dcmds is sent to the shell command's standard input, and its
+standard output is processed as input for the next dcmd in the pipeline, as
+described under
+.Sx dcmd Pipelines
+below.
+For example:
+.Bd -literal -offset 2
+> ::walk thread ! 'head -10 | tail -2' | ::findstack
+.Ed
+.Pp
+A quote-delimited shell command can also stand at the head of a pipeline, with
+no dcmd before the \&! character.
+In that case there is no preceding dcmd to supply its standard input, so the
+command is run with its standard input redirected from
+.Pa /dev/null ,
+and its standard output is processed as input for the next dcmd in the
+pipeline.
+This is useful when the address list must be produced or transformed by an
+external program; a plain file of addresses can instead be read directly with
+.Ic ::cat .
+For example, to strip comments from an external file and remove duplicates
+before examining each address:
+.Bd -literal -offset 2
+> ! 'grep -v "^#" /tmp/suspects | sort -u' | ::print proc_t
+.Ed
+.Pp
+The \&!< character sequence creates a shell escape whose standard output is
+read back and evaluated by the debugger as a series of commands, as if it were
+a macro file sourced with
+.Ic $< .
+When suffixed to a pipeline, the standard output of the last dcmd is first
+sent to the shell command's standard input, in the manner of \&!; the shell
+command's output is collected while the pipeline runs and is evaluated once
+the pipeline and the shell command have completed.
+If the pipeline is aborted, the collected output is discarded.
 .Ss Variables
 A
 .Em variable

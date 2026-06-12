@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2026 Oxide Computer Company
+ */
+
+/*
  * Utility routines to manage debugger frames and commands.  A debugger frame
  * is used by each invocation of mdb_run() (the main parsing loop) to manage
  * its state.  Refer to the comments in mdb.c for more information on frames.
@@ -37,6 +41,7 @@
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_lex.h>
 #include <mdb/mdb_io.h>
+#include <mdb/mdb_string.h>
 #include <mdb/mdb.h>
 
 mdb_cmd_t *
@@ -63,6 +68,8 @@ mdb_cmd_destroy(mdb_cmd_t *cp)
 	mdb_addrvec_destroy(&cp->c_addrv);
 	mdb_argvec_destroy(&cp->c_argv);
 	mdb_vcb_purge(cp->c_vcbs);
+	if (cp->c_shcmd != NULL)
+		strfree(cp->c_shcmd);
 	mdb_free(cp, sizeof (mdb_cmd_t));
 }
 
@@ -111,6 +118,7 @@ mdb_frame_push(mdb_frame_t *fp)
 
 	fp->f_flags = mdb.m_flags & MDB_FL_VOLATILE;
 	fp->f_pcmd = mdb.m_frame->f_pcmd;
+	fp->f_shellsrc = -1;		/* not inherited; reset per frame */
 	fp->f_id = mdb.m_fid++;
 	mdb.m_frame->f_dot = mdb_nv_get_value(mdb.m_dot);
 

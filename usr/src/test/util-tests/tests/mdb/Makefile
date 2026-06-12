@@ -11,7 +11,7 @@
 
 #
 # Copyright 2020 Joyent, Inc.
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 include $(SRC)/cmd/Makefile.cmd
@@ -30,6 +30,7 @@ MAKEDIRS = \
 	format \
 	options \
 	numbers \
+	shell \
 	sou \
 	typedef
 
@@ -73,6 +74,14 @@ FILES = \
 	numbers/tst.prefsym.ksh \
 	options/tst.autowrap.mdb \
 	options/tst.autowrap.mdb.out \
+	shell/err.bangpipe.ksh \
+	shell/err.unterminated.ksh \
+	shell/tst.escape.ksh \
+	shell/tst.exec.ksh \
+	shell/tst.filter.ksh \
+	shell/tst.head.ksh \
+	shell/tst.pipe.ksh \
+	shell/tst.source.ksh \
 	sou/tst.anon.ksh \
 	sou/tst.anon.ksh.out \
 	typedef/err.badid-leadnum.ksh \

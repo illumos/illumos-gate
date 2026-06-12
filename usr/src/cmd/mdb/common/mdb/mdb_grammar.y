@@ -27,6 +27,7 @@
 
 /*
  * Copyright (c) 2019, Joyent, Inc.  All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <mdb/mdb_types.h>
@@ -92,6 +93,7 @@ yyexpand(int val)
 
 %token	<l_string>	MDB_TOK_SYMBOL
 %token	<l_string>	MDB_TOK_STRING
+%token			MDB_TOK_SHELLSRC
 %token	<l_char>	MDB_TOK_CHAR
 %token	<l_immediate>	MDB_TOK_IMMEDIATE
 %token	<l_dcmd>	MDB_TOK_DCMD
@@ -197,9 +199,19 @@ statement:	pipeline shell_pipe terminator {
 		}
 
 	|	'!' MDB_TOK_STRING terminator {
-			if (mdb_iob_isapipe(mdb.m_in))
+			if (mdb_iob_isapipe(mdb.m_in)) {
+				strfree($2);
 				yyerror("syntax error");
+			}
 			mdb_shell_exec($2);
+		}
+
+	|	MDB_TOK_SHELLSRC MDB_TOK_STRING terminator {
+			if (mdb_iob_isapipe(mdb.m_in)) {
+				strfree($2);
+				yyerror("syntax error");
+			}
+			mdb_shell_source($2);
 		}
 
 	|	terminator {
@@ -220,6 +232,26 @@ statement:	pipeline shell_pipe terminator {
 	;
 
 pipeline:	pipeline '|' command { mdb_cmd_create($3, &mdb.m_frame->f_argvec); }
+	|	pipeline '!' MDB_TOK_STRING '|' command {
+			/*
+			 * A quote-delimited shell command may itself form a
+			 * stage of a dcmd pipeline.
+			 */
+			mdb_cmd_t *cp;
+
+			cp = mdb_cmd_create($5, &mdb.m_frame->f_argvec);
+			cp->c_shcmd = $3;
+		}
+	|	'!' MDB_TOK_STRING '|' command {
+			/*
+			 * A quote-delimited shell command may also stand at the
+			 * head of a pipeline, with no producing dcmd.
+			 */
+			mdb_cmd_t *cp;
+
+			cp = mdb_cmd_create($4, &mdb.m_frame->f_argvec);
+			cp->c_shcmd = $2;
+		}
 	|	command { mdb_cmd_create($1, &mdb.m_frame->f_argvec); }
 	;
 
@@ -234,6 +266,7 @@ command:	'?' format_list { $$ = mdb_dcmd_lookup("?"); }
 
 shell_pipe:	/* Empty */
 	|	'!' MDB_TOK_STRING { mdb_shell_pipe($2); }
+	|	MDB_TOK_SHELLSRC MDB_TOK_STRING { mdb_shell_pipe_source($2); }
 	;
 
 format_list:	/* Empty */

@@ -1718,6 +1718,15 @@ dir  path=opt/util-tests/tests/mdb/progs
 file path=opt/util-tests/tests/mdb/progs/anon mode=0555
 file path=opt/util-tests/tests/mdb/progs/bitfields mode=0555
 file path=opt/util-tests/tests/mdb/progs/number_symbol mode=0555
+dir  path=opt/util-tests/tests/mdb/shell
+file path=opt/util-tests/tests/mdb/shell/err.bangpipe.ksh mode=0444
+file path=opt/util-tests/tests/mdb/shell/err.unterminated.ksh mode=0444
+file path=opt/util-tests/tests/mdb/shell/tst.escape.ksh mode=0444
+file path=opt/util-tests/tests/mdb/shell/tst.exec.ksh mode=0444
+file path=opt/util-tests/tests/mdb/shell/tst.filter.ksh mode=0444
+file path=opt/util-tests/tests/mdb/shell/tst.head.ksh mode=0444
+file path=opt/util-tests/tests/mdb/shell/tst.pipe.ksh mode=0444
+file path=opt/util-tests/tests/mdb/shell/tst.source.ksh mode=0444
 dir  path=opt/util-tests/tests/mdb/sou
 file path=opt/util-tests/tests/mdb/sou/tst.anon.ksh mode=0444
 file path=opt/util-tests/tests/mdb/sou/tst.anon.ksh.out mode=0444

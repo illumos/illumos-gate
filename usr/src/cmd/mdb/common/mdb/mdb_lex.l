@@ -29,7 +29,7 @@
  * Copyright 2011 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
  * Copyright 2019, Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -86,6 +86,7 @@ static void unput(int);
 static void output(int);
 
 static void string_unquote(char *);
+static void shellcmd_unescape(char *);
 
 extern int yydebug;
 
@@ -136,6 +137,17 @@ RGX_COMMENT	"//".*\n
 <S_INITIAL>"%%"	|
 <S_EXPR>"%%"	return (MDB_TOK_MODULUS); /* Modulus operator */
 
+<S_INITIAL>"!<"	|
+<S_FMTLIST>"!<"	|
+<S_ARGLIST>"!<"	{
+		/*
+		 * Shell input escapes are legal in all of these states --
+		 * switch to the shell command state and return the token.
+		 */
+		BEGIN(S_SHELLCMD);
+		return (MDB_TOK_SHELLSRC);
+	}
+
 <S_INITIAL>"!"	|
 <S_FMTLIST>"!"	|
 <S_ARGLIST>"!"	{
@@ -157,11 +169,50 @@ RGX_COMMENT	"//".*\n
 		return (yytext[0]);
 	}
 
-<S_SHELLCMD>[^;\n]+	{
+<S_SHELLCMD>[ \t]*"'"{RGX_CHR_SEQ}$	|
+<S_SHELLCMD>[ \t]*\"{RGX_STR_SEQ}$	yyerror("syntax error: quote unmatched");
+
+<S_SHELLCMD>[ \t]*"'"{RGX_CHR_SEQ}"'"	{
+		/*
+		 * Single-quoted shell command -- the quote body is passed to
+		 * $SHELL -c verbatim, except that \' yields a literal single
+		 * quote so that the command can itself contain single quotes.
+		 * Normal lexing resumes after the closing quote so that the
+		 * command can be followed by further pipeline stages.
+		 */
+		char *s = strchr(yytext, '\'');
+
+		yytext[yyleng - 1] = '\0';
+		yylval.l_string = strdup(s + 1);
+		shellcmd_unescape(yylval.l_string);
+		BEGIN(S_INITIAL);
+		return (MDB_TOK_STRING);
+	}
+
+<S_SHELLCMD>[ \t]*\"{RGX_STR_SEQ}\"	{
+		/*
+		 * Double-quoted shell command -- as above, but C escape
+		 * sequences in the quote body are processed in the same way
+		 * as for any other string token. As for the single-quoted
+		 * form, \' then yields a literal single quote.
+		 */
+		char *s = strchr(yytext, '"');
+
+		yytext[yyleng - 1] = '\0';
+		yylval.l_string = strdup(s + 1);
+		(void) stresc2chr(yylval.l_string);
+		shellcmd_unescape(yylval.l_string);
+		BEGIN(S_INITIAL);
+		return (MDB_TOK_STRING);
+	}
+
+<S_SHELLCMD>[ \t]*[^;\n \t'"][^;\n]*	{
 		/*
 		 * Once in the shell-command state, we return all remaining
 		 * characters up to a newline or ';' delimiter as a single
-		 * string which will be passed to $SHELL -c.
+		 * string which will be passed to $SHELL -c. A command whose
+		 * first non-blank character is a quote is handled by the
+		 * delimited rules above instead.
 		 */
 		yylval.l_string = strdup(yytext);
 		BEGIN(S_INITIAL);
@@ -725,6 +776,24 @@ string_unquote(char *s)
 	}
 
 	(void) memmove(s, o, strlen(o) + 1);
+}
+
+/*
+ * Within a quoted shell command, a backslash before a single quote yields a
+ * literal single quote.
+ */
+static void
+shellcmd_unescape(char *s)
+{
+	char *p, *q;
+
+	for (p = q = s; *p != '\0'; p++) {
+		if (p[0] == '\\' && p[1] == '\'')
+			p++;
+		*q++ = *p;
+	}
+
+	*q = '\0';
 }
 
 /*
