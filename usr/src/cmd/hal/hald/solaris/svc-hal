@@ -5,19 +5,16 @@
 #
 # Licensed under the Academic Free License version 2.1
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 . /lib/svc/share/smf_include.sh
 
+if smf_is_nonglobalzone; then
+	echo "$SMF_FMRI is not supported in a local zone"
+	smf_method_exit $SMF_EXIT_TEMP_DISABLE "non-global zone"
+fi
+
 case "$1" in
 'start')
-        if smf_is_nonglobalzone; then
-                /usr/sbin/svcadm disable $SMF_FMRI
-                echo "$SMF_FMRI is not supported in a local zone"
-                sleep 5 &
-                exit $SMF_EXIT_OK
-        fi
-
 	[ ! -x /usr/lib/hal/hald ] && exit $SMF_EXIT_ERR_CONFIG
 
 	[ ! -d /var/run/hald ] && /usr/bin/mkdir -m 755 /var/run/hald
@@ -31,9 +28,9 @@ case "$1" in
 	fi
 	;;
 *)
-        echo "Usage: $0 { start }"
-	exit $SMF_EXIT_ERR_FATAL 
-        ;;
+	echo "Usage: $0 { start }"
+	exit $SMF_EXIT_ERR_FATAL
+	;;
 esac
 
 exit $SMF_EXIT_OK

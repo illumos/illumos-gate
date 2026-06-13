@@ -39,10 +39,8 @@ fi
 
 if smf_is_nonglobalzone; then
 	echo "The $SVCNAME service has been disabled because " \
-	    "it is not supported in a local zone."
-	/usr/sbin/svcadm disable "$SMF_FMRI"
-	sleep 5 &
-	exit "$SMF_EXIT_OK"
+	    "it is not supported in a non-global zone."
+	smf_method_exit $SMF_EXIT_TEMP_DISABLE "non-global zone"
 fi
 
 #
@@ -59,13 +57,12 @@ fi
 if [ ! -c "$VLDS" ]; then
 	echo "The $SVCNAME service has been disabled because the system" \
 	    "has no virtual domain service (vlds) device."
-	/usr/sbin/svcadm disable -t "$SMF_FMRI"
-	sleep 5 &
-	exit "$SMF_EXIT_OK"
+	smf_method_exit $SMF_EXIT_TEMP_DISABLE \
+	    "no virtual domain service (vlds) device"
 fi
 
 if [ ! -x "$LDMAD" ]; then
-	echo "The $SVCNAME service requires the $LDMAD executable." 
+	echo "The $SVCNAME service requires the $LDMAD executable."
 	exit "$SMF_EXIT_ERR_CONFIG"
 fi
 

@@ -24,7 +24,7 @@
 # Use is subject to license terms.
 # Copyright 2015 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2012 Joyent, Inc.  All rights reserved.
-# Copyright 2021 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 smf_present () {
@@ -241,6 +241,44 @@ smf_kill_contract() {
 	return 0
 }
 
+# A wrapper which records a human-readable reason for the action a method is
+# taking before exiting with the provided status. It is intended for use with
+# SMF_EXIT_TEMP_DISABLE, where the message is shown by `svcs -xv` and `svcs -l`
+# for the disabled instance.
+#
+# The reason is stored in the general_ovr/comment property (as for `svcadm
+# disable -c`). This property is non-persistent and is removed automatically
+# when the instance is re-enabled.
+#
+# smf_method_exit EXITCODE MESSAGE
+#
+
+# This can be unset by smf_clean_env() so keep a copy
+__smf_method_exit_fmri="$SMF_FMRI"
+smf_method_exit() {
+	typeset exitcode=${1:?exit code}; shift
+	typeset msg="$*"
+
+	# svccfg builds its command-line arguments back together into a single
+	# space-separated string and re-parses that with its own lexer, so
+	# shell-level quoting of the message does not survive. Pass the message
+	# as an embedded double-quoted string, escaping the characters that are
+	# special within one.
+	msg="${msg//\\/\\\\}"
+	msg="${msg//\"/\\\"}"
+
+	# The property group may not exist yet; create it first, ignoring any
+	# error should it already be present. Recording the reason is
+	# best-effort and the disable does not depend on it, but any error from
+	# setting the property is left to appear in the service log.
+	svccfg -s "$__smf_method_exit_fmri" \
+		addpg general_ovr framework P >/dev/null 2>&1
+	svccfg -s "$__smf_method_exit_fmri" \
+		setprop general_ovr/comment = astring: "\"$msg\"" >/dev/null
+
+	exit $exitcode
+}
+
 #
 # smf(7) method and monitor exit status definitions
 #   SMF_EXIT_ERR_OTHER, although not defined, encompasses all non-zero
@@ -250,6 +288,10 @@ smf_kill_contract() {
 # need to run any persistent process. This indicates success, abandons the
 # contract, and allows dependencies to be met.
 #
+# The SMF_EXIT_TEMP_DISABLE exit status should be used when a method wishes
+# to disable the service temporarily (i.e. until the next system restart or
+# administrator intervention).
+#
 SMF_EXIT_OK=0
 SMF_EXIT_NODAEMON=94
 SMF_EXIT_ERR_FATAL=95
@@ -258,3 +300,4 @@ SMF_EXIT_MON_DEGRADE=97
 SMF_EXIT_MON_OFFLINE=98
 SMF_EXIT_ERR_NOSMF=99
 SMF_EXIT_ERR_PERM=100
+SMF_EXIT_TEMP_DISABLE=101

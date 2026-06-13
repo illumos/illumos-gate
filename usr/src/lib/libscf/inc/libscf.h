@@ -886,6 +886,10 @@ int smf_notify_del_params(const char *, const char *, int32_t);
  * The SMF_EXIT_NODAEMON exit status should be used when a method does not
  * need to run any persistent process. This indicates success, abandons the
  * contract, and allows dependencies to be met.
+ *
+ * The SMF_EXIT_TEMP_DISABLE exit status should be used when a method wishes
+ * to disable the service temporarily (i.e. until the next system restart or
+ * administrator intervention).
  */
 #define	SMF_EXIT_OK		  0
 #define	SMF_EXIT_NODAEMON	 94
@@ -895,6 +899,7 @@ int smf_notify_del_params(const char *, const char *, int32_t);
 #define	SMF_EXIT_MON_OFFLINE	 98
 #define	SMF_EXIT_ERR_NOSMF	 99
 #define	SMF_EXIT_ERR_PERM	100
+#define	SMF_EXIT_TEMP_DISABLE	101
 
 #ifdef	__cplusplus
 }

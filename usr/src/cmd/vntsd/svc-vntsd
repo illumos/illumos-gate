@@ -143,9 +143,8 @@ if [ ! -c "$VNTSD_DEV" ]; then
 	echo "The Virtual Network Terminal Server service has been disabled" \
 	    "because the system has no virtual console concentrator (vcc)" \
 	    "device."
-	/usr/sbin/svcadm disable -t "$SMF_FMRI"
-	sleep 5 &
-	exit $SMF_EXIT_OK
+	smf_method_exit $SMF_EXIT_TEMP_DISABLE \
+		"no virtual console concentrator (vcc) device"
 fi
 
 if [ -x /usr/lib/ldoms/vntsd ]; then
