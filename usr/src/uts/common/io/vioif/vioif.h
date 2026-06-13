@@ -21,6 +21,9 @@
 #ifndef _VIOIF_H
 #define	_VIOIF_H
 
+#include <sys/stdbool.h>
+#include <sys/taskq_impl.h>
+
 #include "virtio.h"
 
 #ifdef __cplusplus
@@ -49,12 +52,16 @@ extern "C" {
 /*
  * VIRTIO NETWORK VIRTQUEUES
  *
- * Note that the control queue is only present if VIRTIO_NET_F_CTRL_VQ is
- * negotiated with the device.
+ * The device provides at least one pair of virtqueues: receive at index 0 and
+ * transmit at index 1. If VIRTIO_NET_F_MQ is negotiated, the device provides
+ * "max_virtqueue_pairs" pairs, with the queues for pair "n" at the indices
+ * given below. The control queue, present only if VIRTIO_NET_F_CTRL_VQ is
+ * negotiated, follows all of the provided pairs; when VIRTIO_NET_F_MQ has not
+ * been negotiated its index is found by passing 1 for "maxqpairs".
  */
-#define	VIRTIO_NET_VIRTQ_RX		0
-#define	VIRTIO_NET_VIRTQ_TX		1
-#define	VIRTIO_NET_VIRTQ_CONTROL	2
+#define	VIRTIO_NET_VIRTQ_RX(n)			(2 * (n))
+#define	VIRTIO_NET_VIRTQ_TX(n)			(2 * (n) + 1)
+#define	VIRTIO_NET_VIRTQ_CONTROL(maxqpairs)	(2 * (maxqpairs))
 
 /*
  * VIRTIO NETWORK FEATURE BITS
@@ -165,6 +172,17 @@ extern "C" {
 #define	VIRTIO_NET_F_CTRL_RX_EXTRA	(1ULL << 20)
 
 /*
+ * MQ:
+ *	The device supports multiple pairs of receive and transmit virtqueues.
+ *	The number of available pairs can be read from
+ *	VIRTIO_NET_CONFIG_MAX_VQ_PAIRS. The driver selects the number of pairs
+ *	that will be used by sending the VIRTIO_NET_CTRL_MQ_VQ_PAIRS_SET
+ *	command on the control queue. Until it does so, the device only uses
+ *	the first pair. This feature depends on VIRTIO_NET_F_CTRL_VQ.
+ */
+#define	VIRTIO_NET_F_MQ			(1ULL << 22)
+
+/*
  * SPEED_DUPLEX:
  *	The VIRTIO_NET_CONFIG_SPEED and VIRTIO_NET_CONFIG_DUPLEX registers are
  *	available, which allows the driver to determine the link speed and
@@ -187,6 +205,7 @@ extern "C" {
 					VIRTIO_NET_F_MTU |		\
 					VIRTIO_NET_F_CTRL_VQ |		\
 					VIRTIO_NET_F_CTRL_RX |		\
+					VIRTIO_NET_F_MQ |		\
 					VIRTIO_NET_F_STATUS)
 
 /* The following features are only available with the modern interface. */
@@ -247,6 +266,7 @@ struct virtio_net_ctrlq_hdr {
  * Control Queue Classes
  */
 #define	VIRTIO_NET_CTRL_RX		0
+#define	VIRTIO_NET_CTRL_MQ		4
 
 /*
  * CTRL_RX commands
@@ -257,6 +277,26 @@ struct virtio_net_ctrlq_hdr {
 #define	VIRTIO_NET_CTRL_RX_NOMULTI	3
 #define	VIRTIO_NET_CTRL_RX_NOUNI	4
 #define	VIRTIO_NET_CTRL_RX_NOBCAST	5
+
+/*
+ * CTRL_MQ commands
+ */
+#define	VIRTIO_NET_CTRL_MQ_VQ_PAIRS_SET	0
+
+/*
+ * The valid range for the "max_virtqueue_pairs" configuration field, and for
+ * the argument to VIRTIO_NET_CTRL_MQ_VQ_PAIRS_SET.
+ */
+#define	VIRTIO_NET_CTRL_MQ_PAIRS_MIN	1
+#define	VIRTIO_NET_CTRL_MQ_PAIRS_MAX	0x8000
+
+/*
+ * The body of a VIRTIO_NET_CTRL_MQ_VQ_PAIRS_SET request. The pair count is
+ * little-endian.
+ */
+struct virtio_net_ctrl_mq {
+	uint16_t	vncm_pairs;
+} __packed;
 
 /*
  * Control queue ack values
@@ -271,17 +311,29 @@ struct virtio_net_ctrlq_hdr {
 
 /*
  * At attach, we allocate a fixed pool of buffers for receipt and transmission
- * of frames.  The maximum number of buffers of each type that we will allocate
- * is specified here.  If the ring size is smaller than this number, we will
- * use the ring size instead.
+ * of frames for each virtqueue pair. The maximum number of buffers of each
+ * type that we will allocate is specified here. If the ring size is smaller
+ * than this number, we will use the ring size instead.
  */
 #define	VIRTIO_NET_TX_BUFS		256
 #define	VIRTIO_NET_RX_BUFS		256
 
 /*
- * Initially, only use a single buf for control queue requests (when
- * present). If this becomes a bottleneck, we can simply increase this
- * value as necessary.
+ * The maximum number of virtqueue pairs we are prepared to use. Each
+ * additional pair consumes two MSI-X vectors and its own pools of transmit
+ * and receive buffers, of which the receive pool in particular is a
+ * significant allocation (VIRTIO_NET_RX_BUFS buffers of VIOIF_RX_BUF_SIZE
+ * bytes; around 16MB per pair). The number of pairs used is also limited by
+ * the device, the number of CPUs and the number of available interrupt
+ * vectors, and can be restricted with the "vioif_max_qpairs" tuneable.
+ */
+#define	VIOIF_MAX_QPAIRS		8
+
+/*
+ * The control queue has a single buffer, which also serves to serialise
+ * control queue requests. Increasing this value requires the request path
+ * to be reworked first. With more than one request outstanding, a caller
+ * polling for completion could otherwise collect another caller's response.
  */
 #define	VIRTIO_NET_CTRL_BUFS		1
 
@@ -343,6 +395,8 @@ struct virtio_net_ctrlq_hdr {
  */
 
 typedef struct vioif vioif_t;
+typedef struct vioif_rxq vioif_rxq_t;
+typedef struct vioif_txq vioif_txq_t;
 
 /*
  * Receive buffers are allocated in advance as a combination of DMA memory and
@@ -350,13 +404,13 @@ typedef struct vioif vioif_t;
  * to avoid copying, and this object contains the free routine to pass to
  * desballoc().
  *
- * When receive buffers are not in use, they are linked into the per-instance
- * free list, "vif_rxbufs" via "rb_link".  Under normal conditions, we expect
- * the free list to be empty much of the time; most buffers will be in the ring
- * or on loan.
+ * When receive buffers are not in use, they are linked into the owning
+ * receive queue's free list, "vrq_bufs", via "rb_link". Under normal
+ * conditions, we expect the free list to be empty much of the time; most
+ * buffers will be in the ring or on loan.
  */
 typedef struct vioif_rxbuf {
-	vioif_t				*rb_vioif;
+	vioif_rxq_t			*rb_rxq;
 	frtn_t				rb_frtn;
 
 	virtio_dma_t			*rb_dma;
@@ -379,8 +433,8 @@ typedef struct vioif_ctrlbuf {
  * the virtio net header, and to hold small packets.  Larger packets are mapped
  * from storage loaned to the driver by the network stack.
  *
- * When transmit buffers are not in use, they are linked into the per-instance
- * free list, "vif_txbufs" via "tb_link".
+ * When transmit buffers are not in use, they are linked into the owning
+ * transmit queue's free list, "vtq_bufs", via "tb_link".
  */
 typedef struct vioif_txbuf {
 	mblk_t				*tb_mp;
@@ -410,6 +464,112 @@ typedef enum vioif_runstate {
 } vioif_runstate_t;
 
 /*
+ * Buffer space for the longest virtqueue name, and its terminating NUL.
+ */
+#define	VIOIF_VQ_NAME_LEN		(sizeof ("rx32767"))
+
+/*
+ * Per-receive queue state. Each receive queue is presented to MAC as a
+ * receive ring, and has its own pool of receive buffers.
+ */
+struct vioif_rxq {
+	vioif_t				*vrq_vif;
+	virtio_queue_t			*vrq_vq;
+	char				vrq_name[VIOIF_VQ_NAME_LEN];
+
+	kmutex_t			vrq_mutex;
+
+	/*
+	 * "vrq_running" is set while the ring is started. While it is clear
+	 * we drop incoming frames and refuse to insert more receive buffers
+	 * into the receive queue.
+	 *
+	 * "vrq_polling" is set while MAC has claimed the ring for polled
+	 * receive. Virtqueue interrupt suppression is only advisory, so the
+	 * interrupt handler uses this to avoid delivering frames that the
+	 * poll thread is responsible for collecting.
+	 */
+	bool				vrq_running;
+	bool				vrq_polling;
+
+	/*
+	 * Frames returned by the device while its interrupt was suppressed
+	 * are collected from the driver task queue. "vrq_collect_queued" is
+	 * set while the pre-allocated task entry is on the queue.
+	 */
+	taskq_ent_t			vrq_collect_tqent;
+	bool				vrq_collect_queued;
+
+	mac_ring_handle_t		vrq_ringh;
+	uint64_t			vrq_gen;
+
+	/*
+	 * Receive buffer free list and accounting:
+	 */
+	list_t				vrq_bufs;
+	uint_t				vrq_nbufs_alloc;
+	uint_t				vrq_nbufs_onloan;
+	uint_t				vrq_nbufs_onloan_max;
+	uint_t				vrq_bufs_capacity;
+	vioif_rxbuf_t			*vrq_bufs_mem;
+
+	/*
+	 * Per-ring statistics:
+	 */
+	uint64_t			vrq_ipackets;
+	uint64_t			vrq_rbytes;
+	uint64_t			vrq_brdcstrcv;
+	uint64_t			vrq_multircv;
+	uint64_t			vrq_norecvbuf;
+	uint64_t			vrq_ierrors;
+
+	uint64_t			vrq_rxfail_chain_undersize;
+	uint64_t			vrq_rxfail_chain_oversize;
+};
+
+/*
+ * Per-transmit queue state. Each transmit queue is presented to MAC as a
+ * transmit ring, and has its own pool of transmit buffers.
+ */
+struct vioif_txq {
+	vioif_t				*vtq_vif;
+	virtio_queue_t			*vtq_vq;
+	char				vtq_name[VIOIF_VQ_NAME_LEN];
+
+	kmutex_t			vtq_mutex;
+
+	/* TX virtqueue management resources */
+	bool				vtq_corked;
+	bool				vtq_drain;
+	timeout_id_t			vtq_reclaim_tid;
+
+	mac_ring_handle_t		vtq_ringh;
+
+	/*
+	 * Transmit buffer free list and accounting:
+	 */
+	list_t				vtq_bufs;
+	uint_t				vtq_nbufs_alloc;
+	uint_t				vtq_bufs_capacity;
+	vioif_txbuf_t			*vtq_bufs_mem;
+
+	/*
+	 * Per-ring statistics:
+	 */
+	uint64_t			vtq_opackets;
+	uint64_t			vtq_obytes;
+	uint64_t			vtq_brdcstxmt;
+	uint64_t			vtq_multixmt;
+	uint64_t			vtq_notxbuf;
+	uint64_t			vtq_oerrors;
+
+	uint64_t			vtq_txfail_dma_bind;
+	uint64_t			vtq_txfail_indirect_limit;
+
+	uint64_t			vtq_stat_tx_reclaim;
+};
+
+/*
  * Per-instance driver object.
  */
 struct vioif {
@@ -421,22 +581,38 @@ struct vioif {
 	/*
 	 * The NIC is considered RUNNING between the mc_start(9E) and
 	 * mc_stop(9E) calls.  Otherwise it is STOPPING (while draining
-	 * resources) then STOPPED.  When not RUNNING, we will drop incoming
-	 * frames and refuse to insert more receive buffers into the receive
-	 * queue.
+	 * resources) then STOPPED.
 	 */
 	vioif_runstate_t		vif_runstate;
 
 	mac_handle_t			vif_mac_handle;
 
-	virtio_queue_t			*vif_rx_vq;
-	virtio_queue_t			*vif_tx_vq;
-	virtio_queue_t			*vif_ctrl_vq;
+	/*
+	 * The receive group handle is not currently used, but is retained,
+	 * as in other ring-capable drivers, for debugging and for future
+	 * group operations.
+	 */
+	mac_group_handle_t		vif_rx_grouph;
 
-	/* TX virtqueue management resources */
-	boolean_t			vif_tx_corked;
-	boolean_t			vif_tx_drain;
-	timeout_id_t			vif_tx_reclaim_tid;
+	/*
+	 * Used by the receive path to collect and deliver frames that were
+	 * returned by the device while its interrupt was suppressed.
+	 */
+	taskq_t				*vif_taskq;
+
+	/*
+	 * "vif_nqpairs" is the number of receive and transmit virtqueue pairs
+	 * in use, and is the number of rings of each type that we present to
+	 * MAC. "vif_nqpairs_alloc" is the number of pairs for which we have
+	 * allocated queues and buffers; the two only differ if the device
+	 * refused our VIRTIO_NET_CTRL_MQ_VQ_PAIRS_SET request.
+	 */
+	uint_t				vif_nqpairs;
+	uint_t				vif_nqpairs_alloc;
+	vioif_rxq_t			*vif_rxqs;
+	vioif_txq_t			*vif_txqs;
+
+	virtio_queue_t			*vif_ctrl_vq;
 
 	/*
 	 * Configured offload features:
@@ -457,29 +633,17 @@ struct vioif {
 
 	uint32_t			vif_speed;	/* Mb/s */
 	uint16_t			vif_status;
+
+	/*
+	 * The link state most recently reported to MAC.
+	 */
+	link_state_t			vif_link_state;
 	uint8_t				vif_duplex;
 	uint_t				vif_mtu;
 	uint_t				vif_mtu_max;
 	uint8_t				vif_mac[ETHERADDRL];
 
-	/*
-	 * Receive buffer free list and accounting:
-	 */
-	list_t				vif_rxbufs;
-	uint_t				vif_nrxbufs_alloc;
-	uint_t				vif_nrxbufs_onloan;
-	uint_t				vif_nrxbufs_onloan_max;
-	uint_t				vif_rxbufs_capacity;
-	vioif_rxbuf_t			*vif_rxbufs_mem;
 	size_t				vif_rxbuf_hdrlen;
-
-	/*
-	 * Transmit buffer free list and accounting:
-	 */
-	list_t				vif_txbufs;
-	uint_t				vif_ntxbufs_alloc;
-	uint_t				vif_txbufs_capacity;
-	vioif_txbuf_t			*vif_txbufs_mem;
 
 	/*
 	 * These copy size thresholds are exposed as private MAC properties so
@@ -493,39 +657,35 @@ struct vioif {
 	uint_t				vif_ctrlbufs_capacity;
 	vioif_ctrlbuf_t			*vif_ctrlbufs_mem;
 
-	/*
-	 * Statistics visible through mac:
-	 */
-	uint64_t			vif_ipackets;
-	uint64_t			vif_opackets;
-	uint64_t			vif_rbytes;
-	uint64_t			vif_obytes;
-	uint64_t			vif_brdcstxmt;
-	uint64_t			vif_brdcstrcv;
-	uint64_t			vif_multixmt;
-	uint64_t			vif_multircv;
-	uint64_t			vif_norecvbuf;
-	uint64_t			vif_notxbuf;
-	uint64_t			vif_ierrors;
-	uint64_t			vif_oerrors;
-
-	/*
-	 * Internal debugging statistics:
-	 */
-	uint64_t			vif_rxfail_dma_handle;
-	uint64_t			vif_rxfail_dma_buffer;
-	uint64_t			vif_rxfail_dma_bind;
-	uint64_t			vif_rxfail_chain_undersize;
-	uint64_t			vif_rxfail_no_descriptors;
-	uint64_t			vif_txfail_dma_handle;
-	uint64_t			vif_txfail_dma_bind;
-	uint64_t			vif_txfail_indirect_limit;
-
-	uint64_t			vif_stat_tx_reclaim;
-
 	uint64_t			vif_noctrlbuf;
 	uint64_t			vif_ctrlbuf_toosmall;
 };
+
+/*
+ * Data and functions shared between the source files which make up the
+ * driver.
+ */
+
+/* vioif.c */
+extern ddi_dma_attr_t vioif_dma_attr_bufs;
+extern const uchar_t vioif_broadcast[ETHERADDRL];
+
+/* vioif_rx.c */
+extern void vioif_rxbuf_free(vioif_rxq_t *, vioif_rxbuf_t *);
+extern int vioif_alloc_rxq_bufs(vioif_rxq_t *);
+extern void vioif_free_rxq_bufs(vioif_rxq_t *);
+extern bool vioif_rx_drain(vioif_t *);
+extern uint_t vioif_rx_handler(caddr_t, caddr_t);
+extern void vioif_fill_rx_ring(void *, mac_ring_type_t, const int, const int,
+    mac_ring_info_t *, mac_ring_handle_t);
+
+/* vioif_tx.c */
+extern int vioif_alloc_txq_bufs(vioif_txq_t *);
+extern void vioif_free_txq_bufs(vioif_txq_t *);
+extern void vioif_tx_drain(vioif_txq_t *);
+extern uint_t vioif_tx_handler(caddr_t, caddr_t);
+extern void vioif_fill_tx_ring(void *, mac_ring_type_t, const int, const int,
+    mac_ring_info_t *, mac_ring_handle_t);
 
 #ifdef __cplusplus
 }

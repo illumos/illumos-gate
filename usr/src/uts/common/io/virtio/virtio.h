@@ -12,7 +12,7 @@
 /*
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2026 Hans Rosenfeld
  */
 
@@ -187,6 +187,11 @@
  * The NO_INTERRUPT flag on a queue may be set or cleared with
  * virtio_queue_no_interrupt().  Note that this flag is purely advisory, and
  * may not actually stop interrupts from the device in a timely fashion.
+ * Additionally, the device consults the flag only at the moment it returns a
+ * chain, i.e. clearing the flag does not produce an interrupt for chains that
+ * were returned while it was set. After clearing the flag, a driver can call
+ * virtio_queue_pending() to discover whether returned chains are waiting to be
+ * collected with virtio_queue_poll().
  *
  * INTERRUPT MANAGEMENT
  *
@@ -199,6 +204,15 @@
  * virtio_interrupts_enable() routine may be called.  Interrupts may be
  * disabled again by calling virtio_interrupts_disable().  Interrupt resources
  * will be deallocated as part of a subsequent call to virtio_fini().
+ *
+ * Once initialisation is complete, virtio_interrupts_type() returns the
+ * interrupt type that was allocated, as one of the DDI_INTR_TYPE_* constants.
+ * A driver that sized its queue configuration around per-queue MSI-X vectors
+ * can use this to discover whether the framework instead had to fall back to
+ * a single shared fixed interrupt, and adapt accordingly. When MSI-X is in
+ * use, the interrupt handle for the vector assigned to a particular queue can
+ * be retrieved with virtio_queue_intr_handle(). This is useful with interrupt
+ * management interfaces that operate on specific vectors.
  *
  * DMA MEMORY MANAGEMENT: ALLOCATION AND FREE
  *
@@ -331,8 +345,10 @@ virtio_chain_t *virtio_queue_poll(virtio_queue_t *);
 virtio_chain_t *virtio_queue_evacuate(virtio_queue_t *);
 void virtio_queue_flush(virtio_queue_t *);
 void virtio_queue_no_interrupt(virtio_queue_t *, boolean_t);
+boolean_t virtio_queue_pending(virtio_queue_t *);
 uint_t virtio_queue_nactive(virtio_queue_t *);
 uint_t virtio_queue_size(virtio_queue_t *);
+ddi_intr_handle_t virtio_queue_intr_handle(virtio_queue_t *);
 
 virtio_chain_t *virtio_chain_alloc(virtio_queue_t *, int);
 void virtio_chain_clear(virtio_chain_t *);
@@ -347,6 +363,7 @@ size_t virtio_chain_received_length(virtio_chain_t *);
 
 int virtio_interrupts_enable(virtio_t *);
 void virtio_interrupts_disable(virtio_t *);
+int virtio_interrupts_type(virtio_t *);
 
 virtio_dma_t *virtio_dma_alloc(virtio_t *, size_t, const ddi_dma_attr_t *, int,
     int);

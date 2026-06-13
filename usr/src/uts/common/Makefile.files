@@ -2132,7 +2132,7 @@ VIRTIO_OBJS = virtio_main.o virtio_legacy.o virtio_modern.o virtio_dma.o
 VIOBLK_OBJS = vioblk.o
 
 # Virtio network driver
-VIOIF_OBJS = vioif.o
+VIOIF_OBJS = vioif.o vioif_rx.o vioif_tx.o
 
 # Virtio SCSI driver
 VIOSCSI_OBJS = vioscsi.o
