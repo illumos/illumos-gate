@@ -24,7 +24,7 @@
 # Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2016 RackTop Systems.
-# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2020 Peter Tribble
 #
 
@@ -198,7 +198,6 @@ PKGMOG_DEFINES= \
 	JAVA_8_ONLY=$(JAVA_8_ONLY)
 
 PKGDEP_TOKENS_i386= \
-	'PLATFORM=i86hvm' \
 	'PLATFORM=i86pc' \
 	'PLATFORM=i86xpv' \
 	'ISALIST=amd64' \

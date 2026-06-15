@@ -29,6 +29,7 @@
  * Copyright (c) 2014 by Delphix. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -68,6 +69,7 @@
 #include <public/xen.h>
 #include <public/event_channel.h>
 #include <public/io/xenbus.h>
+#include <sys/x86_archext.h>
 #else
 #include <sys/hypervisor.h>
 #include <sys/evtchn_impl.h>
@@ -255,6 +257,13 @@ xpvd_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	extern void xvdi_watch_devices(int);
 #ifdef XPV_HVM_DRIVER
 	extern dev_info_t *xpv_dip;
+
+	/*
+	 * xpvd.conf creates this node on every i86pc system, but the
+	 * paravirtual framework is only available under Xen HVM.
+	 */
+	if ((get_hwenv() & HW_XEN_HVM) == 0)
+		return (DDI_FAILURE);
 
 	if (xpv_dip == NULL) {
 		if (ddi_hold_installed_driver(ddi_name_to_major("xpv")) ==

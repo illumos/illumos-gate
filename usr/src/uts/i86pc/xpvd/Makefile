@@ -18,25 +18,48 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 #
 
-UTSBASE=	../../..
+#
+#	Path to the base of the uts directory tree (usually /usr/src/uts).
+#
+UTSBASE	= ../..
 
-MODULE=		rtls
-OBJECTS=	$(PV_RTLS_OBJS:%=$(OBJS_DIR)/%)
-ROOTMODULE=	$(ROOT_HVM_DRV_DIR)/$(MODULE)
+#
+#	Define the module and object file sets.
+#
+MODULE		= xpvd
+OBJECTS		= $(XPVD_OBJS:%=$(OBJS_DIR)/%)
+ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
+CONF_SRCDIR	= $(UTSBASE)/i86pc/io/xen
 
-include		$(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
+#
+#	Include common rules.
+#
+include $(UTSBASE)/i86pc/Makefile.i86pc
 
-ALL_TARGET=	$(BINARY)
-INSTALL_TARGET=	$(BINARY) $(ROOTMODULE)
+#
+#	Define targets
+#
+ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
+CPPFLAGS	+= -DXPV_HVM_DRIVER -D_SOLARIS -DHVMPV_XPVD_VERS=1
+LDFLAGS		+= -Ndrv/xpv
+
+CERRWARN	+= $(CNOWARN_UNINIT)
+
+# needs work
+SMATCH		= off
+
+#
+#	Default build targets.
+#
 .KEEP_STATE:
 
 def:		$(DEF_DEPS)
@@ -49,4 +72,7 @@ clobber:	$(CLOBBER_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-include		$(UTSBASE)/i86pc/i86hvm/Makefile.targ
+#
+#	Include common targets.
+#
+include $(UTSBASE)/i86pc/Makefile.targ

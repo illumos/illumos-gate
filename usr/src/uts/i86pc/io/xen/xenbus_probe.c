@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
+/*
  * Talks to Xen Store to figure out what devices we have.
  *
  * Copyright (C) 2005 Rusty Russell, IBM Corporation
@@ -63,7 +67,7 @@
 
 static int
 read_otherend_details(struct xenbus_device *xendev,
-			char *id_node, char *path_node)
+    char *id_node, char *path_node)
 {
 	int err = xenbus_gather(XBT_NULL, xendev->nodename,
 	    id_node, "%i", &xendev->otherend_id, path_node, NULL,

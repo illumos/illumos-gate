@@ -23,6 +23,8 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+#
 
 #
 #	This Makefile defines the build rules for the directory uts/i86xpv
@@ -103,6 +105,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/boot/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/gfx_private/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/xen/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 

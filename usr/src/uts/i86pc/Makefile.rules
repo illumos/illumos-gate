@@ -23,7 +23,7 @@
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright 2015 Igor Kozhukhov <ikozhukhov@gmail.com>
 # Copyright 2019 Joyent, Inc.
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2022 Oxide Computer Company
 # Copyright 2025 MNX Cloud, Inc.
 #
@@ -216,6 +216,10 @@ $(OBJS_DIR)/%.o:		$(SRC)/common/dis/i386/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/gfx_private/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/xen/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 

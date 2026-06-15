@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Nexenta Systems, Inc.  All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -60,6 +61,9 @@
 #include <sys/miiregs.h>
 #include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
+#ifdef __x86
+#include <sys/x86_archext.h>
+#endif
 
 #include "rtls.h"
 
@@ -374,6 +378,16 @@ rtls_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	default:
 		return (DDI_FAILURE);
 	}
+
+#ifdef __x86
+	/*
+	 * Under Xen HVM, the emulated NIC is also presented as a paravirtual
+	 * device, which uses the xnf driver. Leave the emulated NIC alone so
+	 * that the guest does not see the same interface twice.
+	 */
+	if ((get_hwenv() & HW_XEN_HVM) != 0)
+		return (DDI_FAILURE);
+#endif
 
 	/*
 	 * we don't support high level interrupts in the driver

@@ -28,6 +28,8 @@
 #
 # Copyright (c) 2019, Joyent, Inc.
 #
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+#
 
 MODULE = genunix.so
 MDBTGT = kvm
@@ -65,6 +67,7 @@ dmod/$(MODULE) := LDLIBS += -lm -lproc
 #
 CPPFLAGS += -I$(SRC)/uts/i86pc
 CPPFLAGS += -I$(SRC)/uts/i86xpv
+CPPFLAGS += -I$(SRC)/uts/common/xen
 
 # Needed to include c2/audit.h (from cred.h)
 CPPFLAGS += -I$(SRC)/uts/common

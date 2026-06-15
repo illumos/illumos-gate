@@ -23,6 +23,8 @@
 # Use is subject to license terms.
 #
 # Copyright 2016 Joyent, Inc.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+#
 
 MODULE = xpv_psm.so
 MDBTGT = kvm
@@ -41,6 +43,7 @@ CPPFLAGS += -DMP -D_MACHDEP -D__xen
 CPPFLAGS += -I../../../../common
 CPPFLAGS += -I../../../../i86pc/modules/common
 CPPFLAGS += -I$(SRC)/uts/common
+CPPFLAGS += -I$(SRC)/uts/common/xen
 CPPFLAGS += -I$(SRC)/uts/i86xpv
 CPPFLAGS += -I$(SRC)/uts/i86pc
 CPPFLAGS += -I$(SRC)/uts/intel

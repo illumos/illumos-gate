@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
+/*
  * gnttab.c
  *
  * Granting foreign access to our memory reservation.
@@ -269,7 +273,7 @@ gnttab_grant_foreign_access(domid_t domid, gnttab_frame_t frame, int readonly)
 
 void
 gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
-				gnttab_frame_t frame, int readonly)
+    gnttab_frame_t frame, int readonly)
 {
 	ASSERT(VALID_GRANT_REF(ref));
 
@@ -475,7 +479,7 @@ gnttab_release_grant_reference(grant_ref_t *private_head, grant_ref_t release)
 
 void
 gnttab_request_free_callback(struct gnttab_free_callback *callback,
-	void (*fn)(void *), void *arg, uint16_t count)
+    void (*fn)(void *), void *arg, uint16_t count)
 {
 	mutex_enter(&gnttab_list_lock);
 	if (callback->next)

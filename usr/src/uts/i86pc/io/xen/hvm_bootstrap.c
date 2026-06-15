@@ -24,31 +24,36 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include <sys/modctl.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
-
-/*
- * The hvm_bootstrap misc module is installed in the i86hvm platform
- * directly so it will only be loaded in HVM emulated environment.
- */
-
+#include <sys/x86_archext.h>
 
 /*
  * hvmboot_rootconf() exists to force attach all xdf disk driver nodes
- * before the pv cmdk disk driver comes along and tries to access any of
+ * before the cmdk disk driver comes along and tries to access any of
  * these nodes (which usually happens when mounting the root disk device
- * in an hvm environment).  See the block comments at the top of pv_cmdk.c
- * for more information about why this is necessary.
+ * in an hvm environment).
  *
  * hvmboot_rootconf() also force attaches xnf network driver nodes so
- * that boot interface can be plumbed when booted via the network.
+ * that the boot interface can be plumbed when booted via the network.
+ *
+ * This module is part of the base i86pc platform and so is always present.
+ * It must therefore do nothing unless we are running under Xen HVM.  On
+ * bare metal there is no xpvd nexus to configure.
  */
 int
 hvmboot_rootconf()
 {
 	dev_info_t	*xpvd_dip;
 	major_t		dev_major;
+
+	if ((get_hwenv() & HW_XEN_HVM) == 0)
+		return (0);
 
 	dev_major = ddi_name_to_major("xdf");
 	if (dev_major == (major_t)-1)

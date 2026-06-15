@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2022 Garrett D'Amore <garrett@damore.org>
  * Copyright 2026 Oxide Computer Company
  * Copyright 2023 MNX Cloud, Inc.
@@ -822,7 +822,7 @@ fcnname##_info:							\
         END_MODULE(cpr);
 
 /*
- * Stubs for i86hvm bootstraping
+ * Stubs for Xen HVM bootstrapping
  */
 	MODULE(hvm_bootstrap,misc);
 	NO_UNLOAD_STUB(hvm_bootstrap, hvmboot_rootconf, nomod_zero);

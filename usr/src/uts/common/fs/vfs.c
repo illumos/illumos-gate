@@ -27,6 +27,7 @@
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2017 RackTop Systems.
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -4521,12 +4522,10 @@ rootconf()
 
 #if defined(__x86)
 	/*
-	 * hvmboot_rootconf() is defined in the hvm_bootstrap misc module,
-	 * which lives in /platform/i86hvm, and hence is only available when
-	 * booted in an x86 hvm environment.  If the hvm_bootstrap misc module
-	 * is not available then the modstub for this function will return 0.
-	 * If the hvm_bootstrap misc module is available it will be loaded
-	 * and hvmboot_rootconf() will be invoked.
+	 * hvmboot_rootconf() is provided by the hvm_bootstrap misc module.
+	 * It forces the paravirtualised root devices to be configured when
+	 * booting under Xen HVM and does nothing otherwise.  If the module
+	 * cannot be loaded then the modstub for this function returns 0.
 	 */
 	if (error = hvmboot_rootconf())
 		return (error);

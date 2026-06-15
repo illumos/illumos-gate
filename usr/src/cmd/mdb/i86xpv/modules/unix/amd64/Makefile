@@ -23,6 +23,8 @@
 # Use is subject to license terms.
 #
 # Copyright 2019 Joyent, Inc.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+#
 
 MODULE = unix.so
 MDBTGT = kvm
@@ -42,6 +44,7 @@ CPPFLAGS += -DMP -D_MACHDEP -D__xpv
 CPPFLAGS += -I../../../../common
 CPPFLAGS += -I../../../../intel
 CPPFLAGS += -I$(SRC)/uts/common
+CPPFLAGS += -I$(SRC)/uts/common/xen
 CPPFLAGS += -I$(SRC)/uts/i86xpv
 CPPFLAGS += -I$(SRC)/uts/i86pc
 CPPFLAGS += -I$(SRC)/uts/intel

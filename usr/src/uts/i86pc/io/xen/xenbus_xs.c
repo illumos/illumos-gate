@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
+/*
  *
  * xenbus_xs.c
  *
@@ -289,11 +293,11 @@ out:
  */
 static int
 xs_talkv(xenbus_transaction_t t,
-		    enum xsd_sockmsg_type type,
-		    const iovec_t *iovec,
-		    unsigned int num_vecs,
-		    void **rval,
-		    unsigned int *len)
+    enum xsd_sockmsg_type type,
+    const iovec_t *iovec,
+    unsigned int num_vecs,
+    void **rval,
+    unsigned int *len)
 {
 	struct xsd_sockmsg msg;
 	struct xs_stored_msg *reply_msg;
@@ -358,9 +362,9 @@ out:
 /* Simplified version of xs_talkv: single message. */
 static int
 xs_single(xenbus_transaction_t t,
-			enum xsd_sockmsg_type type,
-			const char *string, void **ret,
-			unsigned int *len)
+    enum xsd_sockmsg_type type,
+    const char *string, void **ret,
+    unsigned int *len)
 {
 	iovec_t iovec;
 
@@ -425,7 +429,7 @@ split(char *strings, unsigned int len, unsigned int *num)
 
 char **
 xenbus_directory(xenbus_transaction_t t,
-			const char *dir, const char *node, unsigned int *num)
+    const char *dir, const char *node, unsigned int *num)
 {
 	char *strings, *path;
 	unsigned int len;
@@ -480,7 +484,7 @@ xenbus_exists_dir(const char *dir, const char *node)
  */
 int
 xenbus_read(xenbus_transaction_t t,
-	    const char *dir, const char *node, void **retp, unsigned int *len)
+    const char *dir, const char *node, void **retp, unsigned int *len)
 {
 	char *path;
 	int err;
@@ -525,7 +529,7 @@ xenbus_read_str(const char *dir, const char *node, char **retp)
  */
 int
 xenbus_write(xenbus_transaction_t t,
-		const char *dir, const char *node, const char *string)
+    const char *dir, const char *node, const char *string)
 {
 	char *path;
 	iovec_t iovec[2];
@@ -625,7 +629,7 @@ xenbus_transaction_end(xenbus_transaction_t t, int abort)
 /* SCANFLIKE4 */
 int
 xenbus_scanf(xenbus_transaction_t t,
-		const char *dir, const char *node, const char *fmt, ...)
+    const char *dir, const char *node, const char *fmt, ...)
 {
 	va_list ap;
 	int ret;
@@ -648,7 +652,7 @@ xenbus_scanf(xenbus_transaction_t t,
 /* PRINTFLIKE4 */
 int
 xenbus_printf(xenbus_transaction_t t,
-		const char *dir, const char *node, const char *fmt, ...)
+    const char *dir, const char *node, const char *fmt, ...)
 {
 	va_list ap;
 	int ret;

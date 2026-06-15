@@ -20,58 +20,32 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Fake rtls module. Prevents the real rtls driver from loading in
- * a xen HVM domain so that xnf may operate instead.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
-#include <sys/sunddi.h>
-#include <sys/errno.h>
-#include <sys/modctl.h>
+#ifndef _SYS_XPV_IMPL_H
+#define	_SYS_XPV_IMPL_H
 
-static struct dev_ops stub_ops = {
-	DEVO_REV,
-	0,
-	NULL,
-	nulldev,
-	nulldev,
-	NULL,
-	NULL,
-	nodev,
-	NULL,
-	NULL,
-	NULL,
-	ddi_quiesce_not_needed
-};
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-static struct modldrv modldrv = {
-	&mod_driverops,
-	"xVM rtls stub",
-	&stub_ops
-};
+#if !defined(_ASM)
+#include <sys/types.h>
+#endif
 
-static struct modlinkage modlinkage = {
-	MODREV_1, (void *)&modldrv, NULL
-};
+#define	__XEN_INTERFACE_VERSION__	__XEN_LATEST_INTERFACE_VERSION__
 
-int
-_init(void)
-{
-	return (mod_install(&modlinkage));
+#include <xen/public/xen.h>
+#include <xen/public/arch-x86/xen-mca.h>
+
+#ifdef __cplusplus
 }
+#endif
 
-int
-_info(struct modinfo *modinfop)
-{
-	return (mod_info(&modlinkage, modinfop));
-}
-
-int
-_fini(void)
-{
-	return (EBUSY);
-}
+#endif /* _SYS_XPV_IMPL_H */

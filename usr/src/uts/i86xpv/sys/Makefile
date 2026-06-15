@@ -23,6 +23,9 @@
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+#
+
 UTSBASE = ../..
 
 #
@@ -38,7 +41,6 @@ FILEMODE = 644
 HDRS=  \
 	balloon.h	\
 	machprivregs.h	\
-	xen_mmu.h \
 	xpv_impl.h
 
 ROOTHDRS=	$(HDRS:%=$(USR_PSM_ISYS_DIR)/%)

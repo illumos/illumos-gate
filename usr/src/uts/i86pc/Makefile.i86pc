@@ -24,7 +24,7 @@
 #
 # Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
 # Copyright (c) 2013 Andrew Stormont.  All rights reserved.
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2019 Joyent, Inc.
 #
 #
@@ -49,9 +49,9 @@ UNAME_M		= $(PLATFORM)
 # platform specific modules.  All code specific to a given implementation
 # resides in the appropriately named subdirectory.   This requires
 # these platforms to have their own Makefiles to define ROOT_PLAT_DIRS,
-# USR_PLAT_DIRS, etc.
+# USR_PLAT_DIRS, etc.  There are currently none.
 #
-IMPLEMENTATIONS	= i86hvm
+IMPLEMENTATIONS	=
 
 #
 #	Everybody needs to know how to build modstubs.o and to locate unix.o
@@ -248,6 +248,14 @@ DRV_KMODS	+= i86pc_ktest
 
 DRV_KMODS	+= cpudrv
 
+#
+#	Xen HVM paravirtualised drivers
+#
+DRV_KMODS	+= xpv
+DRV_KMODS	+= xpvd
+DRV_KMODS	+= xdf
+DRV_KMODS	+= xnf
+
 
 #
 # Platform Power Modules
@@ -293,6 +301,7 @@ SYS_KMODS	+=
 MISC_KMODS	+= gfx_private pcie pci_prd
 MISC_KMODS	+= acpidev
 MISC_KMODS	+= drmach_acpi
+MISC_KMODS	+= hvm_bootstrap
 
 #
 #	'Dacf' modules (/kernel/dacf)

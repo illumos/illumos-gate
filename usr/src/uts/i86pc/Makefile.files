@@ -23,7 +23,7 @@
 # Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
 #
 # Copyright (c) 2010, Intel Corporation.
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2026 Oxide Computer Company
 # Copyright 2021 Jason King
@@ -242,6 +242,17 @@ ROOTNEX_OBJS += rootnex.o immu.o immu_dmar.o immu_dvma.o \
 TZMON_OBJS	+= tzmon.o
 UPPC_OBJS += uppc.o psm_common.o
 XSVC_OBJS += xsvc.o
+
+#
+#	Xen HVM paravirtualised drivers (uts/i86pc/io/xen)
+#
+XPV_OBJS += xpv_support.o xvdi.o gnttab.o evtchn.o xenbus_comms.o \
+		xenbus_client.o xenbus_probe.o xenbus_xs.o
+XPVD_OBJS += xpvd.o
+XDF_OBJS += xdf.o
+XNF_OBJS += xnf.o
+HVM_BOOTSTRAP_OBJS += hvm_bootstrap.o
+
 AMD_IOMMU_OBJS +=	amd_iommu.o amd_iommu_impl.o amd_iommu_acpi.o \
 			amd_iommu_cmd.o amd_iommu_log.o amd_iommu_page_tables.o
 
@@ -254,7 +265,7 @@ I86PC_KTEST_OBJS =	i86pc_ktest.o
 #
 ALL_DEFS	+= -Di86pc
 INC_PATH	+= -I$(UTSBASE)/i86pc -I$(SRC)/common
-INC_PATH	+= -I$(UTSBASE)/i86xpv -I$(UTSBASE)/common/xen
+INC_PATH	+= -I$(UTSBASE)/common/xen
 
 #
 # Since the assym files are derived, the dependencies must be explicit for

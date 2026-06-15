@@ -29,7 +29,7 @@
 # Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2018 Jason King
 # Copyright 2019, Joyent, Inc.
-# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2020 Peter Tribble
 # Copyright 2026 Oxide Computer Company
 #
@@ -579,12 +579,6 @@ usr/include/sys/extdirent.h
 #
 usr/include/libvscan.h
 usr/include/sys/vscan.h
-#
-# i86hvm is not a full platform.  It is just a home for paravirtualized
-# drivers.  There is no usr/ component to this sub-platform, but the
-# directory is created in the proto area to keep other tools happy.
-#
-usr/platform/i86hvm						i386
 #
 # Private sdcard framework headers
 #

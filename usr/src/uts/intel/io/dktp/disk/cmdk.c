@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/scsi/scsi.h>
@@ -48,6 +49,7 @@
 #include <sys/aio_req.h>
 
 #include <sys/cmlb.h>
+#include <sys/x86_archext.h>
 
 /*
  * Local Static Data
@@ -277,6 +279,15 @@ cmdkprobe(dev_info_t *dip)
 	int	instance;
 	int	status;
 	struct	cmdk	*dkp;
+
+	/*
+	 * Under Xen HVM, the emulated IDE disks are also presented as
+	 * paravirtual devices, which use the xdf driver. Leave the emulated
+	 * disks alone so that there is no conflict. Emulated ATAPI devices are
+	 * unaffected since they attach to sd.
+	 */
+	if ((get_hwenv() & HW_XEN_HVM) != 0)
+		return (DDI_PROBE_FAILURE);
 
 	instance = ddi_get_instance(dip);
 

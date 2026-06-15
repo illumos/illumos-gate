@@ -28,7 +28,7 @@
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2020 Joyent, Inc.
 # Copyright 2019 Peter Tribble.
-# Copyright 2024 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2026 Oxide Computer company
 #
 
@@ -1626,7 +1626,6 @@ $(i386_ONLY)dir path=usr/platform/i86xpv/include
 $(i386_ONLY)dir path=usr/platform/i86xpv/include/sys
 $(i386_ONLY)file path=usr/platform/i86xpv/include/sys/balloon.h
 $(i386_ONLY)file path=usr/platform/i86xpv/include/sys/machprivregs.h
-$(i386_ONLY)file path=usr/platform/i86xpv/include/sys/xen_mmu.h
 $(i386_ONLY)file path=usr/platform/i86xpv/include/sys/xpv_impl.h
 $(i386_ONLY)dir path=usr/platform/i86xpv/include/vm
 $(i386_ONLY)file path=usr/platform/i86xpv/include/vm/seg_mf.h

@@ -18,33 +18,29 @@
 #
 # CDDL HEADER END
 #
-
 #
-# uts/i86pc/xdf/Makefile
-#
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 #
-#	i86pc architecture dependent
-#
+
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-UTSBASE	= ../../..
+UTSBASE	= ../..
 
 #
 #	Define the module and object file sets.
 #
-MODULE		= xdf
-OBJECTS		= $(XDF_OBJS:%=$(OBJS_DIR)/%)
-ROOTMODULE	= $(ROOT_HVM_DRV_DIR)/$(MODULE)
+MODULE		= hvm_bootstrap
+OBJECTS		= $(HVM_BOOTSTRAP_OBJS:%=$(OBJS_DIR)/%)
+ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
+include $(UTSBASE)/i86pc/Makefile.i86pc
 
 #
 #	Define targets
@@ -52,12 +48,7 @@ include $(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
 ALL_TARGET	= $(BINARY)
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-# Overrides
-CPPFLAGS	+= -DHVMPV_XDF_VERS=2
-LDFLAGS		+= -Nmisc/cmlb -Ndrv/xpvd -Ndrv/xpv
-
-CERRWARN	+= -_gcc=-Wno-parentheses
-CERRWARN	+= -_gcc=-Wno-switch
+CPPFLAGS	+= -DXPV_HVM_DRIVER -D_SOLARIS
 
 #
 #	Default build targets.
@@ -77,4 +68,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/i86pc/i86hvm/Makefile.targ
+include $(UTSBASE)/i86pc/Makefile.targ

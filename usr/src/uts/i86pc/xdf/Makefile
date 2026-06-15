@@ -18,48 +18,44 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
-#
-
-#
-#	This makefile drives the production of the xpvd nexus driver
-#
-#	i86pc implementation architecture dependent
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-UTSBASE	= ../../..
+UTSBASE	= ../..
 
 #
 #	Define the module and object file sets.
 #
-MODULE		= xpvd
-OBJECTS		= $(XPVD_OBJS:%=$(OBJS_DIR)/%)
-ROOTMODULE	= $(ROOT_HVM_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/common/xen/io
+MODULE		= xdf
+OBJECTS		= $(XDF_OBJS:%=$(OBJS_DIR)/%)
+ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
+include $(UTSBASE)/i86pc/Makefile.i86pc
 
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(CONFMOD)
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+ALL_TARGET	= $(BINARY)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-CPPFLAGS	+= -DHVMPV_XPVD_VERS=1
-LDFLAGS		+= -Ndrv/xpv
+CPPFLAGS	+= -DXPV_HVM_DRIVER -D_SOLARIS -DHVMPV_XDF_VERS=2
+LDFLAGS		+= -Nmisc/cmlb -Ndrv/xpvd -Ndrv/xpv
 
-CERRWARN	+= $(CNOWARN_UNINIT)
+CERRWARN	+= -_gcc=-Wno-parentheses
+CERRWARN	+= -_gcc=-Wno-switch
+
+# needs work
+SMATCH		= off
 
 #
 #	Default build targets.
@@ -79,4 +75,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/i86pc/i86hvm/Makefile.targ
+include $(UTSBASE)/i86pc/Makefile.targ

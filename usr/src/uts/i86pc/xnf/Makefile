@@ -19,15 +19,10 @@
 # CDDL HEADER END
 #
 #
-# uts/i86pc/i86hvm/Makefile
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
-#
-#	This makefile drives the production of the i86hvm platform modules.
-#
-#	i86pc implementation architecture dependent
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 #
 
 #
@@ -36,42 +31,48 @@
 UTSBASE	= ../..
 
 #
+#	Define the module and object file sets.
+#
+MODULE		= xnf
+OBJECTS		= $(XNF_OBJS:%=$(OBJS_DIR)/%)
+ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
+
+#
 #	Include common rules.
 #
-include $(UTSBASE)/i86pc/i86hvm/Makefile.i86hvm
+include $(UTSBASE)/i86pc/Makefile.i86pc
 
-def		:=	TARGET= def
-all		:=	TARGET= all
-install		:=	TARGET= install
-install_h	:=	TARGET= install_h
-clean		:=	TARGET= clean
-clobber		:=	TARGET= clobber
-check		:=	TARGET= check
+#
+#	Define targets
+#
+ALL_TARGET	= $(BINARY)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+
+#
+#	Driver depends on MAC & IP
+#
+CPPFLAGS	+= -DXPV_HVM_DRIVER -D_SOLARIS -DHVMPV_XNF_VERS=1
+LDFLAGS		+= -Nmisc/mac -Ndrv/ip -Ndrv/xpvd -Ndrv/xpv
+
+# needs work
+SMATCH		= off
 
 #
 #	Default build targets.
 #
 .KEEP_STATE:
 
-.PARALLEL: $(HVM_KMODS)
+def:		$(DEF_DEPS)
 
-def all clean clobber:	$(HVM_KMODS)
+all:		$(ALL_DEPS)
 
-install: install_implementations .WAIT \
-	$(HVM_KMODS)
+clean:		$(CLEAN_DEPS)
 
-install_implementations: \
-	$(ROOT_HVM_DIR) \
-	$(ROOT_HVM_DRV_DIR) \
-	$(ROOT_HVM_MISC_DIR) \
-	$(USR_HVM_DIR)
+clobber:	$(CLOBBER_DEPS)
 
-$(HVM_KMODS):	FRC
-	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
-
-install_h check:	FRC
+install:	$(INSTALL_DEPS)
 
 #
 #	Include common targets.
 #
-include $(UTSBASE)/$(PLATFORM)/i86hvm/Makefile.targ
+include $(UTSBASE)/i86pc/Makefile.targ

@@ -18,51 +18,59 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	Common targets for i86hvm platform-implementation specific modules.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 #
 
+#
+#	Path to the base of the uts directory tree (usually /usr/src/uts).
+#
+UTSBASE	= ../..
+
+#
+#	Define the module and object file sets.
+#
+MODULE		= xpv
+OBJECTS		= $(XPV_OBJS:%=$(OBJS_DIR)/%)
+ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
+CONF_SRCDIR	= $(UTSBASE)/i86pc/io/xen
+
+#
+#	Include common rules.
+#
+include $(UTSBASE)/i86pc/Makefile.i86pc
+
+#
+#	Define targets
+#
+ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+
+CPPFLAGS	+= -DXPV_HVM_DRIVER -D_SOLARIS -DHVMPV_XPV_VERS=1
+LDFLAGS		+= -N mach/pcplusmp
+
+# needs work
+SMATCH		= off
+
+#
+#	Default build targets.
+#
 .KEEP_STATE:
 
-#
-# Rules for implementation subdirectories.
-#
-$(ROOT_HVM_DIR):
-	$(INS.dir)
+def:		$(DEF_DEPS)
 
-$(ROOT_HVM_MOD_DIR):		$(ROOT_HVM_DIR)
-	$(INS.dir)
+all:		$(ALL_DEPS)
 
-$(ROOT_HVM_DRV_DIR_32):		$(ROOT_HVM_MOD_DIR)
-	$(INS.dir)
+clean:		$(CLEAN_DEPS)
 
-$(ROOT_HVM_DRV_DIR_64):		$(ROOT_HVM_DRV_DIR_32)
-	$(INS.dir)
+clobber:	$(CLOBBER_DEPS)
 
-$(ROOT_HVM_MISC_DIR_32):	$(ROOT_HVM_MOD_DIR)
-	$(INS.dir)
-
-$(ROOT_HVM_MISC_DIR_64):	$(ROOT_HVM_MISC_DIR_32)
-	$(INS.dir)
-
-$(ROOT_HVM_MOD_DIR)/%:		$(OBJS_DIR)/% $(ROOT_HVM_MOD_DIR) FRC
-	$(INS.file)
-
-$(ROOT_HVM_DRV_DIR)/%:		$(OBJS_DIR)/% $(ROOT_HVM_DRV_DIR) FRC
-	$(INS.file)
-
-$(ROOT_HVM_MISC_DIR)/%:		$(OBJS_DIR)/% $(ROOT_HVM_MISC_DIR) FRC
-	$(INS.file)
-
-$(USR_HVM_DIR):
-	$(INS.dir)
+install:	$(INSTALL_DEPS)
 
 #
 #	Include common targets.
 #
-include $(UTSBASE)/$(PLATFORM)/i86hvm/Makefile.rules
-include $(UTSBASE)/$(PLATFORM)/Makefile.targ
+include $(UTSBASE)/i86pc/Makefile.targ
