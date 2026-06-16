@@ -325,7 +325,7 @@ User: %s
         self.result.runtime = '%02d:%02d' % (m, s)
         self.result.result = 'SKIP'
 
-    def not_found(self):
+    def not_found(self, kind='test'):
         """
         Initialize enough of the test result that we can log a test whose
         file was not found on disk. Reported as a failure.
@@ -337,7 +337,8 @@ User: %s
         retcode = 1
         self.result.stdout = []
         self.result.stderr = [(datetime.now(),
-                               'Test file not found: %s' % self.pathname)]
+                               '%s file not found: %s' %
+                               (kind, self.pathname))]
         self.result.starttime = time()
         m, s = divmod(time() - self.result.starttime, 60)
         self.result.runtime = '%02d:%02d' % (m, s)
@@ -414,6 +415,8 @@ class Test(Cmd):
         self.post = post or ''
         self.post_user = post_user or ''
         self.tags = tags or []
+        self.missing_pre = False
+        self.missing_post = False
 
     def __str__(self):
         post_user = pre_user = ''
@@ -438,14 +441,24 @@ Tags: %s
         Check the pre/post scripts, user and Test. Omit the Test from this
         run if there are any problems.
         """
-        files = [self.pre, self.pathname, self.post]
         users = [self.pre_user, self.user, self.post_user]
 
-        for f in [f for f in files if len(f)]:
-            if not verify_file(f):
-                logger.info("Warning: Test '%s' not added to this run because"
-                            " it failed verification." % f)
-                return False
+        if len(self.pre) and not verify_file(self.pre):
+            logger.warning("pre script '%s' for test '%s' failed "
+                           "verification; tests will be skipped." %
+                           (self.pre, self.pathname))
+            self.missing_pre = True
+
+        if not verify_file(self.pathname):
+            logger.warning("Test '%s' not added to this run because"
+                           " it failed verification." % self.pathname)
+            return False
+
+        if len(self.post) and not verify_file(self.post):
+            logger.warning("post script '%s' for test '%s' failed "
+                           "verification; tests will be skipped.." %
+                           (self.post, self.pathname))
+            self.missing_post = True
 
         for user in [user for user in users if len(user)]:
             if not verify_user(user, logger):
@@ -457,8 +470,11 @@ Tags: %s
 
     def run(self, logger, options):
         """
-        Create Cmd instances for the pre/post scripts. If the pre script
-        doesn't pass, skip this Test. Run the post script regardless.
+        Create Cmd instances for the pre/post scripts. If the post script
+        is missing, refuse to run and report a FAIL for post. If the pre
+        script is missing, report a FAIL for pre and skip this test and
+        post. If the pre script exists but fails, skip this test. Run the
+        post script if pre passed or failed (but not if pre was missing).
         """
         odir = os.path.join(self.outputdir, os.path.basename(self.pre))
         pretest = Cmd(self.pre, identifier=self.identifier, outputdir=odir,
@@ -471,7 +487,17 @@ Tags: %s
                        timeout=self.timeout, user=self.post_user)
 
         cont = True
-        if len(pretest.pathname):
+        if self.missing_post:
+            # post script is missing: refuse to run, report FAIL for post.
+            posttest.not_found('post')
+            posttest.log(logger, options)
+            cont = False
+        elif self.missing_pre:
+            # pre script is missing: report FAIL for pre, skip the test.
+            pretest.not_found('pre')
+            pretest.log(logger, options)
+            cont = False
+        elif len(pretest.pathname):
             pretest.run(options)
             cont = pretest.result.result == 'PASS'
             pretest.log(logger, options)
@@ -485,13 +511,17 @@ Tags: %s
         if test.result.result == 'ABORTED':
             raise RunAborted('test %s' % test.pathname)
 
-        if len(posttest.pathname):
-            logger.debug('Running post cleanup: %s' % posttest.pathname)
-            posttest.run(options)
-            posttest.log(logger, options)
-            if posttest.result.result == 'ABORTED':
-                raise RunAborted(
-                    'post cleanup for %s' % self.pathname)
+        if not self.missing_post and len(posttest.pathname):
+            if self.missing_pre:
+                posttest.skip()
+                posttest.log(logger, options)
+            else:
+                logger.debug('Running post cleanup: %s' % posttest.pathname)
+                posttest.run(options)
+                posttest.log(logger, options)
+                if posttest.result.result == 'ABORTED':
+                    raise RunAborted(
+                        'post cleanup for %s' % self.pathname)
 
 
 class TestGroup(Test):
@@ -538,21 +568,18 @@ Tags: %s
         if len(self.post) and not os.path.isabs(self.post):
             self.post = os.path.join(self.pathname, self.post)
 
-        auxfiles = [self.pre, self.post]
         users = [self.pre_user, self.user, self.post_user]
 
-        for f in [f for f in auxfiles if len(f)]:
-            if self.pathname != os.path.dirname(f):
-                logger.info("Warning: TestGroup '%s' not added to this run. "
-                            "Auxiliary script '%s' exists in a different "
-                            "directory." % (self.pathname, f))
-                return False
+        if len(self.pre) and not verify_file(self.pre):
+            logger.warning("pre script '%s' for TestGroup '%s' failed "
+                           "verification; tests will be skipped." %
+                           (self.pre, self.pathname))
+            self.missing_pre = True
 
-            if not verify_file(f):
-                logger.info("Warning: TestGroup '%s' not added to this run. "
-                            "Auxiliary script '%s' failed verification." %
-                            (self.pathname, f))
-                return False
+        if len(self.post) and not verify_file(self.post):
+            logger.warning("post script '%s' for TestGroup '%s' failed "
+                           "verification." % (self.post, self.pathname))
+            self.missing_post = True
 
         for user in [user for user in users if len(user)]:
             if not verify_user(user, logger):
@@ -570,9 +597,11 @@ Tags: %s
 
     def run(self, logger, options):
         """
-        Create Cmd instances for the pre/post scripts. If the pre script
-        doesn't pass, skip all the tests in this TestGroup. Run the post
-        script regardless.
+        Create Cmd instances for the pre/post scripts. If the post script
+        is missing, refuse to run and report a FAIL for post. If the pre
+        script is missing, report a FAIL for pre and skip all tests and
+        post. If the pre script exists but fails, skip all tests. Run the
+        post script if pre passed or failed (but not if pre was missing).
         """
         # tags assigned to this test group also include the test names
         if options.tags and not set(self.tags).intersection(set(options.tags)):
@@ -586,7 +615,17 @@ Tags: %s
                        user=self.post_user, identifier=self.identifier)
 
         cont = True
-        if len(pretest.pathname):
+        if self.missing_post:
+            # post script is missing: refuse to run, report FAIL for post.
+            posttest.not_found('post')
+            posttest.log(logger, options)
+            cont = False
+        elif self.missing_pre:
+            # pre script is missing: report FAIL for pre, skip all tests.
+            pretest.not_found('pre')
+            pretest.log(logger, options)
+            cont = False
+        elif len(pretest.pathname):
             pretest.run(options)
             cont = pretest.result.result == 'PASS'
             pretest.log(logger, options)
@@ -610,20 +649,24 @@ Tags: %s
         except KeyboardInterrupt:
             # Run the post (cleanup) script even when interrupted, in case
             # the test's own EXIT trap did not clean up (e.g. pools, zinject).
-            if len(posttest.pathname):
+            if not self.missing_post and len(posttest.pathname):
                 print('\nInterrupted, running cleanup...',
                       flush=True)
                 posttest.run(options)
                 posttest.log(logger, options)
             raise
 
-        if len(posttest.pathname):
-            logger.debug('Running post cleanup: %s' % posttest.pathname)
-            posttest.run(options)
-            posttest.log(logger, options)
-            if posttest.result.result == 'ABORTED':
-                raise RunAborted(
-                    'post cleanup for %s' % self.pathname)
+        if not self.missing_post and len(posttest.pathname):
+            if self.missing_pre:
+                posttest.skip()
+                posttest.log(logger, options)
+            else:
+                logger.debug('Running post cleanup: %s' % posttest.pathname)
+                posttest.run(options)
+                posttest.log(logger, options)
+                if posttest.result.result == 'ABORTED':
+                    raise RunAborted(
+                        'post cleanup for %s' % self.pathname)
 
 
 class TestRun(object):
@@ -771,11 +814,18 @@ class TestRun(object):
                 for prop in TestGroup.props:
                     for sect in ['DEFAULT', section]:
                         if config.has_option(sect, prop):
-                            setattr(testgroup, prop, config.get(sect, prop))
+                            if prop == 'tags':
+                                setattr(testgroup, prop,
+                                        eval(config.get(sect, prop)))
+                            else:
+                                setattr(testgroup, prop,
+                                        config.get(sect, prop))
 
                 filenames = os.listdir(pathname)
-                # only files starting with "tst." are considered tests
-                filenames = [f for f in filenames if f.startswith("tst.")]
+                # Only executable files starting with "tst." are tests.
+                # data files might have that prefix but are not tests.
+                filenames = [f for f in filenames if f.startswith("tst.") and
+                             verify_file(os.path.join(pathname, f))]
                 testgroup.tests = sorted(filenames)
 
                 if testgroup.verify(logger):
@@ -963,13 +1013,13 @@ def verify_user(user, logger):
     try:
         _ = getpwnam(user)
     except KeyError:
-        logger.info("Warning: user '%s' does not exist.", user)
+        logger.warning("user '%s' does not exist.", user)
         return False
 
     p = Popen(testcmd)
     p.wait()
     if p.returncode != 0:
-        logger.info("Warning: user '%s' cannot use passwordless sudo.", user)
+        logger.warning("user '%s' cannot use passwordless sudo.", user)
         return False
     else:
         Cmd.verified_users.append(user)
