@@ -25,6 +25,7 @@
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  * Copyright 2020 RackTop Systems, Inc.
  * Copyright 2026 Oxide Computer Company
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 /*
@@ -5098,6 +5099,59 @@ i_mac_group_add_ring(mac_group_t *group, mac_ring_t *ring, int index)
 	return (0);
 }
 
+static void
+i_mac_group_aggr_remove_tx_ring(mac_group_t *group, mac_impl_t *mip,
+    mac_ring_t *ring)
+{
+	if (mip->mi_state_flags & MIS_IS_AGGR &&
+	    mip->mi_default_tx_ring == (mac_ring_handle_t)ring) {
+		/* pick a new default Tx ring */
+		mac_ring_t *new_default = group->mrg_rings;
+
+		while (new_default == ring)
+			new_default = new_default->mr_next;
+
+		/* Yes, this can be NULL. */
+		mip->mi_default_tx_ring = (mac_ring_handle_t)new_default;
+	}
+
+	/*
+	 * If the ring-group isn't at least reserved, don't bother as there
+	 * won't be unquiesced rings.
+	 */
+	if (group->mrg_state < MAC_GROUP_STATE_RESERVED)
+		return;
+
+	/*
+	 * The two remaining states: RESERVED and SHARED, mean we need to
+	 * alert all/any upper clients!
+	 */
+	for (mac_grp_client_t *mgc = group->mrg_clients; mgc != NULL;
+	    mgc = mgc->mgc_next) {
+		mac_soft_ring_t *sringp;
+		mac_client_impl_t *mcip;
+		mac_soft_ring_set_t *mac_srs;
+		mac_srs_tx_t *srs_tx;
+
+		mcip = mgc->mgc_client;
+		VERIFY(mcip->mci_state_flags & MCIS_IS_AGGR_CLIENT);
+		mac_srs = MCIP_TX_SRS(mcip);
+		ASSERT(mac_srs->srs_tx.st_mode == SRS_TX_AGGR ||
+		    mac_srs->srs_tx.st_mode == SRS_TX_BW_AGGR);
+		srs_tx = &mac_srs->srs_tx;
+		/*
+		 * Wakeup any callers blocked on this Tx ring due to flow
+		 * control.
+		 */
+		sringp = srs_tx->st_soft_rings[ring->mr_index];
+		VERIFY(sringp != NULL);
+		mac_tx_client_quiesce((mac_client_handle_t)mcip);
+		mac_tx_invoke_callbacks(mcip, (mac_tx_cookie_t)sringp);
+		mac_tx_srs_del_ring(mac_srs, ring);
+		mac_tx_client_restart((mac_client_handle_t)mcip);
+	}
+}
+
 /*
  * Remove a ring from it's current group. MAC internal function for dynamic
  * grouping.
@@ -5142,69 +5196,31 @@ i_mac_group_rem_ring(mac_group_t *group, mac_ring_t *ring,
 	case MAC_RING_TYPE_TX:
 	{
 		mac_grp_client_t	*mgcp;
-		mac_client_impl_t	*mcip;
-		mac_soft_ring_set_t	*mac_srs;
-		mac_srs_tx_t		*tx;
-		mac_ring_t		*rem_ring;
 		mac_group_t		*defgrp;
-		uint_t			ring_info = 0;
 
 		/*
-		 * For TX this function is invoked in three
-		 * cases:
+		 * For TX this function is invoked in three cases:
 		 *
-		 * 1) In the case of a failure during the
-		 * initial creation of a group when a share is
-		 * associated with a MAC client. So the SRS is not
-		 * yet setup, and will be setup later after the
+		 * 1) In the case of a failure during the initial creation of
+		 * a group when a share is associated with a MAC client. So
+		 * the SRS is not yet setup, and will be setup later after the
 		 * group has been reserved and populated.
 		 *
-		 * 2) From mac_release_tx_group() when freeing
-		 * a TX SRS.
+		 * 2) From mac_release_tx_group() when freeing a TX SRS.
 		 *
-		 * 3) In the case of aggr, when a port gets removed,
-		 * the pseudo Tx rings that it exposed gets removed.
+		 * 3) In the case of aggr, when a port gets removed, the
+		 * pseudo Tx rings that it exposed gets removed.
 		 *
-		 * In the first two cases the SRS and its soft
-		 * rings are already quiesced.
+		 * In the first two cases the SRS and its soft rings are
+		 * already quiesced, AND we are not being called by a driver
+		 * ioctl (driver_call).
+		 *
+		 * The third case is factored out to the
+		 * i_mac_group_aggr_remove_tx_ring() function above.
 		 */
 		if (driver_call) {
-			mac_client_impl_t *mcip;
-			mac_soft_ring_set_t *mac_srs;
-			mac_soft_ring_t *sringp;
-			mac_srs_tx_t *srs_tx;
-
-			if (mip->mi_state_flags & MIS_IS_AGGR &&
-			    mip->mi_default_tx_ring ==
-			    (mac_ring_handle_t)ring) {
-				/* pick a new default Tx ring */
-				mip->mi_default_tx_ring =
-				    (group->mrg_rings != ring) ?
-				    (mac_ring_handle_t)group->mrg_rings :
-				    (mac_ring_handle_t)(ring->mr_next);
-			}
-			/* Presently only aggr case comes here */
-			if (group->mrg_state != MAC_GROUP_STATE_RESERVED)
-				break;
-
-			mcip = MAC_GROUP_ONLY_CLIENT(group);
-			ASSERT(mcip != NULL);
-			ASSERT(mcip->mci_state_flags & MCIS_IS_AGGR_CLIENT);
-			mac_srs = MCIP_TX_SRS(mcip);
-			ASSERT(mac_srs->srs_tx.st_mode == SRS_TX_AGGR ||
-			    mac_srs->srs_tx.st_mode == SRS_TX_BW_AGGR);
-			srs_tx = &mac_srs->srs_tx;
-			/*
-			 * Wakeup any callers blocked on this
-			 * Tx ring due to flow control.
-			 */
-			sringp = srs_tx->st_soft_rings[ring->mr_index];
-			ASSERT(sringp != NULL);
-			mac_tx_invoke_callbacks(mcip, (mac_tx_cookie_t)sringp);
-			mac_tx_client_quiesce((mac_client_handle_t)mcip);
-			mac_tx_srs_del_ring(mac_srs, ring);
-			mac_tx_client_restart((mac_client_handle_t)mcip);
-			break;
+			i_mac_group_aggr_remove_tx_ring(group, mip, ring);
+			break; /* Out of the MAC_RING_TYPE_TX case. */
 		}
 		ASSERT(ring != (mac_ring_t *)mip->mi_default_tx_ring);
 		group_type = mip->mi_tx_group_type;
@@ -5218,15 +5234,15 @@ i_mac_group_rem_ring(mac_group_t *group, mac_ring_t *ring,
 		mgcp = group->mrg_clients;
 		defgrp = MAC_DEFAULT_TX_GROUP(mip);
 		while (mgcp != NULL) {
-			mcip = mgcp->mgc_client;
-			mac_srs = MCIP_TX_SRS(mcip);
-			tx = &mac_srs->srs_tx;
+			mac_client_impl_t *mcip = mgcp->mgc_client;
+			mac_soft_ring_set_t *mac_srs = MCIP_TX_SRS(mcip);
+			mac_srs_tx_t *srs_tx = &mac_srs->srs_tx;
+
 			mac_tx_client_quiesce((mac_client_handle_t)mcip);
 			/*
-			 * If we are here when removing rings from the
-			 * defgroup, mac_reserve_tx_ring would have
-			 * already deleted the ring from the MAC
-			 * clients in the group.
+			 * If we are here when removing rings from the default
+			 * group, mac_reserve_tx_ring would have already
+			 * deleted the ring from the MAC clients in the group.
 			 */
 			if (group != defgrp) {
 				mac_tx_invoke_callbacks(mcip,
@@ -5235,12 +5251,15 @@ i_mac_group_rem_ring(mac_group_t *group, mac_ring_t *ring,
 				mac_tx_srs_del_ring(mac_srs, ring);
 			}
 			/*
-			 * Additionally, if  we are left with only
+			 * Additionally, if we are left with only
 			 * one ring in the group after this, we need
 			 * to modify the mode etc. to. (We haven't
 			 * yet taken the ring out, so we check with 2).
 			 */
 			if (group->mrg_cur_count == 2) {
+				mac_ring_t *rem_ring;
+				uint_t ring_info = 0;
+
 				if (ring->mr_next == NULL)
 					rem_ring = group->mrg_rings;
 				else
@@ -5253,7 +5272,7 @@ i_mac_group_rem_ring(mac_group_t *group, mac_ring_t *ring,
 				if (rem_ring->mr_state != MR_INUSE) {
 					(void) mac_start_ring(rem_ring);
 				}
-				tx->st_arg2 = (void *)rem_ring;
+				srs_tx->st_arg2 = (void *)rem_ring;
 				mac_tx_srs_stat_recreate(mac_srs, B_FALSE);
 				ring_info = mac_hwring_getinfo(
 				    (mac_ring_handle_t)rem_ring);
@@ -5262,14 +5281,15 @@ i_mac_group_rem_ring(mac_group_t *group, mac_ring_t *ring,
 				 * to 1 ring.
 				 */
 				if (mac_srs->srs_type & SRST_BW_CONTROL) {
-					tx->st_mode = SRS_TX_BW;
+					srs_tx->st_mode = SRS_TX_BW;
 				} else if (mac_tx_serialize ||
 				    (ring_info & MAC_RING_TX_SERIALIZE)) {
-					tx->st_mode = SRS_TX_SERIALIZE;
+					srs_tx->st_mode = SRS_TX_SERIALIZE;
 				} else {
-					tx->st_mode = SRS_TX_DEFAULT;
+					srs_tx->st_mode = SRS_TX_DEFAULT;
 				}
-				tx->st_func = mac_tx_get_func(tx->st_mode);
+				srs_tx->st_func =
+				    mac_tx_get_func(srs_tx->st_mode);
 			}
 			mac_tx_client_restart((mac_client_handle_t)mcip);
 			mgcp = mgcp->mgc_next;
