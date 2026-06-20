@@ -30,6 +30,7 @@
 # Copyright 2018 Gary Mills
 # Copyright 2019 Peter Tribble
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 Oxide Computer Company
 #
 
 include ../Makefile.master
@@ -309,7 +310,6 @@ COMMON_SUBDIRS=		\
 	pcidb		\
 	pcidr		\
 	pcieadm		\
-	pcieb		\
 	pcitool		\
 	pfexec		\
 	pfexecd		\

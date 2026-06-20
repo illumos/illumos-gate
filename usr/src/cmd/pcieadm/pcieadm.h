@@ -97,6 +97,8 @@ extern int pcieadm_walk_tab(pcieadm_t *, const pcieadm_cmdtab_t *, int,
     char *[]);
 extern int pcieadm_bar(pcieadm_t *, int, char *[]);
 extern void pcieadm_bar_usage(FILE *);
+extern int pcieadm_link(pcieadm_t *, int, char *[]);
+extern void pcieadm_link_usage(FILE *);
 extern int pcieadm_save_cfgspace(pcieadm_t *, int, char *[]);
 extern void pcieadm_save_cfgspace_usage(FILE *);
 extern int pcieadm_show_cfgspace(pcieadm_t *, int, char *[]);

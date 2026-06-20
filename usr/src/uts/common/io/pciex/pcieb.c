@@ -1492,12 +1492,16 @@ pcieb_close(dev_t dev, int flags, int otyp, cred_t *credp)
 }
 
 static int
-pcieb_ioctl_retrain(pcieb_devstate_t *pcieb, cred_t *credp)
+pcieb_ioctl_retrain(pcieb_devstate_t *pcieb, int mode, cred_t *credp)
 {
 	pcie_bus_t	*bus_p = PCIE_DIP2BUS(pcieb->pcieb_dip);
 
 	if (drv_priv(credp) != 0) {
 		return (EPERM);
+	}
+
+	if ((mode & FWRITE) == 0) {
+		return (EBADF);
 	}
 
 	if (!PCIE_IS_PCIE(bus_p)) {
@@ -1520,6 +1524,10 @@ pcieb_ioctl_get_speed(pcieb_devstate_t *pcieb, intptr_t arg, int mode,
 
 	if (drv_priv(credp) != 0) {
 		return (EPERM);
+	}
+
+	if ((mode & FREAD) == 0) {
+		return (EBADF);
 	}
 
 	if (!PCIE_IS_PCIE(bus_p)) {
@@ -1580,6 +1588,10 @@ pcieb_ioctl_set_speed(pcieb_devstate_t *pcieb, intptr_t arg, int mode,
 
 	if (drv_priv(credp) != 0) {
 		return (EPERM);
+	}
+
+	if ((mode & FWRITE) == 0) {
+		return (EBADF);
 	}
 
 	if (!PCIE_IS_PCIE(bus_p)) {
@@ -1644,7 +1656,7 @@ pcieb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	 */
 	switch (cmd) {
 	case PCIEB_IOCTL_RETRAIN:
-		rv = pcieb_ioctl_retrain(pcieb, credp);
+		rv = pcieb_ioctl_retrain(pcieb, mode, credp);
 		break;
 	case PCIEB_IOCTL_GET_TARGET_SPEED:
 		rv = pcieb_ioctl_get_speed(pcieb, arg, mode, credp);

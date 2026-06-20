@@ -21,6 +21,7 @@ include ../Makefile.ctf
 
 CFLAGS += $(CCVERBOSE)
 CSTD = $(CSTD_GNU17)
+CPPFLAGS += -I$(SRC)/uts/common/io/pciex
 LDLIBS += -ldevinfo -lpcidb -lofmt
 LDLIBS += -L$(ROOT)/usr/lib/fm/64 -R/usr/lib/fm/64 -ltopo
 OBJS = \
@@ -28,6 +29,7 @@ OBJS = \
 	pcieadm_bar.o \
 	pcieadm_cfgspace.o \
 	pcieadm_devs.o \
+	pcieadm_link.o \
 	bitext.o
 ROOTCMDDIR = $(ROOTLIB)/pci
 

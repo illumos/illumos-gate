@@ -670,6 +670,7 @@ pcieadm_walk_tab(pcieadm_t *pcip, const pcieadm_cmdtab_t *tab, int argc,
 
 static const pcieadm_cmdtab_t pcieadm_cmds[] = {
 	{ "bar", pcieadm_bar, pcieadm_bar_usage },
+	{ "link", pcieadm_link, pcieadm_link_usage },
 	{ "show-cfgspace", pcieadm_show_cfgspace, pcieadm_show_cfgspace_usage },
 	{ "save-cfgspace", pcieadm_save_cfgspace, pcieadm_save_cfgspace_usage },
 	{ "show-devs", pcieadm_show_devs, pcieadm_show_devs_usage },
