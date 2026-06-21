@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -99,7 +99,6 @@ static const sc_test_t sc_tests[] = { {
 	.sc_sct = NVME_CQE_SCT_GENERIC,
 	.sc_sc = 0xbf,
 	.sc_str = "unknown command set specific general status code"
-
 }, {
 	.sc_csi = NVME_CSI_NVM,
 	.sc_sct = NVME_CQE_SCT_GENERIC,
@@ -128,7 +127,7 @@ static const sc_test_t sc_tests[] = { {
 }, {
 	.sc_csi = NVME_CSI_NVM,
 	.sc_sct = NVME_CQE_SCT_SPECIFIC,
-	.sc_sc = 0xbf,
+	.sc_sc = 0xb0,
 	.sc_str = "unknown command specific, I/O command set specific status "
 	    "code",
 }, {
