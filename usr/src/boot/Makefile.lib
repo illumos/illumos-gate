@@ -27,9 +27,11 @@ objs pics:
 	-@mkdir -p $@
 
 $(LIBRARY): objs .WAIT $$(OBJS)
+	$(RM) $@
 	$(AR) $(ARFLAGS) $@ $(OBJS)
 
 $(DYNLIB): pics .WAIT $$(PICS)
+	$(RM) $@
 	$(AR) $(ARFLAGS) $@ $(PICS)
 
 CLEANFILES +=	$(OBJS) $(PICS) $(LIBRARY) $(DYNLIB)
