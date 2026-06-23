@@ -22,7 +22,7 @@
  * Copyright (c) 1990, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2023 RackTop Systems, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -604,6 +604,21 @@ mdb_cpu2cpuid(uintptr_t cpup)
 		return (-1);
 
 	return (cpu.cpu_id);
+}
+
+/*
+ * Return the value read from the target's '_ncpu' when the target was
+ * activated. This lets dmods size target-derived allocations from the
+ * target rather than from mdb's own build-time NCPU which may differ.
+ */
+int
+mdb_ncpu(void)
+{
+	if (_mdb_ks_ncpu <= 0) {
+		mdb_warn("target '_ncpu' is unavailable or invalid\n");
+		return (-1);
+	}
+	return (_mdb_ks_ncpu);
 }
 
 int

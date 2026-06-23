@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "intr_common.h"
@@ -30,8 +31,6 @@
  */
 static apic_irq_t	*irq_tbl[APIC_MAX_VECTOR+1];
 static char		level_tbl[APIC_MAX_VECTOR+1];
-static apix_impl_t *d_apixs[NCPU];
-static int d_ncpus = NCPU;
 
 
 /*
@@ -42,6 +41,9 @@ int
 interrupt_dump_apix(uintptr_t addr, uint_t flags, int argc,
     const mdb_arg_t *argv)
 {
+	const int ncpu = mdb_ncpu();
+	apix_impl_t **d_apixs;
+	int d_ncpus;
 	int i, j;
 	apix_impl_t apix;
 	apix_vector_t apix_vector;
@@ -55,17 +57,22 @@ interrupt_dump_apix(uintptr_t addr, uint_t flags, int argc,
 	    NULL) != argc)
 		return (DCMD_USAGE);
 
-	if (mdb_readvar(&d_apixs, "apixs") == -1) {
+	if (ncpu <= 0)
+		return (DCMD_ERR);
+
+	d_apixs = mdb_zalloc(ncpu * sizeof (apix_impl_t *), UM_SLEEP | UM_GC);
+	if (mdb_readsym(d_apixs, ncpu * sizeof (apix_impl_t *),
+	    "apixs") == -1) {
 		mdb_warn("failed to read apixs");
 		return (DCMD_ERR);
 	}
 
 	if (mdb_readvar(&d_ncpus, "apic_nproc") == -1) {
 		mdb_warn("failed to read apic_nproc");
-		d_ncpus = NCPU;
+		d_ncpus = ncpu;
 	}
-	if (d_ncpus == 0 || d_ncpus > NCPU)
-		d_ncpus = NCPU;
+	if (d_ncpus <= 0 || d_ncpus > ncpu)
+		d_ncpus = ncpu;
 
 	if (mdb_readvar(&irq_tbl, "apic_irq_table") == -1) {
 		mdb_warn("failed to read apic_irq_table");

@@ -22,10 +22,12 @@
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Co.
  */
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ctf.h>
+#include <mdb/mdb_ks.h>
 #include <mdb/mdb_x86util.h>
 #include <sys/cpuvar.h>
 #include <sys/systm.h>
@@ -47,8 +49,12 @@
 #define	TT_HDLR_WIDTH	17
 
 
+typedef struct ttrace_walk {
+	int tw_ncpu;
+	trap_trace_ctl_t *tw_ttcp;
+} ttrace_walk_t;
+
 /* apix only */
-static apix_impl_t *d_apixs[NCPU];
 static int use_apix = 0;
 
 static int
@@ -83,19 +89,25 @@ ttrace_ttr_size_check(void)
 int
 ttrace_walk_init(mdb_walk_state_t *wsp)
 {
+	const int ncpu = mdb_ncpu();
+	ttrace_walk_t *tw;
 	trap_trace_ctl_t *ttcp;
-	size_t ttc_size = sizeof (trap_trace_ctl_t) * NCPU;
+	size_t ttc_size;
 	int i;
 
 	if (!ttrace_ttr_size_check())
 		return (WALK_ERR);
 
-	ttcp = mdb_zalloc(ttc_size, UM_SLEEP);
-
 	if (wsp->walk_addr != 0) {
 		mdb_warn("ttrace only supports global walks\n");
 		return (WALK_ERR);
 	}
+
+	if (ncpu <= 0)
+		return (WALK_ERR);
+
+	ttc_size = sizeof (trap_trace_ctl_t) * ncpu;
+	ttcp = mdb_zalloc(ttc_size, UM_SLEEP);
 
 	if (mdb_readsym(ttcp, ttc_size, "trap_trace_ctl") == -1) {
 		mdb_warn("symbol 'trap_trace_ctl' not found; "
@@ -112,7 +124,7 @@ ttrace_walk_init(mdb_walk_state_t *wsp)
 	 * structure member added exclusively to make writing the mdb walker
 	 * a little easier).
 	 */
-	for (i = 0; i < NCPU; i++) {
+	for (i = 0; i < ncpu; i++) {
 		trap_trace_ctl_t *ttc = &ttcp[i];
 
 		if (ttc->ttc_first == 0)
@@ -126,14 +138,18 @@ ttrace_walk_init(mdb_walk_state_t *wsp)
 		ttc->ttc_current = ttc->ttc_next - sizeof (trap_trace_rec_t);
 	}
 
-	wsp->walk_data = ttcp;
+	tw = mdb_zalloc(sizeof (*tw), UM_SLEEP);
+	tw->tw_ncpu = ncpu;
+	tw->tw_ttcp = ttcp;
+	wsp->walk_data = tw;
 	return (WALK_NEXT);
 }
 
 int
 ttrace_walk_step(mdb_walk_state_t *wsp)
 {
-	trap_trace_ctl_t *ttcp = wsp->walk_data, *ttc, *latest_ttc;
+	ttrace_walk_t *tw = wsp->walk_data;
+	trap_trace_ctl_t *ttcp = tw->tw_ttcp, *ttc, *latest_ttc;
 	trap_trace_rec_t rec;
 	int rval, i, recsize = sizeof (trap_trace_rec_t);
 	hrtime_t latest = 0;
@@ -143,7 +159,7 @@ ttrace_walk_step(mdb_walk_state_t *wsp)
 	 * (we want to walk through the trap trace records in reverse
 	 * chronological order).
 	 */
-	for (i = 0; i < NCPU; i++) {
+	for (i = 0; i < tw->tw_ncpu; i++) {
 		ttc = &ttcp[i];
 
 		if (ttc->ttc_current == 0)
@@ -186,7 +202,10 @@ ttrace_walk_step(mdb_walk_state_t *wsp)
 void
 ttrace_walk_fini(mdb_walk_state_t *wsp)
 {
-	mdb_free(wsp->walk_data, sizeof (trap_trace_ctl_t) * NCPU);
+	ttrace_walk_t *tw = wsp->walk_data;
+
+	mdb_free(tw->tw_ttcp, sizeof (trap_trace_ctl_t) * tw->tw_ncpu);
+	mdb_free(tw, sizeof (*tw));
 }
 
 static int
@@ -284,7 +303,9 @@ ttrace_apix_interrupt(trap_trace_rec_t *rec)
 {
 	struct autovec av;
 	apix_impl_t apix;
+	apix_impl_t *apixp;
 	apix_vector_t apix_vector;
+	GElf_Sym sym;
 
 	switch (rec->ttr_regs.r_trapno) {
 	case T_SOFTINT:
@@ -296,9 +317,23 @@ ttrace_apix_interrupt(trap_trace_rec_t *rec)
 
 	mdb_printf("%-3x ", rec->ttr_vector);
 
+	if (mdb_lookup_by_name("apixs", &sym) == -1) {
+		mdb_warn("\nfailed to find 'apixs'");
+		return (-1);
+	}
+	if (rec->ttr_cpuid < 0 ||
+	    (rec->ttr_cpuid + 1) * sizeof (apixp) > sym.st_size) {
+		mdb_warn("\ncpuid %d out of range", rec->ttr_cpuid);
+		return (-1);
+	}
+	if (mdb_vread(&apixp, sizeof (apixp),
+	    (uintptr_t)sym.st_value + rec->ttr_cpuid * sizeof (apixp)) == -1) {
+		mdb_warn("\ncouldn't read apixs[%d]", rec->ttr_cpuid);
+		return (-1);
+	}
+
 	/* Read the per CPU apix entry */
-	if (mdb_vread(&apix, sizeof (apix_impl_t),
-	    (uintptr_t)d_apixs[rec->ttr_cpuid]) == -1) {
+	if (mdb_vread(&apix, sizeof (apix_impl_t), (uintptr_t)apixp) == -1) {
 		mdb_warn("\ncouldn't read apix[%d]", rec->ttr_cpuid);
 		return (-1);
 	}
@@ -412,7 +447,8 @@ typedef struct ttrace_dcmd {
 	processorid_t ttd_cpu;
 	uint_t ttd_extended;
 	uintptr_t ttd_kthread;
-	trap_trace_ctl_t ttd_ttc[NCPU];
+	int ttd_ncpu;
+	trap_trace_ctl_t *ttd_ttc;
 } ttrace_dcmd_t;
 
 #if defined(__amd64)
@@ -468,7 +504,7 @@ ttrace_walk(uintptr_t addr, trap_trace_rec_t *rec, ttrace_dcmd_t *dcmd)
 	struct regs *regs = &rec->ttr_regs;
 	processorid_t cpu = -1, i;
 
-	for (i = 0; i < NCPU; i++) {
+	for (i = 0; i < dcmd->ttd_ncpu; i++) {
 		if (addr >= dcmd->ttd_ttc[i].ttc_first &&
 		    addr < dcmd->ttd_ttc[i].ttc_limit) {
 			cpu = i;
@@ -528,17 +564,26 @@ ttrace_walk(uintptr_t addr, trap_trace_rec_t *rec, ttrace_dcmd_t *dcmd)
 int
 ttrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
+	const int ncpu = mdb_ncpu();
 	ttrace_dcmd_t dcmd;
-	trap_trace_ctl_t *ttc = dcmd.ttd_ttc;
+	trap_trace_ctl_t *ttc;
 	trap_trace_rec_t rec;
-	size_t ttc_size = sizeof (trap_trace_ctl_t) * NCPU;
+	size_t ttc_size;
 
 	if (!ttrace_ttr_size_check())
 		return (WALK_ERR);
 
+	if (ncpu <= 0)
+		return (DCMD_ERR);
+
+	ttc_size = sizeof (trap_trace_ctl_t) * ncpu;
+
 	bzero(&dcmd, sizeof (dcmd));
 	dcmd.ttd_cpu = -1;
 	dcmd.ttd_extended = FALSE;
+	dcmd.ttd_ncpu = ncpu;
+	dcmd.ttd_ttc = mdb_zalloc(ttc_size, UM_SLEEP | UM_GC);
+	ttc = dcmd.ttd_ttc;
 
 	if (mdb_readsym(ttc, ttc_size, "trap_trace_ctl") == -1) {
 		mdb_warn("symbol 'trap_trace_ctl' not found; "
@@ -558,7 +603,7 @@ ttrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (flags & DCMD_ADDRSPEC) {
-		if (addr >= NCPU) {
+		if (addr >= (uintptr_t)ncpu) {
 			if (mdb_vread(&rec, sizeof (rec), addr) == -1) {
 				mdb_warn("couldn't read trap trace record "
 				    "at %p", addr);
@@ -579,10 +624,6 @@ ttrace(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (use_apix) {
-		if (mdb_readvar(&d_apixs, "apixs") == -1) {
-			mdb_warn("\nfailed to read apixs.");
-			return (DCMD_ERR);
-		}
 		/* change to apix ttrace interrupt handler */
 		ttrace_hdlr[4].t_hdlr = ttrace_apix_interrupt;
 	}

@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "intr_common.h"
@@ -74,21 +75,12 @@ soft_interrupt_help(void)
 	    "  -d   instead of ISR, print <driver_name><instance#>\n");
 }
 
-/*
- * This is copied from avintr.c
- * NOTE: Ensure that this definition stays in sync
- */
-typedef struct av_softinfo {
-	cpuset_t	av_pending;	/* pending bitmasks */
-} av_softinfo_t;
-
 /* ARGSUSED */
 int
 soft_interrupt_dump(uintptr_t addr, uint_t flags, int argc,
     const mdb_arg_t *argv)
 {
 	int			i;
-	av_softinfo_t		avsoftinfo;
 	struct autovec		avhp;
 	ddi_softint_hdl_impl_t	hdlp;
 
@@ -116,15 +108,12 @@ soft_interrupt_dump(uintptr_t addr, uint_t flags, int argc,
 		do {
 			if (!avhp.av_vector ||
 			    (mdb_vread(&hdlp, sizeof (ddi_softint_hdl_impl_t),
-			    (uintptr_t)avhp.av_intr_id) == -1) ||
-			    (mdb_vread(&avsoftinfo, sizeof (av_softinfo_t),
-			    (uintptr_t)hdlp.ih_pending) == -1))
+			    (uintptr_t)avhp.av_intr_id) == -1))
 				continue;
 
-			/* Print each soft interrupt entry */
 			mdb_printf("%-16p %-2d   %-2d  %-16p %-16p",
 			    avhp.av_intr_id, mdb_cpuset_find(
-			    (uintptr_t)&avsoftinfo.av_pending) != -1 ? 1 : 0,
+			    (uintptr_t)hdlp.ih_pending) != -1 ? 1 : 0,
 			    avhp.av_prilevel, avhp.av_intarg1, avhp.av_intarg2);
 			interrupt_print_isr((uintptr_t)avhp.av_vector,
 			    (uintptr_t)avhp.av_intarg1, (uintptr_t)hdlp.ih_dip);

@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_MDB_KS_H
@@ -71,6 +72,7 @@ extern int mdb_devinfo2statep(uintptr_t, char *, uintptr_t *);
 extern int mdb_cpu2cpuid(uintptr_t);
 
 extern int mdb_cpuset_find(uintptr_t);
+extern int mdb_ncpu(void);
 
 extern hrtime_t mdb_gethrtime(void);
 extern int64_t mdb_get_lbolt(void);

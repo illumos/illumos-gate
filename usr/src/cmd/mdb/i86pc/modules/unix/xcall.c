@@ -10,10 +10,12 @@
  */
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ctf.h>
+#include <mdb/mdb_ks.h>
 #include <sys/cpuvar.h>
 #include <sys/x_call.h>
 
@@ -33,7 +35,8 @@ typedef struct {
 	uint_t xd_flags;
 	processorid_t xd_cpu_id;
 	size_t xd_msg_index;
-	struct xc_msg xd_msgs[NCPU];
+	size_t xd_msg_max;
+	struct xc_msg *xd_msgs;
 } xcall_data_t;
 
 void
@@ -78,9 +81,9 @@ cpu_id_to_addr(processorid_t cpun, uintptr_t *addrp)
 static int
 xcall_copy_msg(struct xc_msg *msg, xcall_data_t *data, boolean_t current)
 {
-	if (data->xd_msg_index >= NCPU) {
+	if (data->xd_msg_index >= data->xd_msg_max) {
 		mdb_warn("ran out of msg space: %lu >= %lu\n",
-		    data->xd_msg_index, NCPU);
+		    data->xd_msg_index, data->xd_msg_max);
 		return (-1);
 	}
 
@@ -173,6 +176,7 @@ xcall_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	mdb_xcall_cpu_t xcpu = { 0, };
 	xcall_data_t data = { 0, };
+	const int ncpu = mdb_ncpu();
 
 	if (mdb_getopts(argc, argv, NULL) != argc)
 		return (DCMD_USAGE);
@@ -189,7 +193,10 @@ xcall_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 	}
 
-	if (addr < NCPU && cpu_id_to_addr((processorid_t)addr, &addr) != 0) {
+	if (ncpu < 0)
+		return (DCMD_ERR);
+
+	if (addr < ncpu && cpu_id_to_addr((processorid_t)addr, &addr) != 0) {
 		mdb_warn("invalid CPU ID %lu\n", addr);
 		return (DCMD_ERR);
 	}
@@ -202,6 +209,9 @@ xcall_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	data.xd_cpu_id = xcpu.cpu_id;
 	data.xd_flags = flags;
+	data.xd_msg_max = ncpu;
+	data.xd_msgs = mdb_zalloc(ncpu * sizeof (struct xc_msg),
+	    UM_SLEEP | UM_GC);
 
 	if (mdb_pwalk("cpu", xcall_get_msgs, &data, (uintptr_t)NULL) == -1) {
 		mdb_warn("can't walk CPUs");

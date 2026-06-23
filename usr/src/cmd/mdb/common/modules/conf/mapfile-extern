@@ -128,6 +128,7 @@ SYMBOL_SCOPE {
 		mdb_mblk_count			{ FLAGS = EXTERN };
 		mdb_memio_create		{ FLAGS = EXTERN };
 		mdb_name_to_major		{ FLAGS = EXTERN };
+		mdb_ncpu			{ FLAGS = EXTERN };
 		mdb_nhconvert			{ FLAGS = EXTERN };
 		mdb_nicenum			{ FLAGS = EXTERN };
 		mdb_nicetime			{ FLAGS = EXTERN };
