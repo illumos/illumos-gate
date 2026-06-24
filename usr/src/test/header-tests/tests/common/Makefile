@@ -17,14 +17,20 @@
 include $(SRC)/Makefile.master
 
 TESTSUBDIR = common
-PROG = c_symbols_test
 
-OBJS = $(PROG:%=%.o) hdr_test_common.o
-$(BUILD32) OBJS32 = $(OBJS:%.o=%_32.o)
+PROG = c_symbols_test cxx_symbols_test
+
 $(BUILD32) PROG32 = $(PROG:%=%_32)
-
-$(BUILD64) OBJS64 = $(OBJS:%.o=%_64.o)
 $(BUILD64) PROG64= $(PROG:%=%_64)
+
+SRCS = $(PROG:%=%.c) hdr_test_common.c
+COBJS = c_symbols_test.o hdr_test_common.o
+CXXOBJS = cxx_symbols_test.o hdr_test_common.o
+
+COBJS32 = $(COBJS:%.o=%_32.o)
+CXXOBJS32 = $(CXXOBJS:%.o=%_32.o)
+COBJS64 = $(COBJS:%.o=%_64.o)
+CXXOBJS64 = $(CXXOBJS:%.o=%_64.o)
 
 # This gets CSTD, *FLAGS, *DIR
 include ../Makefile.com
@@ -43,18 +49,28 @@ clobber: clean
 	-$(RM) $(PROG32) $(PROG64)
 
 clean:
-	-$(RM) $(OBJS32) $(OBJS64)
+	-$(RM) $(COBJS32) $(CXXOBJS32) $(COBJS64) $(CXXOBJS64)
 
-$(PROG32): $(OBJS32)
-	$(LINK.c) $(OBJS32) -o $@ $(LDLIBS)
+c_symbols_test_32: $(COBJS32)
+	$(LINK.c) $(COBJS32) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-$(PROG64): $(OBJS64)
-	$(LINK64.c) $(OBJS64) -o $@ $(LDLIBS64)
+cxx_symbols_test_32: $(CXXOBJS32)
+	$(LINK.c) $(CXXOBJS32) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
+
+c_symbols_test_64: $(COBJS64)
+	$(LINK64.c) $(COBJS64) -o $@ $(LDLIBS64)
+	$(POST_PROCESS)
+
+cxx_symbols_test_64: $(CXXOBJS64)
+	$(LINK64.c) $(CXXOBJS64) -o $@ $(LDLIBS64)
 	$(POST_PROCESS)
 
 %_32.o: %.c
 	$(COMPILE.c) -o $@ $(CFLAGS_$(MACH)) -DARCH=\"$(MACH)\" $<
+	$(POST_PROCESS_O)
 
 %_64.o: %.c
 	$(COMPILE64.c) -o $@ $(CFLAGS_$(MACH64)) -DARCH=\"$(MACH64)\" $<
+	$(POST_PROCESS_O)

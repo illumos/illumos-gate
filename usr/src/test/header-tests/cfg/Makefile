@@ -45,13 +45,22 @@ CFGS = README \
 	c-symbols/ucontext_h.cfg \
 	c-symbols/unistd_h.cfg \
 	c-symbols/wchar_h.cfg \
-	c-symbols/wctype_h.cfg
+	c-symbols/wctype_h.cfg \
+	cxx-symbols-env.cfg \
+	cxx-symbols/README \
+	cxx-symbols/cmath_h.cfg \
+	cxx-symbols/cstdio_h.cfg \
+	cxx-symbols/cstdlib_h.cfg \
+	cxx-symbols/cstring_h.cfg \
+	cxx-symbols/ctime_h.cfg \
+	cxx-symbols/cwchar_h.cfg
 
 ROOTOPTPKG = $(ROOT)/opt/header-tests
 ROOTOPTPKGCFG = $(ROOT)/opt/header-tests/cfg
 ROOTOPTPKGDIRS = $(ROOTOPTPKG) \
 	$(ROOTOPTPKGCFG) \
-	$(ROOTOPTPKGCFG)/c-symbols
+	$(ROOTOPTPKGCFG)/c-symbols \
+	$(ROOTOPTPKGCFG)/cxx-symbols
 
 FILES = $(CFGS:%=$(ROOTOPTPKGCFG)/%)
 $(FILES) := FILEMODE = 0444

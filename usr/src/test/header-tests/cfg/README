@@ -69,7 +69,8 @@ There are also some internal limits on the length of lines (1K), and on the
 number of fields (20).  As this is only used for these test suites, this
 should not be a significant limitation.
 
-Please see ../tests/common/c_symbols_test.c for an example of correct usage.
+Please see ../tests/common/c_symbols_test.c for an example of correct usage,
+and  ../tests/common/cxx_symbols_test.c for the C++ tests.
 
 Aside:
 

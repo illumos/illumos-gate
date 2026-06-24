@@ -56,3 +56,15 @@ tests = [
 	'wctype_h'
 	 ]
 tags = ['c-symbols']
+
+[/opt/header-tests/tests/cxx-symbols]
+pre = setup
+tests = [
+	'cmath_h',
+	'cstdio_h',
+	'cstdlib_h',
+	'cstring_h',
+	'ctime_h',
+	'cwchar_h'
+	 ]
+tags = ['cxx-symbols']

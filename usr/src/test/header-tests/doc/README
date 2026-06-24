@@ -20,6 +20,7 @@ Header Test Suite README
 2. Building and installing this Header Test Suite
 3. Running this Header Test Suite
 4. Test results
+5. Package layout
 
 --------------------------------------------------------------------------------
 
@@ -48,12 +49,12 @@ install the Utils Header Test Suite.
 Note, the framework will be installed automatically, as this test suite
 depends on it.
 
-A C compiler is also required on the test system.
+C and C++ compilers are also required on the test system.
 
 3. Running this Header Test Suite
 
 The pre-requisites for running the this Header Test Suite are:
-	- GCC or Clang compiler installed.
+	- GCC or Clang C and C++ compilers installed.
 
 Once the pre-requisites are satisfied, simply run the headertest script:
 
@@ -65,3 +66,25 @@ While the Header Test Suite is running, one informational line is printed at
 the end of each test, and a results summary is printed at the end of the run.
 The results summary includes the location of the complete logs, which is of the
 form /var/tmp/test_results/<ISO 8601 date>.
+
+5. Package layout
+
+The installed package under /opt/header-tests contains:
+
+  bin/         - test runner script
+  doc/         - this file
+  runfiles/    - testrunner runfile
+
+  cfg/         - compilation environment definitions and test configs
+    c-symbols-env.cfg
+    cxx-symbols-env.cfg
+    c-symbols/   - test config files for C symbol tests
+    cxx-symbols/ - test config files for C++ symbol tests
+
+  tests/
+    common/    - shared test programs
+    c-symbols/ - per-header test scripts and setup
+    cxx-symbols/ - per-header test scripts and setup
+
+You can run all tests via: bin/headertest
+or run individual tests like: tests/c-symbols/math_h
