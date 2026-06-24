@@ -2375,6 +2375,8 @@ MAC_KTEST_OBJS += mac_ktest.o
 KTEST_KTEST_OBJS += ktest_selftest.o
 STREAM_KTEST_OBJS += stream_ktest.o
 
+SHA2_KTEST_OBJS += sha2_ktest.o
+
 #
 # EEPROM framework driver
 #

@@ -5,6 +5,7 @@
 /*
  * Copyright 2013 Saso Kiselkov.  All rights reserved.
  * Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
+ * Copyright 2026 Gernot Strasser
  */
 
 /*
@@ -52,6 +53,12 @@
 #include <sys/sha2.h>
 #include <sys/sha2_consts.h>
 
+#if	defined(_KERNEL) && defined(__amd64)
+#include <sys/x86_archext.h>	/* is_x86_feature(), X86FSET_* */
+#include <sys/cpuvar.h>		/* CPU, used by kpreempt_enable() */
+#include <sys/disp.h>		/* kpreempt_disable()/kpreempt_enable() */
+#endif
+
 #ifdef _KERNEL
 #include <sys/cmn_err.h>
 
@@ -76,10 +83,30 @@ static void Encode64(uint8_t *, uint64_t *, size_t);
 
 #if	defined(__amd64)
 #define	SHA512Transform(ctx, in) SHA512TransformBlocks((ctx), (in), 1)
-#define	SHA256Transform(ctx, in) SHA256TransformBlocks((ctx), (in), 1)
 
 void SHA512TransformBlocks(SHA2_CTX *ctx, const void *in, size_t num);
 void SHA256TransformBlocks(SHA2_CTX *ctx, const void *in, size_t num);
+
+#if	defined(_KERNEL)
+/*
+ * On amd64 the kernel chooses, at runtime, between the generic SHA-256
+ * block transform (SHA256TransformBlocks, above) and the Intel SHA
+ * Extensions ("SHA-NI") implementation in amd64/sha256-ni.S.  The SHA-NI
+ * routine uses %xmm registers, which it saves and restores re-entrantly
+ * on the stack (so digest operations arriving from interrupt context may
+ * nest inside an interrupted one), and each call runs with preemption
+ * disabled in bounded chunks so the live registers cannot be lost to a
+ * context switch.  Userland gets the same acceleration for free via
+ * symbol capabilities (see lib/libmd), so this dispatch is kernel-only.
+ */
+extern void sha256_transform_blocks_shani(SHA2_CTX *, const void *, size_t);
+static void sha256_transform_blocks_dispatch(SHA2_CTX *, const void *,
+    size_t);
+#define	SHA256TransformBlocksFn	sha256_transform_blocks_dispatch
+#else
+#define	SHA256TransformBlocksFn	SHA256TransformBlocks
+#endif	/* _KERNEL */
+#define	SHA256Transform(ctx, in) SHA256TransformBlocksFn((ctx), (in), 1)
 
 #else
 static void SHA256Transform(SHA2_CTX *, const uint8_t *);
@@ -785,6 +812,72 @@ SHA512Init(SHA512_CTX *ctx)
  *  output: void
  */
 
+#if	defined(__amd64) && defined(_KERNEL)
+/*
+ * Upper bound on the number of 64-byte blocks hashed inside a single
+ * kpreempt_disable()/kpreempt_enable() window.  Preemption is disabled
+ * while the SHA-NI transform runs because the kernel does not preserve a
+ * thread's live %xmm state across a context switch.  The transform itself
+ * saves and restores the %xmm registers it uses on the stack (see the
+ * CLEAR_TS_OR_PUSH_XMM0_TO_XMM10 macro in amd64/sha256-ni.S, modelled on
+ * amd64/aes_intel.S), so it is re-entrant: a digest operation started
+ * from interrupt context (e.g. IPsec through KCF) can interrupt and nest
+ * inside another one safely.  The cap keeps the scheduling latency this
+ * adds low: even at a conservative 1 GB/s, 512 blocks (32 KiB) hash in
+ * ~32 microseconds, and measured SHA-NI rates are severalfold higher.
+ */
+#define	SHA256_NI_BLK_CHUNK	512
+
+/*
+ * Tunable (set in /etc/system or patch via "mdb -kw"): when nonzero, use
+ * the generic SHA-256 block transform even on SHA-NI-capable hardware.  It
+ * acts as a safety valve (e.g. for masked CPUID under virtualisation) and
+ * lets the in-kernel differential test (ktest sha2/sha256/fallback_equiv)
+ * compare the accelerated and generic paths at runtime.  It is consulted
+ * on every call, so changes take effect immediately.
+ */
+int sha256_ni_disable = 0;
+
+/*
+ * The feature tests mirror the symbol-capabilities requirements used for
+ * the userland build of this code (see lib/libmd): the SHA extensions
+ * proper, plus the SSE2, SSSE3 and SSE4.1 instructions (e.g. pshufd,
+ * palignr, pblendw) that amd64/sha256-ni.S uses around them.
+ */
+static boolean_t
+sha256_ni_usable(void)
+{
+	return (sha256_ni_disable == 0 &&
+	    is_x86_feature(x86_featureset, X86FSET_SSE2) &&
+	    is_x86_feature(x86_featureset, X86FSET_SSSE3) &&
+	    is_x86_feature(x86_featureset, X86FSET_SSE4_1) &&
+	    is_x86_feature(x86_featureset, X86FSET_SHA));
+}
+
+static void
+sha256_transform_blocks_dispatch(SHA2_CTX *ctx, const void *in, size_t num)
+{
+	const uint8_t *p = in;
+
+	if (!sha256_ni_usable()) {
+		SHA256TransformBlocks(ctx, in, num);
+		return;
+	}
+
+	while (num != 0) {
+		size_t chunk = (num > SHA256_NI_BLK_CHUNK) ?
+		    SHA256_NI_BLK_CHUNK : num;
+
+		kpreempt_disable();
+		sha256_transform_blocks_shani(ctx, p, chunk);
+		kpreempt_enable();
+
+		p += chunk << 6;	/* 64-byte blocks; cf. SHA2Update() */
+		num -= chunk;
+	}
+}
+#endif	/* __amd64 && _KERNEL */
+
 void
 SHA2Update(SHA2_CTX *ctx, const void *inptr, size_t input_len)
 {
@@ -877,7 +970,7 @@ SHA2Update(SHA2_CTX *ctx, const void *inptr, size_t input_len)
 		if (algotype <= SHA256_HMAC_GEN_MECH_INFO_TYPE) {
 			block_count = (input_len - i) >> 6;
 			if (block_count > 0) {
-				SHA256TransformBlocks(ctx, &input[i],
+				SHA256TransformBlocksFn(ctx, &input[i],
 				    block_count);
 				i += block_count << 6;
 			}

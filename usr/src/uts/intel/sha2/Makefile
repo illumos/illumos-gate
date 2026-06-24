@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2019, Joyent, Inc.
+# Copyright 2026 Gernot Strasser
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -35,7 +36,7 @@ COMDIR	= $(COMMONBASE)/crypto
 #
 MODULE		= sha2
 SHA2_OBJS_32    =
-SHA2_OBJS_64    = sha512-x86_64.o sha256-x86_64.o
+SHA2_OBJS_64    = sha512-x86_64.o sha256-x86_64.o sha256-ni.o
 SHA2_OBJS       += $(SHA2_OBJS_$(CLASS))
 OBJECTS		= $(SHA2_OBJS:%=$(OBJS_DIR)/%)
 ROOTMODULE	= $(ROOT_CRYPTO_DIR)/$(MODULE)
@@ -92,6 +93,18 @@ include $(UTSBASE)/intel/Makefile.targ
 
 $(OBJS_DIR)/%.o: %.S
 	$(COMPILE.s) -o $@ ${@F:.o=.S}
+
+#
+# sha256-ni.S is a static source under common/crypto; the SHA256_NI_KERNEL
+# define selects the kernel-private entry name so it does not collide with
+# the generic SHA256TransformBlocks from sha256-x86_64.o.  Its kernel FPU
+# guard uses CLTS/STTS from sys/machprivregs.h, which lives under the
+# platform directory (same arrangement as intel/aes).
+#
+AS_CPPFLAGS	+= -I../../$(PLATFORM)
+
+$(OBJS_DIR)/%.o: $(COMDIR)/sha2/amd64/%.S
+	$(COMPILE.s) -DSHA256_NI_KERNEL -o $@ $(COMDIR)/sha2/amd64/${@F:.o=.S}
 
 sha512-x86_64.S: $(COMDIR)/sha2/amd64/sha512-x86_64.pl
 	$(PERL) $? $@

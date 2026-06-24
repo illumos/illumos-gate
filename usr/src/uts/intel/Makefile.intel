@@ -780,6 +780,7 @@ DRV_KMODS	+= ktest
 MISC_KMODS	+= mac_ktest
 MISC_KMODS	+= ktest_ktest
 MISC_KMODS	+= stream_ktest
+MISC_KMODS	+= sha2_ktest
 
 #
 #	I2C Devices and Framework

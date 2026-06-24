@@ -18,8 +18,8 @@
  * General Public License for more details.
  *
  * Contact Information:
- * 	Sean Gulley <sean.m.gulley@intel.com>
- * 	Tim Chen <tim.c.chen@linux.intel.com>
+ *	Sean Gulley <sean.m.gulley@intel.com>
+ *	Tim Chen <tim.c.chen@linux.intel.com>
  *
  * BSD LICENSE
  *
@@ -29,15 +29,15 @@
  * modification, are permitted provided that the following conditions
  * are met:
  *
- * 	* Redistributions of source code must retain the above copyright
- * 	  notice, this list of conditions and the following disclaimer.
- * 	* Redistributions in binary form must reproduce the above copyright
- * 	  notice, this list of conditions and the following disclaimer in
- * 	  the documentation and/or other materials provided with the
- * 	  distribution.
- * 	* Neither the name of Intel Corporation nor the names of its
- * 	  contributors may be used to endorse or promote products derived
- * 	  from this software without specific prior written permission.
+ *	* Redistributions of source code must retain the above copyright
+ *	  notice, this list of conditions and the following disclaimer.
+ *	* Redistributions in binary form must reproduce the above copyright
+ *	  notice, this list of conditions and the following disclaimer in
+ *	  the documentation and/or other materials provided with the
+ *	  distribution.
+ *	* Neither the name of Intel Corporation nor the names of its
+ *	  contributors may be used to endorse or promote products derived
+ *	  from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
@@ -55,6 +55,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
+ * Copyright 2026 Gernot Strasser
  */
 
 /*
@@ -71,9 +72,94 @@
  *    to make sure that we get to the actual digest.
  *  o Update the function prototype block comment to reflect that we are
  *    passing the context and not the direct digest.
+ *  o When building the kernel module, the SHA256_NI_KERNEL guard (set via
+ *    -D in uts/intel/sha2/Makefile) renames the entry point to
+ *    sha256_transform_blocks_shani so that it can coexist with the generic
+ *    SHA256TransformBlocks from sha256-x86_64.o in the same module; sha2.c
+ *    selects between the two at runtime.
+ *  o For the kernel build, bracket the transform with a re-entrant stack
+ *    save/restore of the %xmm registers it uses, following the pattern of
+ *    amd64/aes_intel.S (see the block comment below).
  */
 
 #include <sys/asm_linkage.h>
+#ifdef	SHA256_NI_KERNEL
+#include <sys/controlregs.h>	/* CR0_TS */
+#include <sys/machprivregs.h>	/* CLTS, STTS */
+
+/*
+ * In the kernel the transform must preserve the interrupted context's live
+ * %xmm state.  CLEAR_TS_OR_PUSH_XMM0_TO_XMM10 (entry) and
+ * SET_TS_OR_POP_XMM0_TO_XMM10 (exit) follow amd64/aes_intel.S: if CR0.TS
+ * is clear, a live FPU context is loaded, so the %xmm registers this file
+ * uses are saved to, and on exit restored from, the stack.  Saving on the
+ * stack makes the transform re-entrant, so a digest operation started from
+ * interrupt context (e.g. IPsec through KCF) may safely nest inside an
+ * interrupted one.  If CR0.TS is set there is no live state to preserve:
+ * clear TS for the duration and set it again on exit.  Callers must have
+ * preemption disabled (see the dispatch in sha2.c); tmpreg carries the
+ * entry CR0 value to the exit macro and must not be touched in between
+ * (the transform only uses %rax, %rdi, %rsi, %rdx and %xmm0-%xmm10).
+ */
+#ifdef	__xpv
+#define	PROTECTED_CLTS \
+	pushq	%rsi; \
+	CLTS; \
+	popq	%rsi
+#else
+#define	PROTECTED_CLTS \
+	CLTS
+#endif	/* __xpv */
+
+#define	CLEAR_TS_OR_PUSH_XMM0_TO_XMM10(tmpreg) \
+	pushq	%rbp; \
+	movq	%rsp, %rbp; \
+	movq	%cr0, tmpreg; \
+	testq	$CR0_TS, tmpreg; \
+	jnz	1f; \
+	andq	$-XMM_ALIGN, %rsp; \
+	subq	$[XMM_SIZE * 11], %rsp; \
+	movaps	%xmm0, 160(%rsp); \
+	movaps	%xmm1, 144(%rsp); \
+	movaps	%xmm2, 128(%rsp); \
+	movaps	%xmm3, 112(%rsp); \
+	movaps	%xmm4, 96(%rsp); \
+	movaps	%xmm5, 80(%rsp); \
+	movaps	%xmm6, 64(%rsp); \
+	movaps	%xmm7, 48(%rsp); \
+	movaps	%xmm8, 32(%rsp); \
+	movaps	%xmm9, 16(%rsp); \
+	movaps	%xmm10, (%rsp); \
+	jmp	2f; \
+1: \
+	PROTECTED_CLTS; \
+2:
+
+/*
+ * If CR0_TS was not set above, pop %xmm0 - %xmm10 off the stack,
+ * otherwise set CR0_TS.
+ */
+#define	SET_TS_OR_POP_XMM0_TO_XMM10(tmpreg) \
+	testq	$CR0_TS, tmpreg; \
+	jnz	1f; \
+	movaps	(%rsp), %xmm10; \
+	movaps	16(%rsp), %xmm9; \
+	movaps	32(%rsp), %xmm8; \
+	movaps	48(%rsp), %xmm7; \
+	movaps	64(%rsp), %xmm6; \
+	movaps	80(%rsp), %xmm5; \
+	movaps	96(%rsp), %xmm4; \
+	movaps	112(%rsp), %xmm3; \
+	movaps	128(%rsp), %xmm2; \
+	movaps	144(%rsp), %xmm1; \
+	movaps	160(%rsp), %xmm0; \
+	jmp	2f; \
+1: \
+	STTS(tmpreg); \
+2: \
+	movq	%rbp, %rsp; \
+	popq	%rbp
+#endif	/* SHA256_NI_KERNEL */
 
 #define DIGEST_PTR	%rdi	/* 1st arg */
 #define DATA_PTR	%rsi	/* 2nd arg */
@@ -117,7 +203,13 @@
 
 .text
 .align 32
+/* Kernel-private entry name; see the "series of changes" note above. */
+#ifdef	SHA256_NI_KERNEL
+ENTRY_NP(sha256_transform_blocks_shani)
+	CLEAR_TS_OR_PUSH_XMM0_TO_XMM10(%r10)
+#else
 ENTRY_NP(SHA256TransformBlocks)
+#endif
 
 	shl		$6, NUM_BLKS		/* convert to bytes */
 	jz		.Ldone_hash
@@ -154,7 +246,7 @@ ENTRY_NP(SHA256TransformBlocks)
 	movdqa		MSG, MSGTMP0
 		paddd		0*16(SHA256CONSTANTS), MSG
 		sha256rnds2	STATE0, STATE1
-		pshufd 		$0x0E, MSG, MSG
+		pshufd		$0x0E, MSG, MSG
 		sha256rnds2	STATE1, STATE0
 
 	/* Rounds 4-7 */
@@ -163,7 +255,7 @@ ENTRY_NP(SHA256TransformBlocks)
 	movdqa		MSG, MSGTMP1
 		paddd		1*16(SHA256CONSTANTS), MSG
 		sha256rnds2	STATE0, STATE1
-		pshufd 		$0x0E, MSG, MSG
+		pshufd		$0x0E, MSG, MSG
 		sha256rnds2	STATE1, STATE0
 	sha256msg1	MSGTMP1, MSGTMP0
 
@@ -173,7 +265,7 @@ ENTRY_NP(SHA256TransformBlocks)
 	movdqa		MSG, MSGTMP2
 		paddd		2*16(SHA256CONSTANTS), MSG
 		sha256rnds2	STATE0, STATE1
-		pshufd 		$0x0E, MSG, MSG
+		pshufd		$0x0E, MSG, MSG
 		sha256rnds2	STATE1, STATE0
 	sha256msg1	MSGTMP2, MSGTMP1
 
@@ -187,7 +279,7 @@ ENTRY_NP(SHA256TransformBlocks)
 	palignr		$4, MSGTMP2, MSGTMP4
 	paddd		MSGTMP4, MSGTMP0
 	sha256msg2	MSGTMP3, MSGTMP0
-		pshufd 		$0x0E, MSG, MSG
+		pshufd		$0x0E, MSG, MSG
 		sha256rnds2	STATE1, STATE0
 	sha256msg1	MSGTMP3, MSGTMP2
 
@@ -199,7 +291,7 @@ ENTRY_NP(SHA256TransformBlocks)
 	palignr		$4, MSGTMP3, MSGTMP4
 	paddd		MSGTMP4, MSGTMP1
 	sha256msg2	MSGTMP0, MSGTMP1
-		pshufd 		$0x0E, MSG, MSG
+		pshufd		$0x0E, MSG, MSG
 		sha256rnds2	STATE1, STATE0
 	sha256msg1	MSGTMP0, MSGTMP3
 
@@ -211,7 +303,7 @@ ENTRY_NP(SHA256TransformBlocks)
 	palignr		$4, MSGTMP0, MSGTMP4
 	paddd		MSGTMP4, MSGTMP2
 	sha256msg2	MSGTMP1, MSGTMP2
-		pshufd 		$0x0E, MSG, MSG
+		pshufd		$0x0E, MSG, MSG
 		sha256rnds2	STATE1, STATE0
 	sha256msg1	MSGTMP1, MSGTMP0
 
@@ -223,7 +315,7 @@ ENTRY_NP(SHA256TransformBlocks)
 	palignr		$4, MSGTMP1, MSGTMP4
 	paddd		MSGTMP4, MSGTMP3
 	sha256msg2	MSGTMP2, MSGTMP3
-		pshufd 		$0x0E, MSG, MSG
+		pshufd		$0x0E, MSG, MSG
 		sha256rnds2	STATE1, STATE0
 	sha256msg1	MSGTMP2, MSGTMP1
 
@@ -235,7 +327,7 @@ ENTRY_NP(SHA256TransformBlocks)
 	palignr		$4, MSGTMP2, MSGTMP4
 	paddd		MSGTMP4, MSGTMP0
 	sha256msg2	MSGTMP3, MSGTMP0
-		pshufd 		$0x0E, MSG, MSG
+		pshufd		$0x0E, MSG, MSG
 		sha256rnds2	STATE1, STATE0
 	sha256msg1	MSGTMP3, MSGTMP2
 
@@ -247,7 +339,7 @@ ENTRY_NP(SHA256TransformBlocks)
 	palignr		$4, MSGTMP3, MSGTMP4
 	paddd		MSGTMP4, MSGTMP1
 	sha256msg2	MSGTMP0, MSGTMP1
-		pshufd 		$0x0E, MSG, MSG
+		pshufd		$0x0E, MSG, MSG
 		sha256rnds2	STATE1, STATE0
 	sha256msg1	MSGTMP0, MSGTMP3
 
@@ -259,7 +351,7 @@ ENTRY_NP(SHA256TransformBlocks)
 	palignr		$4, MSGTMP0, MSGTMP4
 	paddd		MSGTMP4, MSGTMP2
 	sha256msg2	MSGTMP1, MSGTMP2
-		pshufd 		$0x0E, MSG, MSG
+		pshufd		$0x0E, MSG, MSG
 		sha256rnds2	STATE1, STATE0
 	sha256msg1	MSGTMP1, MSGTMP0
 
@@ -271,7 +363,7 @@ ENTRY_NP(SHA256TransformBlocks)
 	palignr		$4, MSGTMP1, MSGTMP4
 	paddd		MSGTMP4, MSGTMP3
 	sha256msg2	MSGTMP2, MSGTMP3
-		pshufd 		$0x0E, MSG, MSG
+		pshufd		$0x0E, MSG, MSG
 		sha256rnds2	STATE1, STATE0
 	sha256msg1	MSGTMP2, MSGTMP1
 
@@ -283,7 +375,7 @@ ENTRY_NP(SHA256TransformBlocks)
 	palignr		$4, MSGTMP2, MSGTMP4
 	paddd		MSGTMP4, MSGTMP0
 	sha256msg2	MSGTMP3, MSGTMP0
-		pshufd 		$0x0E, MSG, MSG
+		pshufd		$0x0E, MSG, MSG
 		sha256rnds2	STATE1, STATE0
 	sha256msg1	MSGTMP3, MSGTMP2
 
@@ -295,7 +387,7 @@ ENTRY_NP(SHA256TransformBlocks)
 	palignr		$4, MSGTMP3, MSGTMP4
 	paddd		MSGTMP4, MSGTMP1
 	sha256msg2	MSGTMP0, MSGTMP1
-		pshufd 		$0x0E, MSG, MSG
+		pshufd		$0x0E, MSG, MSG
 		sha256rnds2	STATE1, STATE0
 	sha256msg1	MSGTMP0, MSGTMP3
 
@@ -307,7 +399,7 @@ ENTRY_NP(SHA256TransformBlocks)
 	palignr		$4, MSGTMP0, MSGTMP4
 	paddd		MSGTMP4, MSGTMP2
 	sha256msg2	MSGTMP1, MSGTMP2
-		pshufd 		$0x0E, MSG, MSG
+		pshufd		$0x0E, MSG, MSG
 		sha256rnds2	STATE1, STATE0
 
 	/* Rounds 56-59 */
@@ -318,14 +410,14 @@ ENTRY_NP(SHA256TransformBlocks)
 	palignr		$4, MSGTMP1, MSGTMP4
 	paddd		MSGTMP4, MSGTMP3
 	sha256msg2	MSGTMP2, MSGTMP3
-		pshufd 		$0x0E, MSG, MSG
+		pshufd		$0x0E, MSG, MSG
 		sha256rnds2	STATE1, STATE0
 
 	/* Rounds 60-63 */
 	movdqa		MSGTMP3, MSG
 		paddd		15*16(SHA256CONSTANTS), MSG
 		sha256rnds2	STATE0, STATE1
-		pshufd 		$0x0E, MSG, MSG
+		pshufd		$0x0E, MSG, MSG
 		sha256rnds2	STATE1, STATE0
 
 	/* Add current hash values with previously saved */
@@ -349,8 +441,15 @@ ENTRY_NP(SHA256TransformBlocks)
 
 .Ldone_hash:
 
+#ifdef	SHA256_NI_KERNEL
+	SET_TS_OR_POP_XMM0_TO_XMM10(%r10)
+#endif
 	ret
+#ifdef	SHA256_NI_KERNEL
+SET_SIZE(sha256_transform_blocks_shani)
+#else
 SET_SIZE(SHA256TransformBlocks)
+#endif
 
 .section	.rodata.cst256.K256, "aM", @progbits, 256
 .align 64
