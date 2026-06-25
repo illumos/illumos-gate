@@ -25,6 +25,7 @@
  * Copyright (c) 2014 Joyent, Inc. All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/dmu.h>
@@ -1614,6 +1615,8 @@ dsl_dir_set_quota_check(void *arg, dmu_tx_t *tx)
 	 */
 	towrite = dsl_dir_space_towrite(ds->ds_dir);
 	if ((dmu_tx_is_syncing(tx) || towrite == 0) &&
+	    (dsl_dir_phys(ds->ds_dir)->dd_quota == 0 ||
+	    newval < dsl_dir_phys(ds->ds_dir)->dd_quota) &&
 	    (newval < dsl_dir_phys(ds->ds_dir)->dd_reserved ||
 	    newval < dsl_dir_phys(ds->ds_dir)->dd_used_bytes + towrite)) {
 		error = SET_ERROR(ENOSPC);
