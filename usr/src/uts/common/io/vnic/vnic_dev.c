@@ -205,9 +205,6 @@ vnic_unicast_add(vnic_t *vnic, vnic_mac_addr_type_t vnic_addr_type,
 	int err;
 	uint_t addr_len;
 
-	if (flags & VNIC_IOC_CREATE_NODUPCHECK)
-		mac_flags |= MAC_UNICAST_NODUPCHECK;
-
 	switch (vnic_addr_type) {
 	case VNIC_MAC_ADDR_TYPE_FIXED:
 	case VNIC_MAC_ADDR_TYPE_VRID:

@@ -103,14 +103,13 @@ typedef enum {
 
 #define	VNIC_IOC_CREATE		VNICIOC(1)
 
-#define	VNIC_IOC_CREATE_NODUPCHECK		0x00000001
-#define	VNIC_IOC_CREATE_ANCHOR			0x00000002
+#define	VNIC_IOC_CREATE_ANCHOR			0x00000001
 
 /*
  * Force creation of VLAN based VNIC without checking if the
  * undelying MAC supports the margin size.
  */
-#define	VNIC_IOC_CREATE_FORCE			0x00000004
+#define	VNIC_IOC_CREATE_FORCE			0x00000002
 
 typedef struct vnic_ioc_create {
 	datalink_id_t	vc_vnic_id;

@@ -2526,14 +2526,13 @@ mac_get_passive_primary_client(mac_impl_t *mip)
 /*
  * Add a new unicast address to the MAC client.
  *
- * The MAC address can be specified either by value, or the MAC client
- * can specify that it wants to use the primary MAC address of the
- * underlying MAC. See the introductory comments at the beginning
- * of this file for more more information on primary MAC addresses.
+ * The MAC address can be specified either by value, or the MAC client can
+ * specify that it wants to use the primary MAC address of the underlying MAC.
+ * See the introductory comments at the beginning of this file for more
+ * information on primary MAC addresses.
  *
- * Note also the tuple (MAC address, VID) must be unique
- * for the MAC clients defined on top of the same underlying MAC
- * instance, unless the MAC_UNICAST_NODUPCHECK is specified.
+ * Note also the tuple (MAC address, VID) must be unique for the MAC clients
+ * defined on top of the same underlying MAC instance.
  *
  * In no case can a client use the PVID for the MAC, if the MAC has one set.
  */
@@ -2545,7 +2544,6 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 	mac_impl_t		*mip = mcip->mci_mip;
 	int			err;
 	uint_t			mac_len = mip->mi_type->mt_addr_length;
-	boolean_t		check_dups = !(flags & MAC_UNICAST_NODUPCHECK);
 	boolean_t		fastpath_disabled = B_FALSE;
 	boolean_t		is_primary = (flags & MAC_UNICAST_PRIMARY);
 	boolean_t		is_unicast_hw = (flags & MAC_UNICAST_HW);
@@ -2763,7 +2761,7 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		 * Make sure that the specified MAC address is different
 		 * than the unicast MAC address of the underlying NIC.
 		 */
-		if (check_dups && bcmp(mip->mi_addr, mac_addr, mac_len) == 0) {
+		if (bcmp(mip->mi_addr, mac_addr, mac_len) == 0) {
 			*diag = MAC_DIAG_MACADDR_NIC;
 			err = EINVAL;
 			goto bail_out;
@@ -2839,8 +2837,7 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 	 * be activated when the currently active client goes away - this
 	 * works only with primary addresses.
 	 */
-	if ((check_dups || is_primary || is_vnic_primary) &&
-	    mac_addr_in_use(mip, mac_addr, vid)) {
+	if (mac_addr_in_use(mip, mac_addr, vid)) {
 		/*
 		 * Must have set the multiple primary address flag when
 		 * we did a mac_client_open AND this should be a primary
