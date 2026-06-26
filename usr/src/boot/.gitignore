@@ -50,3 +50,16 @@ i386/loader/8x16.c
 i386/loader/vers.c
 libficl/softcore/softcore.c
 libsa/amd64/sha1-x86_64.S
+
+userboot/.gdb_history
+userboot/libficl/amd64/machine
+userboot/libficl/amd64/x86
+userboot/libficl/softcore/softcore.c
+userboot/libsa/amd64/*.[ch]
+userboot/libsa/amd64/machine
+userboot/libsa/amd64/sha1-x86_64.S
+userboot/libsa/amd64/x86
+userboot/test/test
+userboot/userboot/machine
+userboot/userboot/vers.c
+userboot/userboot/x86
