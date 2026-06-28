@@ -35,7 +35,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 
@@ -85,12 +85,14 @@
 #define	SPLIT_DESC_ENT_OFF(ring, idx)	\
 	((ring)->vr_desc.vrp_off + idx * sizeof (struct virtio_desc))
 
-#define	SPLIT_AVAIL_FLAGS_OFF(part)	\
+#define	SPLIT_AVAIL_FLAGS_OFF(ring)	\
 	((ring)->vr_avail.vrp_off)
 #define	SPLIT_AVAIL_IDX_OFF(ring)	\
 	((ring)->vr_avail.vrp_off + sizeof (uint16_t))
 #define	SPLIT_AVAIL_ENT_OFF(ring, idx)	\
 	((ring)->vr_avail.vrp_off + (2 + (idx)) * sizeof (uint16_t))
+#define	SPLIT_AVAIL_USED_EVENT_OFF(ring)				\
+	((ring)->vr_avail.vrp_off + (2 + ((ring)->vr_size)) * sizeof (uint16_t))
 
 #define	SPLIT_USED_FLAGS_OFF(ring)	\
 	((ring)->vr_used.vrp_off)
@@ -99,6 +101,9 @@
 #define	SPLIT_USED_ENT_OFF(ring, idx)	\
 	((ring)->vr_used.vrp_off + 2 * sizeof (uint16_t) + \
 	(idx) * sizeof (struct virtio_used))
+#define	SPLIT_USED_AVAIL_EVENT_OFF(ring)	\
+	((ring)->vr_used.vrp_off + 2 * sizeof (uint16_t) + \
+	((ring)->vr_size) * sizeof (struct virtio_used))
 
 struct vq_held_region {
 	struct iovec	*vhr_iov;
@@ -434,6 +439,14 @@ viona_ring_init(viona_link_t *link, uint16_t idx,
 	/* Initialize queue indexes */
 	ring->vr_cur_aidx = params->vrp_avail_idx;
 	ring->vr_cur_uidx = params->vrp_used_idx;
+	/*
+	 * When restoring state from a snapshot, gathered by
+	 * viona_ring_get_state(), the ring should be in a non-running state.
+	 * Therefore, there are no outstanding entries for the device to
+	 * publish to the ring, interrupt status has been checked, and
+	 * last_chk_uidx == uidx.
+	 */
+	ring->vr_last_chk_uidx = params->vrp_used_idx;
 
 	if (VIONA_RING_ISTX(ring))
 		viona_tx_ring_alloc(ring, qsz);
@@ -467,6 +480,7 @@ fail:
 	ring->vr_used.vrp_pa = 0;
 	ring->vr_cur_aidx = 0;
 	ring->vr_cur_uidx = 0;
+	ring->vr_last_chk_uidx = 0;
 	mutex_exit(&ring->vr_lock);
 	return (err);
 }
@@ -664,23 +678,67 @@ viona_ring_addr(const viona_vring_part_t *vrp, uint_t off)
 	return ((caddr_t)vrp->vrp_map_pages[page_num] + page_off);
 }
 
-void
-viona_intr_ring(viona_vring_t *ring, boolean_t skip_flags_check)
+static inline uint16_t
+viona_ring_read_used_event(viona_vring_t *ring)
 {
-	if (!skip_flags_check) {
+	volatile uint16_t *used_event = viona_ring_addr(&ring->vr_avail,
+	    SPLIT_AVAIL_USED_EVENT_OFF(ring));
+	return (*used_event);
+}
+
+bool
+viona_ring_need_intr(viona_vring_t *ring)
+{
+	const bool evt_idx =
+	    (ring->vr_link->l_features & VIRTIO_F_RING_EVENT_IDX) != 0;
+
+	/*
+	 * Checking for notification is always preceded by publishing
+	 * entries to the used part of the ring. To maintain correct
+	 * ordering and avoid missing a required interrupt it is critical
+	 * that we perform a full barrier between publishing used entries and
+	 * reading the avail part of the ring to determine notification
+	 * status. We want global visibility of the store to the used part
+	 * ("device area") of the ring before we load flags/used_event from
+	 * the avail part ("driver area") of the ring. This is especially
+	 * important when using used_event as a missed interrupt may lead to
+	 * an indefinitely stuck ring until the uidx wraps back around.
+	 *
+	 * For this reason we perform the barrier here rather than leave it
+	 * up to the caller.
+	 */
+	membar_enter();
+
+	if (evt_idx) {
+		mutex_enter(&ring->vr_u_mutex);
+		const uint16_t uidx = ring->vr_cur_uidx;
+		const uint16_t last_chk_uidx = ring->vr_last_chk_uidx;
+		ring->vr_last_chk_uidx = uidx;
+		mutex_exit(&ring->vr_u_mutex);
+		const uint16_t used_event = viona_ring_read_used_event(ring);
+
+		VIONA_PROBE4(ring_need_intr, viona_vring_t *, ring, uint16_t,
+		    used_event, uint16_t, uidx, uint16_t, last_chk_uidx);
+
+		return ((uint16_t)(uidx - used_event - 1) <
+		    (uint16_t)(uidx - last_chk_uidx));
+	} else {
 		volatile uint16_t *avail_flags =
 		    viona_ring_addr(&ring->vr_avail,
 		    SPLIT_AVAIL_FLAGS_OFF(ring));
 
-		if ((*avail_flags & VRING_AVAIL_F_NO_INTERRUPT) != 0) {
-			return;
-		}
+		return ((*avail_flags & VRING_AVAIL_F_NO_INTERRUPT) == 0);
 	}
+}
 
+void
+viona_ring_intr(viona_vring_t *ring)
+{
 	mutex_enter(&ring->vr_lock);
 	uint64_t addr = ring->vr_msi_addr;
 	uint64_t msg = ring->vr_msi_msg;
 	mutex_exit(&ring->vr_lock);
+
 	if (addr != 0) {
 		/* Deliver the interrupt directly, if so configured... */
 		(void) vmm_drv_msi(ring->vr_lease, addr, msg);
@@ -1275,27 +1333,55 @@ vq_pushchain_many(viona_vring_t *ring, uint_t num_bufs, used_elem_t *elem)
 }
 
 /*
- * Set USED_NO_NOTIFY on VQ so guest elides doorbell calls for new entries.
+ * Disable driver->device notification.
+ *
+ * Notification suppression is always on a best-effort basis; and per the
+ * virtio spec the device must always be willing to receive a notification.
+ *
+ * For drivers that have negotiated the F_EVENT_IDX feature we use the
+ * avail_event mechanism; otherwise, we use the used_flags/F_NO_NOTIFY
+ * mechanism.
+ *
+ * See section 2.7.10, Available Buffer Notification Suppression, of
+ * the VIRTIO specification for more details.
  */
 void
 viona_ring_disable_notify(viona_vring_t *ring)
 {
-	volatile uint16_t *used_flags =
-	    viona_ring_addr(&ring->vr_used, SPLIT_USED_FLAGS_OFF(ring));
+	if ((ring->vr_link->l_features & VIRTIO_F_RING_EVENT_IDX) != 0) {
+		volatile uint16_t *avail_event = viona_ring_addr(&ring->vr_used,
+		    SPLIT_USED_AVAIL_EVENT_OFF(ring));
 
-	*used_flags |= VRING_USED_F_NO_NOTIFY;
+		mutex_enter(&ring->vr_a_mutex);
+		*avail_event = ring->vr_cur_aidx - 1;
+		mutex_exit(&ring->vr_a_mutex);
+	} else {
+		volatile uint16_t *used_flags =
+		    viona_ring_addr(&ring->vr_used, SPLIT_USED_FLAGS_OFF(ring));
+
+		*used_flags |= VRING_USED_F_NO_NOTIFY;
+	}
 }
 
 /*
- * Clear USED_NO_NOTIFY on VQ so guest resumes doorbell calls for new entries.
+ * Enable driver->device notification.
  */
 void
 viona_ring_enable_notify(viona_vring_t *ring)
 {
-	volatile uint16_t *used_flags =
-	    viona_ring_addr(&ring->vr_used, SPLIT_USED_FLAGS_OFF(ring));
+	if ((ring->vr_link->l_features & VIRTIO_F_RING_EVENT_IDX) != 0) {
+		volatile uint16_t *avail_event = viona_ring_addr(&ring->vr_used,
+		    SPLIT_USED_AVAIL_EVENT_OFF(ring));
 
-	*used_flags &= ~VRING_USED_F_NO_NOTIFY;
+		mutex_enter(&ring->vr_a_mutex);
+		*avail_event = ring->vr_cur_aidx;
+		mutex_exit(&ring->vr_a_mutex);
+	} else {
+		volatile uint16_t *used_flags = viona_ring_addr(&ring->vr_used,
+		    SPLIT_USED_FLAGS_OFF(ring));
+
+		*used_flags &= ~VRING_USED_F_NO_NOTIFY;
+	}
 }
 
 /*

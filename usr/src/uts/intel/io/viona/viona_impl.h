@@ -182,6 +182,20 @@ typedef struct viona_vring {
 	uint16_t	vr_mask;	/* cached from vr_size */
 	uint16_t	vr_cur_aidx;	/* trails behind 'avail_idx' */
 	uint16_t	vr_cur_uidx;	/* drives 'used_idx' */
+	/*
+	 * The value of uidx the last time the device _checked_ if the
+	 * driver requires an interrupt. When F_EVENT_IDX is
+	 * negotiated we use this as the value of "old_idx" per the
+	 * notification logic described in the VIRTIO spec. This field
+	 * provides an easy place to hang the start of the range of
+	 * newly pushed descriptors as opposed to threading the
+	 * "old_idx" value through various functions. The decision to
+	 * send an interrupt is always based on the most recently
+	 * published range of descriptors and the current value of
+	 * "used_event". After each interrupt check this value should
+	 * be equal to vr_cur_uidx.
+	 */
+	uint16_t	vr_last_chk_uidx;
 
 	/* Reference to guest pages holding virtqueue */
 	void		**vr_map_pages;
@@ -519,10 +533,11 @@ int vq_popchain(viona_vring_t *, struct iovec *, uint_t, uint16_t *,
 void vq_pushchain(viona_vring_t *, uint32_t, uint16_t);
 void vq_pushchain_many(viona_vring_t *, uint_t, used_elem_t *);
 
-void viona_intr_ring(viona_vring_t *ring, boolean_t);
-void viona_ring_set_no_notify(viona_vring_t *, boolean_t);
+bool viona_ring_need_intr(viona_vring_t *);
+void viona_ring_intr(viona_vring_t *);
 void viona_ring_disable_notify(viona_vring_t *);
 void viona_ring_enable_notify(viona_vring_t *);
+
 uint16_t viona_ring_num_avail(viona_vring_t *);
 
 void viona_ring_stat_accept(viona_vring_t *, size_t, size_t);

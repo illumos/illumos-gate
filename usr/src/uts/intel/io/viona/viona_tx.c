@@ -64,6 +64,12 @@ boolean_t viona_default_tx_copy = B_TRUE;
 uint_t viona_max_header_pad = 256;
 
 /*
+ * Tunable to control the number of consecutive TX packets to send
+ * before pausing transmission to check for other ring events.
+ */
+uint_t viona_tx_burst_thresh = 32;
+
+/*
  * copy tx mbufs from virtio ring to avoid necessitating a wait for packet
  * transmission to free resources.
  */
@@ -200,12 +206,10 @@ static void
 viona_tx_done(viona_vring_t *ring, uint32_t len, uint16_t cookie)
 {
 	vq_pushchain(ring, len, cookie);
-
-	membar_enter();
-	viona_intr_ring(ring, B_FALSE);
+	if (viona_ring_need_intr(ring)) {
+		viona_ring_intr(ring);
+	}
 }
-
-#define	TX_BURST_THRESH	32
 
 void
 viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
@@ -223,6 +227,7 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 		uint_t burst = 0;
 
 		viona_ring_disable_notify(ring);
+
 		while (viona_ring_num_avail(ring) != 0) {
 			const size_t size_sent = viona_tx(link, ring);
 			if (size_sent != 0) {
@@ -237,7 +242,7 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 			 * transmission loop tight, but periodic breaks to
 			 * check for other events are of value too.
 			 */
-			if (burst >= TX_BURST_THRESH) {
+			if (burst >= viona_tx_burst_thresh) {
 				mutex_enter(&ring->vr_lock);
 				const bool need_bail = vring_need_bail(ring);
 				mutex_exit(&ring->vr_lock);
@@ -255,22 +260,27 @@ viona_worker_tx(viona_vring_t *ring, viona_link_t *link)
 		}
 
 		/*
-		 * Check for available descriptors on the ring once more in
-		 * case a late addition raced with the NO_NOTIFY flag toggle.
-		 *
-		 * The barrier ensures that visibility of the no-notify
-		 * store does not cross the viona_ring_num_avail() check below.
+		 * Before going to sleep we must first check for
+		 * available descriptors on the ring once more in case
+		 * a guest addition to the available ring races with
+		 * the notification enablement happening here. The
+		 * barrier ensures the notification enablement write
+		 * to the guest memory is visible before the
+		 * viona_ring_num_avail() read below (just before we
+		 * go to sleep).
 		 */
 		viona_ring_enable_notify(ring);
 		membar_enter();
 
+		/*
+		 * A feature leftover from the legacy interface
+		 * definition. Transitional devices MAY offer it. The
+		 * interrupt is sent regardless of the driver's
+		 * interrupt disposition.
+		 */
 		if (viona_ring_num_avail(ring) == 0 &&
 		    (link->l_features & VIRTIO_F_RING_NOTIFY_ON_EMPTY) != 0) {
-			/*
-			 * The NOTIFY_ON_EMPTY interrupt should not pay heed to
-			 * the presence of AVAIL_NO_INTERRUPT.
-			 */
-			viona_intr_ring(ring, B_TRUE);
+			viona_ring_intr(ring);
 		}
 
 		mutex_enter(&ring->vr_lock);

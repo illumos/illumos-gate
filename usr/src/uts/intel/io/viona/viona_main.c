@@ -384,7 +384,6 @@
 #define	VIONA_KSTAT_CLASS	"misc"
 #define	VIONA_KSTAT_NAME	"viona_stat"
 
-
 /*
  * Host capabilities.
  */
@@ -394,13 +393,17 @@
 	VIRTIO_NET_F_GUEST_TSO6 |	\
 	VIRTIO_NET_F_MRG_RXBUF |	\
 	VIRTIO_F_RING_NOTIFY_ON_EMPTY |	\
-	VIRTIO_F_RING_INDIRECT_DESC)
+	VIRTIO_F_RING_INDIRECT_DESC |	\
+	VIRTIO_F_RING_EVENT_IDX)
 
 /* MAC_CAPAB_HCKSUM specifics of interest */
 #define	VIONA_CAP_HCKSUM_INTEREST	\
 	(HCKSUM_INET_PARTIAL |		\
 	HCKSUM_INET_FULL_V4 |		\
 	HCKSUM_INET_FULL_V6)
+
+/* Features to disable. */
+uint64_t viona_feat_disable_mask = 0;
 
 static void		*viona_state;
 static dev_info_t	*viona_dip;
@@ -711,6 +714,8 @@ viona_ioctl(dev_t dev, int cmd, intptr_t data, int md, cred_t *cr, int *rv)
 	switch (cmd) {
 	case VNA_IOC_GET_FEATURES:
 		val = VIONA_S_HOSTCAPS | link->l_features_hw;
+		val &= ~viona_feat_disable_mask;
+
 		if (ddi_copyout(&val, dptr, sizeof (val), md) != 0) {
 			err = EFAULT;
 		}
@@ -722,6 +727,7 @@ viona_ioctl(dev_t dev, int cmd, intptr_t data, int md, cred_t *cr, int *rv)
 		}
 		link->l_modern = ((val & VIRTIO_F_VERSION_1) != 0);
 		val &= (VIONA_S_HOSTCAPS | link->l_features_hw);
+		val &= ~viona_feat_disable_mask;
 
 		if ((val & VIRTIO_NET_F_CSUM) == 0) {
 			val &= ~(VIRTIO_NET_F_HOST_TSO4 |

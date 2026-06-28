@@ -127,17 +127,19 @@ viona_worker_rx(viona_vring_t *ring, viona_link_t *link)
 	ring->vr_state = VRS_STOP;
 
 	/*
-	 * The RX ring is stopping, before we start tearing it down it
-	 * is imperative that we perform an RX barrier so that
-	 * incoming packets are dropped at viona_rx_classified().
+	 * The RX ring is stopping. Before tearing it down we use the
+	 * mac RX barrier to finish delivery of any in-flight packets.
+	 * Packets arriving after the barrier are dropped upon entry
+	 * into viona (as the ring is now in a stopped state).
 	 */
 	mutex_exit(&ring->vr_lock);
 	mac_rx_barrier(link->l_mch);
 	mutex_enter(&ring->vr_lock);
 
 	/*
-	 * If we bailed while renewing the ring lease, we cannot reset
-	 * USED_NO_NOTIFY, since we lack a valid mapping to do so.
+	 * If we bailed while renewing the ring lease, we cannot
+	 * enable notifications, since we lack a valid mapping to
+	 * do so.
 	 */
 	if (ring->vr_lease != NULL) {
 		viona_ring_enable_notify(ring);
@@ -204,7 +206,7 @@ viona_copy_mblk(const mblk_t *mp, size_t seek, caddr_t buf, size_t len,
 
 static int
 viona_recv_plain(viona_vring_t *ring, const mblk_t *mp, size_t msz,
-    uint8_t gro_type)
+    uint8_t gro_type, uint_t *pushed_cnt)
 {
 	struct iovec iov[VTNET_MAXSEGS];
 	uint16_t cookie;
@@ -294,6 +296,7 @@ viona_recv_plain(viona_vring_t *ring, const mblk_t *mp, size_t msz,
 	/* Release this chain */
 	vmm_drv_page_release_chain(pages);
 	vq_pushchain(ring, copied, cookie);
+	*pushed_cnt += 1;
 	return (0);
 
 bad_frame:
@@ -303,12 +306,13 @@ bad_frame:
 
 	vmm_drv_page_release_chain(pages);
 	vq_pushchain(ring, MAX(copied, MIN_BUF_SIZE + hdr_sz), cookie);
+	*pushed_cnt += 1;
 	return (EINVAL);
 }
 
 static int
 viona_recv_merged(viona_vring_t *ring, const mblk_t *mp, size_t msz,
-    uint8_t gro_type)
+    uint8_t gro_type, uint_t *pushed_cnt)
 {
 	struct iovec iov[VTNET_MAXSEGS];
 	used_elem_t uelem[VTNET_MAXSEGS];
@@ -480,8 +484,15 @@ done:
 		vmm_drv_page_release_chain(pages);
 	}
 	vq_pushchain_many(ring, buf_idx + 1, uelem);
+	*pushed_cnt += buf_idx + 1;
 	return (err);
 }
+
+/*
+ * The number of entries to push to the used queue before checking to
+ * see if the guest requires an interrupt.
+ */
+uint_t viona_rx_batch_thresh = 32;
 
 static void
 viona_rx_common(viona_vring_t *ring, mblk_t *mp, boolean_t is_loopback)
@@ -493,7 +504,11 @@ viona_rx_common(viona_vring_t *ring, mblk_t *mp, boolean_t is_loopback)
 	    (link->l_features & VIRTIO_NET_F_MRG_RXBUF) != 0;
 
 	size_t cnt_accept = 0, size_accept = 0, cnt_drop = 0;
-	boolean_t pushed_frames = B_FALSE;
+	/*
+	 * The number of used entries pushed since we last checked for
+	 * guest notification.
+	 */
+	uint_t pushed_cnt = 0;
 
 	while (mp != NULL) {
 		mblk_t *next = mp->b_next;
@@ -712,16 +727,24 @@ viona_rx_common(viona_vring_t *ring, mblk_t *mp, boolean_t is_loopback)
 		}
 
 		if (do_merge) {
-			err = viona_recv_merged(ring, mp, size, gro_type);
+			err = viona_recv_merged(ring, mp, size, gro_type,
+			    &pushed_cnt);
 		} else {
-			err = viona_recv_plain(ring, mp, size, gro_type);
+			err = viona_recv_plain(ring, mp, size, gro_type,
+			    &pushed_cnt);
 		}
 
 		/*
-		 * The viona_recv_x functions touch the used/avail rings in all
-		 * cases except ENOSPC.
+		 * We have reached the batch threshold; check if the
+		 * guest requires notification.
 		 */
-		pushed_frames = pushed_frames || (err != ENOSPC);
+		if (pushed_cnt >= viona_rx_batch_thresh) {
+			pushed_cnt = 0;
+
+			if (viona_ring_need_intr(ring)) {
+				viona_ring_intr(ring);
+			}
+		}
 
 		/*
 		 * The VLAN padding mblk is meant for continual reuse, so
@@ -776,16 +799,22 @@ pad_drop:
 		mp = next;
 	}
 
-	membar_enter();
+	/*
+	 * Notify the guest only if we have published new descriptors
+	 * to the used ring.
+	 */
+	if (pushed_cnt > 0 && viona_ring_need_intr(ring)) {
+		viona_ring_intr(ring);
+	}
 
 	/*
-	 * We should only notify the guest if we have modified the used/avail
-	 * rings. Some error conditions will have pushed a truncated packet,
-	 * some will have been caught before we vq_popchain.
+	 * We currently have no use for notification from the guest as
+	 * it makes Rx buffers available. Delivery is driven purely by
+	 * mac processing (interrupt/softring). When buffers are not
+	 * available we drop packets rather than wait for more to
+	 * become available.
 	 */
-	if (pushed_frames) {
-		viona_intr_ring(ring, B_FALSE);
-	}
+	viona_ring_disable_notify(ring);
 
 	/* Free successfully received frames */
 	if (mprx != NULL) {

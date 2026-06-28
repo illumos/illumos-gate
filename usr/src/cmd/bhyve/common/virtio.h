@@ -460,9 +460,14 @@ vq_devcfg_changed(struct virtio_softc *vs)
 static inline void
 vq_kick_enable(struct vqueue_info *vq)
 {
-	vq->vq_used->flags &= ~VRING_USED_F_NO_NOTIFY;
+	if ((vq->vq_vs->vs_negotiated_caps & VIRTIO_RING_F_EVENT_IDX) != 0) {
+		VQ_AVAIL_EVENT_IDX(vq) = vq->vq_last_avail;
+	} else {
+		vq->vq_used->flags &= ~VRING_USED_F_NO_NOTIFY;
+	}
+
 	/*
-	 * Full memory barrier to make sure the store to vq_used->flags
+	 * Full memory barrier to make sure the store to avail_event/flags
 	 * happens before the load from vq_avail->idx, which results from a
 	 * subsequent call to vq_has_descs().
 	 */
@@ -472,7 +477,11 @@ vq_kick_enable(struct vqueue_info *vq)
 static inline void
 vq_kick_disable(struct vqueue_info *vq)
 {
-	vq->vq_used->flags |= VRING_USED_F_NO_NOTIFY;
+	if ((vq->vq_vs->vs_negotiated_caps & VIRTIO_RING_F_EVENT_IDX) != 0) {
+		VQ_AVAIL_EVENT_IDX(vq) = vq->vq_last_avail - 1;
+	} else {
+		vq->vq_used->flags |= VRING_USED_F_NO_NOTIFY;
+	}
 }
 
 #define	VIRTIO_LEGACY_BAR	0	/* BAR for virtio legacy cfg regs */
