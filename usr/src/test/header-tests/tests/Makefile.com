@@ -31,3 +31,6 @@ $(TESTDIR):
 
 $(TESTDIR)/%: %
 	$(INS.file)
+
+$(TESTDIR)/%: %.py
+	$(INS.pyfile)

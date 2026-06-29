@@ -60,6 +60,10 @@ Once the pre-requisites are satisfied, simply run the headertest script:
 
 	test_machine$ /opt/header-tests/bin/headertest
 
+The number of parallel compile jobs defaults to 4. This can be overridden
+by setting the SYMBOL_TEST_JOBS environment variable, or per-invocation
+with the -j option to the symbol_test program.
+
 4. Test results
 
 While the Header Test Suite is running, one informational line is printed at

@@ -101,10 +101,7 @@ hardlink path=opt/header-tests/tests/c-symbols/unistd_h target=setup
 hardlink path=opt/header-tests/tests/c-symbols/wchar_h target=setup
 hardlink path=opt/header-tests/tests/c-symbols/wctype_h target=setup
 dir  path=opt/header-tests/tests/common
-file path=opt/header-tests/tests/common/c_symbols_test_32 mode=0555
-file path=opt/header-tests/tests/common/c_symbols_test_64 mode=0555
-file path=opt/header-tests/tests/common/cxx_symbols_test_32 mode=0555
-file path=opt/header-tests/tests/common/cxx_symbols_test_64 mode=0555
+file path=opt/header-tests/tests/common/symbol_test mode=0555
 dir  path=opt/header-tests/tests/cxx-symbols
 hardlink path=opt/header-tests/tests/cxx-symbols/cmath_h target=setup
 hardlink path=opt/header-tests/tests/cxx-symbols/cstdio_h target=setup

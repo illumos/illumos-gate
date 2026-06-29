@@ -65,13 +65,6 @@ This parser is rather simplistic, and it lacks support for embedding "|"
 fields in lines, and also doesn't support escaping, so you can't add "\"
 at the end of a line (if you need that, leave some trailing whitespace).
 
-There are also some internal limits on the length of lines (1K), and on the
-number of fields (20).  As this is only used for these test suites, this
-should not be a significant limitation.
-
-Please see ../tests/common/c_symbols_test.c for an example of correct usage,
-and  ../tests/common/cxx_symbols_test.c for the C++ tests.
-
 Aside:
 
   Astute readers may ask why invent a new configuration file, and why use
