@@ -22,6 +22,17 @@
 # in the proto area and are executable.  Auxiliary scripts are
 # allowed to be outside the test group's own directory.
 #
+# Note that some tests might not run on the target system for which
+# this workspace is building.  Some runfiles have test groups that
+# specify an architecture like "arch=i86pc" and run only there.
+# A runfile test group runs on the target if the "arch=" value is
+# absent, or if the "arch" value matches the target architecture.
+#
+# For the build-time checks this runs, assume the build has all
+# architectures for a given MACH (eg. i386/amd64 builds for all of
+# i86pc i86xpv intel) and check for existence of test programs
+# when the runfile arch matches any of the architectures that
+# should exist in this build.
 
 import argparse
 import ast
@@ -35,6 +46,14 @@ import tokenize
 
 SECTION_RE = re.compile(r'^\s*\[(.+?)\]\s*$')
 
+# Maps MACH (build ISA) to the set of architecture names that may appear
+# in runfile "arch=" properties for that build.  Derived from the
+# *_ARCHITECTURES variables in usr/src/uts/Makefile.
+MACH_ARCHITECTURES = {
+    'i386':  {'i86pc', 'i86xpv', 'intel'},
+    'sparc': {'sun4v', 'sun4u', 'sparc'},
+}
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -47,9 +66,9 @@ def parse_args():
         '-T', dest='testroot', required=True,
         help='test root relative to proto root (for example, opt/os-tests)')
     parser.add_argument(
-        '-a', '--arch', default='i86pc',
-        help='only check sections where arch matches this value '
-             '(default: i86pc)')
+        '-m', '--mach', default=None,
+        help='target CPU type (for example, i386 or sparc); used to determine '
+             'which arch-constrained sections to check')
     parser.add_argument(
         'runfiles', nargs='+',
         help='runfile paths to check')
@@ -132,7 +151,7 @@ def emit_error(issues, runfile, lineno, test_group, detail):
     issues.append(format_error(runfile, lineno, test_group, detail))
 
 
-def check_runfile(runfile, testroot, protoroot, arch):
+def check_runfile(runfile, testroot, protoroot, archlist):
     issues = []
     config = configparser.RawConfigParser()
     content = None
@@ -156,8 +175,9 @@ def check_runfile(runfile, testroot, protoroot, arch):
             continue
         if config.has_option(sec, 'arch'):
             sec_arch = config.get(sec, 'arch').strip()
-            if sec_arch != arch:
+            if sec_arch not in archlist:
                 continue
+        # else arch not specified so do checks.
 
         secpath = section_path(sec, testroot)
         proto_path = os.path.join(protoroot, secpath.lstrip('/'))
@@ -273,9 +293,10 @@ def main():
         return 2
 
     runfiles = find_runfiles(args)
+    archlist = MACH_ARCHITECTURES.get(args.mach, set())
     issues = []
     for runfile in runfiles:
-        issues.extend(check_runfile(runfile, testroot, protoroot, args.arch))
+        issues.extend(check_runfile(runfile, testroot, protoroot, archlist))
 
     for issue in issues:
         sys.stderr.write('%s\n' % issue)
