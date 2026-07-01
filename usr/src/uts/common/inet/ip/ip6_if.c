@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 1990 Mentat Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -1388,12 +1389,16 @@ ip_addr_scope_v6(const in6_addr_t *addr)
 	if (IN6_IS_ADDR_V4MAPPED(addr)) {
 		in_addr_t v4addr_h = ntohl(V4_PART_OF_V6((*addr)));
 		if ((v4addr_h >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET ||
-		    (v4addr_h & IN_AUTOCONF_MASK) == IN_AUTOCONF_NET)
+		    (v4addr_h & IN_AUTOCONF_MASK) == IN_AUTOCONF_NET) {
 			return (IP6_SCOPE_LINKLOCAL);
-		if ((v4addr_h & IN_PRIVATE8_MASK) == IN_PRIVATE8_NET ||
-		    (v4addr_h & IN_PRIVATE12_MASK) == IN_PRIVATE12_NET ||
-		    (v4addr_h & IN_PRIVATE16_MASK) == IN_PRIVATE16_NET)
-			return (IP6_SCOPE_SITELOCAL);
+		}
+		/*
+		 * RFC 6724 section 3.2 assigns global scope to all other IPv4
+		 * addresses, including RFC 1918 private addresses. RFC 3484
+		 * had mapped those to site-local scope; that was changed so
+		 * that their selection can be controlled through the prefix
+		 * policy table.
+		 */
 		return (IP6_SCOPE_GLOBAL);
 	}
 
@@ -1402,8 +1407,9 @@ ip_addr_scope_v6(const in6_addr_t *addr)
 
 	/* link-local and loopback addresses are of link-local scope */
 	if (IN6_IS_ADDR_LINKLOCAL(addr) ||
-	    IN6_ARE_ADDR_EQUAL(addr, &ipv6loopback))
+	    IN6_ARE_ADDR_EQUAL(addr, &ipv6loopback)) {
 		return (IP6_SCOPE_LINKLOCAL);
+	}
 	if (IN6_IS_ADDR_SITELOCAL(addr))
 		return (IP6_SCOPE_SITELOCAL);
 	return (IP6_SCOPE_GLOBAL);
