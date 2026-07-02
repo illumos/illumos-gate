@@ -12,17 +12,41 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 STF_TOOLS="/opt/test-runner/stf"
 . ${STF_TOOLS}/contrib/include/logapi.shlib
 
 TEST_NIC="bhyvetest_viona0"
+TEST_NIC_PEER="bhyvetest_viona1"
+TEST_VNIC="bhyvetest_viona2"
+TEST_VNIC2="bhyvetest_viona3"
+TEST_IPTUN="bhyvetest_viona4"
 
-if dladm show-simnet ${TEST_NIC} > /dev/null 2>&1; then
-	log_must dladm delete-simnet ${TEST_NIC}
-	exit ${STF_PASS}
+# The mac_addr and rx_delivery tests create temporary VNICs atop ${TEST_NIC}
+# for the duration of their runs.  Sweep any leftovers from an aborted run
+# before the simnets themselves can be deleted.
+for vnic in ${TEST_VNIC2} ${TEST_VNIC}; do
+	if dladm show-vnic ${vnic} > /dev/null 2>&1; then
+		log_must dladm delete-vnic ${vnic}
+	else
+		log_note "vnic ${vnic} already absent"
+	fi
+done
+
+if dladm show-iptun ${TEST_IPTUN} > /dev/null 2>&1; then
+	log_must dladm delete-iptun -t ${TEST_IPTUN}
 else
-	log_pass "simnet link ${TEST_NIC} already absent"
+	log_note "iptun ${TEST_IPTUN} already absent"
 fi
+
+for nic in ${TEST_NIC_PEER} ${TEST_NIC}; do
+	if dladm show-simnet ${nic} > /dev/null 2>&1; then
+		log_must dladm delete-simnet ${nic}
+	else
+		log_note "simnet link ${nic} already absent"
+	fi
+done
+
+exit ${STF_PASS}

@@ -4411,6 +4411,31 @@ mac_sap_verify(mac_handle_t mh, uint32_t sap, uint32_t *bind_sap)
 	    mip->mi_pdata));
 }
 
+/*
+ * Verify the validity of the specified multicast MAC address.
+ *
+ * Returns B_TRUE if the address is valid, B_FALSE otherwise (unicast or
+ * broadcast address, or incorrect length).  The multicast counterpart of
+ * mac_unicst_verify().
+ */
+boolean_t
+mac_multicst_verify(mac_handle_t mh, const uint8_t *addr, uint_t len)
+{
+	mac_impl_t *mip = (mac_impl_t *)mh;
+
+	/*
+	 * No lock is needed since mi_type and plugin details do not change
+	 * after mac_register().
+	 */
+	if (len != mip->mi_type->mt_addr_length ||
+	    mip->mi_type->mt_ops.mtops_multicst_verify(addr,
+	    mip->mi_pdata) != 0) {
+		return (B_FALSE);
+	} else {
+		return (B_TRUE);
+	}
+}
+
 mblk_t *
 mac_header(mac_handle_t mh, const uint8_t *daddr, uint32_t sap, mblk_t *payload,
     size_t extra_len)

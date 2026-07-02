@@ -85,7 +85,10 @@ post = cleanup
 tests = [
 	'interface_version',
 	'create_delete',
-	'link_params'
+	'link_params',
+	'mac_addr',
+	'mac_filters',
+	'rx_delivery'
 	]
 
 # Tests of userspace mevent system, built from cmd/bhyve

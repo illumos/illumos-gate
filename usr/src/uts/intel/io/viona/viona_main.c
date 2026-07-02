@@ -254,6 +254,80 @@
  * notification when ring events necessitate the assertion of an interrupt.
  *
  *
+ * ---------------------
+ * MAC Address Filtering
+ * ---------------------
+ *
+ * A guest which negotiates VIRTIO_NET_F_CTRL_RX may communicate its reception
+ * policy to the device over the control queue: promiscuous and all-multicast
+ * toggles via VIRTIO_NET_CTRL_RX, and complete unicast and multicast address
+ * tables via VIRTIO_NET_CTRL_MAC_TABLE_SET.  A guest which also negotiates
+ * VIRTIO_NET_F_CTRL_MAC_ADDR may replace the default address via
+ * VIRTIO_NET_CTRL_MAC_ADDR_SET.  Those commands are handled by the
+ * userland device emulation, which is responsible for reception-mode policy
+ * and directs viona through the VNA_IOC_SET_PROMISC, VNA_IOC_SET_MAC_FILTERS,
+ * and VNA_IOC_SET_MAC_ADDR ioctls respectively.  viona installs the requested
+ * multicast filters and unicast address on its MAC client (or a promiscuous
+ * callback in their place) and reports failures back to the emulation, which
+ * decides how to respond.
+ *
+ * The virtio specification leaves filtering loosely defined (see sections
+ * 5.1.6.5.1 and 5.1.6.5.2 of VIRTIO 1.2, including the note that these
+ * commands are best-effort).  There is no limit on table size and no way for
+ * a device to advertise one.  A device given more addresses than it can
+ * handle is permitted to fall back to all-multicast or promiscuous reception.
+ *
+ * Existing drivers accommodate this in different ways.  Linux sends its
+ * complete address lists and ignores TABLE_SET failures beyond a warning.
+ * Other drivers impose their own local limits and select all-multicast or
+ * promiscuous reception when those are exceeded.  The illumos vioif driver
+ * does not send TABLE_SET at all.  It, instead, reports success for multicast
+ * joins without programming any filter and relies on the device delivering
+ * multicast traffic in the absence of a table.
+ *
+ * Device implementations diverge as well.  QEMU enforces a 64-entry table
+ * shared between the unicast and multicast lists, flagging overflow
+ * internally while returning success to the guest and delivering openly.
+ * cloud-hypervisor does not offer VIRTIO_NET_F_CTRL_RX, reserving its
+ * control queue for other command classes; crosvm rejects filtering commands
+ * as invalid; and Firecracker offers no control queue at all.  QEMU is thus
+ * the only device precedent for filtering behavior, and its fail-open
+ * convention is what the drivers above already assume.
+ *
+ * The end-to-end policy is fail-open: the emulation may arrange for delivery
+ * beyond what a guest requested, but must not leave viona filtering traffic
+ * the guest expects.
+ *
+ * When a table cannot be installed, the emulation is expected to fall back
+ * to (or remain in) a promiscuous mode, matching the behavior of other
+ * virtio-net devices.
+ *
+ * Since a guest cannot learn device capacity, the multicast table limit is a
+ * property of the implementation rather than the ABI.  Consumers can discover
+ * it at runtime via VMF_ERR_COUNT.
+ *
+ * Unicast tables are not passed to viona.  Mechanically, a MAC client holds
+ * a single unicast address, and while additional clients could carry more,
+ * honoring a guest-supplied table would raise an authorization question that
+ * viona is not positioned to answer.  Which unicast addresses a link may use
+ * is part of host policy, provisioned through the link configuration (e.g.
+ * the secondary-macs property of a VNIC) and enforced by link protections
+ * such as mac-nospoof.  A guest table is an unauthenticated request to widen
+ * that set.  Guests who do configure additional unicast addresses are instead
+ * served by a promiscuous fallback, which widens reception without granting
+ * the guest any address the host has not assigned.  Replacement of the
+ * primary address via VNA_IOC_SET_MAC_ADDR raises the same question, and
+ * likewise leaves it with the emulation: a consumer must validate the
+ * requested address against host policy before exposing MAC_ADDR_SET to a
+ * guest.  Neither the ability to issue the ioctl nor link protections
+ * such as mac-nospoof stand in for that validation (viona performs the
+ * swap as directed).
+ *
+ * The ioctl contract, its error reporting, the VNA_IOC_GET_MAC_FILTERS
+ * counterpart for reading back the installed table, and the expected pairing
+ * of filter tables with promiscuous modes are described in sys/viona_io.h.
+ *
+ *
  * ---------------
  * Nethook Support
  * ---------------
@@ -350,6 +424,11 @@ static int viona_ioc_delete(viona_soft_state_t *, boolean_t);
 static int viona_ioc_set_notify_ioport(viona_link_t *, uint16_t);
 static int viona_ioc_set_notify_mmio(viona_link_t *, void *, int);
 static int viona_ioc_set_promisc(viona_link_t *, viona_promisc_t);
+static int viona_ioc_set_mac_filters(viona_link_t *, void *, int);
+static int viona_ioc_get_mac_filters(viona_link_t *, void *, int);
+static int viona_ioc_set_mac_addr(viona_link_t *, void *, int);
+static int viona_ioc_get_mac_addr(viona_link_t *, void *, int);
+static void viona_mac_filters_clear(viona_link_t *);
 static int viona_ioc_get_params(viona_link_t *, void *, int);
 static int viona_ioc_set_params(viona_link_t *, void *, int);
 static int viona_ioc_link_setpairs(viona_link_t *, uint16_t);
@@ -721,6 +800,18 @@ viona_ioctl(dev_t dev, int cmd, intptr_t data, int md, cred_t *cr, int *rv)
 	case VNA_IOC_SET_PROMISC:
 		err = viona_ioc_set_promisc(link, (viona_promisc_t)data);
 		break;
+	case VNA_IOC_SET_MAC_FILTERS:
+		err = viona_ioc_set_mac_filters(link, dptr, md);
+		break;
+	case VNA_IOC_GET_MAC_FILTERS:
+		err = viona_ioc_get_mac_filters(link, dptr, md);
+		break;
+	case VNA_IOC_SET_MAC_ADDR:
+		err = viona_ioc_set_mac_addr(link, dptr, md);
+		break;
+	case VNA_IOC_GET_MAC_ADDR:
+		err = viona_ioc_get_mac_addr(link, dptr, md);
+		break;
 	case VNA_IOC_GET_PARAMS:
 		err = viona_ioc_get_params(link, dptr, md);
 		break;
@@ -1034,6 +1125,17 @@ viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 		goto bail;
 	}
 
+	/*
+	 * virtio-net is an Ethernet device, and viona assumes an Ethernet
+	 * link throughout (frame parsing, six byte address tables, the media
+	 * broadcast address).  Refuse other media outright rather than
+	 * misbehave on them.
+	 */
+	if (mac_info(link->l_mh)->mi_media != DL_ETHER) {
+		err = ENOTSUP;
+		goto bail;
+	}
+
 	viona_get_mac_capab(link);
 	viona_params_get_defaults(&link->l_params);
 
@@ -1049,6 +1151,7 @@ viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 	if (err != 0) {
 		goto bail;
 	}
+	link->l_ucast_primary = true;
 
 	if (viona_link_qalloc(link, 1) != 0)
 		goto bail;
@@ -1060,8 +1163,7 @@ viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 	 * if they need to via the virtio net control queue; guests without
 	 * support generally still want to see multicast.
 	 */
-	link->l_promisc = VIONA_PROMISC_MULTI;
-	if ((err = viona_rx_set(link, link->l_promisc)) != 0) {
+	if ((err = viona_rx_set(link, VIONA_PROMISC_MULTI)) != 0) {
 		goto bail;
 	}
 
@@ -1082,8 +1184,9 @@ viona_ioc_create(viona_soft_state_t *ss, void *dptr, int md, cred_t *cr)
 
 bail:
 	if (link != NULL) {
-		viona_rx_clear(link);
 		if (link->l_mch != NULL) {
+			viona_rx_clear(link);
+			viona_mac_filters_clear(link);
 			if (link->l_muh != NULL) {
 				VERIFY0(mac_unicast_remove(link->l_mch,
 				    link->l_muh));
@@ -1157,6 +1260,7 @@ viona_ioc_delete(viona_soft_state_t *ss, boolean_t on_close)
 	if (link->l_mch != NULL) {
 		/* Unhook the receive callbacks and close out the client */
 		viona_rx_clear(link);
+		viona_mac_filters_clear(link);
 		if (link->l_muh != NULL) {
 			VERIFY0(mac_unicast_remove(link->l_mch, link->l_muh));
 			link->l_muh = NULL;
@@ -1299,14 +1403,24 @@ viona_ioc_ring_get_state(viona_link_t *link, void *udata, int md)
 static int
 viona_ioc_link_setpairs(viona_link_t *link, uint16_t pairs)
 {
-	int err;
+	int err, rx_err;
 
 	/* Unhook the receive callbacks while the rings are being reallocated */
 	viona_rx_clear(link);
 	err = viona_link_qalloc(link, pairs);
-	(void) viona_rx_set(link, link->l_promisc);
 
-	return (err);
+	/*
+	 * Restore the receive callbacks removed above, re-applying the
+	 * requested reception mode.  Reinstalling the classified callback
+	 * cannot fail, but re-adding a promiscuous mode can, as
+	 * mac_promisc_add() is fallible through the provider.  In that case,
+	 * the active mode falls back to VIONA_PROMISC_NONE while l_promisc
+	 * retains the request, and retrying this operation reattempts the
+	 * missing handler.  The error is also returned to the ioctl caller.
+	 */
+	rx_err = viona_rx_set(link, link->l_promisc);
+
+	return ((err != 0) ? err : rx_err);
 }
 
 static int
@@ -1517,21 +1631,440 @@ viona_ioc_set_notify_mmio(viona_link_t *link, void *udata, int md)
 static int
 viona_ioc_set_promisc(viona_link_t *link, viona_promisc_t mode)
 {
-	int err;
-
 	if (mode >= VIONA_PROMISC_MAX) {
 		return (EINVAL);
 	}
 
-	if (mode == link->l_promisc) {
+	if (mode == link->l_promisc && mode == link->l_rx_mode) {
 		return (0);
 	}
 
-	if ((err = viona_rx_set(link, mode)) != 0) {
-		return (err);
+	/*
+	 * viona_rx_set() retries when a callback restoration failure left the
+	 * active mode short of the requested one.
+	 */
+	return (viona_rx_set(link, mode));
+}
+
+/* Search the first count rows of a MAC address table for addr */
+static boolean_t
+viona_addrtab_contains(uint8_t tab[][ETHERADDRL], uint32_t count,
+    const uint8_t addr[ETHERADDRL])
+{
+	for (uint32_t i = 0; i < count; i++) {
+		if (bcmp(tab[i], addr, ETHERADDRL) == 0) {
+			return (B_TRUE);
+		}
+	}
+	return (B_FALSE);
+}
+
+static int
+viona_mcast_filter_install(viona_link_t *link,
+    const uint8_t addr[ETHERADDRL])
+{
+	int err;
+
+	if (link->l_nmcast_filters >= VIONA_MAX_MCAST_FILTERS) {
+		return (ENOSPC);
 	}
 
-	link->l_promisc = mode;
+	err = mac_multicast_add(link->l_mch, addr);
+	if (err != 0) {
+		return (err);
+	}
+	bcopy(addr, link->l_mcast_filters[link->l_nmcast_filters], ETHERADDRL);
+	link->l_nmcast_filters++;
+	return (0);
+}
+
+static void
+viona_mcast_filter_uninstall(viona_link_t *link, uint32_t idx)
+{
+	VERIFY3U(idx, <, link->l_nmcast_filters);
+	mac_multicast_remove(link->l_mch, link->l_mcast_filters[idx]);
+	link->l_nmcast_filters--;
+	if (idx != link->l_nmcast_filters) {
+		bcopy(link->l_mcast_filters[link->l_nmcast_filters],
+		    link->l_mcast_filters[idx], ETHERADDRL);
+	}
+	bzero(link->l_mcast_filters[link->l_nmcast_filters], ETHERADDRL);
+}
+
+/*
+ * Remove all installed MAC address filters from the underlying client,
+ * called ahead of mac_client_close() during link teardown.
+ */
+static void
+viona_mac_filters_clear(viona_link_t *link)
+{
+	while (link->l_nmcast_filters > 0) {
+		viona_mcast_filter_uninstall(link, link->l_nmcast_filters - 1);
+	}
+}
+
+static int
+viona_ioc_set_mac_filters(viona_link_t *link, void *udata, int md)
+{
+	vioc_mac_filters_t vmf;
+	uint8_t (*tab)[ETHERADDRL] = NULL;
+	size_t tab_sz = 0;
+	uint32_t nmcast;
+
+	/*
+	 * Reception-mode policy stays with the caller, the userland VMM, as
+	 * viona does not enter a promiscuous mode on its behalf when a table
+	 * cannot be installed.  Only the emulation knows the guest's complete
+	 * receive policy and can choose between VIONA_PROMISC_MULTI and
+	 * VIONA_PROMISC_ALL.  On error, it keeps or restores that fallback
+	 * through VNA_IOC_SET_PROMISC.  vmf_err and vmf_erraddr identify the
+	 * failed check and offending entry, and VNA_IOC_GET_MAC_FILTERS is
+	 * available to inspect what is installed.  Failures prior to
+	 * installation leave the existing filters untouched, while a failure
+	 * partway through installation leaves a consistent but partial table
+	 * (see below).  The expected pairing of filter tables with the
+	 * promiscuous modes is described in sys/viona_io.h.
+	 */
+	if (ddi_copyin(udata, &vmf, sizeof (vmf), md) != 0) {
+		return (EFAULT);
+	}
+	vmf.vmf_err = VMF_OK;
+	bzero(vmf.vmf_erraddr, ETHERADDRL);
+	bzero(vmf.vmf_pad, sizeof (vmf.vmf_pad));
+
+	if (vmf.vmf_nmcast > VIONA_MAX_MCAST_FILTERS) {
+		vmf.vmf_err = VMF_ERR_COUNT;
+		vmf.vmf_nmcast = VIONA_MAX_MCAST_FILTERS;
+		goto out;
+	}
+
+	/*
+	 * Installation requires an active unicast address on the client,
+	 * absent only after a failed restoration in VNA_IOC_SET_MAC_ADDR,
+	 * which also empties the filter table.  Without unicast flows,
+	 * mac_multicast_add() records no memberships while reporting success,
+	 * which would diverge the tracked table from the client.
+	 */
+	if (link->l_muh == NULL && vmf.vmf_nmcast > 0) {
+		VERIFY0(link->l_nmcast_filters);
+		vmf.vmf_err = VMF_ERR_NO_UNICAST;
+		goto out;
+	}
+
+	if (vmf.vmf_nmcast > 0) {
+		tab_sz = vmf.vmf_nmcast * ETHERADDRL;
+		tab = kmem_alloc(tab_sz, KM_SLEEP);
+		if (ddi_copyin((void *)(uintptr_t)vmf.vmf_addrs, tab, tab_sz,
+		    md) != 0) {
+			kmem_free(tab, tab_sz);
+			return (EFAULT);
+		}
+	}
+
+	/*
+	 * Compact away duplicate entries.  Broadcast entries are dropped
+	 * rather than refused, and must be removed ahead of validation, as
+	 * mac_multicst_verify() rejects the broadcast address.  A MAC client
+	 * is joined to broadcast for the lifetime of its unicast address, so
+	 * no filter is needed, and the table contents are guest-controlled
+	 * (nothing prevents a guest from submitting a broadcast entry).
+	 * Other virtio-net devices (QEMU), likewise, deliver broadcast
+	 * without consulting the table, so an entry for it is inert there as
+	 * well.  Suppressing broadcast reception is instead left to
+	 * VIRTIO_NET_CTRL_RX_NOBCAST, part of VIRTIO_NET_F_CTRL_RX_EXTRA,
+	 * which viona does not offer.
+	 */
+	nmcast = 0;
+	for (uint32_t i = 0; i < vmf.vmf_nmcast; i++) {
+		if (bcmp(tab[i], mac_info(link->l_mh)->mi_brdcst_addr,
+		    ETHERADDRL) == 0 ||
+		    viona_addrtab_contains(tab, nmcast, tab[i])) {
+			continue;
+		}
+		if (nmcast != i) {
+			bcopy(tab[i], tab[nmcast], ETHERADDRL);
+		}
+		nmcast++;
+	}
+
+	/*
+	 * Validation defers to the MAC plugin rather than open coding
+	 * link-layer knowledge, matching the RX path's classification
+	 * through mac_vlan_header_info().  Duplicates of an invalid entry
+	 * are removed by the compaction above, but its first occurrence
+	 * always survives to be caught here.
+	 */
+	for (uint32_t i = 0; i < nmcast; i++) {
+		if (!mac_multicst_verify(link->l_mh, tab[i], ETHERADDRL)) {
+			vmf.vmf_err = VMF_ERR_NOT_MCAST;
+			bcopy(tab[i], vmf.vmf_erraddr, ETHERADDRL);
+			goto out;
+		}
+	}
+
+	/*
+	 * Remove installed filters absent from the new table before adding
+	 * the new entries, keeping the installed count within its bound.
+	 * Addresses present in both tables are left untouched, avoiding any
+	 * gap in their delivery.
+	 */
+	for (uint32_t i = 0; i < link->l_nmcast_filters; ) {
+		if (viona_addrtab_contains(tab, nmcast,
+		    link->l_mcast_filters[i])) {
+			i++;
+		} else {
+			viona_mcast_filter_uninstall(link, i);
+		}
+	}
+
+	/*
+	 * Install the new entries.  Should a failure occur partway, the
+	 * tracked state remains consistent with what was applied to the
+	 * client, and the caller is expected to restore a promiscuous mode
+	 * rather than rely on the partial table.
+	 */
+	for (uint32_t i = 0; i < nmcast; i++) {
+		if (viona_addrtab_contains(link->l_mcast_filters,
+		    link->l_nmcast_filters, tab[i])) {
+			continue;
+		}
+		if (viona_mcast_filter_install(link, tab[i]) != 0) {
+			vmf.vmf_err = VMF_ERR_INSTALL;
+			bcopy(tab[i], vmf.vmf_erraddr, ETHERADDRL);
+			break;
+		}
+	}
+
+out:
+	if (tab != NULL) {
+		kmem_free(tab, tab_sz);
+	}
+	if (ddi_copyout(&vmf, udata, sizeof (vmf), md) != 0) {
+		return (EFAULT);
+	}
+	return (0);
+}
+
+static int
+viona_ioc_get_mac_filters(viona_link_t *link, void *udata, int md)
+{
+	vioc_mac_filters_t vmf;
+	uint32_t ncopy;
+
+	if (ddi_copyin(udata, &vmf, sizeof (vmf), md) != 0) {
+		return (EFAULT);
+	}
+	vmf.vmf_err = VMF_OK;
+	bzero(vmf.vmf_erraddr, ETHERADDRL);
+	bzero(vmf.vmf_pad, sizeof (vmf.vmf_pad));
+
+	ncopy = MIN(vmf.vmf_nmcast, link->l_nmcast_filters);
+	if (ncopy > 0 &&
+	    ddi_copyout(link->l_mcast_filters,
+	    (void *)(uintptr_t)vmf.vmf_addrs, ncopy * ETHERADDRL, md) != 0) {
+		return (EFAULT);
+	}
+	vmf.vmf_nmcast = link->l_nmcast_filters;
+	if (ddi_copyout(&vmf, udata, sizeof (vmf), md) != 0) {
+		return (EFAULT);
+	}
+	return (0);
+}
+
+static int
+viona_ioc_set_mac_addr(viona_link_t *link, void *udata, int md)
+{
+	vioc_mac_addr_t vma;
+	mac_diag_t diag;
+	uint8_t primary[ETHERADDRL];
+	bool to_primary;
+	bool removed = false;
+	uint32_t nmcast = 0;
+	int err;
+
+	if (ddi_copyin(udata, &vma, sizeof (vma), md) != 0) {
+		return (EFAULT);
+	}
+	vma.vma_err = VMA_OK;
+
+	if (!mac_unicst_verify(link->l_mh, vma.vma_addr, ETHERADDRL)) {
+		vma.vma_err = VMA_ERR_NOT_UNICAST;
+		goto out;
+	}
+
+	/*
+	 * A VNIC carries exactly one unicast address, with the client's
+	 * MAC_UNICAST_PRIMARY entry wrapping it rather than owning a separate
+	 * installation (see i_mac_unicast_add()).  Replace the VNIC's address
+	 * in place, which reprograms the lower MAC client and preserves
+	 * classified delivery without a removal window.
+	 */
+	if (mac_is_vnic(link->l_mh)) {
+		if (mac_unicast_primary_set(link->l_mh, vma.vma_addr) != 0) {
+			vma.vma_err = VMA_ERR_INSTALL;
+		}
+		goto out;
+	}
+
+	mac_unicast_primary_get(link->l_mh, primary);
+	to_primary = (bcmp(vma.vma_addr, primary, ETHERADDRL) == 0);
+
+	/* Skip replacement when the requested address is already active. */
+	if (link->l_muh != NULL &&
+	    ((link->l_ucast_primary && to_primary) ||
+	    (!link->l_ucast_primary &&
+	    bcmp(vma.vma_addr, link->l_ucast_addr, ETHERADDRL) == 0))) {
+		goto out;
+	}
+
+	/*
+	 * The replacement removes the current unicast address before
+	 * installing the new one, leaving a window with no classified
+	 * unicast delivery.  Installing the new address ahead of the removal
+	 * would close the window, but a MAC client holds only one distinct
+	 * unicast address, with additional flows permitted only for that
+	 * address on other VIDs (see i_mac_unicast_add()).  Consumers are
+	 * expected to hold VIONA_PROMISC_ALL across the replacement,
+	 * narrowing reception only after it succeeds.
+	 *
+	 * Note: VIONA_PROMISC_MULTI cannot cover the unicast gap (see the
+	 * VNA_IOC_SET_MAC_ADDR notes in sys/viona_io.h).
+	 */
+	if (link->l_muh != NULL) {
+		/*
+		 * Remove installed multicast filters ahead of the unicast
+		 * removal.  mac_multicast_remove() resolves memberships
+		 * through the unicast flows of the client, so once the last
+		 * address is gone they become unreachable, and link teardown
+		 * would leave stale client references on the broadcast
+		 * groups.  The tracked table is retained for reinstallation
+		 * after the swap and holding VIONA_PROMISC_ALL also covers the
+		 * resulting multicast delivery gap.
+		 */
+		nmcast = link->l_nmcast_filters;
+		for (uint32_t i = 0; i < nmcast; i++) {
+			mac_multicast_remove(link->l_mch,
+			    link->l_mcast_filters[i]);
+		}
+		VERIFY0(mac_unicast_remove(link->l_mch, link->l_muh));
+		link->l_muh = NULL;
+		removed = true;
+	}
+
+	/*
+	 * MAC refuses an explicit installation of the link's own primary
+	 * address (MAC_DIAG_MACADDR_NIC), so a return to the primary must go
+	 * through MAC_UNICAST_PRIMARY instead.
+	 */
+	if (to_primary) {
+		err = mac_unicast_add(link->l_mch, NULL, MAC_UNICAST_PRIMARY,
+		    &link->l_muh, VLAN_ID_NONE, &diag);
+	} else {
+		err = mac_unicast_add(link->l_mch, vma.vma_addr, 0,
+		    &link->l_muh, VLAN_ID_NONE, &diag);
+	}
+	if (err == 0) {
+		link->l_ucast_primary = to_primary;
+		if (to_primary) {
+			bzero(link->l_ucast_addr, ETHERADDRL);
+		} else {
+			bcopy(vma.vma_addr, link->l_ucast_addr, ETHERADDRL);
+		}
+		goto reinstall;
+	}
+	vma.vma_err = VMA_ERR_INSTALL;
+
+	/*
+	 * Restore the previous installation, in its previous mode, so a
+	 * refused update does not alter delivery.  Should the restoration
+	 * itself fail, the client is left without a unicast address, which
+	 * VNA_IOC_GET_MAC_ADDR reports through vma_present.
+	 */
+	if (removed) {
+		if (link->l_ucast_primary) {
+			(void) mac_unicast_add(link->l_mch, NULL,
+			    MAC_UNICAST_PRIMARY, &link->l_muh, VLAN_ID_NONE,
+			    &diag);
+		} else {
+			(void) mac_unicast_add(link->l_mch,
+			    link->l_ucast_addr, 0, &link->l_muh, VLAN_ID_NONE,
+			    &diag);
+		}
+	}
+
+reinstall:
+	if (removed && link->l_muh != NULL) {
+		/*
+		 * Reinstall the multicast table removed ahead of the swap.
+		 * Entries refused by MAC are compacted out, keeping the
+		 * tracked table a mirror of the client and observable via
+		 * VNA_IOC_GET_MAC_FILTERS.  A reinstallation failure on an
+		 * otherwise successful replacement is reported, so a consumer
+		 * holding VIONA_PROMISC_ALL does not narrow reception.
+		 */
+		uint32_t kept = 0;
+
+		for (uint32_t i = 0; i < nmcast; i++) {
+			int merr = mac_multicast_add(link->l_mch,
+			    link->l_mcast_filters[i]);
+
+			if (merr != 0) {
+				if (vma.vma_err == VMA_OK) {
+					vma.vma_err = VMA_ERR_MCAST_RESTORE;
+				}
+				continue;
+			}
+			if (kept != i) {
+				bcopy(link->l_mcast_filters[i],
+				    link->l_mcast_filters[kept], ETHERADDRL);
+			}
+			kept++;
+		}
+		for (uint32_t i = kept; i < nmcast; i++) {
+			bzero(link->l_mcast_filters[i], ETHERADDRL);
+		}
+		link->l_nmcast_filters = kept;
+	} else if (removed) {
+		/*
+		 * The restoration failed, leaving the client without unicast
+		 * flows.  Its multicast memberships were removed ahead of the
+		 * swap; therefore, we drop the tracked table to match so that
+		 * teardown does not reach for memberships which no longer
+		 * exist.
+		 */
+		for (uint32_t i = 0; i < nmcast; i++) {
+			bzero(link->l_mcast_filters[i], ETHERADDRL);
+		}
+		link->l_nmcast_filters = 0;
+	}
+
+out:
+	/* Report address presence as VNA_IOC_GET_MAC_ADDR would */
+	vma.vma_present = (link->l_muh != NULL) ? 1 : 0;
+	vma.vma_pad = 0;
+	if (ddi_copyout(&vma, udata, sizeof (vma), md) != 0) {
+		return (EFAULT);
+	}
+	return (0);
+}
+
+static int
+viona_ioc_get_mac_addr(viona_link_t *link, void *udata, int md)
+{
+	vioc_mac_addr_t vma;
+
+	bzero(&vma, sizeof (vma));
+	if (link->l_muh != NULL) {
+		vma.vma_present = 1;
+		if (link->l_ucast_primary) {
+			mac_unicast_primary_get(link->l_mh, vma.vma_addr);
+		} else {
+			bcopy(link->l_ucast_addr, vma.vma_addr, ETHERADDRL);
+		}
+	}
+	if (ddi_copyout(&vma, udata, sizeof (vma), md) != 0) {
+		return (EFAULT);
+	}
 	return (0);
 }
 

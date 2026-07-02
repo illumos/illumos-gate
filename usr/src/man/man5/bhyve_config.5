@@ -27,7 +27,7 @@
 .\" Portions Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
 .\" Portions Copyright 2026 Oxide Computer Company
 .\"
-.Dd February 9, 2026
+.Dd September 1, 2026
 .Dt BHYVE_CONFIG 5
 .Os
 .Sh NAME
@@ -476,6 +476,10 @@ Specify speed of the virtual network device as advertised to the guest.
 This value is specified as a number of megabits per second
 .Pq Mb/s .
 .El
+.Pp
+A guest which negotiates the VirtIO control queue may install multicast
+address filters on the VNIC, in place of the multicast promiscuity used
+otherwise.
 .Pp
 Viona network devices have the ability to lend out their TX buffers, which
 can occasionally cause issues if they are not returned.

@@ -85,6 +85,9 @@ bhyve-tests/tests/perf/payload_entry_exit
 bhyve-tests/tests/viona/create_delete
 bhyve-tests/tests/viona/interface_version
 bhyve-tests/tests/viona/link_params
+bhyve-tests/tests/viona/mac_addr
+bhyve-tests/tests/viona/mac_filters
+bhyve-tests/tests/viona/rx_delivery
 bhyve-tests/tests/vmm/auto_destruct
 bhyve-tests/tests/vmm/check_iommu
 bhyve-tests/tests/vmm/cpuid_ioctl

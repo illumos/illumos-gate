@@ -28,8 +28,7 @@
 
 /*
  * This file contains *private* MAC API definitions. This header file
- * should only be included by kernel components which are part of the
- * GLDv3 stack (dld, dls, aggr, softmac).
+ * should only be included by kernel components internal to the gate.
  */
 
 #ifndef	_SYS_MAC_CLIENT_PRIV_H
@@ -71,6 +70,7 @@ extern dev_info_t *mac_devinfo_get(mac_handle_t);
 extern void *mac_driver(mac_handle_t);
 extern boolean_t mac_capab_get(mac_handle_t, mac_capab_t, void *);
 extern boolean_t mac_sap_verify(mac_handle_t, uint32_t, uint32_t *);
+extern boolean_t mac_multicst_verify(mac_handle_t, const uint8_t *, uint_t);
 extern mblk_t *mac_header(mac_handle_t, const uint8_t *, uint32_t, mblk_t *,
     size_t);
 extern int mac_header_info(mac_handle_t, mblk_t *, mac_header_info_t *);

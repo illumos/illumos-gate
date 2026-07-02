@@ -9,13 +9,14 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-# Copyright 2024 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/Makefile.cmd.64
 include $(SRC)/test/Makefile.com
 
-PROGS =	interface_version create_delete link_params
+PROGS =	interface_version create_delete link_params mac_addr mac_filters \
+	rx_delivery
 
 SCRIPTS =	setup cleanup
 
@@ -38,9 +39,10 @@ CPPFLAGS =	-I$(COMPAT)/bhyve -I$(CONTRIB)/bhyve \
 		$(CPPFLAGS.master) \
 		-I$(SRC)/uts/intel/io/vmm \
 		-I$(SRC)/uts/intel \
+		-I$(SRC)/uts/common/io/virtio \
 		-I../common
 
-$(PROGS) :=	LDLIBS += -lvmmapi -ldladm
+$(PROGS) :=	LDLIBS += -lvmmapi -ldladm -ldlpi -lsocket
 link_params :=	LDLIBS += -lnvpair
 
 all: $(PROGS)

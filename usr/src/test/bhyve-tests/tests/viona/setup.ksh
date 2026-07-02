@@ -12,17 +12,30 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 STF_TOOLS="/opt/test-runner/stf"
 . ${STF_TOOLS}/contrib/include/logapi.shlib
 
 TEST_NIC="bhyvetest_viona0"
+TEST_NIC_PEER="bhyvetest_viona1"
+TEST_IPTUN="bhyvetest_viona4"
 
-if dladm show-simnet ${TEST_NIC} > /dev/null 2>&1; then
-	log_pass "simnet link ${TEST_NIC} already exists"
-else
+if ! dladm show-simnet ${TEST_NIC} > /dev/null 2>&1; then
 	log_must dladm create-simnet ${TEST_NIC}
-	exit ${STF_PASS}
 fi
+
+if ! dladm show-simnet ${TEST_NIC_PEER} > /dev/null 2>&1; then
+	log_must dladm create-simnet ${TEST_NIC_PEER}
+fi
+
+# Peer the simnets unconditionally, in case they pre-existed unpeered
+log_must dladm modify-simnet -p ${TEST_NIC} ${TEST_NIC_PEER}
+
+# An addressless IP tunnel supplies non-Ethernet media for create_delete.
+if ! dladm show-iptun ${TEST_IPTUN} > /dev/null 2>&1; then
+	log_must dladm create-iptun -t -T ipv4 ${TEST_IPTUN}
+fi
+
+exit ${STF_PASS}

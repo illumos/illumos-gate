@@ -161,7 +161,11 @@ struct pci_viona_softc {
 	bool		vsc_promisc_promisc;	/* PROMISC enabled */
 	bool		vsc_promisc_allmulti;	/* ALLMULTI enabled */
 	bool		vsc_promisc_umac;	/* unicast MACs sent */
-	bool		vsc_promisc_mmac;	/* multicast MACs sent */
+	bool		vsc_promisc_mmac;	/* multicast promisc needed */
+	uint32_t	vsc_mcast_max;		/* MAC filter table capacity */
+
+	/* The MAC address of the VNIC, restored to the config space on reset */
+	uint8_t		vsc_macaddr[ETHERADDRL];
 };
 
 static int pci_viona_cfgread(void *, int, int, uint32_t *);
@@ -172,6 +176,7 @@ static void pci_viona_qnotify(void *, struct vqueue_info *);
 static void pci_viona_ctlqnotify(void *, struct vqueue_info *);
 static void pci_viona_ring_init(void *, uint64_t, bool);
 static void pci_viona_reset(void *);
+static void pci_viona_rx_reset(struct pci_viona_softc *);
 static void pci_viona_ring_set_msix(void *, int);
 static void pci_viona_update_msix(void *, uint64_t);
 
@@ -324,6 +329,9 @@ pci_viona_reset(void *vsc)
 	/* Shrink back down to one queue pair */
 	VERIFY(pci_viona_set_usepairs(sc, 1));
 	VERIFY(pci_viona_qalloc(sc, 1));
+
+	/* Forget the receive configuration of the previous guest */
+	pci_viona_rx_reset(sc);
 }
 
 static const char *
@@ -351,8 +359,9 @@ pci_viona_eval_promisc(struct pci_viona_softc *sc)
 	 * If the guest has explicitly requested promiscuous mode or has sent a
 	 * non-empty unicast MAC address table, then set viona to promiscuous
 	 * mode. Otherwise, if the guest has explicitly requested multicast
-	 * promiscuity or has sent a non-empty multicast MAC address table,
-	 * then set viona to multicast promiscuous mode.
+	 * promiscuity or its multicast MAC address table could not be
+	 * installed as filters on the link, then set viona to multicast
+	 * promiscuous mode.
 	 */
 	if (sc->vsc_promisc_promisc || sc->vsc_promisc_umac)
 		mode = VIONA_PROMISC_ALL;
@@ -374,6 +383,129 @@ pci_viona_eval_promisc(struct pci_viona_softc *sc)
 	}
 
 	return (err);
+}
+
+static const char *
+pci_viona_vmf_err_descr(uint32_t err)
+{
+	switch (err) {
+	case VMF_OK:
+		return ("ok");
+	case VMF_ERR_COUNT:
+		return ("table exceeds device capacity");
+	case VMF_ERR_NOT_MCAST:
+		return ("entry is not a multicast address");
+	case VMF_ERR_INSTALL:
+		return ("entry refused by the MAC layer");
+	case VMF_ERR_NO_UNICAST:
+		return ("link has no unicast address");
+	default:
+		return ("unknown error");
+	}
+}
+
+/*
+ * Discover the capacity of the multicast filter table of the link. The way we
+ * query is, oddly, via the set ioctl. If this fails then the capacity is left
+ * at zero and every non-empty table falls back to promiscuity.
+ */
+static void
+pci_viona_mcast_capacity(struct pci_viona_softc *sc)
+{
+	vioc_mac_filters_t vmf = {
+		.vmf_nmcast = UINT32_MAX,
+	};
+
+	if (ioctl(sc->vsc_vnafd, VNA_IOC_SET_MAC_FILTERS, &vmf) != 0) {
+		WPRINTF("ioctl viona MAC filter capacity query failed %d",
+		    errno);
+		return;
+	}
+	if (vmf.vmf_err != VMF_ERR_COUNT) {
+		WPRINTF("viona MAC filter capacity query returned %u",
+		    vmf.vmf_err);
+		return;
+	}
+
+	DPRINTF("viona: MAC filter table capacity is %u", vmf.vmf_nmcast);
+	sc->vsc_mcast_max = vmf.vmf_nmcast;
+}
+
+/*
+ * Install the guest's multicast MAC address table as filters on the link,
+ * replacing any table installed previously. A count of zero clears the
+ * filters. Returns true if the table is now installed in full.
+ *
+ * The receive mode is not adjusted here. Callers install a table before
+ * narrowing the receive mode, and widen the mode before relying on a table
+ * having been cleared, so that a transition never leaves a gap in delivery
+ * (see the discussion in sys/viona_io.h).
+ */
+static bool
+pci_viona_set_mac_filters(struct pci_viona_softc *sc,
+    const uint8_t (*tab)[ETHERADDRL], uint32_t cnt)
+{
+	vioc_mac_filters_t vmf = {
+		.vmf_nmcast = cnt,
+		.vmf_addrs = (uintptr_t)tab,
+	};
+
+	if (ioctl(sc->vsc_vnafd, VNA_IOC_SET_MAC_FILTERS, &vmf) != 0) {
+		WPRINTF("ioctl viona set MAC filters failed %d", errno);
+		return (false);
+	}
+
+	if (vmf.vmf_err != VMF_OK) {
+		DPRINTF("viona: MAC filter table (%u entries) not installed: "
+		    "%s", cnt, pci_viona_vmf_err_descr(vmf.vmf_err));
+		if (vmf.vmf_err == VMF_ERR_NOT_MCAST ||
+		    vmf.vmf_err == VMF_ERR_INSTALL) {
+			DPRINTF("       offending entry %s",
+			    ether_ntoa((struct ether_addr *)vmf.vmf_erraddr));
+		}
+		return (false);
+	}
+
+	DPRINTF("viona: installed %u MAC filters", cnt);
+	return (true);
+}
+
+/*
+ * Return the receive path to the state which a freshly started guest
+ * expects. I.e. multicast promiscuity with no address filters, and the MAC
+ * address of the VNIC in the config space. Guests which negotiate
+ * VIRTIO_NET_F_CTRL_RX narrow this through the control queue. Those which do
+ * not still generally need to receive multicast, and it is what older
+ * versions of viona did.
+ *
+ * Promiscuity is restored ahead of the filters being cleared so that
+ * multicast delivery is not interrupted.
+ *
+ * Failures of either step are deliberately ignored beyond logging warnings.
+ * A failed clear leaves a stale table, but the link is in multicast
+ * promiscuous mode, and the guest's next table set replaces it. A failed
+ * change of promiscuity leaves the link in its existing mode and the next
+ * control queue command retries it. The one guest-visible thing should a reset
+ * fail is when an earlier driver, e.g. a boot loader, left the link in
+ * VIONA_PROMISC_NONE and a following driver does not negotiate
+ * VIRTIO_NET_F_CTRL_RX. In that case no multicast will be received. It's an
+ * edge case and no multicast is preferable to a guest abort.
+ */
+static void
+pci_viona_rx_reset(struct pci_viona_softc *sc)
+{
+	sc->vsc_promisc_promisc = false;
+	sc->vsc_promisc_allmulti = false;
+	sc->vsc_promisc_umac = false;
+	sc->vsc_promisc_mmac = true;
+	(void) pci_viona_eval_promisc(sc);
+	(void) pci_viona_set_mac_filters(sc, NULL, 0);
+
+	/*
+	 * A legacy guest may have written a new address to the config space,
+	 * which does not reach the link.
+	 */
+	memcpy(sc->vsc_config.vnc_macaddr, sc->vsc_macaddr, ETHERADDRL);
 }
 
 static uint8_t
@@ -412,24 +544,84 @@ pci_viona_control_rx(struct vqueue_info *vq, const virtio_net_ctrl_hdr_t *hdr,
 	return (VIRTIO_NET_CQ_ERR);
 }
 
-static void
-pci_viona_control_mac_dump(const char *tag, iov_bunch_t *iob, uint32_t cnt)
+/*
+ * Read a MAC address table, a count followed by that many addresses, from
+ * the control message. On success, the entries are returned in a newly
+ * allocated buffer which the caller must free, or as NULL for an empty table.
+ * A table with more than max entries is skipped rather than read, and is also
+ * returned as NULL, along with its count.
+ */
+static bool
+pci_viona_control_mac_table(iov_bunch_t *iob, const char *tag, uint32_t max,
+    uint32_t *cntp, uint8_t (**tabp)[ETHERADDRL])
 {
-	if (!pci_viona_debug) {
-		(void) iov_bunch_skip(iob, cnt * ETHERADDRL);
-		return;
+	uint8_t (*tab)[ETHERADDRL] = NULL;
+	uint32_t cnt;
+
+	if (!iov_bunch_copy(iob, &cnt, sizeof (cnt))) {
+		EPRINTLN("viona: bad control MAC %s header", tag);
+		return (false);
+	}
+
+	/*
+	 * A table which is too large to be used is not read. The control chain
+	 * can describe far more guest memory than any table could need, so we
+	 * need to cap the allocation to the capacity of the device rather than
+	 * by the size of the chain.
+	 */
+	if (cnt > max) {
+		if (!iov_bunch_skip(iob, (size_t)cnt * ETHERADDRL)) {
+			EPRINTLN("viona: bad control MAC %s table", tag);
+			return (false);
+		}
+		DPRINTF("-- %s MAC TABLE (entries: %u) exceeds limit of %u",
+		    tag, cnt, max);
+		*cntp = cnt;
+		*tabp = NULL;
+		return (true);
+	}
+
+	if (cnt > 0) {
+		tab = malloc((size_t)cnt * ETHERADDRL);
+		if (tab == NULL) {
+			EPRINTLN("viona: failed to allocate MAC %s table", tag);
+			return (false);
+		}
+		if (!iov_bunch_copy(iob, tab, (size_t)cnt * ETHERADDRL)) {
+			EPRINTLN("viona: bad control MAC %s table", tag);
+			free(tab);
+			return (false);
+		}
 	}
 
 	DPRINTF("-- %s MAC TABLE (entries: %u)", tag, cnt);
-
-	for (uint32_t i = 0; i < cnt; i++) {
-		ether_addr_t mac;
-
-		if (!iov_bunch_copy(iob, &mac, sizeof (mac)))
-			return;
-
-		DPRINTF("   [%2d] %s", i, ether_ntoa((struct ether_addr *)mac));
+	if (pci_viona_debug) {
+		for (uint32_t i = 0; i < cnt; i++) {
+			DPRINTF("   [%2u] %s", i,
+			    ether_ntoa((struct ether_addr *)tab[i]));
+		}
 	}
+
+	*cntp = cnt;
+	*tabp = tab;
+	return (true);
+}
+
+/*
+ * Return true if a unicast table holds any address other than that of the
+ * link, or if it was too large to be read.
+ */
+static bool
+pci_viona_unicast_foreign(const struct pci_viona_softc *sc,
+    const uint8_t (*tab)[ETHERADDRL], uint32_t cnt)
+{
+	if (cnt != 0 && tab == NULL)
+		return (true);
+	for (uint32_t i = 0; i < cnt; i++) {
+		if (memcmp(tab[i], sc->vsc_macaddr, ETHERADDRL) != 0)
+			return (true);
+	}
+	return (false);
 }
 
 static uint8_t
@@ -440,45 +632,58 @@ pci_viona_control_mac(struct vqueue_info *vq, const virtio_net_ctrl_hdr_t *hdr,
 
 	switch (hdr->vnch_command) {
 	case VIRTIO_NET_CTRL_MAC_TABLE_SET: {
-		virtio_net_ctrl_mac_t table;
+		uint8_t (*utab)[ETHERADDRL], (*mtab)[ETHERADDRL];
+		uint32_t ucnt, mcnt;
 
 		DPRINTF("viona: ctrl MAC table set");
 
+		if (!pci_viona_control_mac_table(iob, "UNICAST",
+		    sc->vsc_mcast_max, &ucnt, &utab)) {
+			return (VIRTIO_NET_CQ_ERR);
+		}
+		if (!pci_viona_control_mac_table(iob, "MULTICAST",
+		    sc->vsc_mcast_max, &mcnt, &mtab)) {
+			free(utab);
+			return (VIRTIO_NET_CQ_ERR);
+		}
+
 		/*
-		 * We advertise VIRTIO_NET_F_CTRL_RX and therefore need to
-		 * accept VIRTIO_NET_CTRL_MAC, but we don't support passing
-		 * changes in the MAC address lists down to viona.
-		 * Instead, we set flags to indicate if the guest has sent
-		 * any MAC addresses for each table, and use these to determine
-		 * the resulting promiscuous mode, see pci_viona_eval_promisc()
-		 * above.
+		 * A MAC client carries a single unicast address, so a
+		 * unicast table cannot be honoured with filters. The link is
+		 * instead placed in promiscuous mode for as long as the guest
+		 * keeps an address other than that of the link in its table,
+		 * see pci_viona_eval_promisc(). Some guests list their own
+		 * address there, which classified delivery already covers.
 		 */
+		sc->vsc_promisc_umac = pci_viona_unicast_foreign(sc, utab,
+		    ucnt);
+		free(utab);
 
-		/* Unicast MAC table */
-		if (!iov_bunch_copy(iob,
-		    &table.vncm_entries, sizeof (table.vncm_entries))) {
-			EPRINTLN("viona: bad control MAC unicast header");
-			return (VIRTIO_NET_CQ_ERR);
+		/*
+		 * The multicast table is installed on the link as filters,
+		 * with multicast promiscuity used in its place if that fails.
+		 * A table beyond the capacity of the device was not read and
+		 * is not offered to it. Installation happens before the
+		 * receive mode evaluation below so that leaving multicast
+		 * promiscuity does not leave a gap in delivery.
+		 */
+		if (mcnt != 0 && mtab == NULL) {
+			sc->vsc_promisc_mmac = true;
+		} else {
+			sc->vsc_promisc_mmac = !pci_viona_set_mac_filters(sc,
+			    mtab, mcnt);
 		}
-		sc->vsc_promisc_umac = (table.vncm_entries != 0);
-		pci_viona_control_mac_dump("UNICAST", iob, table.vncm_entries);
-
-		/* Multicast MAC table */
-		if (!iov_bunch_copy(iob,
-		    &table.vncm_entries, sizeof (table.vncm_entries))) {
-			EPRINTLN("viona: bad control MAC multicast header");
-			return (VIRTIO_NET_CQ_ERR);
-		}
-		sc->vsc_promisc_mmac = (table.vncm_entries != 0);
-		pci_viona_control_mac_dump("MULTICAST", iob,
-		    table.vncm_entries);
-
+		free(mtab);
 		break;
 	}
 	case VIRTIO_NET_CTRL_MAC_ADDR_SET:
-		/* disallow setting the primary filter MAC address */
-		DPRINTF("viona: ctrl MAC addr set with 0x%x bytes",
-		    iob->ib_remain);
+		/*
+		 * VIRTIO_F_CTRL_MAC_ADDR is not offered. Which addresses a
+		 * link may use is host policy, and viona would apply a
+		 * replacement to the VNIC itself, where it would outlive the
+		 * guest, so the request is refused.
+		 */
+		DPRINTF("viona: ctrl MAC addr set refused");
 		return (VIRTIO_NET_CQ_ERR);
 	default:
 		EPRINTLN("viona: unrecognised MAC control cmd %u",
@@ -743,6 +948,8 @@ pci_viona_viona_init(struct vmctx *ctx, struct pci_viona_softc *sc)
 		return (-1);
 	}
 
+	pci_viona_mcast_capacity(sc);
+
 	return (0);
 }
 
@@ -982,6 +1189,7 @@ pci_viona_init(struct pci_devinst *pi, nvlist_t *nvl)
 		dladm_close(handle);
 		return (pci_viona_free_softstate(sc, 1));
 	}
+	memcpy(sc->vsc_macaddr, attr.va_mac_addr, ETHERADDRL);
 	memcpy(sc->vsc_config.vnc_macaddr, attr.va_mac_addr, ETHERADDRL);
 	sc->vsc_config.vnc_status = VIRTIO_NET_S_LINK_UP; /* link always up */
 	sc->vsc_config.vnc_duplex = VIRTIO_NET_DUPLEX_FULL;
@@ -1021,15 +1229,7 @@ pci_viona_init(struct pci_devinst *pi, nvlist_t *nvl)
 	vi_pci_init(pi, VIRTIO_MODE_TRANSITIONAL, VIRTIO_DEV_NET,
 	    VIRTIO_ID_NETWORK, PCIC_NETWORK);
 
-	/*
-	 * Guests that do not support CTRL_RX_MAC still generally need to
-	 * receive multicast packets. Guests that do support this feature will
-	 * end up setting this flag indirectly via messages on the control
-	 * queue but it does not hurt to default to multicast promiscuity here
-	 * and it is what older version of viona did.
-	 */
-	sc->vsc_promisc_mmac = true;
-	pci_viona_eval_promisc(sc);
+	pci_viona_rx_reset(sc);
 
 	/* Viona always uses MSI-X */
 	if (!vi_intr_init(&sc->vsc_vs, true))

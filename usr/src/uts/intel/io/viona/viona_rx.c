@@ -43,6 +43,7 @@
 #include <sys/types.h>
 #include <sys/strsubr.h>
 
+#include <sys/atomic.h>
 #include <sys/dlpi.h>
 #include <sys/pattr.h>
 #include <sys/vlan.h>
@@ -891,121 +892,263 @@ viona_rx_split_deliver(viona_link_t *link, mblk_t *head,
 	viona_rx_ring_deliver(ring, head, is_loopback);
 }
 
-static void
-viona_rx_classified(void *arg, mac_resource_handle_t mrh __unused, mblk_t *mp,
-    boolean_t is_loopback)
+/*
+ * Determine whether the destination of a packet is a (non-broadcast)
+ * multicast group address, according to the MAC plugin.  If the leading
+ * mblk_t is too short for the plugin to examine the header, retry after a
+ * pull-up.  A packet whose header cannot be examined is reported as
+ * non-multicast.
+ */
+static boolean_t
+viona_rx_pkt_is_mcast(viona_link_t *link, mblk_t *mp)
 {
-	viona_link_t *link = (viona_link_t *)arg;
-	viona_rx_split_deliver(link, mp, is_loopback);
+	mac_header_info_t mhi;
+	int err;
+
+	err = mac_vlan_header_info(link->l_mh, mp, &mhi);
+	if (err != 0) {
+		mblk_t *pull;
+
+		pull = msgpullup(mp, sizeof (struct ether_vlan_header));
+		if (pull == NULL) {
+			err = ENOMEM;
+		} else {
+			err = mac_vlan_header_info(link->l_mh, pull, &mhi);
+			freemsg(pull);
+		}
+		if (err != 0) {
+			viona_vring_t *my_ring =
+			    viona_rx_pick_ring(link, mp);
+			VIONA_RING_STAT_INCR(my_ring, rx_mcast_check);
+			return (B_FALSE);
+		}
+	}
+
+	return (mhi.mhi_dsttype == MAC_ADDRTYPE_MULTICAST);
 }
 
-static void
-viona_rx_mcast(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
-    boolean_t is_loopback)
+/*
+ * Filter a packet chain on the multicast destination.  With keep_mcast set,
+ * only multicast packets survive; otherwise, multicast packets are dropped.
+ * Since a packet whose header cannot be examined counts as non-multicast, such
+ * packets are dropped by the promiscuous-multicast path and delivered by the
+ * classified path.
+ */
+static mblk_t *
+viona_rx_filter_mcast(viona_link_t *link, mblk_t *mp,
+    const boolean_t keep_mcast)
 {
-	viona_link_t *link = (viona_link_t *)arg;
-	mac_handle_t mh = link->l_mh;
-	mblk_t *mp_mcast_only = NULL;
-	mblk_t **mpp = &mp_mcast_only;
+	mblk_t *head = NULL;
+	mblk_t **mpp = &head;
 
-	/*
-	 * In addition to multicast traffic, broadcast packets will also arrive
-	 * via the MAC_CLIENT_PROMISC_MULTI handler. The mac_rx_set() callback
-	 * for fully-classified traffic has already delivered that broadcast
-	 * traffic, so it should be suppressed here, rather than duplicating it
-	 * to the guest.
-	 */
 	while (mp != NULL) {
-		mblk_t *mp_next;
-		mac_header_info_t mhi;
-		int err;
+		mblk_t *mp_next = mp->b_next;
 
-		mp_next = mp->b_next;
 		mp->b_next = NULL;
-
-		/* Determine the packet type */
-		err = mac_vlan_header_info(mh, mp, &mhi);
-		if (err != 0) {
-			mblk_t *pull;
-
-			/*
-			 * It is possible that gathering of the header
-			 * information was impeded by a leading mblk_t which
-			 * was of inadequate length to reference the needed
-			 * fields.  Try again, in case that could be solved
-			 * with a pull-up.
-			 */
-			pull = msgpullup(mp, sizeof (struct ether_vlan_header));
-			if (pull == NULL) {
-				err = ENOMEM;
-			} else {
-				err = mac_vlan_header_info(mh, pull, &mhi);
-				freemsg(pull);
-			}
-
-			if (err != 0) {
-				viona_vring_t *my_ring =
-				    viona_rx_pick_ring(link, mp);
-				VIONA_RING_STAT_INCR(my_ring, rx_mcast_check);
-			}
-		}
-
-		/* Chain up matching packets while discarding others */
-		if (err == 0 && mhi.mhi_dsttype == MAC_ADDRTYPE_MULTICAST) {
+		if (viona_rx_pkt_is_mcast(link, mp) == keep_mcast) {
 			*mpp = mp;
 			mpp = &mp->b_next;
 		} else {
 			freemsg(mp);
 		}
-
 		mp = mp_next;
 	}
 
-	if (mp_mcast_only != NULL) {
-		viona_rx_split_deliver(link, mp_mcast_only, is_loopback);
+	return (head);
+}
+
+/*
+ * Classified receive callback, which is installed once and left in place across
+ * reception-mode transitions.  The filtering behavior follows l_rx_mode,
+ * which viona_rx_set() publishes after the new promiscuous callback is
+ * installed and before the old one is removed.  Delivery paths therefore
+ * overlap during a transition, leaving no gap for new arrivals.  Packets
+ * already queued here at the transition are filtered under the new mode.
+ */
+static void
+viona_rx_classified(void *arg, mac_resource_handle_t mrh __unused, mblk_t *mp,
+    boolean_t is_loopback)
+{
+	viona_link_t *link = (viona_link_t *)arg;
+
+	switch (link->l_rx_mode) {
+	case VIONA_PROMISC_MULTI:
+		/*
+		 * The promiscuous callback owns multicast delivery in this
+		 * mode.  MAC may also send the same packet through this
+		 * classified callback, either because its destination is
+		 * installed on the client or because the provider directs
+		 * multicast into the client's ring group.  Drop that copy so
+		 * the guest receives the packet only once.  Broadcast remains
+		 * on this path because viona_rx_mcast() suppresses its
+		 * promiscuous copy.
+		 *
+		 * MAC_CLIENT_PROMISC_MULTI withholds multicast whose VID
+		 * does not match the client's flows.  Such a frame does not
+		 * need its classified copy preserved: classified SRS fanout
+		 * applies the same VID check before invoking this callback.
+		 * Since viona has only a VLAN_ID_NONE flow, nonzero-VID
+		 * multicast is rejected before reaching either callback.
+		 */
+		mp = viona_rx_filter_mcast(link, mp, B_FALSE);
+		break;
+	case VIONA_PROMISC_ALL:
+		/*
+		 * The promiscuous callback carries the entire inbound stream,
+		 * classified traffic included.  Drop the classified copies.
+		 */
+		freemsgchain(mp);
+		return;
+	default:
+		break;
+	}
+
+	if (mp != NULL) {
+		viona_rx_split_deliver(link, mp, is_loopback);
+	}
+}
+
+static void
+viona_rx_promisc(void *arg, mac_resource_handle_t mrh __unused, mblk_t *mp,
+    boolean_t is_loopback)
+{
+	viona_link_t *link = (viona_link_t *)arg;
+
+	viona_rx_split_deliver(link, mp, is_loopback);
+}
+
+static void
+viona_rx_mcast(void *arg, mac_resource_handle_t mrh __unused, mblk_t *mp,
+    boolean_t is_loopback)
+{
+	viona_link_t *link = (viona_link_t *)arg;
+
+	/*
+	 * In addition to multicast traffic, broadcast packets will also arrive
+	 * via the MAC_CLIENT_PROMISC_MULTI handler. The classified callback
+	 * has already delivered that broadcast traffic, so it should be
+	 * suppressed here, rather than duplicating it to the guest.
+	 */
+	mp = viona_rx_filter_mcast(link, mp, B_TRUE);
+	if (mp != NULL) {
+		viona_rx_split_deliver(link, mp, is_loopback);
 	}
 }
 
 int
 viona_rx_set(viona_link_t *link, viona_promisc_t mode)
 {
+	mac_promisc_handle_t old_mph = link->l_mph;
+	mac_promisc_handle_t new_mph = NULL;
 	int err = 0;
 
-	if (link->l_mph != NULL) {
-		mac_promisc_remove(link->l_mph);
-		link->l_mph = NULL;
+	/*
+	 * The classified callback is left in place across mode transitions;
+	 * otherwise, changing its mode-dependent filtering would require
+	 * replacing it through mac_rx_set(), which quiesces the receive
+	 * datapath and can drop packets arriving during that quiescence.  The
+	 * installed callback instead filters based on l_rx_mode.  It is
+	 * removed only by viona_rx_clear(), during ring reallocation or link
+	 * teardown.
+	 *
+	 * Installation precedes the promiscuous work below so that a failure
+	 * there cannot leave the link without any receive callback, as during
+	 * ring reallocation, where viona_rx_clear() has already torn both
+	 * down.  On failure, an existing handler and active mode remain in
+	 * place.  After such a teardown, the active mode remains
+	 * VIONA_PROMISC_NONE while l_promisc retains the mode being restored
+	 * for a retry.
+	 */
+	if (!link->l_rx_classified) {
+		mac_rx_set(link->l_mch, viona_rx_classified, link);
+		link->l_rx_classified = true;
 	}
 
 	switch (mode) {
 	case VIONA_PROMISC_MULTI:
-		mac_rx_set(link->l_mch, viona_rx_classified, link);
+		/*
+		 * Even with VNA_IOC_SET_MAC_FILTERS available, multicast
+		 * promiscuity remains in use for guests which do not negotiate
+		 * VIRTIO_NET_F_CTRL_RX, request all-multicast reception, or
+		 * overflow the filter tables.  While it is active, multicast
+		 * flows through the promiscuous callback, with
+		 * viona_rx_classified() dropping its classified copies.
+		 *
+		 * Installed filters are retained because receive-mode and
+		 * table state are independent: only VNA_IOC_SET_MAC_FILTERS
+		 * and link teardown alter the table.  Leaving the
+		 * all-multicast mode must resume table-filtered delivery
+		 * without requiring another VIRTIO_NET_CTRL_MAC_TABLE_SET
+		 * from the guest.
+		 */
 		err = mac_promisc_add(link->l_mch, MAC_CLIENT_PROMISC_MULTI,
-		    viona_rx_mcast, link, &link->l_mph,
+		    viona_rx_mcast, link, &new_mph,
 		    MAC_PROMISC_FLAGS_NO_TX_LOOP |
 		    MAC_PROMISC_FLAGS_VLAN_TAG_STRIP);
 		break;
 	case VIONA_PROMISC_ALL:
-		mac_rx_clear(link->l_mch);
 		err = mac_promisc_add(link->l_mch, MAC_CLIENT_PROMISC_ALL,
-		    viona_rx_classified, link, &link->l_mph,
+		    viona_rx_promisc, link, &new_mph,
 		    MAC_PROMISC_FLAGS_NO_TX_LOOP |
 		    MAC_PROMISC_FLAGS_VLAN_TAG_STRIP);
-		/*
-		 * In case adding the promisc handler failed, restore the
-		 * generic classified callback so that packets continue to
-		 * flow to the guest.
-		 */
-		if (err != 0) {
-			mac_rx_set(link->l_mch, viona_rx_classified, link);
-		}
 		break;
 	case VIONA_PROMISC_NONE:
 	default:
-		mac_rx_set(link->l_mch, viona_rx_classified, link);
 		break;
 	}
 
-	return (err);
+	if (err != 0) {
+		/*
+		 * With an existing promiscuous handler in place, the active
+		 * mode remains backed by it and the failed transition is
+		 * abandoned.  Without one, the active mode is already
+		 * VIONA_PROMISC_NONE: initial state and viona_rx_clear()
+		 * establish it, and a live transition without a handler starts
+		 * there.  l_promisc remains unchanged.  During callback
+		 * restoration, it retains the requested mode so a retry
+		 * reattempts the missing handler.
+		 */
+		IMPLY(old_mph == NULL, link->l_rx_mode == VIONA_PROMISC_NONE);
+		return (err);
+	}
+
+	/*
+	 * The new mode is published after the new promiscuous callback is in
+	 * place and before the old one is removed, so the delivery paths
+	 * overlap during a transition rather than leaving a gap.  The overlap
+	 * can briefly duplicate delivery, which is preferred to loss.
+	 *
+	 * One narrow loss window remains for packets already queued for
+	 * classified delivery.  For example, a unicast packet destined for
+	 * the client's primary address can be queued before a NONE-to-ALL
+	 * transition installs the ALL handler, and therefore receive no
+	 * promiscuous copy at ingress.  If it drains after the new mode is
+	 * published, the classified callback discards it even though both
+	 * modes accept it.  A NONE-to-MULTI transition has the equivalent
+	 * case for multicast matching an installed filter.  MAC offers no
+	 * way to drain the client's soft ring set without also dropping new
+	 * arrivals for the duration.
+	 *
+	 * mac_promisc_add() installs a new handler before returning.  A packet
+	 * which passes ingress before that installation is visible, but later
+	 * observes the new mode in the classified callback, falls within the
+	 * same window described above.  A producer barrier after the mode
+	 * store orders it ahead of retiring the old handler.  The removal path
+	 * takes locks whose ordering would cover this, but the barrier states
+	 * the requirement here rather than leaning on MAC's internal locking.
+	 * This is a writer-side ordering requirement, i.e., it does not
+	 * require readers to observe the new mode immediately.  The classified
+	 * callback loads the mode and branches, with no later protected-data
+	 * load for a consumer barrier to order.
+	 */
+	link->l_rx_mode = mode;
+	membar_producer();
+	link->l_mph = new_mph;
+	if (old_mph != NULL)
+		mac_promisc_remove(old_mph);
+	link->l_promisc = mode;
+
+	return (0);
 }
 
 void
@@ -1016,4 +1159,6 @@ viona_rx_clear(viona_link_t *link)
 		link->l_mph = NULL;
 	}
 	mac_rx_clear(link->l_mch);
+	link->l_rx_classified = false;
+	link->l_rx_mode = VIONA_PROMISC_NONE;
 }
