@@ -323,7 +323,6 @@ cmihdl_disp(uintptr_t addr, cmi_hdl_impl_t *hdl)
 	struct modctl cmimodc, cmsmodc;		/* 288 bytes max */
 	cmi_t cmi;				/* 40 bytes max */
 	cms_t cms;				/* 40 bytes max */
-	cpu_t *cp;
 	char cmimodnm[25], cmsmodnm[25];	/* 50 bytes */
 	char cpuidstr[4], hwidstr[16];
 	int native = hdl->cmih_class == CMI_HDL_NATIVE;
@@ -395,7 +394,7 @@ cmihdl_disp(uintptr_t addr, cmi_hdl_impl_t *hdl)
 	}
 
 	if (native) {
-		cp = mdb_alloc(sizeof (cpu_t), UM_SLEEP);
+		cpu_t *cp = mdb_alloc(sizeof (cpu_t), UM_SLEEP);
 
 		if (mdb_vread(cp, sizeof (cpu_t),
 		    (uintptr_t)hdl->cmih_hdlpriv) != sizeof (cpu_t)) {
@@ -404,11 +403,10 @@ cmihdl_disp(uintptr_t addr, cmi_hdl_impl_t *hdl)
 			    hdl->cmih_hdlpriv);
 			return (0);
 		}
-	}
 
-	if (native) {
 		(void) mdb_snprintf(cpuidstr, sizeof (cpuidstr), "%d",
 		    cp->cpu_id);
+		mdb_free(cp, sizeof (cpu_t));
 	} else {
 		(void) mdb_snprintf(cpuidstr, sizeof (cpuidstr), "-");
 	}
@@ -419,9 +417,6 @@ cmihdl_disp(uintptr_t addr, cmi_hdl_impl_t *hdl)
 	mdb_printf("%16lx %3d %3s %8s %3s %2s %-13s %-24s\n", addr,
 	    refcnt, cpuidstr, hwidstr, hdl->cmih_mstrand ? "M" : "S",
 	    hdl->cmih_mcops ? "Y" : "N", cmimodnm, cmsmodnm);
-
-	if (native)
-		mdb_free(cp, sizeof (cpu_t));
 
 	return (1);
 }
