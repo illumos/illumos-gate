@@ -81,7 +81,7 @@ typedef struct mdb_nv_disc {
  *
  * A variable's name can be a pointer to external storage (v_ename and
  * MDB_NV_EXTNAME set), or it can be stored locally (bytes of storage are
- * allocated immediately after v_lname[0]).
+ * allocated immediately after v_lname[]).
  *
  * A variable may have multiple definitions (v_ndef chain), but this feature
  * is mutually exclusive with MDB_NV_EXTNAME in order to save space.
@@ -95,7 +95,7 @@ typedef struct mdb_var {
 	const mdb_nv_disc_t *v_disc;	/* Link to variable discipline */
 	struct mdb_var *v_next;		/* Link to next var in hash chain */
 	uchar_t v_flags;		/* Variable flags (see above) */
-	char v_lname[1];		/* Variable name if stored locally */
+	char v_lname[];			/* Variable name if stored locally */
 } mdb_var_t;
 
 #define	MDB_NV_VALUE(v)		((v)->v_uvalue)

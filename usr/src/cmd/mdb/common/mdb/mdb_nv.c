@@ -40,7 +40,7 @@
 
 #define	NV_SIZE(v) \
 	(((v)->v_flags & MDB_NV_EXTNAME) ? sizeof (mdb_var_t) : \
-	sizeof (mdb_var_t) + strlen((v)->v_lname))
+	sizeof (mdb_var_t) + strlen((v)->v_lname) + 1)
 
 #define	NV_HASHSZ	211
 
@@ -74,7 +74,7 @@ nv_var_alloc(const char *name, const mdb_nv_disc_t *disc,
 	if (flags & MDB_NV_EXTNAME)
 		nbytes = sizeof (mdb_var_t);
 	else
-		nbytes = sizeof (mdb_var_t) + strlen(name);
+		nbytes = sizeof (mdb_var_t) + strlen(name) + 1;
 
 	v = mdb_alloc(nbytes, um_flags);
 
@@ -83,7 +83,6 @@ nv_var_alloc(const char *name, const mdb_nv_disc_t *disc,
 
 	if (flags & MDB_NV_EXTNAME) {
 		v->v_ename = name;
-		v->v_lname[0] = '\0';
 	} else {
 		/*
 		 * We don't overflow here since the mdb_var_t itself has
