@@ -187,11 +187,14 @@ init_mmu(void)
 
 	if (mdb_readsym(&mmu, sizeof (mmu), "mmu") == -1)
 		mdb_warn("Can't use HAT information before mmu_init()\n");
+
 	if (mdb_readsym(&kas, sizeof (kas), "kas") == -1)
 		mdb_warn("Couldn't find kas - kernel's struct as\n");
+	else
+		khat = kas.a_hat;
+
 	if (mdb_readsym(&kernelbase, sizeof (kernelbase), "kernelbase") == -1)
 		mdb_warn("Couldn't find kernelbase\n");
-	khat = kas.a_hat;
 
 	/*
 	 * Is this a paravirtualized domain image?
@@ -558,6 +561,10 @@ do_va2pa(uintptr_t addr, struct as *asp, int print_level, physaddr_t *pap,
 		}
 		hatp = as.a_hat;
 	} else {
+		if (khat == NULL) {
+			mdb_warn("khat is NULL\n");
+			return (DCMD_ERR);
+		}
 		hatp = khat;
 	}
 
@@ -704,6 +711,11 @@ do_report_maps(pfn_t pfn)
 	physaddr_t paddr;
 	size_t len;
 
+	if (khat == NULL) {
+		mdb_warn("khat is NULL\n");
+		return (DCMD_ERR);
+	}
+
 	/*
 	 * The hats are kept in a list with khat at the head.
 	 */
@@ -836,6 +848,11 @@ do_ptable_dcmd(pfn_t pfn, uint64_t level)
 	x86pte_t pte;
 	physaddr_t paddr;
 	size_t len;
+
+	if (khat == NULL) {
+		mdb_warn("khat is NULL\n");
+		return (DCMD_ERR);
+	}
 
 	/*
 	 * The hats are kept in a list with khat at the head.
