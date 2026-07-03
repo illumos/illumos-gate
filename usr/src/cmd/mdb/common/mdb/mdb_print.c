@@ -1487,7 +1487,7 @@ print_hole(printarg_t *pap, int depth, ulong_t off, ulong_t endoff)
 	ASSERT(off < endoff);
 
 	if (bits > NBBY * sizeof (uint64_t)) {
-		ulong_t end;
+		ulong_t end = 0;
 
 		/*
 		 * The hole is larger than the largest integer type.  To
