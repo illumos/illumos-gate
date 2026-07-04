@@ -42,105 +42,100 @@
 .\"
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2026 Oxide Computer Company
 .\"
-.TH POSIX_SPAWN_FILE_ACTIONS_ADDDUP2 3C "Jan 30, 2004"
-.SH NAME
-posix_spawn_file_actions_adddup2 \- add dup2 action to spawn file actions
-object
-.SH SYNOPSIS
-.LP
-.nf
-#include <spawn.h>
-
-\fBint\fR \fBposix_spawn_file_actions_adddup2\fR(
-     \fBposix_spawn_file_actions_t *\fR\fIfile_actions\fR, \fBint\fR \fIfildes\fR,
-     \fBint\fR \fInewfildes\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBposix_spawn_file_actions_adddup2()\fR function adds a \fBdup2\fR(3C)
-action to the object referenced by \fIfile_actions\fR that causes the file
-descriptor \fIfildes\fR to be duplicated as \fInewfildes\fR (as if
-\fBdup2\fR(\fIfildes\fR, \fInewfildes\fR) had been called) when a new process
-is spawned using this file actions object.
-.sp
-.LP
+.Dd July 4, 2026
+.Dt POSIX_SPAWN_FILE_ACTIONS_ADDDUP2 3C
+.Os
+.Sh NAME
+.Nm posix_spawn_file_actions_adddup2
+.Nd add dup2 action to spawn file actions object
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In spawn.h
+.Ft int
+.Fo posix_spawn_file_actions_adddup2
+.Fa "posix_spawn_file_actions_t *file_actions"
+.Fa "int fildes"
+.Fa "int newfildes"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn posix_spawn_file_actions_adddup2
+function adds a
+.Xr dup2 3C
+action to the object referenced by
+.Fa file_actions
+that causes the file descriptor
+.Fa fildes
+to be duplicated as
+.Fa newfildes
+.Po
+as if
+.Fn dup2 fildes newfildes
+had been called
+.Pc
+when a new process is spawned using this file actions object.
+.Pp
 A spawn file actions object is as defined in
-\fBposix_spawn_file_actions_addclose\fR(3C).
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, the \fBposix_spawn_file_actions_adddup2()\fR
-function returns 0. Otherwise, an error number is be returned to indicate the
-error.
-.SH ERRORS
-.sp
-.LP
-The \fBposix_spawn_file_actions_adddup2()\fR function will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEBADF\fR\fR
-.ad
-.RS 10n
-The value specified by \fIfildes\fR or \fInewfildes\fR is negative or greater
-than or equal to {\fBOPEN_MAX\fR}.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOMEM\fR\fR
-.ad
-.RS 10n
+.Xr posix_spawn_file_actions_addclose 3C .
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn posix_spawn_file_actions_adddup2
+function returns 0.
+Otherwise, an error number is returned to indicate the error.
+.Sh ERRORS
+The
+.Fn posix_spawn_file_actions_adddup2
+function will fail if:
+.Bl -tag -width Er
+.It Er EBADF
+The value specified by
+.Fa fildes
+or
+.Fa newfildes
+is negative or greater than or equal to
+.Brq Dv OPEN_MAX .
+.It Er ENOMEM
 Insufficient memory exists to add to the spawn file actions object.
-.RE
-
-.sp
-.LP
-The \fBposix_spawn_file_actions_adddup2()\fR function may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The value specified by \fIfile_actions\fR is invalid.
-.RE
-
-.sp
-.LP
-It is not considered an error for the \fIfildes\fR argument passed to
-\fBposix_spawn_file_actions_adddup2()\fR to specify a file descriptor for which
-the specified operation could not be performed at the time of the call. Any
-such error will be detected when the associated file actions object is later
-used during a \fBposix_spawn\fR(3C) or \fBposix_spawnp\fR(3C) operation.
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-_
-MT-Level	MT-Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-.BR dup2 (3C),
-.BR posix_spawn (3C),
-.BR posix_spawn_file_actions_addclose (3C),
-.BR posix_spawn_file_actions_destroy (3C),
-.BR attributes (7),
-.BR standards (7)
+.El
+.Pp
+The
+.Fn posix_spawn_file_actions_adddup2
+function may fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+The value specified by
+.Fa file_actions
+is invalid.
+.El
+.Pp
+It is not considered an error for the
+.Fa fildes
+argument passed to
+.Fn posix_spawn_file_actions_adddup2
+to specify a file descriptor for which the specified operation could not be
+performed at the time of the call.
+Any such error will be detected when the associated file actions object is
+later used during a
+.Xr posix_spawn 3C
+or
+.Xr posix_spawnp 3C
+operation.
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr dup2 3C ,
+.Xr posix_spawn 3C ,
+.Xr posix_spawn_file_actions_addclose 3C ,
+.Xr posix_spawn_file_actions_destroy 3C ,
+.Xr attributes 7 ,
+.Xr standards 7
+.Sh STANDARDS
+The
+.Fn posix_spawn_file_actions_adddup2
+function conforms to
+.St -p1003.1-2001 .

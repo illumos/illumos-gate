@@ -42,107 +42,100 @@
 .\"
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2026 Oxide Computer Company
 .\"
-.TH POSIX_SPAWNATTR_GETSIGDEFAULT 3C "Jan 30, 2004"
-.SH NAME
-posix_spawnattr_getsigdefault, posix_spawnattr_setsigdefault \- get and set
-spawn-sigdefault attribute of spawn attributes object
-.SH SYNOPSIS
-.LP
-.nf
-#include <signal.h>
-#include <spawn.h>
-
-\fBint\fR \fBposix_spawnattr_getsigdefault\fR(\fBconst posix_spawnattr_t *restrict\fR \fIattr\fR,
-     \fBsigset_t *restrict\fR \fIsigdefault\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBposix_spawnattr_setsigdefault\fR(\fBposix_spawnattr_t *restrict\fR \fIattr\fR,
-     \fBconst sigset_t *restrict\fR \fIsigdefault\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBposix_spawnattr_getsigdefault()\fR function obtains the value of the
-\fIspawn-sigdefault\fR attribute from the attributes object referenced by
-\fIattr\fR.
-.sp
-.LP
-The \fBposix_spawnattr_setsigdefault()\fR function sets the
-\fIspawn-sigdefault\fR attribute in an initialized attributes object referenced
-by \fIattr\fR.
-.sp
-.LP
-The \fIspawn-sigdefault\fR attribute represents the set of signals to be forced
-to default signal handling in the new process image (if
-\fBPOSIX_SPAWN_SETSIGDEF\fR is set in the \fIspawn-flags\fR attribute) by a
-spawn operation. The default value of this attribute is an empty signal set.
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, \fBposix_spawnattr_getsigdefault()\fR returns 0 and
-stores the value of the \fIspawn-sigdefault\fR attribute of \fIattr\fR into the
-object referenced by the \fIsigdefault\fR parameter.  Otherwise, an error
-number is returned to indicate the error.
-.sp
-.LP
-Upon successful completion, \fBposix_spawnattr_setsigdefault()\fR returns 0.
+.Dd July 4, 2026
+.Dt POSIX_SPAWNATTR_GETSIGDEFAULT 3C
+.Os
+.Sh NAME
+.Nm posix_spawnattr_getsigdefault ,
+.Nm posix_spawnattr_setsigdefault
+.Nd get and set spawn-sigdefault attribute of spawn attributes object
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In signal.h
+.In spawn.h
+.Ft int
+.Fo posix_spawnattr_getsigdefault
+.Fa "const posix_spawnattr_t *restrict attr"
+.Fa "sigset_t *restrict sigdefault"
+.Fc
+.Ft int
+.Fo posix_spawnattr_setsigdefault
+.Fa "posix_spawnattr_t *restrict attr"
+.Fa "const sigset_t *restrict sigdefault"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn posix_spawnattr_getsigdefault
+function obtains the value of the spawn-sigdefault attribute from the
+attributes object referenced by
+.Fa attr .
+.Pp
+The
+.Fn posix_spawnattr_setsigdefault
+function sets the spawn-sigdefault attribute in an initialized attributes
+object referenced by
+.Fa attr .
+.Pp
+The spawn-sigdefault attribute represents the set of signals to be forced to
+default signal handling in the new process image
+.Po
+if
+.Dv POSIX_SPAWN_SETSIGDEF
+is set in the spawn-flags attribute
+.Pc
+by a spawn operation.
+The default value of this attribute is an empty signal set.
+.Sh RETURN VALUES
+Upon successful completion,
+.Fn posix_spawnattr_getsigdefault
+returns 0 and stores the value of the spawn-sigdefault attribute of
+.Fa attr
+into the object referenced by the
+.Fa sigdefault
+parameter.
 Otherwise, an error number is returned to indicate the error.
-.SH ERRORS
-.sp
-.LP
+.Pp
+Upon successful completion,
+.Fn posix_spawnattr_setsigdefault
+returns 0.
+Otherwise, an error number is returned to indicate the error.
+.Sh ERRORS
 These functions may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The value specified by \fIattr\fR is invalid.
-.RE
-
-.sp
-.LP
-The \fBposix_spawnattr_setsigdefault()\fR function may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
+.Bl -tag -width Er
+.It Er EINVAL
+The value specified by
+.Fa attr
+is invalid.
+.El
+.Pp
+The
+.Fn posix_spawnattr_setsigdefault
+function may fail if:
+.Bl -tag -width Er
+.It Er EINVAL
 The value of the attribute being set is not valid.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-_
-MT-Level	MT-Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-.BR posix_spawn (3C),
-.BR posix_spawnattr_destroy (3C),
-.BR posix_spawnattr_getflags (3C),
-.BR posix_spawnattr_getpgroup (3C),
-.BR posix_spawnattr_getschedparam (3C),
-.BR posix_spawnattr_getschedpolicy (3C),
-.BR posix_spawnattr_getsigmask (3C),
-.BR attributes (7),
-.BR standards (7)
+.El
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr posix_spawn 3C ,
+.Xr posix_spawnattr_destroy 3C ,
+.Xr posix_spawnattr_getflags 3C ,
+.Xr posix_spawnattr_getpgroup 3C ,
+.Xr posix_spawnattr_getschedparam 3C ,
+.Xr posix_spawnattr_getschedpolicy 3C ,
+.Xr posix_spawnattr_getsigmask 3C ,
+.Xr attributes 7 ,
+.Xr standards 7
+.Sh STANDARDS
+The
+.Fn posix_spawnattr_getsigdefault
+and
+.Fn posix_spawnattr_setsigdefault
+functions conform to
+.St -p1003.1-2001 .

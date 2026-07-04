@@ -42,102 +42,98 @@
 .\"
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2026 Oxide Computer Company
 .\"
-.TH POSIX_SPAWNATTR_GETPGROUP 3C "Jan 30, 2004"
-.SH NAME
-posix_spawnattr_getpgroup, posix_spawnattr_setpgroup \- get and set
-spawn-pgroup attribute of spawn attributes object
-.SH SYNOPSIS
-.LP
-.nf
-#include <spawn.h>
-
-\fBint\fR \fBposix_spawnattr_getpgroup\fR(\fBconst posix_spawnattr_t *restrict\fR \fIattr\fR,
-     \fBpid_t *restrict\fR \fIpgroup\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBposix_spawnattr_setpgroup\fR(\fBposix_spawnattr_t *\fR\fIattr\fR, \fBpid_t\fR \fIpgroup\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBposix_spawnattr_getpgroup()\fR function obtains the value of the
-\fIspawn-pgroup\fR attribute from the attributes object referenced by
-\fIattr\fR.
-.sp
-.LP
-The \fBposix_spawnattr_setpgroup()\fR function sets the \fIspawn-pgroup\fR
-attribute in an initialized attributes object referenced by \fIattr\fR.
-.sp
-.LP
-The \fIspawn-pgroup\fR attribute represents the process group to be joined by
-the new process image in a spawn operation (if \fBPOSIX_SPAWN_SETPGROUP\fR is
-set in the \fIspawn-flags\fR attribute). The default value of this attribute is
-zero.
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, \fBposix_spawnattr_getpgroup()\fR returns 0 and
-stores the value of the \fIspawn-pgroup\fR attribute of \fIattr\fR into the
-object referenced by the \fIpgroup\fR parameter. Otherwise, an error number is
-returned to indicate the error.
-.sp
-.LP
-Upon successful completion, \fBposix_spawnattr_setpgroup()\fR returns 0.
+.Dd July 4, 2026
+.Dt POSIX_SPAWNATTR_GETPGROUP 3C
+.Os
+.Sh NAME
+.Nm posix_spawnattr_getpgroup ,
+.Nm posix_spawnattr_setpgroup
+.Nd get and set spawn-pgroup attribute of spawn attributes object
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In spawn.h
+.Ft int
+.Fo posix_spawnattr_getpgroup
+.Fa "const posix_spawnattr_t *restrict attr"
+.Fa "pid_t *restrict pgroup"
+.Fc
+.Ft int
+.Fo posix_spawnattr_setpgroup
+.Fa "posix_spawnattr_t *attr"
+.Fa "pid_t pgroup"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn posix_spawnattr_getpgroup
+function obtains the value of the spawn-pgroup attribute from the attributes
+object referenced by
+.Fa attr .
+.Pp
+The
+.Fn posix_spawnattr_setpgroup
+function sets the spawn-pgroup attribute in an initialized attributes object
+referenced by
+.Fa attr .
+.Pp
+The spawn-pgroup attribute represents the process group to be joined by the new
+process image in a spawn operation
+.Po
+if
+.Dv POSIX_SPAWN_SETPGROUP
+is set in the spawn-flags attribute
+.Pc .
+The default value of this attribute is zero.
+.Sh RETURN VALUES
+Upon successful completion,
+.Fn posix_spawnattr_getpgroup
+returns 0 and stores the value of the spawn-pgroup attribute of
+.Fa attr
+into the object referenced by the
+.Fa pgroup
+parameter.
 Otherwise, an error number is returned to indicate the error.
-.SH ERRORS
-.sp
-.LP
+.Pp
+Upon successful completion,
+.Fn posix_spawnattr_setpgroup
+returns 0.
+Otherwise, an error number is returned to indicate the error.
+.Sh ERRORS
 These functions may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The value specified by \fIattr\fR is invalid.
-.RE
-
-.sp
-.LP
-The \fBposix_spawnattr_setpgroup()\fR function may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
+.Bl -tag -width Er
+.It Er EINVAL
+The value specified by
+.Fa attr
+is invalid.
+.El
+.Pp
+The
+.Fn posix_spawnattr_setpgroup
+function may fail if:
+.Bl -tag -width Er
+.It Er EINVAL
 The value of the attribute being set is not valid.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-_
-MT-Level	MT-Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBposix_spawn\fR(3C), posix_spawnattr_getpgroup(3C),
-posix_spawnattr_getpgroup(3C), \fBposix_spawnattr_getschedparam\fR(3C),
-.BR posix_spawnattr_getschedpolicy (3C),
-.BR posix_spawnattr_getsigdefault (3C),
-.BR posix_spawnattr_getsigmask (3C),
-.BR attributes (7),
-.BR standards (7)
+.El
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr posix_spawn 3C ,
+.Xr posix_spawnattr_destroy 3C ,
+.Xr posix_spawnattr_getflags 3C ,
+.Xr posix_spawnattr_getschedparam 3C ,
+.Xr posix_spawnattr_getschedpolicy 3C ,
+.Xr posix_spawnattr_getsigdefault 3C ,
+.Xr posix_spawnattr_getsigmask 3C ,
+.Xr attributes 7 ,
+.Xr standards 7
+.Sh STANDARDS
+The
+.Fn posix_spawnattr_getpgroup
+and
+.Fn posix_spawnattr_setpgroup
+functions conform to
+.St -p1003.1-2001 .

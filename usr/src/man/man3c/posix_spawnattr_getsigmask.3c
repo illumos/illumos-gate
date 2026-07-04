@@ -42,103 +42,99 @@
 .\"
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2004, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2026 Oxide Computer Company
 .\"
-.TH POSIX_SPAWNATTR_GETSIGMASK 3C "Jan 30, 2004"
-.SH NAME
-posix_spawnattr_getsigmask, posix_spawnattr_setsigmask \- get and set
-spawn-sigmask attribute of spawn attributes object
-.SH SYNOPSIS
-.LP
-.nf
-#include <signal.h>
-#include <spawn.h>
-
-\fBint\fR \fBposix_spawnattr_getsigmask\fR(\fBconst posix_spawnattr_t *restrict\fR \fIattr\fR,
-     \fBsigset_t *restrict\fR \fIsigmask\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBposix_spawnattr_setsigmask\fR(\fBposix_spawnattr_t *restrict\fR \fIattr\fR,
-     \fBconst sigset_t *restrict\fR \fIsigmask\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBposix_spawnattr_getsigmask()\fR function obtains the value of the
-\fIspawn-sigmask\fR attribute from the attributes object referenced by
-\fIattr\fR.
-.sp
-.LP
-The \fBposix_spawnattr_setsigmask()\fR function sets the \fIspawn-sigmask\fR
-attribute in an initialized attributes object referenced by \fIattr\fR.
-.sp
-.LP
-The \fIspawn-sigmask\fR attribute represents the signal mask in effect in the
-new process image of a spawn operation (if \fBPOSIX_SPAWN_SETSIGMASK\fR is set
-in the\fI spawn-flags\fR attribute). The default value of this attribute is
-unspecified.
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, \fBposix_spawnattr_getsigmask()\fR returns 0 and
-stores the value of the \fIspawn-sigmask\fR attribute of \fIattr\fR into the
-object referenced by the \fIsigmask\fR parameter.  Otherwise, an error number
-is returned to indicate the error.
-.sp
-.LP
-Upon successful completion, \fBposix_spawnattr_setsigmask()\fR returns 0.
+.Dd July 4, 2026
+.Dt POSIX_SPAWNATTR_GETSIGMASK 3C
+.Os
+.Sh NAME
+.Nm posix_spawnattr_getsigmask ,
+.Nm posix_spawnattr_setsigmask
+.Nd get and set spawn-sigmask attribute of spawn attributes object
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In signal.h
+.In spawn.h
+.Ft int
+.Fo posix_spawnattr_getsigmask
+.Fa "const posix_spawnattr_t *restrict attr"
+.Fa "sigset_t *restrict sigmask"
+.Fc
+.Ft int
+.Fo posix_spawnattr_setsigmask
+.Fa "posix_spawnattr_t *restrict attr"
+.Fa "const sigset_t *restrict sigmask"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn posix_spawnattr_getsigmask
+function obtains the value of the spawn-sigmask attribute from the attributes
+object referenced by
+.Fa attr .
+.Pp
+The
+.Fn posix_spawnattr_setsigmask
+function sets the spawn-sigmask attribute in an initialized attributes object
+referenced by
+.Fa attr .
+.Pp
+The spawn-sigmask attribute represents the signal mask in effect in the new
+process image of a spawn operation
+.Po
+if
+.Dv POSIX_SPAWN_SETSIGMASK
+is set in the spawn-flags attribute
+.Pc .
+The default value of this attribute is unspecified.
+.Sh RETURN VALUES
+Upon successful completion,
+.Fn posix_spawnattr_getsigmask
+returns 0 and stores the value of the spawn-sigmask attribute of
+.Fa attr
+into the object referenced by the
+.Fa sigmask
+parameter.
 Otherwise, an error number is returned to indicate the error.
-.SH ERRORS
-.sp
-.LP
+.Pp
+Upon successful completion,
+.Fn posix_spawnattr_setsigmask
+returns 0.
+Otherwise, an error number is returned to indicate the error.
+.Sh ERRORS
 These functions may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The value specified by \fIattr\fR is invalid.
-.RE
-
-.sp
-.LP
-The \fBposix_spawnattr_setsigmask()\fR function may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
+.Bl -tag -width Er
+.It Er EINVAL
+The value specified by
+.Fa attr
+is invalid.
+.El
+.Pp
+The
+.Fn posix_spawnattr_setsigmask
+function may fail if:
+.Bl -tag -width Er
+.It Er EINVAL
 The value of the attribute being set is not valid.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Standard
-_
-MT-Level	MT-Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-\fBposix_spawn\fR(3C), \fBposix_spawnattr_destroy\fR(3C),
-\fBposix_spawnattr_getflags\fR(3C), \fBposix_spawnattr_getpgroup\fR(3C),
-.BR posix_spawnattr_getschedparam (3C),
-\fBposix_spawnattr_getschedpolicy\fR(3C), posix_spawnattr_getsigmask(3C),
-.BR attributes (7),
-.BR standards (7)
+.El
+.Sh INTERFACE STABILITY
+.Sy Standard
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr posix_spawn 3C ,
+.Xr posix_spawnattr_destroy 3C ,
+.Xr posix_spawnattr_getflags 3C ,
+.Xr posix_spawnattr_getpgroup 3C ,
+.Xr posix_spawnattr_getschedparam 3C ,
+.Xr posix_spawnattr_getschedpolicy 3C ,
+.Xr posix_spawnattr_getsigdefault 3C ,
+.Xr attributes 7 ,
+.Xr standards 7
+.Sh STANDARDS
+The
+.Fn posix_spawnattr_getsigmask
+and
+.Fn posix_spawnattr_setsigmask
+functions conform to
+.St -p1003.1-2001 .

@@ -43,456 +43,638 @@
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Portions Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2011 by Delphix.  All rights reserved.
-.\" Copyright 2025 Oxide Computer Company
+.\" Copyright 2026 Oxide Computer Company
 .\"
-.TH POSIX_SPAWN 3C "Jan 5, 2025"
-.SH NAME
-posix_spawn, posix_spawnp \- spawn a process
-.SH SYNOPSIS
-#include <spawn.h>
-
-\fBint\fR \fBposix_spawn\fR(\fBpid_t *restrict\fR \fIpid\fR, \fBconst char *restrict\fR \fIpath\fR,
-     \fBconst posix_spawn_file_actions_t *\fR\fIfile_actions\fR,
-     \fBconst posix_spawnattr_t *restrict\fR \fIattrp\fR,
-     \fBchar *const\fR \fIargv\fR[restrict], \fBchar *const\fR \fIenvp\fR[restrict]);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBposix_spawnp\fR(\fBpid_t *restrict\fR \fIpid\fR, \fBconst char *restrict\fR \fIfile\fR,
-     \fBconst posix_spawn_file_actions_t *\fR\fIfile_actions\fR,
-     \fBconst posix_spawnattr_t *restrict\fR \fIattrp\fR,
-     \fBchar *const\fR \fIargv\fR[restrict], \fBchar *const\fR \fIenvp\fR[restrict]);
-.fi
-
-.SH DESCRIPTION
-The \fBposix_spawn()\fR and \fBposix_spawnp()\fR functions create a new process
-(child process) from the specified process image. The new process image is
-constructed from a regular executable file called the new process image file.
-.sp
-.LP
+.Dd July 4, 2026
+.Dt POSIX_SPAWN 3C
+.Os
+.Sh NAME
+.Nm posix_spawn ,
+.Nm posix_spawnp
+.Nd spawn a process
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In spawn.h
+.Ft int
+.Fo posix_spawn
+.Fa "pid_t *restrict pid"
+.Fa "const char *restrict path"
+.Fa "const posix_spawn_file_actions_t *file_actions"
+.Fa "const posix_spawnattr_t *restrict attrp"
+.Fa "char *const argv[restrict]"
+.Fa "char *const envp[restrict]"
+.Fc
+.Ft int
+.Fo posix_spawnp
+.Fa "pid_t *restrict pid"
+.Fa "const char *restrict file"
+.Fa "const posix_spawn_file_actions_t *file_actions"
+.Fa "const posix_spawnattr_t *restrict attrp"
+.Fa "char *const argv[restrict]"
+.Fa "char *const envp[restrict]"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn posix_spawn
+and
+.Fn posix_spawnp
+functions create a new process
+.Pq child process
+from the specified process image.
+The new process image is constructed from a regular executable file called the
+new process image file.
+.Pp
 When a C program is executed as the result of this call, it is entered as a C
 language function call as follows:
-.sp
-.in +2
-.nf
-int main(int \fIargc\fR, char *\fIargv\fR[]);
-.fi
-.in -2
-
-.sp
-.LP
-where \fIargc\fR is the argument count and \fIargv\fR is an array of character
-pointers to the arguments themselves. In addition, the following variable
-.sp
-.in +2
-.nf
+.Bd -literal -offset indent
+int main(int argc, char *argv[]);
+.Ed
+.Pp
+where
+.Fa argc
+is the argument count and
+.Fa argv
+is an array of character pointers to the arguments themselves.
+In addition, the following variable
+.Bd -literal -offset indent
 extern char **environ;
-.fi
-.in -2
-
-.sp
-.LP
+.Ed
+.Pp
 is initialized as a pointer to an array of character pointers to the
 environment strings.
-.sp
-.LP
-The argument \fIargv\fR is an array of character pointers to null-terminated
-strings. The last member of this array is a null pointer and is not counted in
-\fIargc\fR. These strings constitute the argument list available to the new
-process image. The value in \fIargv\fR[0] should point to a filename that is
-associated with the process image being started by the \fBposix_spawn()\fR or
-\fBposix_spawnp()\fR function.
-.sp
-.LP
-The argument \fIenvp\fR is an array of character pointers to null-terminated
-strings. These strings constitute the environment for the new process image.
+.Pp
+The argument
+.Fa argv
+is an array of character pointers to null-terminated strings.
+The last member of this array is a null pointer and is not counted in
+.Fa argc .
+These strings constitute the argument list available to the new process image.
+The value in
+.Fa argv Ns [0]
+should point to a filename that is associated with the process image being
+started by the
+.Fn posix_spawn
+or
+.Fn posix_spawnp
+function.
+.Pp
+The argument
+.Fa envp
+is an array of character pointers to null-terminated strings.
+These strings constitute the environment for the new process image.
 The environment array is terminated by a null pointer.
-.sp
-.LP
+.Pp
 The number of bytes available for the child process's combined argument and
-environment lists is {\fBARG_MAX\fR}, counting all character pointers, the
-strings they point to, the trailing null bytes in the strings, and the
-list-terminating null pointers. There is no additional system overhead included
-in this total.
-.sp
-.LP
-The \fIpath\fR argument to \fBposix_spawn()\fR is a pathname that identifies
-the new process image file to execute.
-.sp
-.LP
-The \fIfile\fR parameter to \fBposix_spawnp()\fR is used to construct a
-pathname that identifies the new process image file. If the file parameter
-contains a slash character, the file parameter is used as the pathname for the
-new process image file. Otherwise, the path prefix for this file is obtained by
-a search of the directories passed as the environment variable \fBPATH\fR. If
-this environment variable is not defined, the results of the search are
+environment lists is
+.Brq Dv ARG_MAX ,
+counting all character pointers, the strings they point to, the trailing
+null bytes in the strings, and the list-terminating null pointers.
+There is no additional system overhead included in this total.
+.Pp
+The
+.Fa path
+argument to
+.Fn posix_spawn
+is a pathname that identifies the new process image file to execute.
+.Pp
+The
+.Fa file
+parameter to
+.Fn posix_spawnp
+is used to construct a pathname that identifies the new process image file.
+If the file parameter contains a slash character, the file parameter is used as
+the pathname for the new process image file.
+Otherwise, the path prefix for this file is obtained by a search of the
+directories passed as the environment variable
+.Ev PATH .
+If this environment variable is not defined, the results of the search are
 implementation-defined.
-.sp
-.LP
-If \fIfile_actions\fR is a null pointer, then file descriptors open in the
-calling process remain open in the child process, except for those whose
-close-on-exec flag \fBFD_CLOEXEC\fR is set (see \fBfcntl\fR(2)).  For those
-file descriptors that remain open, all attributes of the corresponding open
-file descriptions, including file locks (see \fBfcntl\fR(2)), remain unchanged.
-.sp
-.LP
-If \fIfile_actions\fR is not \fINULL\fR, then the file descriptors open in the
-child process are those open in the calling process as modified by the spawn
-file actions object pointed to by \fIfile_actions\fR and the \fBFD_CLOEXEC\fR
+.Pp
+If
+.Fa file_actions
+is a null pointer, then file descriptors open in the calling process remain
+open in the child process, except for those whose close-on-exec flag
+.Dv FD_CLOEXEC
+is set
+.Pq see Xr fcntl 2 .
+For those file descriptors that remain open, all attributes of the
+corresponding open file descriptions, including file locks
+.Pq see Xr fcntl 2 ,
+remain unchanged.
+.Pp
+If
+.Fa file_actions
+is not
+.Dv NULL ,
+then the file descriptors open in the child process are those open in the
+calling process as modified by the spawn file actions object pointed to by
+.Fa file_actions
+and the
+.Dv FD_CLOEXEC
 flag of each remaining open file descriptor after the spawn file actions have
-been processed. The effective order of processing the spawn file actions are:
-.RS +4
-.TP
-1.
-The set of open file descriptors for the child process are initially the
-same set as is open for the calling process. All attributes of the
-corresponding open file descriptions, including file locks (see
-\fBfcntl\fR(2)), remain unchanged.
-.RE
-.RS +4
-.TP
-2.
-The signal mask, signal default or ignore actions, and the effective user
-and group IDs for the child process are changed as specified in the attributes
-object referenced by \fIattrp\fR.
-.RE
-.RS +4
-.TP
-3.
+been processed.
+The effective order of processing the spawn file actions are:
+.Bl -enum
+.It
+The set of open file descriptors for the child process are initially the same
+set as is open for the calling process.
+All attributes of the corresponding open file descriptions, including file
+locks
+.Pq see Xr fcntl 2 ,
+remain unchanged.
+.It
+The signal mask, signal default or ignore actions, and the effective user and
+group IDs for the child process are changed as specified in the attributes
+object referenced by
+.Fa attrp .
+.It
 The file actions specified by the spawn file actions object are performed in
 the order in which they were added to the spawn file actions object.
-.RE
-.RS +4
-.TP
-4.
-Any file descriptor that has its \fBFD_CLOEXEC\fR flag set (see
-\fBfcntl\fR(2)) is closed.
-.RE
-.sp
-.LP
-The child's working directory is dependent on the file actions specified. By
-default, the child inherits the parent's current working directory. However,
-this may be changed by using the \fBposix_spawn_file_actions_addchdir\fR(3C)
-family of functions. These file actions are processed like any other file
-actions and are handled per the steps described above.
-.sp
-.LP
-The \fBposix_spawnattr_t\fR spawn attributes object type is defined in
-<\fBspawn.h\fR>. It contains at least the attributes defined below.
-.sp
-.LP
-By default, the child process inherits the existing session and progress group
-of the parent process. This behavior can be changed by specifying one of the
-\fBPOSIX_SPAWN_SETSID\fR or \fBPOSIX_SPAWN_SETPGROUP\fR flags described below.
-.sp
-.LP
-If the \fBPOSIX_SPAWN_SETSID\fR flag is set in the \fIspawn-flags\fR attribute
-of the object referenced by \fIattrp\fR then the child will have all the effects
-of calling
-.BR setsid(2)
-applied. Chiefly, it will have no controlling terminal, it will be the leader of
-a new process group, and it will be the leader of a new session. POSIX leaves
-undefined the behavior of setting both the \fBPOSIX_SPAWN_SETSID\fR and
-\fBPOSIX_SPAWN_SETPGROUP\fR (described below) flags. It is recommended to only
-set one or the other.
-.sp
-.LP
-If the \fBPOSIX_SPAWN_SETPGROUP\fR flag is set in the \fIspawn-flags\fR
-attribute of the object referenced by \fIattrp\fR, and the \fIspawn-pgroup\fR
-attribute of the same object is non-zero, then the child's process group is as
-specified in the \fIspawn-pgroup\fR attribute of the object referenced by
-\fIattrp\fR.
-.sp
-.LP
-As a special case, if the \fBPOSIX_SPAWN_SETPGROUP\fR flag is set in the
-\fIspawn-flags\fR attribute of the object referenced by \fIattrp\fR, and the
-\fIspawn-pgroup\fR attribute of the same object is set to zero, then the child
-will be in a new process group with a process group ID equal to its process ID.
-.sp
-.LP
-If the \fBPOSIX_SPAWN_SETSCHEDPARAM\fR flag is set in the \fIspawn-flags\fR
-attribute of the object referenced by \fIattrp\fR, but
-\fBPOSIX_SPAWN_SETSCHEDULER\fR is not set, the new process image initially has
-the scheduling policy of the calling process with the scheduling parameters
-specified in the \fIspawn-schedparam\fR attribute of the object referenced by
-\fIattrp\fR.
-.sp
-.LP
-If the \fBPOSIX_SPAWN_SETSCHEDULER\fR flag is set in \fIspawn-flags\fR
-attribute of the object referenced by \fIattrp\fR (regardless of the setting of
-the \fBPOSIX_SPAWN_SETSCHEDPARAM\fR flag), the new process image initially has
-the scheduling policy specified in the \fIspawn-schedpolicy\fR attribute of the
-object referenced by \fIattrp\fR and the scheduling parameters specified in the
-\fIspawn-schedparam\fR attribute of the same object.
-.sp
-.LP
-The \fBPOSIX_SPAWN_RESETIDS\fR flag in the \fIspawn-flags\fR attribute of the
-object referenced by \fIattrp\fR governs the effective user ID of the child
-process. If this flag is not set, the child process inherits the parent
-process's effective user ID. If this flag is set, the child process's effective
-user ID is reset to the parent's real user ID. In either case, if the
-set-user-ID mode bit of the new process image file is set, the effective user
-ID of the child process becomes that file's owner ID before the new process
-image begins execution. If this flag is set, the child process's effective user
-ID is reset to the parent's real user ID. In either case, if the set-user-ID
-mode bit of the new process image file is set, the effective user ID of the
-child process becomes that file's owner ID before the new process image begins
-execution.
-.sp
-.LP
-The \fBPOSIX_SPAWN_RESETIDS\fR flag in the \fIspawn-flags\fR attribute of the
-object referenced by \fIattrp\fR also governs the effective group ID of the
-child process. If this flag is not set, the child process inherits the parent
-process's effective group ID. If this flag is set, the child process's
-effective group ID is reset to the parent's real group ID. In either case, if
-the set-group-ID mode bit of the new process image file is set, the effective
-group ID of the child process becomes that file's group ID before the new
-process image begins execution.
-.sp
-.LP
-If the \fBPOSIX_SPAWN_SETSIGMASK\fR flag is set in the \fIspawn-flags\fR
-attribute of the object referenced by \fIattrp\fR, the child process initially
-has the signal mask specified in the \fIspawn-sigmask\fR attribute of the
-object referenced by \fIattrp\fR.
-.sp
-.LP
-If the \fBPOSIX_SPAWN_SETSIGDEF\fR flag is set in the \fIspawn-flags\fR
-attribute of the object referenced by \fIattrp\fR, the signals specified in the
-\fIspawn-sigdefault\fR attribute of the same object is set to their default
-actions in the child process.
-.sp
-.LP
-If the \fBPOSIX_SPAWN_SETSIGIGN_NP\fR flag is set in the spawn-flags attribute
-of the object referenced by \fIattrp\fR, the signals specified in the
-\fIspawn-sigignore\fR attribute of the same object are set to be ignored in the
-child process.
-.sp
-.LP
-If both \fBPOSIX_SPAWN_SETSIGDEF\fR and \fBPOSIX_SPAWN_SETSIGIGN_NP\fR flags
-are set in the spawn-flags attribute of the object referenced by \fIattrp\fR,
-the actions for \fBPOSIX_SPAWN_SETSIGDEF\fR take precedence over the actions
-for \fBPOSIX_SPAWN_SETSIGIGN_NP\fR.
-.sp
-.LP
-If the \fBPOSIX_SPAWN_NOSIGCHLD_NP\fR flag is set in the \fIspawn-flags\fR
-attribute of the object referenced by \fIattrp\fR, no \fBSIGCHLD\fR signal will
-be posted to the parent process when the child process terminates, regardless
-of the disposition of the \fBSIGCHLD\fR signal in the parent.  \fBSIGCHLD\fR
+.It
+Any file descriptor that has its
+.Dv FD_CLOEXEC
+flag set
+.Pq see Xr fcntl 2
+is closed.
+.El
+.Pp
+The child's working directory is dependent on the file actions specified.
+By default, the child inherits the parent's current working directory.
+However, this may be changed by using the
+.Xr posix_spawn_file_actions_addchdir 3C
+family of functions.
+These file actions are processed like any other file actions and are handled
+per the steps described above.
+.Pp
+The
+.Vt posix_spawnattr_t
+spawn attributes object type is defined in
+.In spawn.h .
+It contains at least the attributes defined below.
+.Pp
+By default, the child process inherits the existing session and process group
+of the parent process.
+This behavior can be changed by specifying one of the
+.Dv POSIX_SPAWN_SETSID
+or
+.Dv POSIX_SPAWN_SETPGROUP
+flags described below.
+.Pp
+If the
+.Dv POSIX_SPAWN_SETSID
+flag is set in the spawn-flags attribute of the object referenced by
+.Fa attrp
+then the child will have all the effects of calling
+.Xr setsid 2
+applied.
+Chiefly, it will have no controlling terminal, it will be the leader of a new
+process group, and it will be the leader of a new session.
+POSIX leaves undefined the behavior of setting both the
+.Dv POSIX_SPAWN_SETSID
+and
+.Dv POSIX_SPAWN_SETPGROUP
+.Pq described below
+flags.
+It is recommended to only set one or the other.
+.Pp
+If the
+.Dv POSIX_SPAWN_SETPGROUP
+flag is set in the spawn-flags attribute of the object referenced by
+.Fa attrp ,
+and the spawn-pgroup attribute of the same object is non-zero, then the child's
+process group is as specified in the spawn-pgroup attribute of the object
+referenced by
+.Fa attrp .
+.Pp
+As a special case, if the
+.Dv POSIX_SPAWN_SETPGROUP
+flag is set in the spawn-flags attribute of the object referenced by
+.Fa attrp ,
+and the spawn-pgroup attribute of the same object is set to zero, then the
+child will be in a new process group with a process group ID equal to its
+process ID.
+.Pp
+If the
+.Dv POSIX_SPAWN_SETSCHEDPARAM
+flag is set in the spawn-flags attribute of the object referenced by
+.Fa attrp ,
+but
+.Dv POSIX_SPAWN_SETSCHEDULER
+is not set, the new process image initially has the scheduling policy of the
+calling process with the scheduling parameters specified in the
+spawn-schedparam attribute of the object referenced by
+.Fa attrp .
+.Pp
+If the
+.Dv POSIX_SPAWN_SETSCHEDULER
+flag is set in spawn-flags attribute of the object referenced by
+.Fa attrp
+.Po
+regardless of the setting of the
+.Dv POSIX_SPAWN_SETSCHEDPARAM
+flag
+.Pc ,
+the new process image initially has the scheduling policy specified in the
+spawn-schedpolicy attribute of the object referenced by
+.Fa attrp
+and the scheduling parameters specified in the spawn-schedparam attribute of
+the same object.
+.Pp
+The
+.Dv POSIX_SPAWN_RESETIDS
+flag in the spawn-flags attribute of the object referenced by
+.Fa attrp
+governs the effective user ID of the child process.
+If this flag is not set, the child process inherits the parent process's
+effective user ID.
+If this flag is set, the child process's effective user ID is reset to the
+parent's real user ID.
+In either case, if the set-user-ID mode bit of the new process image file is
+set, the effective user ID of the child process becomes that file's owner ID
+before the new process image begins execution.
+.Pp
+The
+.Dv POSIX_SPAWN_RESETIDS
+flag in the spawn-flags attribute of the object referenced by
+.Fa attrp
+also governs the effective group ID of the child process.
+If this flag is not set, the child process inherits the parent process's
+effective group ID.
+If this flag is set, the child process's effective group ID is reset to the
+parent's real group ID.
+In either case, if the set-group-ID mode bit of the new process image file is
+set, the effective group ID of the child process becomes that file's group ID
+before the new process image begins execution.
+.Pp
+If the
+.Dv POSIX_SPAWN_SETSIGMASK
+flag is set in the spawn-flags attribute of the object referenced by
+.Fa attrp ,
+the child process initially has the signal mask specified in the spawn-sigmask
+attribute of the object referenced by
+.Fa attrp .
+.Pp
+If the
+.Dv POSIX_SPAWN_SETSIGDEF
+flag is set in the spawn-flags attribute of the object referenced by
+.Fa attrp ,
+the signals specified in the spawn-sigdefault attribute of the same object is
+set to their default actions in the child process.
+.Pp
+If the
+.Dv POSIX_SPAWN_SETSIGIGN_NP
+flag is set in the spawn-flags attribute of the object referenced by
+.Fa attrp ,
+the signals specified in the spawn-sigignore attribute of the same object are
+set to be ignored in the child process.
+.Pp
+If both
+.Dv POSIX_SPAWN_SETSIGDEF
+and
+.Dv POSIX_SPAWN_SETSIGIGN_NP
+flags are set in the spawn-flags attribute of the object referenced by
+.Fa attrp ,
+the actions for
+.Dv POSIX_SPAWN_SETSIGDEF
+take precedence over the actions for
+.Dv POSIX_SPAWN_SETSIGIGN_NP .
+.Pp
+If the
+.Dv POSIX_SPAWN_NOSIGCHLD_NP
+flag is set in the spawn-flags attribute of the object referenced by
+.Fa attrp ,
+no
+.Dv SIGCHLD
+signal will be posted to the parent process when the child process terminates,
+regardless of the disposition of the
+.Dv SIGCHLD
+signal in the parent.
+.Dv SIGCHLD
 signals are still possible for job control stop and continue actions if the
 parent has requested them.
-.sp
-.LP
-If the \fBPOSIX_SPAWN_WAITPID_NP\fR flag is set in the \fIspawn-flags\fR
-attribute of the object referenced by \fIattrp\fR, no wait-for-multiple-pids
-operation by the parent, as in \fBwait()\fR, \fBwaitid\fR(\fBP_ALL\fR), or
-\fBwaitid\fR(\fBP_PGID\fR), will succeed in reaping the child, and the child
-will not be reaped automatically due the disposition of the \fBSIGCHLD\fR
-signal being set to be ignored in the parent.  Only a specific wait for the
-child, as in \fBwaitid\fR(\fBP_PID\fR, \fBpid\fR), is allowed and it is
-required, else when the child exits it will remain a zombie until the parent
-exits.
-.sp
-.LP
-If the \fBPOSIX_SPAWN_NOEXECERR_NP\fR flag is set in the spawn-flags attribute
-of the object referenced by \fIattrp\fR, and if the specified process image
-file cannot be executed, then the \fBposix_spawn()\fR and \fBposix_spawnp()\fR
-functions do not fail with one of the \fBexec\fR(2) error codes, as is normal,
-but rather return successfully having created a child process that exits
-immediately with exit status 127. This flag permits \fBsystem\fR(3C) and
-\fBpopen\fR(3C) to be implemented with \fBposix_spawn()\fR and still conform
-strictly to their POSIX specifications.
-.sp
-.LP
+.Pp
+If the
+.Dv POSIX_SPAWN_WAITPID_NP
+flag is set in the spawn-flags attribute of the object referenced by
+.Fa attrp ,
+no wait-for-multiple-pids operation by the parent, as in
+.Fn wait ,
+.Fn waitid P_ALL ,
+or
+.Fn waitid P_PGID ,
+will succeed in reaping the child, and the child will not be reaped
+automatically due to the disposition of the
+.Dv SIGCHLD
+signal being set to be ignored in the parent.
+Only a specific wait for the child, as in
+.Fn waitid P_PID pid ,
+is allowed and it is required, else when the child exits it will remain a
+zombie until the parent exits.
+.Pp
+If the
+.Dv POSIX_SPAWN_NOEXECERR_NP
+flag is set in the spawn-flags attribute of the object referenced by
+.Fa attrp ,
+and if the specified process image file cannot be executed, then the
+.Fn posix_spawn
+and
+.Fn posix_spawnp
+functions do not fail with one of the
+.Xr exec 2
+error codes, as is normal, but rather return successfully having created a
+child process that exits immediately with exit status 127.
+This flag permits
+.Xr system 3C
+and
+.Xr popen 3C
+to be implemented with
+.Fn posix_spawn
+and still conform strictly to their POSIX specifications.
+.Pp
 Signals set to be caught or set to the default action in the calling process
 are set to the default action in the child process, unless the
-\fBPOSIX_SPAWN_SETSIGIGN_NP\fR flag is set in the spawn-flags attribute of the
-object referenced by \fIattrp\fR and the signals are specified in the
-\fIspawn-sigignore\fR attribute of the same object.
-.sp
-.LP
-Except for \fBSIGCHLD\fR, signals set to be ignored by the calling process
-image are set to be ignored by the child process, unless otherwise specified by
-the \fBPOSIX_SPAWN_SETSIGDEF\fR flag being set in the \fIspawn-flags\fR
-attribute of the object referenced by \fIattrp\fR and the signals being
-indicated in the \fIspawn-sigdefault\fR attribute of the object referenced by
-\fIattrp\fR.
-.sp
-.LP
-If the \fBSIGCHLD\fR signal is set to be ignored by the calling process, it is
-unspecified whether the \fBSIGCHLD\fR signal is set to be ignored or to the
-default action in the child process, unless otherwise specified by the
-\fBPOSIX_SPAWN_SETSIGDEF\fR flag being set in the \fIspawn-flags\fR attribute
-of the object referenced by \fIattrp\fR and the \fBSIGCHLD\fR signal being
-indicated in the \fIspawn-sigdefault\fR attribute of the object referenced by
-\fIattrp\fR.
-.sp
-.LP
-If the value of the \fIattrp\fR pointer is \fINULL\fR, then the default values
-are used.
-.sp
-.LP
+.Dv POSIX_SPAWN_SETSIGIGN_NP
+flag is set in the spawn-flags attribute of the object referenced by
+.Fa attrp
+and the signals are specified in the spawn-sigignore attribute of the same
+object.
+.Pp
+Except for
+.Dv SIGCHLD ,
+signals set to be ignored by the calling process image are set to be ignored by
+the child process, unless otherwise specified by the
+.Dv POSIX_SPAWN_SETSIGDEF
+flag being set in the spawn-flags attribute of the object referenced by
+.Fa attrp
+and the signals being indicated in the spawn-sigdefault attribute of the object
+referenced by
+.Fa attrp .
+.Pp
+If the
+.Dv SIGCHLD
+signal is set to be ignored by the calling process, it is unspecified whether
+the
+.Dv SIGCHLD
+signal is set to be ignored or to the default action in the child process,
+unless otherwise specified by the
+.Dv POSIX_SPAWN_SETSIGDEF
+flag being set in the spawn-flags attribute of the object referenced by
+.Fa attrp
+and the
+.Dv SIGCHLD
+signal being indicated in the spawn-sigdefault attribute of the object
+referenced by
+.Fa attrp .
+.Pp
+If the value of the
+.Fa attrp
+pointer is
+.Dv NULL ,
+then the default values are used.
+.Pp
 All process attributes, other than those influenced by the attributes set in
-the object referenced by \fIattrp\fR as specified above or by the file
-descriptor manipulations specified in \fIfile_actions\fR appear in the new
-process image as though \fBfork()\fR had been called to create a child process
-and then a member of the \fBexec\fR family of functions had been called by the
-child process to execute the new process image.
-.sp
-.LP
-The fork handlers are not run when \fBposix_spawn()\fR or \fBposix_spawnp()\fR
+the object referenced by
+.Fa attrp
+as specified above or by the file descriptor manipulations specified in
+.Fa file_actions
+appear in the new process image as though
+.Fn fork
+had been called to create a child process and then a member of the
+.Sy exec
+family of functions had been called by the child process to execute the new
+process image.
+.Pp
+The fork handlers are not run when
+.Fn posix_spawn
+or
+.Fn posix_spawnp
 is called.
-.SH RETURN VALUES
-Upon successful completion, \fBposix_spawn()\fR and \fBposix_spawnp()\fR return
-the process ID of the child process to the parent process in the variable
-pointed to by a non-null \fIpid\fR argument, and return zero as the function
-return value. Otherwise, no child process is created, the value stored into the
-variable pointed to by a non-null \fIpid\fR is unspecified, and an error number
-is returned as the function return value to indicate the error. If the
-\fIpid\fR argument is a null pointer, the process ID of the child is not
-returned to the caller.
-.SH ERRORS
-The \fBposix_spawn()\fR and \fBposix_spawnp()\fR functions will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The value specified by \fIfile_actions\fR or \fIattrp\fR is invalid.
-.RE
-
-.sp
-.LP
-If \fBposix_spawn()\fR or \fBposix_spawnp()\fR fails for any of the reasons
-that would cause \fBfork()\fR or one of the \fBexec\fR family of functions to
-fail, an error value is returned as described by \fBfork\fR(2) and
-\fBexec\fR(2), respectively
-.sp
-.LP
-If \fBPOSIX_SPAWN_SETPGROUP\fR is set in the \fIspawn-flags\fR attribute of the
-object referenced by \fIattrp\fR, and \fBposix_spawn()\fR or
-\fBposix_spawnp()\fR fails while changing the child's process group, an error
-value is returned as described by \fBsetpgid\fR(2).
-.sp
-.LP
-If \fBPOSIX_SPAWN_SETSCHEDPARAM\fR is set and \fBPOSIX_SPAWN_SETSCHEDULER\fR is
-not set in the \fIspawn-flags\fR attribute of the object referenced by
-\fIattrp\fR, then if \fBposix_spawn()\fR or \fBposix_spawnp()\fR fails for any
-of the reasons that would cause \fBsched_setparam()\fR to fail, an error value
-is returned as described by \fBsched_setparam\fR(3C).
-.sp
-.LP
-If \fBPOSIX_SPAWN_SETSCHEDULER\fR is set in the \fIspawn-flags\fR attribute of
-the object referenced by \fIattrp\fR, and if \fBposix_spawn()\fR or
-\fBposix_spawnp()\fR fails for any of the reasons that would cause
-\fBsched_setscheduler()\fR to fail, an error value is returned as described by
-\fBsched_setscheduler\fR(3C).
-.sp
-.LP
-If the \fIfile_actions\fR argument is not \fINULL\fR and specifies any
-\fBclose()\fR, \fBdup2()\fR, or \fBopen()\fR actions to be performed, and if
-\fBposix_spawn()\fR or \fBposix_spawnp()\fR fails for any of the reasons that
-would cause \fBclose()\fR, \fBdup2()\fR, or \fBopen()\fR to fail, an error
-value is returned as described by \fBclose\fR(2), \fBdup2\fR(3C), or
-\fBopen\fR(2), respectively. An open file action might, by itself, result in
-any of the errors described by \fBclose()\fR or \fBdup2()\fR, in addition to
-those described by \fBopen()\fR.
-.sp
-.LP
-If a \fBclose\fR(2) operation is specified to be performed for a file
-descriptor that is not open at the time of the call to \fBposix_spawn()\fR or
-\fBposix_spawnp()\fR, the action does not cause \fBposix_spawn()\fR or
-\fBposix_spawnp()\fR to fail.
-.SH ATTRIBUTES
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Committed
-_
-MT-Level	MT-Safe
-_
-Standard	See \fBstandards\fR(7).
-.TE
-
-.SH SEE ALSO
-.BR alarm (2),
-.BR chmod (2),
-.BR close (2),
-.BR dup (2),
-.BR exec (2),
-.BR exit (2),
-.BR fcntl (2),
-.BR fork (2),
-.BR kill (2),
-.BR open (2),
-.BR setpgid (2),
-.BR setuid (2),
-.BR stat (2),
-.BR times (2),
-.BR dup2 (3C),
-.BR popen (3C),
-.BR posix_spawn_file_actions_addchdir (3C),
-.BR posix_spawn_file_actions_addclose (3C),
-.BR posix_spawn_file_actions_adddup2 (3C),
-.BR posix_spawn_file_actions_addopen (3C),
-.BR posix_spawn_file_actions_destroy (3C),
-.BR posix_spawn_file_actions_init (3C),
-.BR posix_spawn_pipe_np (3C),
-.BR posix_spawnattr_destroy (3C),
-.BR posix_spawnattr_getflags (3C),
-.BR posix_spawnattr_getpgroup (3C),
-.BR posix_spawnattr_getschedparam (3C),
-.BR posix_spawnattr_getschedpolicy (3C),
-.BR posix_spawnattr_getsigdefault (3C),
-.BR posix_spawnattr_getsigignore_np (3C),
-.BR posix_spawnattr_getsigmask (3C),
-.BR posix_spawnattr_init (3C),
-.BR posix_spawnattr_setflags (3C),
-.BR posix_spawnattr_setpgroup (3C),
-.BR posix_spawnattr_setschedparam (3C),
-.BR posix_spawnattr_setschedpolicy (3C),
-.BR posix_spawnattr_setsigdefault (3C),
-.BR posix_spawnattr_setsigignore_np (3C),
-.BR posix_spawnattr_setsigmask (3C),
-.BR sched_setparam (3C),
-.BR sched_setscheduler (3C),
-.BR system (3C),
-.BR wait (3C),
-.BR attributes (7),
-.BR standards (7)
-.SH NOTES
-The POSIX standard permits the \fBposix_spawn()\fR and \fBposix_spawnp()\fR
+.Sh RETURN VALUES
+Upon successful completion,
+.Fn posix_spawn
+and
+.Fn posix_spawnp
+return the process ID of the child process to the parent process in the
+variable pointed to by a non-null
+.Fa pid
+argument, and return zero as the function return value.
+Otherwise, no child process is created, the value stored into the variable
+pointed to by a non-null
+.Fa pid
+is unspecified, and an error number is returned as the function return value to
+indicate the error.
+If the
+.Fa pid
+argument is a null pointer, the process ID of the child is not returned to the
+caller.
+.Sh ERRORS
+The
+.Fn posix_spawn
+and
+.Fn posix_spawnp
+functions will fail if:
+.Bl -tag -width Er
+.It Er EINVAL
+The value specified by
+.Fa file_actions
+or
+.Fa attrp
+is invalid.
+.El
+.Pp
+If
+.Fn posix_spawn
+or
+.Fn posix_spawnp
+fails for any of the reasons that would cause
+.Fn fork
+or one of the
+.Sy exec
+family of functions to fail, an error value is returned as described by
+.Xr fork 2
+and
+.Xr exec 2 ,
+respectively.
+.Pp
+If
+.Dv POSIX_SPAWN_SETPGROUP
+is set in the spawn-flags attribute of the object referenced by
+.Fa attrp ,
+and
+.Fn posix_spawn
+or
+.Fn posix_spawnp
+fails while changing the child's process group, an error value is returned as
+described by
+.Xr setpgid 2 .
+.Pp
+If
+.Dv POSIX_SPAWN_SETSCHEDPARAM
+is set and
+.Dv POSIX_SPAWN_SETSCHEDULER
+is not set in the spawn-flags attribute of the object referenced by
+.Fa attrp ,
+then if
+.Fn posix_spawn
+or
+.Fn posix_spawnp
+fails for any of the reasons that would cause
+.Fn sched_setparam
+to fail, an error value is returned as described by
+.Xr sched_setparam 3C .
+.Pp
+If
+.Dv POSIX_SPAWN_SETSCHEDULER
+is set in the spawn-flags attribute of the object referenced by
+.Fa attrp ,
+and if
+.Fn posix_spawn
+or
+.Fn posix_spawnp
+fails for any of the reasons that would cause
+.Fn sched_setscheduler
+to fail, an error value is returned as described by
+.Xr sched_setscheduler 3C .
+.Pp
+If the
+.Fa file_actions
+argument is not
+.Dv NULL
+and specifies any
+.Fn close ,
+.Fn dup2 ,
+or
+.Fn open
+actions to be performed, and if
+.Fn posix_spawn
+or
+.Fn posix_spawnp
+fails for any of the reasons that would cause
+.Fn close ,
+.Fn dup2 ,
+or
+.Fn open
+to fail, an error value is returned as described by
+.Xr close 2 ,
+.Xr dup2 3C ,
+or
+.Xr open 2 ,
+respectively.
+An open file action might, by itself, result in any of the errors described by
+.Fn close
+or
+.Fn dup2 ,
+in addition to those described by
+.Fn open .
+.Pp
+If a
+.Xr close 2
+operation is specified to be performed for a file descriptor that is not open
+at the time of the call to
+.Fn posix_spawn
+or
+.Fn posix_spawnp ,
+the action does not cause
+.Fn posix_spawn
+or
+.Fn posix_spawnp
+to fail.
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr alarm 2 ,
+.Xr chmod 2 ,
+.Xr close 2 ,
+.Xr dup 2 ,
+.Xr exec 2 ,
+.Xr exit 2 ,
+.Xr fcntl 2 ,
+.Xr fork 2 ,
+.Xr kill 2 ,
+.Xr open 2 ,
+.Xr setpgid 2 ,
+.Xr setsid 2 ,
+.Xr setuid 2 ,
+.Xr stat 2 ,
+.Xr times 2 ,
+.Xr dup2 3C ,
+.Xr popen 3C ,
+.Xr posix_spawn_file_actions_addchdir 3C ,
+.Xr posix_spawn_file_actions_addclose 3C ,
+.Xr posix_spawn_file_actions_adddup2 3C ,
+.Xr posix_spawn_file_actions_addopen 3C ,
+.Xr posix_spawn_file_actions_destroy 3C ,
+.Xr posix_spawn_file_actions_init 3C ,
+.Xr posix_spawn_pipe_np 3C ,
+.Xr posix_spawnattr_destroy 3C ,
+.Xr posix_spawnattr_getflags 3C ,
+.Xr posix_spawnattr_getpgroup 3C ,
+.Xr posix_spawnattr_getschedparam 3C ,
+.Xr posix_spawnattr_getschedpolicy 3C ,
+.Xr posix_spawnattr_getsigdefault 3C ,
+.Xr posix_spawnattr_getsigignore_np 3C ,
+.Xr posix_spawnattr_getsigmask 3C ,
+.Xr posix_spawnattr_init 3C ,
+.Xr posix_spawnattr_setflags 3C ,
+.Xr posix_spawnattr_setpgroup 3C ,
+.Xr posix_spawnattr_setschedparam 3C ,
+.Xr posix_spawnattr_setschedpolicy 3C ,
+.Xr posix_spawnattr_setsigdefault 3C ,
+.Xr posix_spawnattr_setsigignore_np 3C ,
+.Xr posix_spawnattr_setsigmask 3C ,
+.Xr sched_setparam 3C ,
+.Xr sched_setscheduler 3C ,
+.Xr system 3C ,
+.Xr wait 3C ,
+.Xr attributes 7 ,
+.Xr standards 7
+.Sh STANDARDS
+The
+.Fn posix_spawn
+and
+.Fn posix_spawnp
+functions conform to
+.St -p1003.1-2001 .
+.Sh NOTES
+The POSIX standard permits the
+.Fn posix_spawn
+and
+.Fn posix_spawnp
 functions to return successfully before some of the above-described errors are
 detected, allowing the child process to fail instead:
-.sp
-.in +2
-.nf
+.Bd -literal -offset indent
 \&... if the error occurs after the calling process
 successfully returns, the child process exits with
 exit status 127.
-.fi
-.in -2
-
-.sp
-.LP
-With the one exception of when the \fBPOSIX_SPAWN_NOEXECERR_NP\fR flag is
-passed in the attributes structure, this behavior is not present in the Solaris
-implementation. Any error that occurs before the new process image is
-successfully constructed causes the \fBposix_spawn()\fR and
-\fBposix_spawnp()\fR functions to return the corresponding non-zero error value
-without creating a child process.
-.sp
-.LP
-The \fBPOSIX_SPAWN_NOSIGCHLD_NP\fR, \fBPOSIX_SPAWN_WAITPID_NP\fR,
-\fBPOSIX_SPAWN_NOEXECERR_NP\fR, and \fBPOSIX_SPAWN_SETSIGIGN_NP\fR flags and
-the \fBposix_spawnattr_getsigignore_np()\fR and
-\fBposix_spawnattr_setsigignore_np()\fR functions are non-portable Solaris
-extensions to the \fBposix_spawn()\fR and \fBposix_spawnp()\fR interfaces.
+.Ed
+.Pp
+With the one exception of when the
+.Dv POSIX_SPAWN_NOEXECERR_NP
+flag is passed in the attributes structure, this behavior is not present in
+this implementation.
+Any error that occurs before the new process image is successfully constructed
+causes the
+.Fn posix_spawn
+and
+.Fn posix_spawnp
+functions to return the corresponding non-zero error value without creating a
+child process.
+.Pp
+The
+.Dv POSIX_SPAWN_NOSIGCHLD_NP ,
+.Dv POSIX_SPAWN_WAITPID_NP ,
+.Dv POSIX_SPAWN_NOEXECERR_NP ,
+and
+.Dv POSIX_SPAWN_SETSIGIGN_NP
+flags and the
+.Fn posix_spawnattr_getsigignore_np
+and
+.Fn posix_spawnattr_setsigignore_np
+functions are non-portable illumos extensions to the
+.Fn posix_spawn
+and
+.Fn posix_spawnp
+interfaces.

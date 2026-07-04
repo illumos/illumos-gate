@@ -1,117 +1,117 @@
-'\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH POSIX_SPAWNATTR_GETSIGIGNORE_NP 3C "Oct 28, 2008"
-.SH NAME
-posix_spawnattr_getsigignore_np, posix_spawnattr_setsigignore_np \- get and set
-spawn-sigignore attribute of spawn attributes object
-.SH SYNOPSIS
-.LP
-.nf
-#include <signal.h>
-#include <spawn.h>
-
-\fBint\fR \fBposix_spawnattr_getsigignore_np\fR(
-     \fBconst posix_spawnattr_t *restrict\fR \fIattr\fR,
-     \fBsigset_t *restrict\fR \fIsigignore\fR);
-.fi
-
-.LP
-.nf
-\fBint\fR \fBposix_spawnattr_setsigignore_np\fR(
-     \fBposix_spawnattr_t *restrict\fR \fIattr\fR,
-     \fBconst sigset_t *restrict\fR \fIsigignore\fR);
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
-The \fBposix_spawnattr_getsigignore_np()\fR function obtains the value of the
-\fIspawn-sigignore\fR attribute from the attributes object referenced by
-\fIattr\fR.
-.sp
-.LP
-The \fBposix_spawnattr_setsigignore_np()\fR function sets the
-\fIspawn-sigignore\fR attribute in an initialized attributes object referenced
-by \fIattr\fR.
-.sp
-.LP
-The \fIspawn-sigignore\fR attribute represents the set of signals to be forced
-to be ignored in the new process image (if \fBPOSIX_SPAWN_SETSIGIGN_NP\fR is
-set in the spawn-flags attribute) by a spawn operation. The default value of
-this attribute is an empty signal set.
-.SH RETURN VALUES
-.sp
-.LP
-Upon successful completion, \fBposix_spawnattr_getsigignore_np()\fR returns 0
-and stores the value of the \fIspawn-sigignore\fR attribute of \fIattr\fR into
-the object referenced by the \fIsigignore\fR parameter.  Otherwise, an error
-value is returned to indicate the error.
-.sp
-.LP
-Upon successful completion, \fBposix_spawnattr_setsigignore_np()\fR returns 0.
+.\" The contents of this file are subject to the terms of the Common
+.\" Development and Distribution License (the "License").  You may not use
+.\" this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or
+.\" http://www.opensolaris.org/os/licensing.  See the License for the
+.\" specific language governing permissions and limitations under the
+.\" License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each file
+.\" and include the License file at usr/src/OPENSOLARIS.LICENSE.  If
+.\" applicable, add the following below this CDDL HEADER, with the fields
+.\" enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\" Copyright 2026 Oxide Computer Company
+.\"
+.Dd July 4, 2026
+.Dt POSIX_SPAWNATTR_GETSIGIGNORE_NP 3C
+.Os
+.Sh NAME
+.Nm posix_spawnattr_getsigignore_np ,
+.Nm posix_spawnattr_setsigignore_np
+.Nd get and set spawn-sigignore attribute of spawn attributes object
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In signal.h
+.In spawn.h
+.Ft int
+.Fo posix_spawnattr_getsigignore_np
+.Fa "const posix_spawnattr_t *restrict attr"
+.Fa "sigset_t *restrict sigignore"
+.Fc
+.Ft int
+.Fo posix_spawnattr_setsigignore_np
+.Fa "posix_spawnattr_t *restrict attr"
+.Fa "const sigset_t *restrict sigignore"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn posix_spawnattr_getsigignore_np
+function obtains the value of the spawn-sigignore attribute from the attributes
+object referenced by
+.Fa attr .
+.Pp
+The
+.Fn posix_spawnattr_setsigignore_np
+function sets the spawn-sigignore attribute in an initialized attributes object
+referenced by
+.Fa attr .
+.Pp
+The spawn-sigignore attribute represents the set of signals to be forced to be
+ignored in the new process image
+.Po
+if
+.Dv POSIX_SPAWN_SETSIGIGN_NP
+is set in the spawn-flags attribute
+.Pc
+by a spawn operation.
+The default value of this attribute is an empty signal set.
+.Sh RETURN VALUES
+Upon successful completion,
+.Fn posix_spawnattr_getsigignore_np
+returns 0 and stores the value of the spawn-sigignore attribute of
+.Fa attr
+into the object referenced by the
+.Fa sigignore
+parameter.
 Otherwise, an error value is returned to indicate the error.
-.SH ERRORS
-.sp
-.LP
+.Pp
+Upon successful completion,
+.Fn posix_spawnattr_setsigignore_np
+returns 0.
+Otherwise, an error value is returned to indicate the error.
+.Sh ERRORS
 These functions may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
-The value specified by \fIattr\fR is invalid.
-.RE
-
-.sp
-.LP
-The \fBposix_spawnattr_setsigignore_np()\fR function may fail if:
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
+.Bl -tag -width Er
+.It Er EINVAL
+The value specified by
+.Fa attr
+is invalid.
+.El
+.Pp
+The
+.Fn posix_spawnattr_setsigignore_np
+function may fail if:
+.Bl -tag -width Er
+.It Er EINVAL
 The value of the attribute being set is not valid.
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Committed
-_
-MT-Level	MT-Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-.BR posix_spawn (3C),
-.BR posix_spawnattr_destroy (3C),
-.BR posix_spawnattr_getflags (3C),
-.BR posix_spawnattr_getpgroup (3C),
-.BR posix_spawnattr_getschedparam (3C),
-.BR posix_spawnattr_getschedpolicy (3C),
-.BR posix_spawnattr_setsigdefault (3C),
-.BR posix_spawnattr_setsigmask (3C),
-.BR attributes (7)
-.SH NOTES
-.sp
-.LP
-The \fBPOSIX_SPAWN_SETSIGIGN_NP\fR flag and the
-\fBposix_spawnattr_getsigignore_np()\fR and
-\fBposix_spawnattr_setsigignore_np()\fR functions are non-portable Solaris
-extensions to the \fBposix_spawn\fR(3C) and \fBposix_spawnp()\fR interfaces.
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr posix_spawn 3C ,
+.Xr posix_spawnattr_destroy 3C ,
+.Xr posix_spawnattr_getflags 3C ,
+.Xr posix_spawnattr_getpgroup 3C ,
+.Xr posix_spawnattr_getschedparam 3C ,
+.Xr posix_spawnattr_getschedpolicy 3C ,
+.Xr posix_spawnattr_setsigdefault 3C ,
+.Xr posix_spawnattr_setsigmask 3C ,
+.Xr attributes 7
+.Sh NOTES
+The
+.Dv POSIX_SPAWN_SETSIGIGN_NP
+flag and the
+.Fn posix_spawnattr_getsigignore_np
+and
+.Fn posix_spawnattr_setsigignore_np
+functions are non-portable illumos extensions to the
+.Xr posix_spawn 3C
+and
+.Xr posix_spawnp 3C
+interfaces.
