@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -52,9 +52,15 @@ static const nvme_log_page_info_t *kioxia_cd8_log_pages[] = {
 	&ocp_log_devcap, &ocp_log_unsup, &kioxia_cd8_log_extsmart
 };
 
+static const nvme_feat_info_t *kioxia_cd8_feats[] = {
+	&ocp_feat_errinj, &ocp_feat_plpfail, &ocp_feat_plphealth
+};
+
 const nvme_vsd_t kioxia_cd8 = {
 	.nvd_ident = kioxia_cd8_idents,
 	.nvd_nident = ARRAY_SIZE(kioxia_cd8_idents),
 	.nvd_logs = kioxia_cd8_log_pages,
-	.nvd_nlogs = ARRAY_SIZE(kioxia_cd8_log_pages)
+	.nvd_nlogs = ARRAY_SIZE(kioxia_cd8_log_pages),
+	.nvd_feats = kioxia_cd8_feats,
+	.nvd_nfeats = ARRAY_SIZE(kioxia_cd8_feats)
 };

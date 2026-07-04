@@ -32,6 +32,7 @@
 #include <assert.h>
 #include <libcmdutils.h>
 #include <ctype.h>
+#include <sys/nvme/ocp.h>
 
 #include "nvmeadm.h"
 
@@ -2520,6 +2521,83 @@ nvme_print_feat_host_behavior(uint32_t cdw0, void *b, size_t s,
 	nvme_print_bit(6, "Copy Descriptor 4",
 	    nvme_vers_atleast(version, &nvme_vers_2v1), hb->nhb_cdfe & (1 << 4),
 	    "enabled", "disabled");
+}
+
+void
+nvme_print_feat_ocp_err_inj(uint32_t cdw0, void *b, size_t s,
+    const nvme_identify_ctrl_t *id, const nvme_version_t *version)
+{
+	size_t max;
+
+	nvme_print_int64(4, "Number of Error Injections", cdw0, NULL, NULL);
+	if (cdw0 == 0)
+		return;
+
+	max = s / sizeof (ocp_vuf_errinj_t);
+	if (cdw0 > max) {
+		warnx("device value of %u error injections exceeds returned "
+		    "buffer maximum of %zu, limiting to %zu", cdw0, max, max);
+		cdw0 = max;
+	}
+
+	const ocp_vuf_errinj_t *inject = b;
+	for (size_t i = 0; i < cdw0; i++) {
+		nvme_print(4, "Error Event", (int)i, NULL);
+		nvme_print_bit(6, "Event Enabled", B_TRUE,
+		    (inject[i].oei_flags & OCP_ERRINJ_F_ENABLE) != 0, "yes",
+		    "no");
+		nvme_print_bit(6, "Single Instance", B_TRUE,
+		    (inject[i].oei_flags & OCP_ERRINJ_F_SINGLE) != 0, "yes",
+		    "no");
+		nvme_print(6, "Type", -1, "%s (0x%x)",
+		    nvmeadm_ocp_errinj_type_to_str(inject[i].oei_type),
+		    inject[i].oei_type);
+		nvme_print_int64(6, "Number of Reads to Trigger Event",
+		    inject[i].oei_nrtde, NULL, NULL);
+		nvme_print_int64(6, "Latency Duration", inject[i].oei_lat, NULL,
+		    "us");
+	}
+}
+
+void
+nvme_print_feat_ocp_plp_fail(uint32_t cdw0, void *b, size_t s,
+    const nvme_identify_ctrl_t *id, const nvme_version_t *version)
+{
+	ocp_vuf_plp_fail_t fail;
+	const char *mode;
+
+	(void) memcpy(&fail, &cdw0, sizeof (fail));
+	switch (fail.opf_mode) {
+	case OCP_PLP_MODE_READ_ONLY:
+		mode = "read only mode";
+		break;
+	case OCP_PLP_MODE_WRITE_TRHOUGH:
+		mode = "write through mode";
+		break;
+	case OCP_PLP_MODE_NORMAL:
+		mode = "normal";
+		break;
+	default:
+		mode = "unknown";
+		break;
+	}
+	nvme_print(4, "End of Life Behavior", -1, "%s (%u)", mode,
+	    fail.opf_mode);
+}
+
+void
+nvme_print_feat_ocp_plp_health(uint32_t cdw0, void *b, size_t s,
+    const nvme_identify_ctrl_t *id, const nvme_version_t *version)
+{
+	ocp_vuf_plp_health_t plp;
+
+	(void) memcpy(&plp, &cdw0, sizeof (plp));
+	if (plp.oph_hci == 0) {
+		nvme_print(4, "Health Check Interval", -1, "disabled");
+	} else {
+		nvme_print(4, "Health Check Interval", -1, "%u minutes",
+		    plp.oph_hci);
+	}
 }
 
 /*

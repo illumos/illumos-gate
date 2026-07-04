@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 PROGS = \
@@ -28,7 +28,8 @@ PROGS = \
 	ns-lifecycle \
 	ns-max \
 	pev \
-	sctostr
+	sctostr \
+	set-feature
 
 #
 # These are programs that are only used as part of pre-checks for the

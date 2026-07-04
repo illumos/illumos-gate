@@ -863,12 +863,12 @@ bool nvme_set_feat_req_init_by_disc(nvme_ctrl_t *ctrl,
 		req->sfr_allow |= 1 << NVME_SET_FEAT_REQ_FIELD_CDW15;
 	}
 
-	if ((disc->nfd_in_get & NVME_SET_FEAT_F_DATA) != 0) {
+	if ((disc->nfd_in_set & NVME_SET_FEAT_F_DATA) != 0) {
 		req->sfr_need |= 1 << NVME_SET_FEAT_REQ_FIELD_DPTR;
 		req->sfr_allow |= 1 << NVME_SET_FEAT_REQ_FIELD_DPTR;
 	}
 
-	if ((disc->nfd_in_get & NVME_SET_FEAT_F_NSID) != 0) {
+	if ((disc->nfd_in_set & NVME_SET_FEAT_F_NSID) != 0) {
 		req->sfr_need |= 1 << NVME_SET_FEAT_REQ_FIELD_NSID;
 		req->sfr_allow |= 1 << NVME_SET_FEAT_REQ_FIELD_NSID;
 	}

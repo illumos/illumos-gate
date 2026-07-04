@@ -505,6 +505,18 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		.c_optparse = optparse_vendor_cmd
 	},
 	{
+		.c_name = "ocp/error-inject",
+		.c_desc = "inject errors onto an NVMe controller",
+		.c_flagdesc = "  -l lat_us\tset latency duration to lat_us "
+		    "microseconds\n"
+		    "  -n nreads\tdelay error injection until nreads read "
+		    "commands complete\n",
+		.c_func = do_ocp_errinj,
+		.c_usage = usage_ocp_errinj,
+		.c_optparse = optparse_ocp_errinj,
+		.c_flags = NVMEADM_C_EXCL
+	},
+	{
 		.c_name = "sandisk/hwrev",
 		.c_desc = "obtain device hardware revision",
 		.c_func = do_sandisk_hwrev,
@@ -564,49 +576,58 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 
 static const nvmeadm_feature_t features[] = {
 	{
-		.f_feature = NVME_FEAT_ARBITRATION,
+		.f_feature = "arb",
 		.f_print = nvme_print_feat_arbitration
 	}, {
-		.f_feature = NVME_FEAT_POWER_MGMT,
+		.f_feature = "pm",
 		.f_print = nvme_print_feat_power_mgmt
 	}, {
-		.f_feature = NVME_FEAT_LBA_RANGE,
+		.f_feature = "range",
 		.f_print = nvme_print_feat_lba_range
 	}, {
-		.f_feature = NVME_FEAT_TEMPERATURE,
+		.f_feature = "temp",
 		.f_get = do_get_feat_temp_thresh,
 		.f_print = nvme_print_feat_temperature
 	}, {
-		.f_feature = NVME_FEAT_ERROR,
+		.f_feature = "errrec",
 		.f_print = nvme_print_feat_error
 	}, {
-		.f_feature = NVME_FEAT_WRITE_CACHE,
+		.f_feature = "cache",
 		.f_print = nvme_print_feat_write_cache
 	}, {
-		.f_feature = NVME_FEAT_NQUEUES,
+		.f_feature = "queues",
 		.f_print = nvme_print_feat_nqueues
 	}, {
-		.f_feature = NVME_FEAT_INTR_COAL,
+		.f_feature = "coalescing",
 		.f_print = nvme_print_feat_intr_coal
 	}, {
-		.f_feature = NVME_FEAT_INTR_VECT,
+		.f_feature = "vector",
 		.f_get = do_get_feat_intr_vect,
 		.f_print = nvme_print_feat_intr_vect
 	}, {
-		.f_feature = NVME_FEAT_WRITE_ATOM,
+		.f_feature = "atomicity",
 		.f_print = nvme_print_feat_write_atom
 	}, {
-		.f_feature = NVME_FEAT_ASYNC_EVENT,
+		.f_feature = "event",
 		.f_print = nvme_print_feat_async_event
 	}, {
-		.f_feature = NVME_FEAT_AUTO_PST,
+		.f_feature = "apst",
 		.f_print = nvme_print_feat_auto_pst
 	}, {
-		.f_feature = NVME_FEAT_PROGRESS,
+		.f_feature = "progress",
 		.f_print = nvme_print_feat_progress
 	}, {
-		.f_feature = NVME_FEAT_HOST_BEHAVE,
+		.f_feature = "hostsup",
 		.f_print = nvme_print_feat_host_behavior
+	}, {
+		.f_feature = "ocp/errinj",
+		.f_print = nvme_print_feat_ocp_err_inj
+	}, {
+		.f_feature = "ocp/plpfail",
+		.f_print = nvme_print_feat_ocp_plp_fail
+	}, {
+		.f_feature = "ocp/plphealth",
+		.f_print = nvme_print_feat_ocp_plp_health
 	}
 };
 
@@ -3323,14 +3344,14 @@ static void
 do_get_features_cb(const nvme_process_arg_t *npa, const nvme_feat_disc_t *disc)
 {
 	const nvmeadm_feature_t *feat = NULL;
-	uint32_t fid = nvme_feat_disc_fid(disc);
+	const char *name = nvme_feat_disc_short(disc);
 	nvme_get_feat_fields_t fields;
 	void *data = NULL;
 	size_t datalen = 0;
 	uint32_t cdw0;
 
 	for (size_t i = 0; i < ARRAY_SIZE(features); i++) {
-		if (features[i].f_feature == fid) {
+		if (strcmp(features[i].f_feature, name) == 0) {
 			feat = &features[i];
 			break;
 		}

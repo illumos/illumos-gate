@@ -69,13 +69,19 @@ static const nvme_vuc_disc_t sndk_sn861_vuc[] = { {
 	.nvd_lock = NVME_VUC_DISC_LOCK_NONE
 } };
 
+static const nvme_feat_info_t *sndk_sn861_feats[] = {
+	&ocp_feat_errinj, &ocp_feat_plpfail, &ocp_feat_plphealth
+};
+
 const nvme_vsd_t sandisk_sn861 = {
 	.nvd_ident = sandisk_sn861_idents,
 	.nvd_nident = ARRAY_SIZE(sandisk_sn861_idents),
 	.nvd_logs = sandisk_sn861_log_pages,
 	.nvd_nlogs = ARRAY_SIZE(sandisk_sn861_log_pages),
 	.nvd_vuc = sndk_sn861_vuc,
-	.nvd_nvuc = ARRAY_SIZE(sndk_sn861_vuc)
+	.nvd_nvuc = ARRAY_SIZE(sndk_sn861_vuc),
+	.nvd_feats = sndk_sn861_feats,
+	.nvd_nfeats = ARRAY_SIZE(sndk_sn861_feats)
 };
 
 bool

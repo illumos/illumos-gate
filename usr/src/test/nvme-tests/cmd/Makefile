@@ -10,12 +10,13 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 include $(SRC)/Makefile.master
 
 CMDS = \
+	destruct-ocp \
 	destructive \
 	non-destructive \
 	unit

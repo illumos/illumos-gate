@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 #
@@ -27,10 +27,12 @@ set name=info.classification \
 set name=variant.arch value=$(ARCH)
 dir  path=opt/nvme-tests
 dir  path=opt/nvme-tests/bin
+file path=opt/nvme-tests/bin/destruct-ocp mode=0555
 file path=opt/nvme-tests/bin/destructive mode=0555
 file path=opt/nvme-tests/bin/non-destructive mode=0555
 file path=opt/nvme-tests/bin/unit mode=0555
 dir  path=opt/nvme-tests/runfiles
+file path=opt/nvme-tests/runfiles/destruct-ocp.run mode=0444
 file path=opt/nvme-tests/runfiles/destruct.run mode=0444
 file path=opt/nvme-tests/runfiles/non-destruct.run mode=0444
 file path=opt/nvme-tests/runfiles/unit.run mode=0444
@@ -92,7 +94,10 @@ file path=opt/nvme-tests/tests/libnvme/pev.32 mode=0555
 file path=opt/nvme-tests/tests/libnvme/pev.64 mode=0555
 file path=opt/nvme-tests/tests/libnvme/sctostr.32 mode=0555
 file path=opt/nvme-tests/tests/libnvme/sctostr.64 mode=0555
+file path=opt/nvme-tests/tests/libnvme/set-feature.32 mode=0555
+file path=opt/nvme-tests/tests/libnvme/set-feature.64 mode=0555
 dir  path=opt/nvme-tests/tests/nvmeadm
+file path=opt/nvme-tests/tests/nvmeadm/nvmeadm_feat mode=0555
 file path=opt/nvme-tests/tests/nvmeadm/nvmeadm_lifecycle mode=0555
 file path=opt/nvme-tests/tests/nvmeadm/nvmeadm_test mode=0555
 dir  path=opt/nvme-tests/tests/unit

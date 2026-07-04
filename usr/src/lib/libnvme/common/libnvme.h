@@ -528,7 +528,22 @@ typedef enum {
 	 * Indicates that a set features request can't be executed because
 	 * required fields have not been set.
 	 */
-	NVME_ERR_SET_FEAT_REQ_MISSING_FIELDS
+	NVME_ERR_SET_FEAT_REQ_MISSING_FIELDS,
+	/*
+	 * Indicates that the vendor-specific library operation could not
+	 * proceed because the underlying feature is not supported by the given
+	 * device.
+	 */
+	NVME_ERR_VU_FEAT_UNSUP_BY_DEV,
+	/*
+	 * OCP Error Injection specific errors.
+	 */
+	NVME_ERR_OCP_ERRINJ_TYPE_RANGE,
+	NVME_ERR_OCP_ERRINJ_NRTDE_RANGE,
+	NVME_ERR_OCP_ERRINJ_LD_RANGE,
+	NVME_ERR_OCP_ERRINJ_LD_UNSUP,
+	NVME_ERR_OCP_ERRINJ_LD_UNUSE,
+	NVME_ERR_OCP_ERRINJ_REQ_MISSING_FIELDS
 } nvme_err_t;
 
 /*
@@ -612,6 +627,7 @@ typedef struct nvme_ns_delete_req nvme_ns_delete_req_t;
  * Vendor-specific forwards.
  */
 typedef struct nvme_wdc_e6_req nvme_wdc_e6_req_t;
+typedef struct nvme_ocp_errinj_req nvme_ocp_errinj_req_t;
 
 extern nvme_t *nvme_init(void);
 extern void nvme_fini(nvme_t *);
@@ -1363,6 +1379,18 @@ extern bool nvme_wdc_assert_inject(nvme_ctrl_t *);
  */
 extern bool nvme_sndk_pci_eye(nvme_ctrl_t *, uint8_t, void *, size_t);
 extern bool nvme_sndk_hw_rev(nvme_ctrl_t *, uint8_t *, uint8_t *);
+
+/*
+ * OCP Error Injection.
+ */
+extern bool nvme_ocp_errinj_req_init(nvme_ctrl_t *, nvme_ocp_errinj_req_t **);
+extern void nvme_ocp_errinj_req_fini(nvme_ocp_errinj_req_t *);
+extern bool nvme_ocp_errinj_req_set_type(nvme_ocp_errinj_req_t *, uint32_t);
+extern bool nvme_ocp_errinj_req_set_nrtde(nvme_ocp_errinj_req_t *, uint32_t);
+extern bool nvme_ocp_errinj_req_set_ld(nvme_ocp_errinj_req_t *, uint32_t);
+extern bool nvme_ocp_errinj_req_exec(nvme_ocp_errinj_req_t *);
+
+extern bool nvme_ocp_errinj_clear(nvme_ctrl_t *);
 
 #ifdef __cplusplus
 }

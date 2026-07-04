@@ -15,8 +15,9 @@
 
 /*
  * libnvme logic specific to Micron device families. Currently this has support
- * for the Micron 7300, 7400, 7450, 6500, 7500, and 9550 device generations.
- * Right now we only have support for some of the device-specific log pages.
+ * for the Micron 7300, 7400, 7450, 6500, 7500, 9550, and 7600 device
+ * generations. This covers support for some of the device-specific log pages
+ * and features.
  */
 
 #include <sys/sysmacros.h>
@@ -132,11 +133,17 @@ static const nvme_log_page_info_t *micron_x500_log_pages[] = {
 	&ocp_log_devcap, &ocp_log_unsup
 };
 
+static const nvme_feat_info_t *micron_x500_feats[] = {
+	&ocp_feat_plpfail, &ocp_feat_plphealth
+};
+
 const nvme_vsd_t micron_x500 = {
 	.nvd_ident = micron_x500_idents,
 	.nvd_nident = ARRAY_SIZE(micron_x500_idents),
 	.nvd_logs = micron_x500_log_pages,
-	.nvd_nlogs = ARRAY_SIZE(micron_x500_log_pages)
+	.nvd_nlogs = ARRAY_SIZE(micron_x500_log_pages),
+	.nvd_feats = micron_x500_feats,
+	.nvd_nfeats = ARRAY_SIZE(micron_x500_feats)
 };
 
 static const nvme_vsd_ident_t micron_9550_idents[] = {
@@ -156,11 +163,17 @@ static const nvme_log_page_info_t *micron_9550_log_pages[] = {
 	&ocp_log_devcap, &ocp_log_unsup, &ocp_log_telstr
 };
 
+static const nvme_feat_info_t *micron_9550_feats[] = {
+	&ocp_feat_errinj, &ocp_feat_plpfail, &ocp_feat_plphealth
+};
+
 const nvme_vsd_t micron_9550 = {
 	.nvd_ident = micron_9550_idents,
 	.nvd_nident = ARRAY_SIZE(micron_9550_idents),
 	.nvd_logs = micron_9550_log_pages,
-	.nvd_nlogs = ARRAY_SIZE(micron_9550_log_pages)
+	.nvd_nlogs = ARRAY_SIZE(micron_9550_log_pages),
+	.nvd_feats = micron_9550_feats,
+	.nvd_nfeats = ARRAY_SIZE(micron_9550_feats)
 };
 
 static const nvme_vsd_ident_t micron_7600_idents[] = {
@@ -180,9 +193,15 @@ static const nvme_log_page_info_t *micron_7600_log_pages[] = {
 	&ocp_log_hwcomp, &ocp_log_telstr
 };
 
+static const nvme_feat_info_t *micron_7600_feats[] = {
+	&ocp_feat_errinj, &ocp_feat_plpfail, &ocp_feat_plphealth
+};
+
 const nvme_vsd_t micron_7600 = {
 	.nvd_ident = micron_7600_idents,
 	.nvd_nident = ARRAY_SIZE(micron_7600_idents),
 	.nvd_logs = micron_7600_log_pages,
-	.nvd_nlogs = ARRAY_SIZE(micron_7600_log_pages)
+	.nvd_nlogs = ARRAY_SIZE(micron_7600_log_pages),
+	.nvd_feats = micron_7600_feats,
+	.nvd_nfeats = ARRAY_SIZE(micron_7600_feats)
 };

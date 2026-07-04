@@ -183,6 +183,13 @@
 .Ar ctl[/ns]
 .Nm
 .Op Fl dv
+.Cm ocp/error-inject
+.Op Fl l Ar lat_us
+.Op Fl n Ar nreads
+.Ar ctl
+.Ar error
+.Nm
+.Op Fl dv
 .Cm sandisk/hwrev
 .Ar ctl
 .Nm
@@ -1283,6 +1290,9 @@ Asynchronous Event Configuration:event:controller
 Autonomous Power State Transition:apst:controller
 Software Progress Marker:progress:controller
 Host Behavior Support:hostsup:controller
+OCP Error Injection:ocp/errinj:nvm
+OCP PLP Failure Mode:ocp/plpfail:nvm
+OCP PLP Health Check Interval:ocp/plphealth:nvm
 .TE
 .Pp
 For an explanation of the individual features refer to the description
@@ -1968,6 +1978,174 @@ value which will be interpreted in seconds.
 .El
 .It Xo
 .Nm
+.Cm ocp/error-inject
+.Op Fl l Ar lat_us
+.Op Fl r Ar nreads
+.Ar ctl
+.Ar error
+.Xc
+This command performs error injection on the NVMe controller identified
+by
+.Ar ctl
+as described by the OCP Datacenter NVMe SSD Specification.
+The specific errors and events that may be injected vary based on the
+controller.
+This command allows for the injection of a single error at a time.
+If an error is still pending when another error is injected, then it
+generally will replace that pending error.
+Not all controllers support this.
+.Pp
+The
+.Ar error
+operand identifies the class of error to inject.
+Errors are identified either by name and are listed below.
+In addition, one may use the numeric identifier of an error in either
+decimal or hexadecimal.
+The following errors and events are supported:
+.Bl -tag -width Ds
+.It Sy clear-errors
+Clear any pending or active event and error injections.
+This only clears events that would persist over a period of time after
+injection has begun.
+.It Sy cpu-hang
+Inject a CPU and/or controller hardware logic hang.
+.It Sy nand-hang
+Inject a NAND logic hang.
+.It Sy plp-defect
+Inject a power loss protection (PLP) failure.
+.It Sy fw-error
+Inject a logical firmware error and assert.
+.It Sy dram-corrupt-crit
+Inject a DRAM uncorrectable error in a device-critical data path.
+The specification does not define any distinctions between critical and
+non-critical error injections.
+.It Sy dram-corrupt-noncrit
+Inject a DRAM uncorrectable error in a less critical data path.
+.It Sy nand-corrupt
+Inject an uncorrectable NAND error.
+.It Sy sram-corrupt
+Inject an uncorrectable SRAM error.
+.It Sy hw-malfunction
+Inject a hardware hang.
+.It Sy no-spare-nand
+Cause the device to run out of spare NAND, making it unable to continue
+writing.
+This simulates a device end-of-life situation.
+.It Sy incomplete-shutdown
+Cause the device to believe it did not cleanly shut down on its next
+power cycle.
+E.g. being unable to flush all metadata to stable storage.
+This event was added in the OCP DSSD Version 2.5.
+.It Sy metadata-corrupt
+Inject an error that causes device metadata structures to be
+unrepairable.
+This event was added in the OCP DSSD Version 2.6.
+.It Sy critical-gc
+Cause the device to prioritize internal garbage collection to avoid failing writes.
+.It Sy latency-spike
+Cause a subsequent I/O to have a delay in completing the I/O.
+This event was added in the OCP DSSD Version 2.6.
+.It Sy io-failure
+Cause the next I/O command to fail.
+This event was added in the OCP DSSD Version 2.6.
+.It Sy io-timeout
+Cause the next I/O command to never return a completion.
+This event was added in the OCP DSSD Version 2.6.
+.It Sy admin-failure
+Cause the next admin command to fail.
+This event was added in the OCP DSSD Version 2.6.
+.It Sy admin-timeout
+Cause the next admin command to never return a completion.
+This event was added in the OCP DSSD Version 2.6.
+.It Sy thermal-throttle-start
+Cause the device to act as though the temperature has crossed the
+warning threshold and cause the device to throttle as well as generate
+additional events.
+This will persist until the controller is reset or the
+.Sy thermal-throttle-end
+event is injected.
+This event was added in the OCP DSSD Version 2.6.
+.It Sy thermal-throttle-end
+Cause an injected thermal event to terminate.
+This is the pair of
+.Sy thermal-throttle-start
+and has no effect if it is not actively ongoing.
+This event was added in the OCP DSSD Version 2.6.
+.It Sy crit-temp
+Inject a critical temperature event that will cause thermal throttling
+and an emergency shutdown.
+This will persist until the controller is power cycled.
+This event was added in the OCP DSSD Version 2.6.
+.It Sy nand-offline
+Inject a failure of an entire NAND die.
+This event was added in the OCP DSSD Version 2.6.
+.It Sy sanitize-cmd-failure
+Cause the next sanitize command to fail with the Sanitize Failed
+.Pq 0x1c
+error code.
+This event was added in the OCP DSSD Version 2.7.
+.It Sy require-user-data-erase
+Causes the next Format NVM command that would use a cryptographic erase
+to use a user data erase instead.
+This event was added in the OCP DSSD Version 2.7.
+.It Sy pcie-correctable
+Injects correctable errors in the PCIe AER Correctable Error Status
+Register.
+This event was added in the OCP DSSD Version 2.7.
+.It Sy pcie-uncorrectable
+Injects uncorrectable errors in the PCIe AER Uncorrectable Error Status
+Register.
+This event was added in the OCP DSSD Version 2.7.
+.It Sy clear-pel
+Causes the persistent event log to be cleared.
+It is vendor-specific as to whether the log is restored after this
+error injection is terminated.
+This event was added in the OCP DSSD Version 2.7.
+.It Sy sanitize-op-failure
+Causes the next sanitize command that is issued to complete
+successfully, but subsequently fail the operation in the sanitize log
+page.
+This event was added in the OCP DSSD Version 2.7.
+.It Sy random-io-spikes
+Causes the device to inject random I/O delays.
+This event was added in the OCP DSSD Version 2.7.
+.It Sy factory-reset
+Causes the device to simulate being restored to its factory default
+state.
+This event was added in the OCP DSSD Version 2.7.
+.It Sy voltage-drop
+Causes the device to act as though it has lost power and begin the power
+loss protection event.
+This event was added in the OCP DSSD Version 2.7.
+.It Sy available-spare
+Causes the device to simulate the available spare capacity to drop below
+the available spare threshold.
+This event was added in the OCP DSSD Version 2.7.
+.It Sy volatile-memory-backup
+Causes the device to simulate a failure to persist its volatile memory.
+This event was added in the OCP DSSD Version 2.7.
+.El
+.Pp
+The following options are supported:
+.Bl -tag -width Ds
+.It Fl l Ar lat_us
+Indicates the duration for the
+.Sy latency-spike
+event.
+This value is in microseconds.
+It is not valid with any other event type.
+This field was added in the OCP DSSD specification version 2.7 and may
+not work with devices which are on older versions of the specification.
+.It Fl r Ar nreads
+Delay error injection until the specified number of reads, up to 65,535,
+have occurred.
+A value of 0, the default, indicates that the error should be injected
+immediately.
+Otherwise, after the specified number of read commands are completed and
+returned to the device, the error will occur.
+.El
+.It Xo
+.Nm
 .Cm sandisk/hwrev
 .Ar ctl
 .Xc
@@ -2324,3 +2502,9 @@ The short names used by various filters are
 .Xr nvme 4D
 .Pp
 .Lk http://www.nvmexpress.org/specifications/ "NVMe specifications"
+.Rs
+.%A Open Compute Project
+.%T Datacenter NVMe SSD Specification
+.%V Version 2.6
+.%D September 25, 2024
+.Re

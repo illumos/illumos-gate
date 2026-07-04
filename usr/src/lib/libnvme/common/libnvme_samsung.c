@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -31,6 +31,10 @@ static const nvme_vsd_ident_t samsung_pm9d3a_idents[] = {
 	}
 };
 
+static const nvme_feat_info_t *samsung_pm9d3a_feats[] = {
+	&ocp_feat_plpfail, &ocp_feat_plphealth
+};
+
 static const nvme_log_page_info_t *samsung_pm9d3a_log_pages[] = {
 	&ocp_log_smart, &ocp_log_errrec, &ocp_log_fwact, &ocp_log_lat,
 	&ocp_log_devcap, &ocp_log_unsup, &ocp_log_telstr
@@ -40,5 +44,7 @@ const nvme_vsd_t samsung_pm9d3a = {
 	.nvd_ident = samsung_pm9d3a_idents,
 	.nvd_nident = ARRAY_SIZE(samsung_pm9d3a_idents),
 	.nvd_logs = samsung_pm9d3a_log_pages,
-	.nvd_nlogs = ARRAY_SIZE(samsung_pm9d3a_log_pages)
+	.nvd_nlogs = ARRAY_SIZE(samsung_pm9d3a_log_pages),
+	.nvd_feats = samsung_pm9d3a_feats,
+	.nvd_nfeats = ARRAY_SIZE(samsung_pm9d3a_feats)
 };

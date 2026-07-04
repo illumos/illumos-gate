@@ -10,13 +10,14 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 include $(SRC)/Makefile.master
 
 RUNFILES = \
 	destruct.run \
+	destruct-ocp.run \
 	non-destruct.run \
 	unit.run
 

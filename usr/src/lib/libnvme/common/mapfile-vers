@@ -230,6 +230,13 @@ SYMBOL_VERSION ILLUMOSprivate {
 	nvme_nvm_lba_fmt_id;
 	nvme_nvm_lba_fmt_meta_size;
 	nvme_nvm_lba_fmt_rel_perf;
+	nvme_ocp_errinj_clear;
+	nvme_ocp_errinj_req_exec;
+	nvme_ocp_errinj_req_fini;
+	nvme_ocp_errinj_req_init;
+	nvme_ocp_errinj_req_set_ld;
+	nvme_ocp_errinj_req_set_nrtde;
+	nvme_ocp_errinj_req_set_type;
 	nvme_sctostr;
 	nvme_scttostr;
 	nvme_set_feat_req_clear_input;

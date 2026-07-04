@@ -100,8 +100,10 @@ typedef enum {
 	 */
 	OCP_FEAT_DSSD_EOLPLP		= 0xc2,
 	/*
-	 * Clears the PCIe correctable error counters. Added in v1.0. Scoped to
-	 * the controller.
+	 * Clears the PCIe correctable error counters in the OCP_LOG_DSSD_SMART
+	 * log page. It does not impact the PCIe AER registers. There is no
+	 * meaningful GET FEATURE for this. Added in v1.0. Scoped to the
+	 * controller.
 	 */
 	OCP_FEAT_DSSD_CLEAR_PCIE_ERRCOR	= 0xc3,
 	/*
@@ -110,7 +112,8 @@ typedef enum {
 	 */
 	OCP_FEAT_DSSD_IEEE1667		= 0xc4,
 	/*
-	 * Controls the latency monitor feature. Added in v2.0. Scoped to the
+	 * Controls attributes of the latency monitor feature. Paired with the
+	 * OCP_LOG_DSSD_LATENCY log page. Added in v2.0. Scoped to the
 	 * controller.
 	 */
 	OCP_FEAT_DSSD_LATENCY		= 0xc5,
@@ -120,8 +123,8 @@ typedef enum {
 	 */
 	OCP_FEAT_DSSD_PLP_HEALTH	= 0xc6,
 	/*
-	 * Controls the power state that the device is in. Added in v2.0. Scoped
-	 * to the NVM subsystem.
+	 * Controls the OCP version of the device power state. Added in v2.0.
+	 * Scoped to the NVM subsystem.
 	 */
 	OCP_FEAT_DSSD_POWER_STATE	= 0xc7,
 	/*
@@ -131,7 +134,8 @@ typedef enum {
 	OCP_FEAT_DSSD_TEL_PROFILE	= 0xc8,
 	/*
 	 * Controls whether additional spec-specific events should be sent with
-	 * the asynchronous event commands.
+	 * the asynchronous event commands. Added in v2.5. Scoped to the
+	 * controller.
 	 */
 	OCP_FEAT_DSSD_ASYNC_EVENT	= 0xc9
 } ocp_vuf_t;
@@ -793,6 +797,96 @@ typedef struct {
 } ocp_vul_telstr_vuest_t;
 
 /*
+ * OCP Error Injection Feature Data Structure
+ */
+typedef enum {
+	/*
+	 * This flag indicates that the error type is enabled.
+	 */
+	OCP_ERRINJ_F_ENABLE	= 1 << 0,
+	/*
+	 * This flag indicates that this error should be injected on its own as
+	 * a single instance.
+	 */
+	OCP_ERRINJ_F_SINGLE	= 1 << 1
+} ocp_errinj_flags_t;
+
+typedef enum {
+	OCP_ERRINJ_T_RSVD = 0,
+	OCP_ERRINJ_T_CPU_HANG,
+	OCP_ERRINJ_T_NAND_HANG,
+	OCP_ERRINJ_T_PLP_DEFECT,
+	OCP_ERRINJ_T_FW_ERROR,
+	OCP_ERRINJ_T_DRAM_CORRUPT_CRIT,
+	OCP_ERRINJ_T_DRAM_CORRUPT_NONCRIT,
+	OCP_ERRINJ_T_NAND_CORRUPT,
+	OCP_ERRINJ_T_SRAM_CORRUPT,
+	OCP_ERRINJ_T_HW_MALFUNC,
+	OCP_ERRINJ_T_NO_SPARE_NAND,
+	/* Added in v2.5 */
+	OCP_ERRINJ_T_INCOMPLETE_SHUTDOWN,
+	/* Added in v2.6 */
+	OCP_ERRINJ_T_METADATA_CORRUPT,
+	OCP_ERRINJ_T_CRIT_GC,
+	OCP_ERRINJ_T_LATENCY_SPIKE,
+	OCP_ERRINJ_T_IO_FAIL,
+	OCP_ERRINJ_T_IO_TIMEOUT,
+	OCP_ERRINJ_T_ADMIN_FAIL,
+	OCP_ERRINJ_T_ADMIN_TIMEOUT,
+	OCP_ERRINJ_T_THERM_THROT_EN,
+	OCP_ERRINJ_T_THERM_THROT_DIS,
+	OCP_ERRINJ_T_THERM_CRIT_TEMP,
+	OCP_ERRINJ_T_DIE_OFFLINE,
+	/* Added in v2.7 */
+	OCP_ERRINJ_T_SANITIZE_CMD_FAIL,
+	/* 0x18 is reserved */
+	OCP_ERRINJ_T_USER_DATA_ERASE	= 0x19,
+	OCP_ERRINJ_T_PCIE_CE,
+	OCP_ERRINJ_T_PCIE_UE,
+	OCP_ERRINJ_T_PEL_CLEAR,
+	OCP_ERRINJ_T_SANITIZE_OP_FAIL,
+	OCP_ERRINJ_T_RANDOM_LATENCY,
+	OCP_ERRINJ_T_FACTORY_RESET,
+	OCP_ERRINJ_T_VOLTAGE_DROP,
+	OCP_ERRINJ_T_AVAIL_SPARE,
+	OCP_ERRINJ_T_VOL_MEM_BACKUP
+} ocp_errinj_type_t;
+
+/*
+ * This is the maximum number of errors that can be injected or information can
+ * be returned about. The data structure is sized to this + 1. Later versions of
+ * the specification have constrained things so only one event may be injected
+ * per command.
+ */
+#define	OCP_ERRINJ_MAX_INJECT	127
+
+typedef struct {
+	uint8_t oei_flags;
+	uint8_t oei_rsvd;
+	uint16_t oei_type;
+	uint16_t oei_nrtde;
+	uint8_t oei_rsvd6[2];
+	uint32_t oei_lat;
+	uint8_t oei_rsvd10[32 - 12];
+} ocp_vuf_errinj_t;
+
+typedef enum {
+	OCP_PLP_MODE_READ_ONLY	= 1,
+	OCP_PLP_MODE_WRITE_TRHOUGH,
+	OCP_PLP_MODE_NORMAL
+} ocp_plp_mode_t;
+
+typedef struct {
+	uint32_t opf_mode:3;
+	uint32_t opf_rsvd:29;
+} ocp_vuf_plp_fail_t;
+
+typedef struct {
+	uint16_t oph_hci;
+	uint16_t oph_rsvd;
+} ocp_vuf_plp_health_t;
+
+/*
  * Our current version of smatch cannot handle packed structures.
  */
 #ifndef __CHECKER__
@@ -826,6 +920,9 @@ CTASSERT(offsetof(ocp_vul_telstr_t, ots_rsvd384) == 384);
 CTASSERT(sizeof (ocp_vul_telstr_sit_t) == 16);
 CTASSERT(sizeof (ocp_vul_telstr_est_t) == 16);
 CTASSERT(sizeof (ocp_vul_telstr_vuest_t) == 16);
+CTASSERT(sizeof (ocp_vuf_errinj_t) == 32);
+CTASSERT(sizeof (ocp_vuf_plp_fail_t) == 4);
+CTASSERT(sizeof (ocp_vuf_plp_health_t) == 4);
 #endif
 
 #pragma	pack()	/* pack(1) */

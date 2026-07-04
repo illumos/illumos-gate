@@ -25,6 +25,7 @@
 #include <stdbool.h>
 #include <nvme_common.h>
 #include <synch.h>
+#include <sys/nvme/ocp.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -449,6 +450,16 @@ struct nvme_wdc_e6_req {
 };
 
 /*
+ * OCP Error injection request.
+ */
+struct nvme_ocp_errinj_req {
+	uint32_t oer_need;
+	uint32_t oer_allow;
+	ocp_vuf_errinj_t oer_err[OCP_ERRINJ_MAX_INJECT + 1];
+	nvme_set_feat_req_t *oer_feat;
+};
+
+/*
  * Common interfaces for operation success and failure. There are currently
  * errors that can exist on four different objects in the library and there is
  * one success() and error() function for each of them. See the theory statement
@@ -574,6 +585,10 @@ extern const nvme_log_page_info_t ocp_log_unsup;
 extern const nvme_log_page_info_t ocp_log_hwcomp;
 extern const nvme_log_page_info_t ocp_log_telstr;
 
+extern const nvme_feat_info_t ocp_feat_errinj;
+extern const nvme_feat_info_t ocp_feat_plpfail;
+extern const nvme_feat_info_t ocp_feat_plphealth;
+
 extern const nvme_vsd_t wdc_sn840;
 extern const nvme_vsd_t wdc_sn65x;
 extern const nvme_vsd_t sandisk_sn861;
@@ -591,6 +606,7 @@ extern const nvme_vsd_t samsung_pm9d3a;
 
 extern void nvme_vendor_map_ctrl(nvme_ctrl_t *);
 extern bool nvme_vendor_vuc_supported(nvme_ctrl_t *, const char *);
+extern bool nvme_vendor_feature_supported(nvme_ctrl_t *, const char *);
 
 /*
  * Internal formatting functions that probably could be external.

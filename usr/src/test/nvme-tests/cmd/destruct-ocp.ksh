@@ -12,12 +12,12 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 #
-# Run destructive user tests after verification that the device is
-# usable.
+# Run tests that can wreak havoc on a device with OCP features (e.g.
+# error injection, changing the PLP Health window, etc.)
 #
 
 #
@@ -30,21 +30,28 @@ unalias -a
 set -o pipefail
 
 de_arg0=$(basename $0)
-de_root="$(dirname $0)/.."
-de_rundir="$de_root/runfiles"
-de_file="destruct.run"
+de_rundir="$(dirname $0)/../runfiles"
+de_file="destruct-ocp.run"
 de_runfile="$de_rundir/$de_file"
 de_runner="/opt/test-runner/bin/run"
-de_check="$de_root/tests/libnvme/check-destruct.64"
+de_nvmeadm="/usr/sbin/nvmeadm"
+
+function fatal
+{
+        typeset msg="$*"
+        [[ -z "$msg" ]] && msg="failed"
+        echo "$de_arg0: $msg" >&2
+        exit 1
+}
 
 
 if (( $# == 0 )); then
 	fatal "missing required device name"
 fi
 
-export NVME_TEST_DEVICE=$1
-if ! $de_check; then
-	exit 1
+if ! $de_nvmeadm list "$1" > /dev/null; then
+	fatal "failed to find device $1"
 fi
 
+export NVME_TEST_DEVICE=$1
 $de_runner -c "$de_runfile"

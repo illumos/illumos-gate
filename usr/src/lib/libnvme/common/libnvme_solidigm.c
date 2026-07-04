@@ -288,6 +288,10 @@ static const nvme_log_page_info_t *solidigm_ps10x0_log_pages[] = {
 	&solidigm_ps10x0_log_temp
 };
 
+static const nvme_feat_info_t *solidigm_ps10x0_feats[] = {
+	&ocp_feat_plpfail, &ocp_feat_plphealth
+};
+
 static const nvme_vsd_ident_t solidigm_ps10x0_idents[] = {
 	{
 		.nvdi_vid = SOLIDIGM_PCI_VID,
@@ -324,5 +328,7 @@ const nvme_vsd_t solidigm_ps10x0 = {
 	.nvd_ident = solidigm_ps10x0_idents,
 	.nvd_nident = ARRAY_SIZE(solidigm_ps10x0_idents),
 	.nvd_logs = solidigm_ps10x0_log_pages,
-	.nvd_nlogs = ARRAY_SIZE(solidigm_ps10x0_log_pages)
+	.nvd_nlogs = ARRAY_SIZE(solidigm_ps10x0_log_pages),
+	.nvd_feats = solidigm_ps10x0_feats,
+	.nvd_nfeats = ARRAY_SIZE(solidigm_ps10x0_feats)
 };

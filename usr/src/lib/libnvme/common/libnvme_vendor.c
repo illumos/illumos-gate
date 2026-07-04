@@ -102,3 +102,19 @@ nvme_vendor_vuc_supported(nvme_ctrl_t *ctrl, const char *name)
 	return (nvme_ctrl_error(ctrl, NVME_ERR_VU_FUNC_UNSUP_BY_DEV, 0,
 	    "device missing support for vendor unique command %s", name));
 }
+
+bool
+nvme_vendor_feature_supported(nvme_ctrl_t *ctrl, const char *name)
+{
+	if (ctrl->nc_vsd != NULL) {
+		for (size_t i = 0; i < ctrl->nc_vsd->nvd_nfeats; i++) {
+			if (strcmp(ctrl->nc_vsd->nvd_feats[i]->nfeat_short,
+			    name) == 0) {
+				return (true);
+			}
+		}
+	}
+
+	return (nvme_ctrl_error(ctrl, NVME_ERR_VU_FEAT_UNSUP_BY_DEV, 0,
+	    "device missing support for vendor unique feature %s", name));
+}

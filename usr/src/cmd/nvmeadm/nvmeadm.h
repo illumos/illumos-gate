@@ -72,7 +72,7 @@ struct nvmeadm_cmd {
  * features.
  */
 struct nvmeadm_feature {
-	uint8_t f_feature;
+	const char *f_feature;
 	boolean_t (*f_get)(const nvme_process_arg_t *, const nvme_feat_disc_t *,
 	    const nvmeadm_feature_t *);
 	void (*f_print)(uint32_t, void *, size_t, const nvme_identify_ctrl_t *,
@@ -206,6 +206,12 @@ extern void nvme_print_feat_progress(uint32_t, void *, size_t,
     const nvme_identify_ctrl_t *, const nvme_version_t *);
 extern void nvme_print_feat_host_behavior(uint32_t, void *, size_t,
     const nvme_identify_ctrl_t *, const nvme_version_t *);
+extern void nvme_print_feat_ocp_err_inj(uint32_t, void *, size_t,
+    const nvme_identify_ctrl_t *, const nvme_version_t *);
+extern void nvme_print_feat_ocp_plp_fail(uint32_t, void *, size_t,
+    const nvme_identify_ctrl_t *, const nvme_version_t *);
+extern void nvme_print_feat_ocp_plp_health(uint32_t, void *, size_t,
+    const nvme_identify_ctrl_t *, const nvme_version_t *);
 
 extern void nvmeadm_dump_hex(const uint8_t *, size_t);
 
@@ -329,6 +335,11 @@ extern void usage_sandisk_hwrev(const char *);
 extern int do_sandisk_pcieye(const nvme_process_arg_t *);
 extern void optparse_sandisk_pcieye(nvme_process_arg_t *);
 extern void usage_sandisk_pcieye(const char *);
+
+extern int do_ocp_errinj(const nvme_process_arg_t *);
+extern void optparse_ocp_errinj(nvme_process_arg_t *);
+extern void usage_ocp_errinj(const char *);
+extern const char *nvmeadm_ocp_errinj_type_to_str(uint32_t);
 
 /*
  * This is an arbitrary maximum that we use for what we expect the likely size
