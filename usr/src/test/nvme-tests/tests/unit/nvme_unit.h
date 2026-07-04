@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _NVME_UNIT_H
@@ -47,6 +47,7 @@ extern const nvme_valid_ctrl_data_t nvme_ctrl_health_1v0;
 extern const nvme_valid_ctrl_data_t nvme_ctrl_base_1v1;
 extern const nvme_valid_ctrl_data_t nvme_ctrl_base_1v2;
 extern const nvme_valid_ctrl_data_t nvme_ctrl_base_2v0;
+extern const nvme_valid_ctrl_data_t nvme_ctrl_base_2v2;
 extern const nvme_valid_ctrl_data_t nvme_ctrl_ns_1v2;
 extern const nvme_valid_ctrl_data_t nvme_ctrl_ns_1v3;
 extern const nvme_valid_ctrl_data_t nvme_ctrl_ns_1v4;

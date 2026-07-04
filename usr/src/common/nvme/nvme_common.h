@@ -51,6 +51,8 @@ extern const nvme_version_t nvme_vers_1v3;
 extern const nvme_version_t nvme_vers_1v4;
 extern const nvme_version_t nvme_vers_2v0;
 extern const nvme_version_t nvme_vers_2v1;
+extern const nvme_version_t nvme_vers_2v2;
+extern const nvme_version_t nvme_vers_2v3;
 
 extern bool nvme_vers_atleast(const nvme_version_t *, const nvme_version_t *);
 
@@ -355,6 +357,23 @@ typedef enum {
 extern const nvme_field_info_t nvme_get_feat_fields[];
 extern const size_t nvme_get_feat_nfields;
 
+typedef enum {
+	NVME_SET_FEAT_REQ_FIELD_FID		= 0,
+	NVME_SET_FEAT_REQ_FIELD_SAVE,
+	NVME_SET_FEAT_REQ_FIELD_CDW11,
+	/*
+	 * CDW12, 13, and 15 were added in NVMe 1.2.
+	 */
+	NVME_SET_FEAT_REQ_FIELD_CDW12,
+	NVME_SET_FEAT_REQ_FIELD_CDW13,
+	NVME_SET_FEAT_REQ_FIELD_CDW15,
+	NVME_SET_FEAT_REQ_FIELD_DPTR,
+	NVME_SET_FEAT_REQ_FIELD_NSID
+} nvme_set_feat_req_field_t;
+
+extern const nvme_field_info_t nvme_set_feat_fields[];
+extern const size_t nvme_set_feat_nfields;
+
 /*
  * Common feature information.
  */
@@ -380,6 +399,7 @@ struct nvme_feat_info {
 	nvme_feat_scope_t nfeat_scope;
 	nvme_feat_csi_t nfeat_csi;
 	nvme_feat_flags_t nfeat_flags;
+	nvme_disc_impact_t nfeat_impact;
 	/*
 	 * These four entries describe what an NVMe device uses as input and
 	 * output fields.

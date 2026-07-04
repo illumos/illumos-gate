@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -67,6 +67,28 @@
  * of a broadcast namespace ID. While the controller node may ask for any
  * feature, those using a namespace node are limited in terms of what they can
  * actually issue.
+ *
+ * Set Feature
+ * -----------
+ *
+ * The kernel restricts set feature requests to the set of vendor-specific
+ * requests, as a number of standard features are things that are set in concert
+ * by the driver. For example, we don't want someone changing out queue,
+ * interrupt related, or host behavior features behind our back. That could lead
+ * to chaos. Vendor-specific features are a bit of a compromise and we treat
+ * them more like vendor-specific commands. We ask for what the impact is and
+ * rely on someone who is privileged enough to do this to know that if they do
+ * something that could erase all data or delete namespaces behind our back
+ * without telling us, there's not much we can do. The only other option would
+ * be to take the userland vendor-specific feature registry and bring it into
+ * the kernel.
+ *
+ * Because these are all vendor-specific, we focus validation on consistency.
+ * That is, we can't verify specific values of cdw11 or know if there is
+ * sufficient data present (or if it takes data at all) for the feature.
+ *
+ * Similar to the Get Feature discussion above, we treat namespaces in the same
+ * manner and do not employ rewriting.
  *
  * Identify
  * --------
@@ -132,7 +154,7 @@
  * command is supported, that we aren't going to a read-only slot when saving,
  * or related.
  *
- * Namesapce Management
+ * Namespace Management
  * --------------------
  *
  * Namespace management consists of four commands: namespace create, namespace
@@ -219,14 +241,25 @@ nvme_validate_one_field(nvme_ioctl_common_t *com, uint64_t val,
  * optionally support a 32-bit wide length argument. We opt to support a smaller
  * amount than the NVMe 1.3 maximum: 1 MiB, which is a fairly arbitrary sized
  * value.
+ *
+ * We apply a similar limit to features. Features do not have a similar means of
+ * specifying the overall requested length and instead are just expected to have
+ * the right amount of data present.
  */
 uint32_t nvme_log_page_max_size = 1 * 1024 * 1024;
+uint32_t nvme_feature_max_size = 1 * 1024 * 1024;
 
 static boolean_t
-nvme_logpage_is_vendor(nvme_ioctl_get_logpage_t *log)
+nvme_logpage_is_vendor(const nvme_ioctl_get_logpage_t *log)
 {
 	return (log->nigl_lid >= NVME_LOGPAGE_VEND_MIN &&
 	    log->nigl_lid <= NVME_LOGPAGE_VEND_MAX);
+}
+
+static boolean_t
+nvme_feature_is_vendor(uint32_t fid)
+{
+	return (fid >= NVME_FEAT_VEND_MIN && fid <= NVME_FEAT_VEND_MAX);
 }
 
 static const nvme_validate_info_t nvme_valid_log_csi = {
@@ -428,7 +461,74 @@ static const nvme_validate_info_t nvme_valid_get_feat_cdw11 = {
 };
 
 /*
- * To validate a feature we take the following high-level steps:
+ * Validate the fields of a get feature request. Because this is a
+ * vendor-specific log, we don't really have information about it or its side
+ * effects. As such we do generic validation on fields. A few notes here:
+ *
+ * - We don't perform additional validation for the namespace ID. We don't know
+ *   if it should or shouldn't be used. We rely on the common ioctl code having
+ *   already verified the range.
+ *
+ * - Since we don't have a specific feature we're comparing against, we just
+ *   always pass in the expected bit that should be set for checking whether or
+ *   not it's used for the nvme_validate_one_field() unused bit checking.
+ *
+ * - Unlike the common logic, we don't validate the expected feature size.
+ *   However we do constrain the maximum size that it is allowed to be much like
+ *   a log page.
+ */
+static boolean_t
+nvme_validate_get_feature_vendor(nvme_ioctl_get_feature_t *get,
+    const nvme_valid_ctrl_data_t *ctrl_data)
+{
+	if (!nvme_validate_one_field(&get->nigf_common, get->nigf_sel,
+	    &nvme_valid_get_feat_sel, ctrl_data, 0)) {
+		return (B_FALSE);
+	}
+
+	if (get->nigf_sel == NVME_FEATURE_SEL_SUPPORTED) {
+		if (get->nigf_cdw11 != 0) {
+			return (nvme_ioctl_error(&get->nigf_common,
+			    NVME_IOCTL_E_GET_FEAT_CDW11_UNUSE, 0, 0));
+		}
+
+		if (get->nigf_data != 0 || get->nigf_len != 0) {
+			return (nvme_ioctl_error(&get->nigf_common,
+			    NVME_IOCTL_E_GET_FEAT_DATA_UNUSE, 0, 0));
+		}
+
+		return (B_TRUE);
+	}
+
+	if (!nvme_validate_one_field(&get->nigf_common, get->nigf_cdw11,
+	    &nvme_valid_get_feat_cdw11, ctrl_data, NVME_GET_FEAT_F_CDW11)) {
+		return (B_FALSE);
+	}
+
+	/*
+	 * For validating data, we need to confirm either both are set or none
+	 * are.
+	 */
+	if (get->nigf_data != 0 && get->nigf_len == 0) {
+		return (nvme_ioctl_error(&get->nigf_common,
+		    NVME_IOCTL_E_GET_FEAT_DATA_RANGE, 0, 0));
+	}
+
+	if (get->nigf_data == 0 && get->nigf_len != 0) {
+		return (nvme_ioctl_error(&get->nigf_common,
+		    NVME_IOCTL_E_GET_FEAT_DATA_RANGE, 0, 0));
+	}
+
+	if (get->nigf_len > nvme_feature_max_size) {
+		return (nvme_ioctl_error(&get->nigf_common,
+		    NVME_IOCTL_E_GET_FEAT_DATA_RANGE, 0, 0));
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * To validate a Get Feature we take the following high-level steps:
  *
  * 1) First, we have to determine that this is a feature that we know about.
  * 2) Ensure that this feature is actually supported. We may not be able to
@@ -448,6 +548,10 @@ nvme_validate_get_feature(nvme_t *nvme, nvme_ioctl_get_feature_t *get)
 
 	ctrl_data.vcd_vers = &nvme->n_version;
 	ctrl_data.vcd_id = nvme->n_idctl;
+
+	if (nvme_feature_is_vendor(get->nigf_fid)) {
+		return (nvme_validate_get_feature_vendor(get, &ctrl_data));
+	}
 
 	for (size_t i = 0; i < nvme_std_nfeats; i++) {
 		if (nvme_std_feats[i].nfeat_fid == get->nigf_fid) {
@@ -552,10 +656,139 @@ nvme_validate_get_feature(nvme_t *nvme, nvme_ioctl_get_feature_t *get)
 	 * In the past, the driver also checked a few of the specific values of
 	 * cdw11 against information that the kernel had such as the maximum
 	 * number of interrupts that we had configured or the valid temperature
-	 * types in the temperature thrshold. In the future, if we wanted to add
-	 * a cdw11-specific validation, this is where we'd want to insert it
+	 * types in the temperature threshold. In the future, if we wanted to
+	 * add a cdw11-specific validation, this is where we'd want to insert it
 	 * roughly.
 	 */
+
+	return (B_TRUE);
+}
+
+static const nvme_validate_info_t nvme_valid_set_feat_save = {
+	nvme_set_feat_fields, NVME_SET_FEAT_REQ_FIELD_SAVE, 0,
+	NVME_IOCTL_E_SET_FEAT_SAVE_RANGE, NVME_IOCTL_E_SET_FEAT_SAVE_UNSUP, 0
+};
+
+static const nvme_validate_info_t nvme_valid_set_feat_cdw11 = {
+	nvme_set_feat_fields, NVME_SET_FEAT_REQ_FIELD_CDW11,
+	NVME_SET_FEAT_F_CDW11, NVME_IOCTL_E_SET_FEAT_CDW11_RANGE,
+	0, NVME_IOCTL_E_SET_FEAT_CDW11_UNUSE
+};
+
+static const nvme_validate_info_t nvme_valid_set_feat_cdw12 = {
+	nvme_set_feat_fields, NVME_SET_FEAT_REQ_FIELD_CDW12,
+	NVME_SET_FEAT_F_CDW12, NVME_IOCTL_E_SET_FEAT_CDW12_RANGE,
+	NVME_IOCTL_E_SET_FEAT_CDW12_UNSUP, NVME_IOCTL_E_SET_FEAT_CDW12_UNUSE
+};
+
+static const nvme_validate_info_t nvme_valid_set_feat_cdw13 = {
+	nvme_set_feat_fields, NVME_SET_FEAT_REQ_FIELD_CDW13,
+	NVME_SET_FEAT_F_CDW13, NVME_IOCTL_E_SET_FEAT_CDW13_RANGE,
+	NVME_IOCTL_E_SET_FEAT_CDW13_UNSUP, NVME_IOCTL_E_SET_FEAT_CDW13_UNUSE
+};
+
+static const nvme_validate_info_t nvme_valid_set_feat_cdw15 = {
+	nvme_set_feat_fields, NVME_SET_FEAT_REQ_FIELD_CDW15,
+	NVME_SET_FEAT_F_CDW15, NVME_IOCTL_E_SET_FEAT_CDW15_RANGE,
+	NVME_IOCTL_E_SET_FEAT_CDW15_UNSUP, NVME_IOCTL_E_SET_FEAT_CDW15_UNUSE
+};
+
+/*
+ * To validate a Set Feature we take the following high level steps:
+ *
+ * 1) First determine if the feature ID is in a valid range.
+ * 2) Verify that this is a vendor-specific feature. If it is not, we walk the
+ *    standard feature list so we can try to give a better error message.
+ * 3) Perform basic field validation.
+ *
+ * Like in other cases, because we're not doing rewriting we know that the
+ * requested namespace ID is valid, but there is nothing more we can really say
+ * about it because we only allow vendor-specific feature and don't have
+ * metadata about them.
+ */
+boolean_t
+nvme_validate_set_feature(nvme_t *nvme, nvme_ioctl_set_feature_t *set)
+{
+	nvme_valid_ctrl_data_t ctrl_data;
+	const uint32_t all_impact = NVME_IMPACT_NS;
+
+	ctrl_data.vcd_vers = &nvme->n_version;
+	ctrl_data.vcd_id = nvme->n_idctl;
+
+	if (!nvme_feature_is_vendor(set->nisf_fid)) {
+		/*
+		 * This isn't a vendor-specific feature. This means that there
+		 * are a few cases:
+		 *
+		 * 1. This feature identifier is generally invalid.
+		 * 2. This feature isn't known to the kernel.
+		 * 3. We do know, but we don't support it.
+		 */
+		for (size_t i = 0; i < nvme_std_nfeats; i++) {
+			if (nvme_std_feats[i].nfeat_fid == set->nisf_fid) {
+				return (nvme_ioctl_error(&set->nisf_common,
+				    NVME_IOCTL_E_SET_FEAT_USER_UNSUP, 0, 0));
+			}
+		}
+
+		return (nvme_ioctl_error(&set->nisf_common,
+		    NVME_IOCTL_E_UNKNOWN_FEATURE, 0, 0));
+	}
+
+	if (!nvme_validate_one_field(&set->nisf_common, set->nisf_save,
+	    &nvme_valid_set_feat_save, &ctrl_data, 0)) {
+		return (B_FALSE);
+	}
+
+	/*
+	 * As we don't know what is valid or invalid in these, we always set the
+	 * corresponding bit in these requests to say that is valid to have this
+	 * present. If we move to using information for these like standard
+	 * features, then that information should come from them.
+	 */
+	if (!nvme_validate_one_field(&set->nisf_common, set->nisf_cdw11,
+	    &nvme_valid_set_feat_cdw11, &ctrl_data, NVME_SET_FEAT_F_CDW11)) {
+		return (B_FALSE);
+	}
+
+	if (!nvme_validate_one_field(&set->nisf_common, set->nisf_cdw12,
+	    &nvme_valid_set_feat_cdw12, &ctrl_data, NVME_SET_FEAT_F_CDW12)) {
+		return (B_FALSE);
+	}
+
+	if (!nvme_validate_one_field(&set->nisf_common, set->nisf_cdw13,
+	    &nvme_valid_set_feat_cdw13, &ctrl_data, NVME_SET_FEAT_F_CDW13)) {
+		return (B_FALSE);
+	}
+
+	if (!nvme_validate_one_field(&set->nisf_common, set->nisf_cdw15,
+	    &nvme_valid_set_feat_cdw15, &ctrl_data, NVME_SET_FEAT_F_CDW15)) {
+		return (B_FALSE);
+	}
+
+	/*
+	 * To validate data, we simply check that a buffer and length are set or
+	 * neither are.
+	 */
+	if (set->nisf_data != 0 && set->nisf_len == 0) {
+		return (nvme_ioctl_error(&set->nisf_common,
+		    NVME_IOCTL_E_SET_FEAT_DATA_RANGE, 0, 0));
+	}
+
+	if (set->nisf_data == 0 && set->nisf_len != 0) {
+		return (nvme_ioctl_error(&set->nisf_common,
+		    NVME_IOCTL_E_SET_FEAT_DATA_RANGE, 0, 0));
+	}
+
+	if (set->nisf_len > nvme_feature_max_size) {
+		return (nvme_ioctl_error(&set->nisf_common,
+		    NVME_IOCTL_E_SET_FEAT_DATA_RANGE, 0, 0));
+	}
+
+	if ((set->nisf_impact & ~all_impact) != 0) {
+		return (nvme_ioctl_error(&set->nisf_common,
+		    NVME_IOCTL_E_SET_FEAT_IMPACT_RANGE, 0, 0));
+	}
 
 	return (B_TRUE);
 }

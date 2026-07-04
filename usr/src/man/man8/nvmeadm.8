@@ -12,7 +12,7 @@
 .\" Copyright 2026 Oxide Computer Company
 .\" Copyright 2022 Tintri by DDN, Inc. All rights reserved.
 .\"
-.Dd March 6, 2026
+.Dd July 3, 2026
 .Dt NVMEADM 8
 .Os
 .Sh NAME
@@ -83,6 +83,18 @@
 .Cm get-features
 .Ar ctl[/ns] Ns [,...]
 .Op Ar feature-list
+.Nm
+.Op Fl dv
+.Cm set-feature
+.Op Fl s
+.Op Fl v Ar value
+.Op Fl -cdw12 Ar cdw12
+.Op Fl -cdw13 Ar cdw13
+.Op Fl -cdw15 Ar cdw15
+.Op Fl l Ar length Fl i Ar file
+.Op Fl I Ar impact Ns Op , Ns Ar ...
+.Ar ctl
+.Ar feature
 .Nm
 .Op Fl dv
 .Cm format
@@ -1279,6 +1291,111 @@ of the
 admin command in the NVMe specification.
 .It Xo
 .Nm
+.Cm set-feature
+.Op Fl s
+.Op Fl v Ar value | Fl -cdw11 Ar cdw11
+.Op Fl -cdw12 Ar cdw12
+.Op Fl -cdw13 Ar cdw13
+.Op Fl -cdw15 Ar cdw15
+.Op Fl l Ar length Fl i Ar file
+.Op Fl I Ar impact Ns Op , Ns Ar ...
+.Ar ctl
+.Ar feature
+.Xc
+Set the NVMe feature named by
+.Ar feature
+on the controller indicated by
+.Ar ctl Ns Op /Ns .
+Currently only vendor-specific features are allowed to be set.
+The list of features that are known can be determined by running
+.Nm
+.Cm list-features .
+If the value of
+.Ar feature
+is not known to the system, it will be parsed as a feature identifier
+and used if it is within the NVMe vendor-specific feature range [0xc0,
+0xff].
+This may be specified in either decimal or hexadecimal.
+.Pp
+Each feature has its own required fields.
+This is generally at least one of a 32-bit value in cdw11 and an
+optional data object.
+When specifying the optional data object, both an input file
+.Pq Fl i
+and its length
+.Pq Fl l
+must be specified.
+The list of fields that are required to set a feature may be discovered
+by using the
+.Dq set-in
+field with
+.Nm
+.Cm list-features .
+.Pp
+The
+.Cm set-feature
+command supports the following options:
+.Bl -tag -width Ds
+.It Fl s
+The controller should persist the feature value across any device resets
+and power cycles.
+By default, features are only set until the next controller reset.
+.It Fl v , -cdw11 Ar value
+Sets the 32-bit value of command dword 11 to the value
+.Ar value .
+Whether or not this is required is feature specific, though this is the
+primary field for most features.
+.Pp
+If no value is specified, this field will be set to 0 in the command.
+.It Fl -cdw12, Fl 2 Ar cdw12
+Sets the 32-bit value of command dword 12 to the value
+.Ar cdw12 .
+Whether or not this is required is feature specific.
+.Pp
+If no value is specified, this field will be set to 0 in the command.
+.It Fl -cdw13, Fl 3 Ar cdw13
+Sets the 32-bit value of command dword 13 to the value
+.Ar cdw13 .
+Whether or not this is required is feature specific.
+.Pp
+If no value is specified, this field will be set to 0 in the command.
+.It Fl -cdw15, Fl 5 Ar cdw15
+Sets the 32-bit value of command dword 15 to the value
+.Ar cdw15 .
+Whether or not this is required is feature specific.
+.Pp
+If no value is specified, this field will be set to 0 in the command.
+.It Fl i , -input Ar file
+Read the input to the command from
+.Ar file .
+Requires that
+.Fl l
+is specified.
+If the input file,
+.Ar file ,
+is shorter than the length specified with
+.Fl l ,
+then the remaining data will be filled with 0s.
+.It Fl l , -length Ar length
+Indicates the length in bytes of the data argument for the feature to
+read from the input file specified with
+.Fl i .
+.It Fl I , -impact Ar impact Ns Op , Ns Ar ...
+A comma-separated list of values that describe to the system the impact
+of running this command on the system.
+By default, no impact to the system is assumed.
+The following values are accepted:
+.Bl -tag -width namespace
+.It Sy data
+Indicates that the data on the controller or namespace may be lost as a
+result of running this command.
+.It Sy namespace
+Indicates that namespaces and their attributes may be modified as a
+result of running this command.
+.El
+.El
+.It Xo
+.Nm
 .Cm format
 .Ar ctl[/ns]
 .Op Ar lba-format
@@ -1746,7 +1863,7 @@ The following arguments are supported:
 Sets the numeric operation code that should be used for the command.
 This option is required.
 Valid values are in the range [0xc0, 0xff].
-.It Fl n , --nsid Ar nsid
+.It Fl n , -nsid Ar nsid
 Sets the namespace identifier to send in the command to
 .Ar nsid .
 If the command is specified against a namespace specifically, then this

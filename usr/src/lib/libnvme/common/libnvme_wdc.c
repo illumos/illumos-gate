@@ -280,7 +280,7 @@ static const nvme_vuc_disc_t wdc_sn840_sn65x_vuc[] = { {
 	.nvd_short = "wdc/resize",
 	.nvd_desc = "drive resize",
 	.nvd_opc = WDC_VUC_RESIZE_OPC,
-	.nvd_impact = NVME_VUC_DISC_IMPACT_DATA | NVME_VUC_DISC_IMPACT_NS,
+	.nvd_impact = NVME_DISC_IMPACT_DATA | NVME_DISC_IMPACT_NS,
 	.nvd_dt = NVME_VUC_DISC_IO_NONE,
 	.nvd_lock = NVME_VUC_DISC_LOCK_WRITE
 }, {
@@ -408,8 +408,8 @@ nvme_wdc_resize_set(nvme_ctrl_t *ctrl, uint32_t gb)
 		return (false);
 	}
 
-	if (!nvme_vuc_req_set_impact(vuc, NVME_VUC_DISC_IMPACT_DATA |
-	    NVME_VUC_DISC_IMPACT_NS)) {
+	if (!nvme_vuc_req_set_impact(vuc, NVME_DISC_IMPACT_DATA |
+	    NVME_DISC_IMPACT_NS)) {
 		nvme_vuc_req_fini(vuc);
 		return (false);
 	}

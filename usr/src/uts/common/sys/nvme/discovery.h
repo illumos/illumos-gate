@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SYS_NVME_DISCOVERY_H
@@ -97,7 +97,8 @@ typedef enum {
 
 typedef enum {
 	NVME_FEAT_SCOPE_CTRL	= 1 << 0,
-	NVME_FEAT_SCOPE_NS	= 1 << 1
+	NVME_FEAT_SCOPE_NS	= 1 << 1,
+	NVME_FEAT_SCOPE_NVM	= 1 << 2
 } nvme_feat_scope_t;
 
 typedef enum {
@@ -128,6 +129,12 @@ typedef enum {
 	NVME_SET_FEAT_F_CDW11	= 1 << 0,
 	NVME_SET_FEAT_F_CDW12	= 1 << 1,
 	NVME_SET_FEAT_F_CDW13	= 1 << 2,
+	/*
+	 * In NVMe 1.2 CDW14 was added as a possible field for features. In NVMe
+	 * 1.4 it was instead changed to be a UUID. This represents the possible
+	 * 1.2 / 1.3 usage as a non-UUID field. UUID support will be done with
+	 * distinct fields in all structures.
+	 */
 	NVME_SET_FEAT_F_CDW14	= 1 << 3,
 	NVME_SET_FEAT_F_CDW15	= 1 << 4,
 	/*
@@ -201,6 +208,27 @@ typedef enum {
 	NVME_FEAT_IMPL_UNSUPPORTED,
 	NVME_FEAT_IMPL_SUPPORTED
 } nvme_feat_impl_t;
+
+/*
+ * Series of impact definitions that are used across various potentially
+ * destructive vendor-specific commands and set features requests. These
+ * commands and features may have a broader scope, but this allows one a way to
+ * discover and then tell the system what might happen. An example of commands
+ * and features that would return these are those that adjust all of the
+ * overprovisioning settings of a device.
+ */
+typedef enum {
+	/*
+	 * Indicates that when this command or feature is run, one should assume
+	 * that all data is potentially erased.
+	 */
+	NVME_DISC_IMPACT_DATA	= 1 << 0,
+	/*
+	 * Indicates that when this command or feature is run, one should assume
+	 * that the list of namespaces and their attributes will change.
+	 */
+	NVME_DISC_IMPACT_NS		= 1 << 1
+} nvme_disc_impact_t;
 
 #ifdef __cplusplus
 }

@@ -61,7 +61,8 @@ extern "C" {
 #define	NVME_IOC_CTRL_DETACH		(NVME_IOC | 14)
 #define	NVME_IOC_NS_CREATE		(NVME_IOC | 15)
 #define	NVME_IOC_NS_DELETE		(NVME_IOC | 16)
-#define	NVME_IOC_MAX			NVME_IOC_NS_DELETE
+#define	NVME_IOC_SET_FEATURE		(NVME_IOC | 17)
+#define	NVME_IOC_MAX			NVME_IOC_SET_FEATURE
 
 #define	IS_NVME_IOC(x)			((x) > NVME_IOC && (x) <= NVME_IOC_MAX)
 #define	NVME_IOC_CMD(x)			((x) & 0xff)
@@ -502,7 +503,41 @@ typedef enum {
 	 * provisioning.
 	 */
 	NVME_IOCTL_E_DRV_CSI_UNSUP,
-	NVME_IOCTL_E_CTRL_THIN_PROV_UNSUP
+	NVME_IOCTL_E_CTRL_THIN_PROV_UNSUP,
+	/*
+	 * Indicates that while this feature is known to the system, setting it
+	 * is not supported from userland.
+	 */
+	NVME_IOCTL_E_SET_FEAT_USER_UNSUP,
+	/*
+	 * The following errors indicate a bad value for a given set feature
+	 * field. This would happen because the value is outside the supported
+	 * range.
+	 */
+	NVME_IOCTL_E_SET_FEAT_SAVE_RANGE,
+	NVME_IOCTL_E_SET_FEAT_CDW11_RANGE,
+	NVME_IOCTL_E_SET_FEAT_CDW12_RANGE,
+	NVME_IOCTL_E_SET_FEAT_CDW13_RANGE,
+	NVME_IOCTL_E_SET_FEAT_CDW15_RANGE,
+	NVME_IOCTL_E_SET_FEAT_DATA_RANGE,
+	NVME_IOCTL_E_SET_FEAT_IMPACT_RANGE,
+	/*
+	 * The following set of errors indicate that the field is not supported.
+	 * This generally happens because the controller is older than the
+	 * version of the specification that they were introduced in.
+	 */
+	NVME_IOCTL_E_SET_FEAT_SAVE_UNSUP,
+	NVME_IOCTL_E_SET_FEAT_CDW12_UNSUP,
+	NVME_IOCTL_E_SET_FEAT_CDW13_UNSUP,
+	NVME_IOCTL_E_SET_FEAT_CDW15_UNSUP,
+	/*
+	 * Fields that may be unusable in certain circumstances.
+	 */
+	NVME_IOCTL_E_SET_FEAT_CDW11_UNUSE,
+	NVME_IOCTL_E_SET_FEAT_CDW12_UNUSE,
+	NVME_IOCTL_E_SET_FEAT_CDW13_UNUSE,
+	NVME_IOCTL_E_SET_FEAT_CDW15_UNUSE,
+	NVME_IOCTL_E_SET_FEAT_DATA_UNUSE
 } nvme_ioctl_errno_t;
 
 /*
@@ -573,10 +608,28 @@ typedef struct {
 } nvme_ioctl_get_feature_t;
 
 /*
+ * Set a specific feature (NVME_IOC_SET_FEATURE).
+ */
+typedef struct {
+	nvme_ioctl_common_t nisf_common;
+	uint32_t nisf_fid;
+	uint32_t nisf_save;
+	uint32_t nisf_cdw11;
+	uint32_t nisf_cdw12;
+	uint32_t nisf_cdw13;
+	uint32_t nisf_cdw15;
+	uint32_t nisf_impact;
+	uintptr_t nisf_data;
+	uint64_t nisf_len;
+	uint32_t nisf_cdw0;
+} nvme_ioctl_set_feature_t;
+
+/*
  * Feature maximums.
  */
 #define	NVME_FEAT_MAX_FID	0xff
 #define	NVME_FEAT_MAX_SEL	0x3
+#define	NVME_FEAT_MAX_SAVE	0x1
 
 /*
  * Get a specific log page (NVME_IOC_GET_LOGPAGE). By default, unused fields
@@ -799,6 +852,20 @@ typedef struct {
 	uint64_t nigf_len;
 	uint32_t nigf_cdw0;
 } nvme_ioctl_get_feature32_t;
+
+typedef struct {
+	nvme_ioctl_common_t nisf_common;
+	uint32_t nisf_fid;
+	uint32_t nisf_save;
+	uint32_t nisf_cdw11;
+	uint32_t nisf_cdw12;
+	uint32_t nisf_cdw13;
+	uint32_t nisf_cdw15;
+	uint32_t nisf_impact;
+	uintptr32_t nisf_data;
+	uint64_t nisf_len;
+	uint32_t nisf_cdw0;
+} nvme_ioctl_set_feature32_t;
 
 typedef struct {
 	nvme_ioctl_common_t nigl_common;
@@ -2125,6 +2192,9 @@ typedef union {
 
 #define	NVME_FEAT_PROGRESS	0x80	/* Software Progress Marker */
 
+#define	NVME_FEAT_VEND_MIN	0xc0
+#define	NVME_FEAT_VEND_MAX	0xff
+
 /*
  * This enumeration represents the capabilities in the Get Features select / Set
  * Features save options. This was introduced in NVMe 1.1 and the values below
@@ -2146,6 +2216,15 @@ typedef union {
 	} b;
 	uint32_t r;
 } nvme_get_features_dw10_t;
+
+typedef union {
+	struct {
+		uint32_t st_fid:8;	/* Feature ID */
+		uint32_t st_rsvd:23;
+		uint32_t st_save:1;	/* Select */
+	} b;
+	uint32_t r;
+} nvme_set_features_dw10_t;
 
 /* Arbitration Feature */
 typedef union {

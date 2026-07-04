@@ -494,7 +494,8 @@ typedef enum {
 
 static const nvmeadm_bitstr_t nvmeadm_feat_scopes[] = {
 	{ NVME_FEAT_SCOPE_CTRL, "controller" },
-	{ NVME_FEAT_SCOPE_NS, "namespace" }
+	{ NVME_FEAT_SCOPE_NS, "namespace" },
+	{ NVME_FEAT_SCOPE_NVM, "nvm" }
 };
 
 static const nvmeadm_bitstr_t nvmeadm_feat_get_in[] = {

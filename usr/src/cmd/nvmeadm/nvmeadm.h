@@ -147,6 +147,12 @@ typedef struct {
 extern boolean_t nvme_version_check(const nvme_process_arg_t *,
     const nvme_version_t *);
 
+/* Common option parsing */
+extern long long optparse_ui_range(const char *, const char *, uint64_t,
+    uint64_t);
+extern nvme_disc_impact_t optparse_impact(char *);
+extern void *nvmeadm_fill_from_file(const char *, size_t);
+
 /* printing functions */
 extern int nvme_strlen(const char *, int);
 extern void nvme_print(int, const char *, int, const char *, ...);

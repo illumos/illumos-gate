@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -49,6 +49,7 @@ main(void)
 	nvme_ns_create_req_t *create_req = NULL;
 	nvme_ns_delete_req_t *delete_req = NULL;
 	nvme_ns_attach_req_t *attach_req = NULL;
+	nvme_set_feat_req_t *set_feat_req = NULL;
 
 	libnvme_test_init(&nvme, &ctrl);
 
@@ -166,7 +167,22 @@ main(void)
 	}
 	nvme_ns_attach_req_fini(attach_req);
 
-
+	if (!nvme_set_feat_req_init(ctrl, &set_feat_req)) {
+		libnvme_test_ctrl_warn(ctrl, "failed to initialize set feature "
+		    "request");
+		ret = EXIT_FAILURE;
+	} else if (nvme_set_feat_req_exec(set_feat_req)) {
+		warnx("TEST FAILED: set feature request succeeded despite "
+		    "missing fields");
+		ret = EXIT_FAILURE;
+	} else if (!missing_field_err(ctrl, "set feature",
+	    NVME_ERR_SET_FEAT_REQ_MISSING_FIELDS)) {
+		ret = EXIT_FAILURE;
+	} else {
+		(void) printf("TEST PASSED: set feature generated missing "
+		    "fields error\n");
+	}
+	nvme_set_feat_req_fini(set_feat_req);
 
 	nvme_ctrl_fini(ctrl);
 	nvme_fini(nvme);

@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -265,6 +265,8 @@ nvme_ioctl_test_cmdstr(int cmd)
 		return ("NVME_IOC_NS_CREATE");
 	case NVME_IOC_NS_DELETE:
 		return ("NVME_IOC_NS_DELETE");
+	case NVME_IOC_SET_FEATURE:
+		return ("NVME_IOC_SET_FEATURE");
 	default:
 		return ("unknown");
 	}

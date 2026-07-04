@@ -57,7 +57,7 @@ typedef struct nvmeadm_vuc {
 	const char *vuc_input;
 	const char *vuc_output;
 	nvme_lock_level_t vuc_lock;
-	nvme_vuc_disc_impact_t vuc_impact;
+	nvme_disc_impact_t vuc_impact;
 } nvmeadm_vuc_t;
 
 nvme_vuc_disc_t *
@@ -137,23 +137,6 @@ static const struct option vendor_cmd_lopts[] = {
 	{ NULL, 0, NULL, 0 }
 };
 
-static long long
-optparse_vendor_cmd_ui(const char *raw, const char *field, uint64_t min,
-    uint64_t max)
-{
-	const char *errstr;
-	long long l;
-
-	l = strtonumx(raw, min, max, &errstr, 0);
-	if (errstr != NULL) {
-		errx(-1, "failed to parse %s: value %s is %s: valid values "
-		    "are in the range [0x%" PRIx64 ", 0x%" PRIx64 "]", field,
-		    raw, errstr, min, max);
-	}
-
-	return (l);
-}
-
 void
 optparse_vendor_cmd(nvme_process_arg_t *npa)
 {
@@ -175,11 +158,9 @@ optparse_vendor_cmd(nvme_process_arg_t *npa)
 	 */
 	while ((c = getopt_long(npa->npa_argc + 1, npa->npa_argv - 1,
 	    ":O:n:l:i:I:o:L:t:2:3:4:5:", vendor_cmd_lopts, NULL)) != -1) {
-		char *last;
-
 		switch (c) {
 		case 'O':
-			vuc->vuc_opc = (uint8_t)optparse_vendor_cmd_ui(optarg,
+			vuc->vuc_opc = (uint8_t)optparse_ui_range(optarg,
 			    "opcode", NVME_PASSTHRU_MIN_ADMIN_OPC,
 			    NVME_PASSTHRU_MAX_ADMIN_OPC);
 			break;
@@ -189,11 +170,11 @@ optparse_vendor_cmd(nvme_process_arg_t *npa)
 			 * allow the invalid nsid 0 to be specified for this
 			 * field.
 			 */
-			vuc->vuc_nsid = (uint8_t)optparse_vendor_cmd_ui(optarg,
-			    "opcode", 0, NVME_NSID_BCAST);
+			vuc->vuc_nsid = (uint32_t)optparse_ui_range(optarg,
+			    "nsid", 0, NVME_NSID_BCAST);
 			break;
 		case 'l':
-			vuc->vuc_dlen = (uint32_t)optparse_vendor_cmd_ui(optarg,
+			vuc->vuc_dlen = (uint32_t)optparse_ui_range(optarg,
 			    "length", 0, NVMEADM_VUC_LEN_MAX);
 			if (vuc->vuc_dlen % NVMEADM_VUC_LEN_ALIGN != 0) {
 				errx(-1, "invalid data length %u: must be a "
@@ -217,46 +198,33 @@ optparse_vendor_cmd(nvme_process_arg_t *npa)
 			}
 			break;
 		case 'I':
-			for (char *s = strtok_r(optarg, ",", &last); s != NULL;
-			    s = strtok_r(NULL, ",", &last)) {
-				if (strcmp(s, "data") == 0) {
-					vuc->vuc_impact |=
-					    NVME_VUC_DISC_IMPACT_DATA;
-				} else if (strcmp(s, "namespace") == 0) {
-					vuc->vuc_impact |=
-					    NVME_VUC_DISC_IMPACT_NS;
-				} else {
-					errx(-1, "invalid impact string: %s",
-					    s);
-				}
-			}
+			vuc->vuc_impact = optparse_impact(optarg);
 			break;
 		case 't':
 			/* This will be further constrained by libnvme */
-			vuc->vuc_timeout = (uint32_t)optparse_vendor_cmd_ui(
-			    optarg, "timeout", 1, UINT32_MAX);
+			vuc->vuc_timeout = (uint32_t)optparse_ui_range(optarg,
+			    "timeout", 1, UINT32_MAX);
 			break;
 		case '2':
-			vuc->vuc_cdw12 = (uint32_t)optparse_vendor_cmd_ui(
-			    optarg, "cdw12", 0, UINT32_MAX);
+			vuc->vuc_cdw12 = (uint32_t)optparse_ui_range(optarg,
+			    "cdw12", 0, UINT32_MAX);
 			break;
 		case '3':
-			vuc->vuc_cdw13 = (uint32_t)optparse_vendor_cmd_ui(
-			    optarg, "cdw13", 0, UINT32_MAX);
+			vuc->vuc_cdw13 = (uint32_t)optparse_ui_range(optarg,
+			    "cdw13", 0, UINT32_MAX);
 			break;
 		case '4':
-			vuc->vuc_cdw14 = (uint32_t)optparse_vendor_cmd_ui(
-			    optarg, "cdw14", 0, UINT32_MAX);
+			vuc->vuc_cdw14 = (uint32_t)optparse_ui_range(optarg,
+			    "cdw14", 0, UINT32_MAX);
 			break;
 		case '5':
-			vuc->vuc_cdw15 = (uint32_t)optparse_vendor_cmd_ui(
-			    optarg, "cdw15", 0, UINT32_MAX);
+			vuc->vuc_cdw15 = (uint32_t)optparse_ui_range(optarg,
+			    "cdw15", 0, UINT32_MAX);
 			break;
 		case '?':
 			errx(-1, "unknown option: -%c", optopt);
 		case ':':
 			errx(-1, "option -%c requires an argument", optopt);
-			break;
 		}
 	}
 
@@ -323,42 +291,21 @@ do_vendor_cmd(const nvme_process_arg_t *npa)
 	}
 
 	if (vuc->vuc_dlen > 0) {
-		if ((buf = calloc(sizeof (uint8_t), vuc->vuc_dlen)) == NULL) {
-			nvmeadm_fatal(npa, "failed to allocate 0x%x byte "
-			    "request data buffer", vuc->vuc_dlen);
-		}
-
 		/*
 		 * If we have an input file, then we want to read data from it
 		 * until we either hit EOF or we read sufficient bytes from it
 		 * to fill our buffer. Anything we don't will be zero filled,
-		 * which was already taken care of by using calloc.
+		 * which is taken care of by using calloc.
 		 */
 		if (vuc->vuc_input != NULL) {
-			int ifd = open(vuc->vuc_input, O_RDONLY);
-			if (ifd < 0) {
-				err(EXIT_FAILURE, "failed to open input file "
-				    "%s", vuc->vuc_input);
-			}
-
-			size_t rem = vuc->vuc_dlen, off = 0;
-			while (rem > 0) {
-				size_t toread = MIN(16 * 1024, rem);
-				ssize_t ret = read(ifd, buf + off, toread);
-				if (ret < 0) {
-					nvmeadm_fatal(npa, "failed to read %zu "
-					    "bytes at offset %zu from %s",
-					    toread, off, vuc->vuc_input);
-				} else if (ret == 0) {
-					break;
-				}
-
-				rem -= (size_t)ret;
-				off += (size_t)ret;
-			}
-
-			VERIFY0(close(ifd));
+			buf = nvmeadm_fill_from_file(vuc->vuc_input,
+			    vuc->vuc_dlen);
 		} else if (vuc->vuc_output != NULL) {
+			if ((buf = calloc(vuc->vuc_dlen, sizeof (uint8_t))) ==
+			    NULL) {
+				nvmeadm_fatal(npa, "failed to allocate 0x%x "
+				    "byte request data buffer", vuc->vuc_dlen);
+			}
 			ofd = open(vuc->vuc_output, O_RDWR | O_TRUNC | O_CREAT,
 			    0644);
 			if (ofd < 0) {

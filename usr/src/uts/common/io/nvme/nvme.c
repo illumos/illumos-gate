@@ -974,12 +974,22 @@ static const nvme_ioctl_check_t nvme_check_get_logpage = {
 /*
  * When getting a feature, we do not want rewriting behavior as most features do
  * not require a namespace to be specified. Specific instances are checked in
- * nvme_validate_get_feature().
+ * nvme_validate_get_feature(). Setting a feature is the same, but you need
+ * write access. Today we opt to require a full controller lock; however, as
+ * more namespace-specific features are allowed from userland, then we can
+ * change this to just be a write lock of the corresponding entity (which will
+ * mostly be the controller).
  */
 static const nvme_ioctl_check_t nvme_check_get_feature = {
 	.nck_ns_ok = B_TRUE, .nck_ns_minor_ok = B_TRUE,
 	.nck_skip_ctrl = B_FALSE, .nck_ctrl_rewrite = B_FALSE,
 	.nck_bcast_ok = B_TRUE, .nck_excl = NVME_IOCTL_EXCL_NONE
+};
+
+static const nvme_ioctl_check_t nvme_check_set_feature = {
+	.nck_ns_ok = B_TRUE, .nck_ns_minor_ok = B_TRUE,
+	.nck_skip_ctrl = B_FALSE, .nck_ctrl_rewrite = B_FALSE,
+	.nck_bcast_ok = B_TRUE, .nck_excl = NVME_IOCTL_EXCL_CTRL
 };
 
 /*
@@ -7068,6 +7078,167 @@ copyout:
 }
 
 static int
+nvme_ioctl_set_feature(nvme_minor_t *minor, intptr_t arg, int mode,
+    cred_t *cred_p)
+{
+	nvme_t *const nvme = minor->nm_ctrl;
+	nvme_ioctl_set_feature_t feat;
+	uint_t model;
+#ifdef	_MULTI_DATAMODEL
+	nvme_ioctl_set_feature32_t feat32;
+#endif
+	nvme_set_features_dw10_t sf_dw10 = { 0 };
+	nvme_ioc_cmd_args_t args = { NULL };
+	nvme_sqe_t sqe = {
+	    .sqe_opc	= NVME_OPC_SET_FEATURES
+	};
+
+	if (secpolicy_sys_config(cred_p, B_FALSE) != 0)
+		return (EPERM);
+
+	if ((mode & FWRITE) == 0) {
+		return (EBADF);
+	}
+
+	model = ddi_model_convert_from(mode);
+	switch (model) {
+#ifdef	_MULTI_DATAMODEL
+	case DDI_MODEL_ILP32:
+		bzero(&feat, sizeof (feat));
+		if (ddi_copyin((void *)arg, &feat32, sizeof (feat32),
+		    mode & FKIOCTL) != 0) {
+			return (EFAULT);
+		}
+
+		feat.nisf_common.nioc_nsid = feat32.nisf_common.nioc_nsid;
+		feat.nisf_fid = feat32.nisf_fid;
+		feat.nisf_save = feat32.nisf_save;
+		feat.nisf_cdw11 = feat32.nisf_cdw11;
+		feat.nisf_cdw12 = feat32.nisf_cdw12;
+		feat.nisf_cdw13 = feat32.nisf_cdw13;
+		feat.nisf_cdw15 = feat32.nisf_cdw15;
+		feat.nisf_impact = feat32.nisf_impact;
+		feat.nisf_data = feat32.nisf_data;
+		feat.nisf_len = feat32.nisf_len;
+		break;
+#endif	/* _MULTI_DATAMODEL */
+	case DDI_MODEL_NONE:
+		if (ddi_copyin((void *)arg, &feat, sizeof (feat),
+		    mode & FKIOCTL) != 0) {
+			return (EFAULT);
+		}
+		break;
+	default:
+		return (ENOTSUP);
+	}
+
+	if (!nvme_ioctl_check(minor, &feat.nisf_common,
+	    &nvme_check_set_feature)) {
+		goto copyout;
+	}
+
+	if (!nvme_validate_set_feature(nvme, &feat)) {
+		goto copyout;
+	}
+
+	/*
+	 * Some vendor-specific features are used to resize devices. If we have
+	 * an impact, then we need to go through and check namespaces. Most
+	 * features are just manipulating some other aspect and not the
+	 * namespace list and its data.
+	 */
+	const bool impact = feat.nisf_impact != 0;
+	if (impact) {
+		/*
+		 * As with vendor-specific commands, if we've been told there's
+		 * an impact validate against all namespaces.
+		 */
+		nvme_mgmt_lock(nvme, NVME_MGMT_LOCK_NVME);
+		if (!nvme_no_blkdev_attached(nvme, NVME_NSID_BCAST)) {
+			nvme_mgmt_unlock(nvme);
+			(void) nvme_ioctl_error(&feat.nisf_common,
+			    NVME_IOCTL_E_NS_BLKDEV_ATTACH, 0, 0);
+			goto copyout;
+		}
+	}
+
+	sf_dw10.b.st_fid = bitx32(feat.nisf_fid, 7, 0);
+	sf_dw10.b.st_save = bitx32(feat.nisf_save, 0, 0);
+	sqe.sqe_cdw10 = sf_dw10.r;
+	sqe.sqe_cdw11 = feat.nisf_cdw11;
+	sqe.sqe_cdw12 = feat.nisf_cdw12;
+	sqe.sqe_cdw13 = feat.nisf_cdw13;
+	sqe.sqe_cdw15 = feat.nisf_cdw15;
+	sqe.sqe_nsid = feat.nisf_common.nioc_nsid;
+
+	args.ica_sqe = &sqe;
+	if (feat.nisf_len != 0) {
+		args.ica_data = (void *)feat.nisf_data;
+		args.ica_data_len = feat.nisf_len;
+		args.ica_dma_flags = DDI_DMA_WRITE;
+	}
+	args.ica_copy_flags = mode;
+
+	/*
+	 * Use our default timeout. However, if there's an impact to data,
+	 * assume this may be a device resize and therefore requires the default
+	 * extended timeout. It would also be reasonable at some point to allow
+	 * users to optionally set this.
+	 */
+	if (impact) {
+		args.ica_timeout = nvme_format_cmd_timeout;
+	} else {
+		args.ica_timeout = nvme_admin_cmd_timeout;
+	}
+
+	if (nvme_ioc_cmd(nvme, &feat.nisf_common, &args)) {
+		feat.nisf_cdw0 = args.ica_cdw0;
+		if (impact) {
+			nvme_rescan_ns(nvme, NVME_NSID_BCAST);
+		}
+	}
+
+	if (impact) {
+		nvme_mgmt_unlock(nvme);
+	}
+
+copyout:
+	switch (model) {
+#ifdef	_MULTI_DATAMODEL
+	case DDI_MODEL_ILP32:
+		bzero(&feat32, sizeof (feat32));
+
+		feat32.nisf_common = feat.nisf_common;
+		feat32.nisf_fid = feat.nisf_fid;
+		feat32.nisf_save = feat.nisf_save;
+		feat32.nisf_cdw11 = feat.nisf_cdw11;
+		feat32.nisf_cdw12 = feat.nisf_cdw12;
+		feat32.nisf_cdw13 = feat.nisf_cdw13;
+		feat32.nisf_cdw15 = feat.nisf_cdw15;
+		feat32.nisf_impact = feat.nisf_impact;
+		feat32.nisf_data = feat.nisf_data;
+		feat32.nisf_len = feat.nisf_len;
+		feat32.nisf_cdw0 = feat.nisf_cdw0;
+		if (ddi_copyout(&feat32, (void *)arg, sizeof (feat32),
+		    mode & FKIOCTL) != 0) {
+			return (EFAULT);
+		}
+		break;
+#endif	/* _MULTI_DATAMODEL */
+	case DDI_MODEL_NONE:
+		if (ddi_copyout(&feat, (void *)arg, sizeof (feat),
+		    mode & FKIOCTL) != 0) {
+			return (EFAULT);
+		}
+		break;
+	default:
+		return (ENOTSUP);
+	}
+
+	return (0);
+}
+
+static int
 nvme_ioctl_format(nvme_minor_t *minor, intptr_t arg, int mode, cred_t *cred_p)
 {
 	nvme_t *const nvme = minor->nm_ctrl;
@@ -8213,6 +8384,9 @@ nvme_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 		break;
 	case NVME_IOC_GET_FEATURE:
 		ret = nvme_ioctl_get_feature(minor, arg, mode, cred_p);
+		break;
+	case NVME_IOC_SET_FEATURE:
+		ret = nvme_ioctl_set_feature(minor, arg, mode, cred_p);
 		break;
 	case NVME_IOC_BD_DETACH:
 		ret = nvme_ioctl_bd_detach(minor, arg, mode, cred_p);

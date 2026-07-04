@@ -90,7 +90,7 @@ nvme_vuc_disc_dt(const nvme_vuc_disc_t *disc)
 	return (disc->nvd_dt);
 }
 
-nvme_vuc_disc_impact_t
+nvme_disc_impact_t
 nvme_vuc_disc_impact(const nvme_vuc_disc_t *disc)
 {
 	return (disc->nvd_impact);
@@ -433,15 +433,11 @@ nvme_vuc_req_data_validate(nvme_vuc_req_t *req, const void *buf, size_t len,
  * kernel's values. Therefore we don't use the standard validation routines.
  */
 bool
-nvme_vuc_req_set_impact(nvme_vuc_req_t *req, nvme_vuc_disc_impact_t impact)
+nvme_vuc_req_set_impact(nvme_vuc_req_t *req, nvme_disc_impact_t impact)
 {
-	const nvme_vuc_disc_impact_t all_impact = NVME_VUC_DISC_IMPACT_DATA |
-	    NVME_VUC_DISC_IMPACT_NS;
-
-	if ((impact & ~all_impact) != 0) {
-		return (nvme_ctrl_error(req->nvr_ctrl,
-		    NVME_ERR_VUC_IMPACT_RANGE, 0, "encountered unknown impact "
-		    "flags: 0x%x", impact & ~all_impact));
+	if (!nvme_field_valid_impact(req->nvr_ctrl, impact,
+	    NVME_ERR_VUC_IMPACT_RANGE)) {
+		return (false);
 	}
 
 	req->nvr_impact = impact;

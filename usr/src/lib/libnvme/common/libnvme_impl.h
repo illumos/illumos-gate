@@ -267,6 +267,7 @@ struct nvme_feat_disc {
 	nvme_set_feat_fields_t nfd_in_set;
 	nvme_feat_output_t nfd_out_get;
 	nvme_feat_output_t nfd_out_set;
+	nvme_disc_impact_t nfd_impact;
 	uint64_t nfd_len;
 	nvme_feat_impl_t nfd_impl;
 };
@@ -274,6 +275,8 @@ struct nvme_feat_disc {
 struct nvme_feat_iter {
 	nvme_ctrl_t *nfi_ctrl;
 	nvme_feat_scope_t nfi_scope;
+	bool nfi_std_done;
+	bool nfi_vs_done;
 	size_t nfi_cur_idx;
 	nvme_feat_disc_t nfi_disc;
 };
@@ -297,6 +300,29 @@ struct nvme_get_feat_req {
 	uint32_t gfr_cdw0;
 };
 
+struct nvme_set_feat_req {
+	nvme_ctrl_t *sfr_ctrl;
+	uint32_t sfr_need;
+	uint32_t sfr_allow;
+	nvme_feat_flags_t sfr_flags;
+	uint32_t sfr_fid;
+	uint32_t sfr_save;
+	uint32_t sfr_cdw11;
+	uint32_t sfr_cdw12;
+	uint32_t sfr_cdw13;
+	uint32_t sfr_cdw15;
+	const void *sfr_buf;
+	size_t sfr_len;
+	uint64_t sfr_targ_len;
+	uint32_t sfr_nsid;
+	uint32_t sfr_impact;
+	/*
+	 * The following are set on exec.
+	 */
+	bool sfr_results_valid;
+	uint32_t sfr_cdw0;
+};
+
 /*
  * Identify command request
  */
@@ -317,7 +343,7 @@ struct nvme_vuc_disc {
 	const char *nvd_short;
 	const char *nvd_desc;
 	uint8_t nvd_opc;
-	nvme_vuc_disc_impact_t nvd_impact;
+	nvme_disc_impact_t nvd_impact;
 	nvme_vuc_disc_io_t nvd_dt;
 	nvme_vuc_disc_lock_t nvd_lock;
 };
@@ -486,6 +512,8 @@ typedef struct {
 
 extern bool nvme_field_check_one(nvme_ctrl_t *, uint64_t, const char *,
     const nvme_field_check_t *, uint32_t allow);
+extern bool nvme_field_valid_impact(nvme_ctrl_t *, nvme_disc_impact_t,
+    nvme_err_t);
 
 /*
  * Misc. functions.
@@ -533,6 +561,8 @@ typedef struct nvme_vsd {
 	size_t nvd_nlogs;
 	const nvme_vuc_disc_t *nvd_vuc;
 	size_t nvd_nvuc;
+	const nvme_feat_info_t *const *nvd_feats;
+	size_t nvd_nfeats;
 } nvme_vsd_t;
 
 extern const nvme_log_page_info_t ocp_log_smart;

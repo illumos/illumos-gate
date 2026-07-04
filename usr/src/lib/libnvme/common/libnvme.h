@@ -497,7 +497,38 @@ typedef enum {
 	/*
 	 * Indicates that a PCIe eye diagram buffer size was too small.
 	 */
-	NVME_ERR_PCIE_EYE_BUF_RANGE
+	NVME_ERR_PCIE_EYE_BUF_RANGE,
+	/*
+	 * The system does not allow this particular feature to be set by users.
+	 */
+	NVME_ERR_SET_FEAT_USER_UNSUP,
+	/*
+	 * Additional feature fields that are outside the range.
+	 */
+	NVME_ERR_FEAT_SAVE_RANGE,
+	NVME_ERR_FEAT_CDW12_RANGE,
+	NVME_ERR_FEAT_CDW13_RANGE,
+	NVME_ERR_FEAT_CDW15_RANGE,
+	NVME_ERR_FEAT_IMPACT_RANGE,
+	/*
+	 * Additional feature fields that are unusable on certain controllers.
+	 */
+	NVME_ERR_FEAT_SAVE_UNSUP,
+	NVME_ERR_FEAT_CDW12_UNSUP,
+	NVME_ERR_FEAT_CDW13_UNSUP,
+	NVME_ERR_FEAT_CDW15_UNSUP,
+	/*
+	 * Additional feature fields that are not unusable in certain
+	 * circumstances.
+	 */
+	NVME_ERR_FEAT_CDW12_UNUSE,
+	NVME_ERR_FEAT_CDW13_UNUSE,
+	NVME_ERR_FEAT_CDW15_UNUSE,
+	/*
+	 * Indicates that a set features request can't be executed because
+	 * required fields have not been set.
+	 */
+	NVME_ERR_SET_FEAT_REQ_MISSING_FIELDS
 } nvme_err_t;
 
 /*
@@ -572,6 +603,7 @@ typedef struct nvme_format_req nvme_format_req_t;
 typedef struct nvme_feat_disc nvme_feat_disc_t;
 typedef struct nvme_feat_iter nvme_feat_iter_t;
 typedef struct nvme_get_feat_req nvme_get_feat_req_t;
+typedef struct nvme_set_feat_req nvme_set_feat_req_t;
 typedef struct nvme_ns_attach_req nvme_ns_attach_req_t;
 typedef struct nvme_ns_create_req nvme_ns_create_req_t;
 typedef struct nvme_ns_delete_req nvme_ns_delete_req_t;
@@ -1034,11 +1066,6 @@ extern bool nvme_log_req_exec(nvme_log_req_t *);
  * higher level API for specific features. This works okay for an nvmeadm(8)
  * style implementation, but we should consider adding more here based on
  * feedback from consumers.
- *
- * Currently the kernel does not support setting features, which is why there is
- * not a set feature API exposed through here. When it is, there will be an
- * analogues set feature API to the get feature API that allows for one to
- * build this up generically.
  */
 extern const char *nvme_feat_disc_short(const nvme_feat_disc_t *);
 extern const char *nvme_feat_disc_spec(const nvme_feat_disc_t *);
@@ -1055,6 +1082,7 @@ extern nvme_feat_output_t nvme_feat_disc_output_get(const nvme_feat_disc_t *);
 extern nvme_feat_output_t nvme_feat_disc_output_set(const nvme_feat_disc_t *);
 extern uint64_t nvme_feat_disc_data_size(const nvme_feat_disc_t *);
 extern nvme_feat_impl_t nvme_feat_disc_impl(const nvme_feat_disc_t *);
+extern nvme_disc_impact_t nvme_feat_disc_impact_set(const nvme_feat_disc_t *);
 
 extern bool nvme_feat_discover_init(nvme_ctrl_t *, nvme_feat_scope_t, uint32_t,
     nvme_feat_iter_t **);
@@ -1100,6 +1128,37 @@ extern bool nvme_get_feat_req_exec(nvme_get_feat_req_t *);
 extern bool nvme_get_feat_req_get_cdw0(nvme_get_feat_req_t *, uint32_t *);
 
 /*
+ * Set Feature Request
+ *
+ * This allows one to set the value of a feature in a similar fashion to get
+ * feature. Currently only vendor-specific features are supported by the kernel.
+ * By default, a set feature will not save its value. The set of required fields
+ * and the impact will be determined automatically if creating a request from a
+ * discovery object. Otherwise, this must be specified.
+ */
+extern bool nvme_set_feat_req_init(nvme_ctrl_t *, nvme_set_feat_req_t **);
+extern bool nvme_set_feat_req_init_by_disc(nvme_ctrl_t *,
+    const nvme_feat_disc_t *, nvme_set_feat_req_t **);
+extern bool nvme_set_feat_req_init_by_name(nvme_ctrl_t *, const char *,
+    uint32_t, nvme_feat_disc_t **, nvme_set_feat_req_t **);
+extern void nvme_set_feat_req_fini(nvme_set_feat_req_t *);
+
+extern bool nvme_set_feat_req_set_fid(nvme_set_feat_req_t *, uint32_t);
+extern bool nvme_set_feat_req_set_save(nvme_set_feat_req_t *, bool);
+extern bool nvme_set_feat_req_set_nsid(nvme_set_feat_req_t *, uint32_t);
+extern bool nvme_set_feat_req_set_cdw11(nvme_set_feat_req_t *, uint32_t);
+extern bool nvme_set_feat_req_set_cdw12(nvme_set_feat_req_t *, uint32_t);
+extern bool nvme_set_feat_req_set_cdw13(nvme_set_feat_req_t *, uint32_t);
+extern bool nvme_set_feat_req_set_cdw15(nvme_set_feat_req_t *, uint32_t);
+extern bool nvme_set_feat_req_set_input(nvme_set_feat_req_t *, const void *,
+    size_t);
+extern bool nvme_set_feat_req_clear_input(nvme_set_feat_req_t *);
+extern bool nvme_set_feat_req_set_impact(nvme_set_feat_req_t *,
+    nvme_disc_impact_t);
+extern bool nvme_set_feat_req_exec(nvme_set_feat_req_t *);
+extern bool nvme_set_feat_req_get_cdw0(nvme_set_feat_req_t *, uint32_t *);
+
+/*
  * NVMe Vendor Unique Command Discovery and Execution
  *
  * There is a standard form of vendor unique commands which are indicated in the
@@ -1132,20 +1191,7 @@ extern void nvme_vuc_disc_free(nvme_vuc_disc_t *);
 extern const char *nvme_vuc_disc_name(const nvme_vuc_disc_t *);
 extern const char *nvme_vuc_disc_desc(const nvme_vuc_disc_t *);
 extern uint32_t nvme_vuc_disc_opcode(const nvme_vuc_disc_t *);
-
-typedef enum {
-	/*
-	 * Indicates that when this command is run, one should assume that all
-	 * data is potentially erased.
-	 */
-	NVME_VUC_DISC_IMPACT_DATA	= 1 << 0,
-	/*
-	 * Indicates that when this command is run, one should assume that the
-	 * list of namespaces and their attributes will change.
-	 */
-	NVME_VUC_DISC_IMPACT_NS		= 1 << 1
-} nvme_vuc_disc_impact_t;
-extern nvme_vuc_disc_impact_t nvme_vuc_disc_impact(const nvme_vuc_disc_t *);
+extern nvme_disc_impact_t nvme_vuc_disc_impact(const nvme_vuc_disc_t *);
 
 typedef enum {
 	NVME_VUC_DISC_IO_NONE	= 0,
@@ -1191,7 +1237,7 @@ extern bool nvme_vuc_req_set_cdw12(nvme_vuc_req_t *, uint32_t);
 extern bool nvme_vuc_req_set_cdw13(nvme_vuc_req_t *, uint32_t);
 extern bool nvme_vuc_req_set_cdw14(nvme_vuc_req_t *, uint32_t);
 extern bool nvme_vuc_req_set_cdw15(nvme_vuc_req_t *, uint32_t);
-extern bool nvme_vuc_req_set_impact(nvme_vuc_req_t *, nvme_vuc_disc_impact_t);
+extern bool nvme_vuc_req_set_impact(nvme_vuc_req_t *, nvme_disc_impact_t);
 extern bool nvme_vuc_req_set_input(nvme_vuc_req_t *, const void *, size_t);
 extern bool nvme_vuc_req_set_output(nvme_vuc_req_t *, void *, size_t);
 extern bool nvme_vuc_req_clear_output(nvme_vuc_req_t *);

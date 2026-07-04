@@ -49,6 +49,7 @@
 #include <sys/mman.h>
 #include <sys/fm/protocol.h>
 #include <fm/topo_hc.h>
+#include <getopt.h>
 
 #include <sys/nvme.h>
 
@@ -100,6 +101,7 @@ static boolean_t do_get_feat_intr_vect(const nvme_process_arg_t *,
 static boolean_t do_get_feat_temp_thresh(const nvme_process_arg_t *,
     const nvme_feat_disc_t *, const nvmeadm_feature_t *);
 static int do_get_features(const nvme_process_arg_t *);
+static int do_set_feature(const nvme_process_arg_t *);
 static int do_format(const nvme_process_arg_t *);
 static int do_secure_erase(const nvme_process_arg_t *);
 static int do_attach_bd(const nvme_process_arg_t *);
@@ -116,6 +118,7 @@ static void optparse_list_logs(nvme_process_arg_t *);
 static void optparse_get_logpage(nvme_process_arg_t *);
 static void optparse_print_logpage(nvme_process_arg_t *);
 static void optparse_list_features(nvme_process_arg_t *);
+static void optparse_set_feature(nvme_process_arg_t *);
 static void optparse_secure_erase(nvme_process_arg_t *);
 
 static void usage_list(const char *);
@@ -127,6 +130,7 @@ static void usage_get_logpage(const char *);
 static void usage_print_logpage(const char *);
 static void usage_list_features(const char *);
 static void usage_get_features(const char *);
+static void usage_set_feature(const char *);
 static void usage_format(const char *);
 static void usage_secure_erase(const char *);
 static void usage_attach_detach_bd(const char *);
@@ -334,6 +338,22 @@ static const nvmeadm_cmd_t nvmeadm_cmds[] = {
 		NULL,
 		do_get_features, usage_get_features, NULL,
 		NVMEADM_C_MULTI
+	},
+	{
+		.c_name = "set-feature",
+		.c_desc = "set a feature on a controller and/or namespace",
+		.c_flagdesc = "  -s\t\tsave the setting persistently\n"
+		    "  -v value\tset the primary (cdw11) feature value\n"
+		    "  --cdw12 cdw12\tset the cdw12 32-bit value\n"
+		    "  --cdw13 cdw13\tset the cdw13 32-bit value\n"
+		    "  --cdw15 cdw15\tset the cdw15 32-bit value\n"
+		    "  -i input\tthe command input data file\n"
+		    "  -l length\tthe command input data size in bytes\n"
+		    "  -I impact\trequest impact on the system\n",
+		.c_func = do_set_feature,
+		.c_usage = usage_set_feature,
+		.c_optparse = optparse_set_feature,
+		.c_flags = NVMEADM_C_EXCL
 	},
 	{
 		"format",
@@ -698,6 +718,43 @@ boolean_t
 nvme_version_check(const nvme_process_arg_t *npa, const nvme_version_t *vers)
 {
 	return (nvme_vers_atleast(npa->npa_version, vers) ? B_TRUE : B_FALSE);
+}
+
+long long
+optparse_ui_range(const char *raw, const char *field, uint64_t min,
+    uint64_t max)
+{
+	const char *errstr;
+	long long l;
+
+	l = strtonumx(raw, min, max, &errstr, 0);
+	if (errstr != NULL) {
+		errx(-1, "failed to parse %s: value %s is %s: valid values "
+		    "are in the range [0x%" PRIx64 ", 0x%" PRIx64 "]", field,
+		    raw, errstr, min, max);
+	}
+
+	return (l);
+}
+
+nvme_disc_impact_t
+optparse_impact(char *raw)
+{
+	nvme_disc_impact_t impact = 0;
+	char *last;
+
+	for (char *s = strtok_r(raw, ",", &last); s != NULL;
+	    s = strtok_r(NULL, ",", &last)) {
+		if (strcmp(s, "data") == 0) {
+			impact |= NVME_DISC_IMPACT_DATA;
+		} else if (strcmp(s, "namespace") == 0) {
+			impact |= NVME_DISC_IMPACT_NS;
+		} else {
+			errx(-1, "invalid impact string: %s", s);
+		}
+	}
+
+	return (impact);
 }
 
 /*
@@ -2854,7 +2911,7 @@ do_features(const nvme_process_arg_t *npa, nvmeadm_features_t *nf,
 	if (npa->npa_ns != NULL) {
 		scope = NVME_FEAT_SCOPE_NS;
 	} else {
-		scope = NVME_FEAT_SCOPE_CTRL;
+		scope = NVME_FEAT_SCOPE_CTRL | NVME_FEAT_SCOPE_NVM;
 	}
 
 	if (!nvme_feat_discover_init(npa->npa_ctrl, scope, 0, &iter)) {
@@ -3409,6 +3466,269 @@ do_get_features(const nvme_process_arg_t *npa)
 	free(filts);
 	free(used);
 	return (ret);
+}
+
+typedef struct nvmeadm_set_feat {
+	bool nsf_save;
+	bool nsf_hcdw11;
+	bool nsf_hcdw12;
+	bool nsf_hcdw13;
+	bool nsf_hcdw15;
+	uint32_t nsf_cdw11;
+	uint32_t nsf_cdw12;
+	uint32_t nsf_cdw13;
+	uint32_t nsf_cdw15;
+	uint32_t nsf_dlen;
+	const char *nsf_input;
+	nvme_disc_impact_t nsf_impact;
+} nvmeadm_set_feat_t;
+
+/*
+ * Like with vendor-specific commands, we opt to allow long options for this
+ * sub-command so that way the --cdwXX arguments are a little more manageable.
+ * Traditionally cdw11 was the only field set for a feature aside from data. As
+ * such, we use -v as the short value here to allow folks that are used to other
+ * tooling.
+ */
+static const struct option set_feat_lopts[] = {
+	{ "save",	no_argument,		NULL,	's' },
+	{ "cdw11",	required_argument,	NULL,	'v' },
+	{ "cdw12",	required_argument,	NULL,	'2' },
+	{ "cdw13",	required_argument,	NULL,	'3' },
+	{ "cdw15",	required_argument,	NULL,	'5' },
+	{ "input",	required_argument,	NULL,	'i' },
+	{ "length",	required_argument,	NULL,	'l' },
+	{ "impact",	required_argument,	NULL,	'I' },
+	{ NULL, 0, NULL, 0 }
+};
+
+/*
+ * Use a limit that's a bit larger than the kernels in case someone tries to
+ * adjust the tunable or we increase it in the future. This would be a good
+ * thing to ask the kernel about instead.
+ */
+#define	NVMEADM_SET_FEAT_LEN_MAX	(4 * 1024 * 1024)
+
+static void
+optparse_set_feature(nvme_process_arg_t *npa)
+{
+	int c;
+	nvmeadm_set_feat_t *feat;
+
+	if ((feat = calloc(1, sizeof (nvmeadm_set_feat_t))) == NULL) {
+		err(-1, "failed to allocate memory for option tracking");
+	}
+
+	/*
+	 * Work around getopt_long treating optind=0 as a request to restart
+	 * option processing and setting optind = optreset = 1.
+	 */
+	optind++;
+	while ((c = getopt_long(npa->npa_argc + 1, npa->npa_argv - 1,
+	    ":sv:2:3:5:i:l:I:", set_feat_lopts, NULL)) != -1) {
+		switch (c) {
+		case 's':
+			feat->nsf_save = true;
+			break;
+		case 'v':
+			feat->nsf_cdw11 = (uint32_t)optparse_ui_range(optarg,
+			    "cdw11", 0, UINT32_MAX);
+			feat->nsf_hcdw11 = true;
+			break;
+		case '2':
+			feat->nsf_cdw12 = (uint32_t)optparse_ui_range(optarg,
+			    "cdw12", 0, UINT32_MAX);
+			feat->nsf_hcdw12 = true;
+			break;
+		case '3':
+			feat->nsf_cdw13 = (uint32_t)optparse_ui_range(optarg,
+			    "cdw13", 0, UINT32_MAX);
+			feat->nsf_hcdw13 = true;
+			break;
+		case '5':
+			feat->nsf_cdw15 = (uint32_t)optparse_ui_range(optarg,
+			    "cdw15", 0, UINT32_MAX);
+			feat->nsf_hcdw15 = true;
+			break;
+		case 'i':
+			feat->nsf_input = optarg;
+			break;
+		case 'l':
+			feat->nsf_dlen = (uint32_t)optparse_ui_range(optarg,
+			    "length", 0, NVMEADM_SET_FEAT_LEN_MAX);
+			break;
+		case 'I':
+			feat->nsf_impact = optparse_impact(optarg);
+			break;
+		case '?':
+			errx(-1, "unknown option: -%c", optopt);
+		case ':':
+			errx(-1, "option -%c requires an argument", optopt);
+		}
+	}
+
+	/*
+	 * Undo our lies.
+	 */
+	optind--;
+
+	if (feat->nsf_input != NULL && feat->nsf_dlen == 0) {
+		errx(-1, "specified data input file (-i) but missing required "
+		    "data length (-l)");
+	}
+
+	if (feat->nsf_input == NULL && feat->nsf_dlen != 0) {
+		errx(-1, "%u bytes of data transfer requested (-l), but no "
+		    "input (-i) specified", feat->nsf_dlen);
+	}
+
+	npa->npa_cmd_arg = feat;
+}
+
+static void
+usage_set_feature(const char *c_name)
+{
+	(void) fprintf(stderr, "%s [-s] [-v value] [--cdw12 cdw12] "
+	    "[--cdw13 cdw13]\n\t  [--cdw15 cdw15] [-l length -i input] "
+	    "[-I impact] <ctl>[/<ns>]\n\n", c_name);
+	(void) fprintf(stderr, "  set a feature on a controller and/or "
+	    "namespace\n");
+
+}
+
+/*
+ * Read up to len bytes from file. If file hits EOF before len bytes are read,
+ * len will be zero-filled.
+ */
+void *
+nvmeadm_fill_from_file(const char *file, size_t len)
+{
+	void *buf = calloc(len, sizeof (uint8_t));
+	if (buf == NULL) {
+		err(-1, "failed to allocate 0x%zx byte request data buffer",
+		    len);
+	}
+
+	int ifd = open(file, O_RDONLY);
+	if (ifd < 0) {
+		err(-1, "failed to open input file %s", file);
+	}
+
+	size_t rem = len, off = 0;
+	while (rem > 0) {
+		size_t toread = MIN(16 * 1024, rem);
+		ssize_t ret = read(ifd, buf + off, toread);
+		if (ret < 0) {
+			errx(-1, "failed to read %zu bytes at offset %zu from "
+			    "%s", toread, off, file);
+		} else if (ret == 0) {
+			break;
+		}
+
+		rem -= (size_t)ret;
+		off += (size_t)ret;
+	}
+
+	VERIFY0(close(ifd));
+	return (buf);
+}
+
+static int
+do_set_feature(const nvme_process_arg_t *npa)
+{
+	nvmeadm_set_feat_t *feat = npa->npa_cmd_arg;
+	nvme_feat_disc_t *disc = NULL;
+	nvme_set_feat_req_t *req;
+	nvme_ctrl_t *ctrl = npa->npa_ctrl;
+	uint8_t *buf = NULL;
+
+	if (npa->npa_argc < 1) {
+		errx(-1, "missing required feature to set");
+	} else if (npa->npa_argc > 1) {
+		errx(-1, "%s passed extraneous arguments starting with %s",
+		    npa->npa_cmd->c_name, npa->npa_argv[1]);
+	}
+
+	if (npa->npa_ns != NULL) {
+		errx(-1, "features may only bet set on a controller, not a "
+		    "namespace");
+	}
+
+	const char *name = npa->npa_argv[0];
+
+	/*
+	 * First try to parse by name. Otherwise, try to see if this is a
+	 * feature identifier we can parse. If it's not a known name, see if
+	 * it's a valid feature identifier. If it isn't, we use the original
+	 * error message from libnvme.
+	 */
+	if (!nvme_set_feat_req_init_by_name(ctrl, name, 0, &disc,
+	    &req)) {
+		if (nvme_ctrl_err(ctrl) != NVME_ERR_FEAT_NAME_UNKNOWN) {
+			nvmeadm_fatal(npa, "failed to initialize set feature "
+			    "request for %s", name);
+		}
+
+		const char *errstr;
+		uint8_t fid = strtonumx(name, 0, NVME_FEAT_MAX_FID, &errstr, 0);
+		if (errstr != NULL) {
+			nvmeadm_fatal(npa, "failed to initialize set feature "
+			    "request for %s", name);
+		}
+
+		if (!nvme_set_feat_req_init(ctrl, &req)) {
+			nvmeadm_fatal(npa, "failed to initialize set feature "
+			    "request for %s", name);
+		}
+
+		if (!nvme_set_feat_req_set_fid(req, fid)) {
+			nvmeadm_fatal(npa, "failed to set feature id to 0x%x",
+			    fid);
+		}
+	}
+
+	if (npa->npa_ns != NULL) {
+		uint32_t nsid = nvme_ns_info_nsid(npa->npa_ns_info);
+
+		if (!nvme_set_feat_req_set_nsid(req, nsid)) {
+			nvmeadm_fatal(npa, "failed to set feature request "
+			    "namespace ID to 0x%x", nsid);
+		}
+	}
+
+	if (!nvme_set_feat_req_set_save(req, feat->nsf_save) ||
+	    (feat->nsf_hcdw11 && !nvme_set_feat_req_set_cdw11(req,
+	    feat->nsf_cdw11)) ||
+	    (feat->nsf_hcdw12 && !nvme_set_feat_req_set_cdw12(req,
+	    feat->nsf_cdw12)) ||
+	    (feat->nsf_hcdw13 && !nvme_set_feat_req_set_cdw13(req,
+	    feat->nsf_cdw13)) ||
+	    (feat->nsf_hcdw15 && !nvme_set_feat_req_set_cdw15(req,
+	    feat->nsf_cdw15)) ||
+	    !nvme_set_feat_req_set_impact(req, feat->nsf_impact)) {
+		nvmeadm_fatal(npa, "failed to set request fields");
+	}
+
+	if (feat->nsf_dlen > 0) {
+		buf = nvmeadm_fill_from_file(feat->nsf_input, feat->nsf_dlen);
+		if (!nvme_set_feat_req_set_input(req, buf, feat->nsf_dlen)) {
+			nvmeadm_fatal(npa, "failed to set input data buffer");
+		}
+	}
+
+	if (!nvme_set_feat_req_exec(req)) {
+		nvmeadm_fatal(npa, "failed to execute set feature request");
+	}
+
+	uint32_t cdw0;
+	if (nvme_set_feat_req_get_cdw0(req, &cdw0)) {
+		(void) printf("Set Feature cdw0: 0x%x\n", cdw0);
+	}
+
+	nvme_set_feat_req_fini(req);
+	free(buf);
+
+	return (0);
 }
 
 static int

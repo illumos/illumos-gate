@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -48,17 +48,36 @@
 #endif
 
 static bool
-nvme_get_feat_supported_sel(const nvme_field_info_t *field,
-    const nvme_valid_ctrl_data_t *data, char *msg, size_t msglen)
+nvme_feat_ctrl_sup_save(const nvme_valid_ctrl_data_t *data)
 {
-	if (data->vcd_id->id_oncs.on_save != 0) {
-		return (true);
+	return (nvme_field_atleast(data, &nvme_vers_1v1) &&
+	    data->vcd_id->id_oncs.on_save != 0);
+}
+
+static bool
+nvme_feat_field_valid_save(const nvme_field_info_t *field,
+    const nvme_valid_ctrl_data_t *data, uint64_t lsp, char *msg, size_t msglen)
+{
+	uint64_t max = 0;
+
+	if (nvme_feat_ctrl_sup_save(data)) {
+		max = NVME_FEAT_MAX_SAVE;
 	}
 
-	(void) snprintf(msg, msglen, "controller does not support field %s "
-	    "(%s): missing extended data support in Log Page Attributes (LPA)",
-	    field->nlfi_human, field->nlfi_spec);
-	return (false);
+	return (nvme_field_range_check(field, 0, max, msg, msglen, lsp));
+}
+
+static bool
+nvme_feat_field_valid_sel(const nvme_field_info_t *field,
+    const nvme_valid_ctrl_data_t *data, uint64_t lsp, char *msg, size_t msglen)
+{
+	uint64_t max = 0;
+
+	if (nvme_feat_ctrl_sup_save(data)) {
+		max = NVME_FEAT_MAX_SEL;
+	}
+
+	return (nvme_field_range_check(field, 0, max, msg, msglen, lsp));
 }
 
 /*
@@ -78,10 +97,21 @@ const nvme_field_info_t nvme_get_feat_fields[] = {
 		.nlfi_def_req = true,
 		.nlfi_def_allow = true
 	},
+	/*
+	 * The SEL and SAVE fields were added in NVMe 1.1; however, unlike say
+	 * the LSP/LSI fields of a get logpage request, these didn't add
+	 * something that was wholely new. Instead, basically NVMe 1.0 had these
+	 * fields but they only had the meaning of get the current value and
+	 * don't save. As such we model these as always being present so someone
+	 * can alway set these fields. Continuing the LSI/LSP example, log pages
+	 * prior to that didn't use those fields so it wouldn't make sense to
+	 * set them as they are always context-dependent. However, the question
+	 * of what value to get (or save) always has meaning even if it there
+	 * wasn't flexibility originally.
+	 */
 	[NVME_GET_FEAT_REQ_FIELD_SEL] = {
-		.nlfi_vers = &nvme_vers_1v1,
-		.nlfi_sup = nvme_get_feat_supported_sel,
-		.nlfi_max_size = NVME_FEAT_MAX_SEL,
+		.nlfi_vers = &nvme_vers_1v0,
+		.nlfi_valid = nvme_feat_field_valid_sel,
 		.nlfi_spec = "sel",
 		.nlfi_human = "select",
 		/*
@@ -117,6 +147,98 @@ const nvme_field_info_t nvme_get_feat_fields[] = {
 };
 
 const size_t nvme_get_feat_nfields = ARRAY_SIZE(nvme_get_feat_fields);
+
+/*
+ * While the impact is something that we track, because it is not a strict NVMe
+ * field, it is not present as a field here.
+ */
+const nvme_field_info_t nvme_set_feat_fields[] = {
+	[NVME_SET_FEAT_REQ_FIELD_FID] = {
+		.nlfi_vers = &nvme_vers_1v0,
+		.nlfi_max_size = NVME_FEAT_MAX_FID,
+		.nlfi_spec = "fid",
+		.nlfi_human = "feature identifier",
+		.nlfi_def_req = true,
+		.nlfi_def_allow = true
+	},
+	/*
+	 * See the discussion of NVME_GET_FEAT_REQ_FIELD_SEL above.
+	 */
+	[NVME_SET_FEAT_REQ_FIELD_SAVE] = {
+		.nlfi_vers = &nvme_vers_1v0,
+		.nlfi_valid = nvme_feat_field_valid_save,
+		.nlfi_max_size = NVME_FEAT_MAX_SAVE,
+		.nlfi_spec = "sv",
+		.nlfi_human = "save",
+		/*
+		 * We set save's default to false to basically say that the
+		 * system default when setting a feature is that it is not
+		 * saved.
+		 */
+		.nlfi_def_req = false,
+		.nlfi_def_allow = true
+	},
+	/*
+	 * Control words 11, 12, 13, and 15 are optional arguments that vary
+	 * based on the feature. CDW11 has always been used. NVMe 1.2 extended
+	 * this to 12-15. NVMe 1.4 changed things so cdw14 is used for a uuid
+	 * index, so we leave it out.
+	 *
+	 * These are all set to optional and allowed by default. If we are using
+	 * a feature that has additional information in the library via
+	 * discovery, then this will be constrained to what the feature is known
+	 * to require.
+	 */
+	[NVME_SET_FEAT_REQ_FIELD_CDW11] = {
+		.nlfi_vers = &nvme_vers_1v0,
+		.nlfi_max_size = UINT32_MAX,
+		.nlfi_spec = "cdw11",
+		.nlfi_human = "control dword 11",
+		.nlfi_def_req = false,
+		.nlfi_def_allow = true
+	},
+	[NVME_SET_FEAT_REQ_FIELD_CDW12] = {
+		.nlfi_vers = &nvme_vers_1v2,
+		.nlfi_max_size = UINT32_MAX,
+		.nlfi_spec = "cdw12",
+		.nlfi_human = "control dword 12",
+		.nlfi_def_req = false,
+		.nlfi_def_allow = true
+	},
+	[NVME_SET_FEAT_REQ_FIELD_CDW13] = {
+		.nlfi_vers = &nvme_vers_1v2,
+		.nlfi_max_size = UINT32_MAX,
+		.nlfi_spec = "cdw13",
+		.nlfi_human = "control dword 13",
+		.nlfi_def_req = false,
+		.nlfi_def_allow = true
+	},
+	[NVME_SET_FEAT_REQ_FIELD_CDW15] = {
+		.nlfi_vers = &nvme_vers_1v2,
+		.nlfi_max_size = UINT32_MAX,
+		.nlfi_spec = "cdw15",
+		.nlfi_human = "control dword 15",
+		.nlfi_def_req = false,
+		.nlfi_def_allow = true
+	},
+	[NVME_SET_FEAT_REQ_FIELD_DPTR] = {
+		.nlfi_vers = &nvme_vers_1v0,
+		.nlfi_max_size = UINT32_MAX,
+		.nlfi_spec = "dptr",
+		.nlfi_human = "data pointer",
+		.nlfi_def_req = false,
+		.nlfi_def_allow = true
+	},
+	[NVME_SET_FEAT_REQ_FIELD_NSID] = {
+		.nlfi_vers = &nvme_vers_1v0,
+		.nlfi_valid = nvme_field_valid_nsid,
+		.nlfi_spec = "nsid",
+		.nlfi_human = "namespace ID",
+		.nlfi_def_req = false,
+		.nlfi_def_allow = true
+	}
+};
+const size_t nvme_set_feat_nfields = ARRAY_SIZE(nvme_set_feat_fields);
 
 static bool
 nvme_feat_write_cache_sup(const nvme_valid_ctrl_data_t *data,

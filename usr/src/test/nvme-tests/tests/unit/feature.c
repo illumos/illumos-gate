@@ -10,12 +10,13 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
  * Unit tests for the common feature code. Covering fields and whether or not
- * specific features are supported.
+ * specific features are supported. Vendor-specific features are not tested
+ * here.
  */
 
 #include <stdlib.h>
@@ -24,192 +25,544 @@
 
 #include "nvme_unit.h"
 
-static const nvme_unit_field_test_t feature_field_tests[] = { {
-	.nu_desc = "invalid FID (1)",
+static const nvme_unit_field_test_t get_feature_field_tests[] = { {
+	.nu_desc = "get invalid FID (1)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_FID,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = 0x100,
 	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
 }, {
-	.nu_desc = "invalid FID (2)",
+	.nu_desc = "get invalid FID (2)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_FID,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = 0x54321,
 	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
 }, {
-	.nu_desc = "valid FID (1)",
+	.nu_desc = "get valid FID (1)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_FID,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = 0x0,
 	.nu_ret = NVME_FIELD_ERR_OK
 }, {
-	.nu_desc = "valid FID (1)",
-	.nu_fields = nvme_get_feat_fields,
-	.nu_index = NVME_GET_FEAT_REQ_FIELD_FID,
-	.nu_data = &nvme_ctrl_base_1v0,
-	.nu_value = 0x0,
-	.nu_ret = NVME_FIELD_ERR_OK
-}, {
-	.nu_desc = "valid FID (2)",
+	.nu_desc = "get valid FID (2)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_FID,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = 0x78,
 	.nu_ret = NVME_FIELD_ERR_OK
 }, {
-	.nu_desc = "valid FID (3)",
+	.nu_desc = "get valid FID (3)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_FID,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = 0xaa,
 	.nu_ret = NVME_FIELD_ERR_OK
 }, {
-	.nu_desc = "valid FID (4)",
+	.nu_desc = "get valid FID (4)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_FID,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = 0xc0,
 	.nu_ret = NVME_FIELD_ERR_OK
 }, {
-	.nu_desc = "valid FID (5)",
+	.nu_desc = "get valid FID (5)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_FID,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = 0xff,
 	.nu_ret = NVME_FIELD_ERR_OK
 }, {
-	.nu_desc = "unsupported sel (1.0)",
+	.nu_desc = "get invalid sel (1)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_SEL,
 	.nu_data = &nvme_ctrl_base_1v0,
-	.nu_value = 0x0,
-	.nu_ret = NVME_FIELD_ERR_UNSUP_VERSION
+	.nu_value = NVME_FEATURE_SEL_DEFAULT,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
 }, {
-	.nu_desc = "unsupported sel (1.1 No ONCS)",
-	.nu_fields = nvme_get_feat_fields,
-	.nu_index = NVME_GET_FEAT_REQ_FIELD_SEL,
-	.nu_data = &nvme_ctrl_base_1v1,
-	.nu_value = 0x0,
-	.nu_ret = NVME_FIELD_ERR_UNSUP_FIELD
-}, {
-	.nu_desc = "unsupported sel (2.0 No ONCS)",
+	.nu_desc = "get invalid sel (2)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_SEL,
 	.nu_data = &nvme_ctrl_base_2v0,
-	.nu_value = 0x0,
-	.nu_ret = NVME_FIELD_ERR_UNSUP_FIELD
+	.nu_value = NVME_FEATURE_SEL_DEFAULT,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
 }, {
-	.nu_desc = "invalid sel (1)",
+	.nu_desc = "get invalid sel (3)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_SEL,
 	.nu_data = &nvme_ctrl_ns_1v2,
 	.nu_value = 0x4,
 	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
 }, {
-	.nu_desc = "invalid sel (2)",
+	.nu_desc = "get invalid sel (4)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_SEL,
 	.nu_data = &nvme_ctrl_ns_1v2,
 	.nu_value = 0x11,
 	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
 }, {
-	.nu_desc = "valid sel (1)",
+	.nu_desc = "get valid sel (1)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_SEL,
 	.nu_data = &nvme_ctrl_ns_1v2,
 	.nu_value = 0x0,
 	.nu_ret = NVME_FIELD_ERR_OK
 }, {
-	.nu_desc = "valid sel (2)",
+	.nu_desc = "get valid sel (2)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_SEL,
 	.nu_data = &nvme_ctrl_ns_1v2,
 	.nu_value = 0x3,
 	.nu_ret = NVME_FIELD_ERR_OK
 }, {
-	.nu_desc = "valid sel (2)",
+	.nu_desc = "get valid sel (3)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_SEL,
 	.nu_data = &nvme_ctrl_ns_1v2,
 	.nu_value = 0x2,
 	.nu_ret = NVME_FIELD_ERR_OK
 }, {
-	.nu_desc = "invalid cdw11 (1)",
+	.nu_desc = "get valid sel (4)",
+	.nu_fields = nvme_get_feat_fields,
+	.nu_index = NVME_GET_FEAT_REQ_FIELD_SEL,
+	.nu_data = &nvme_ctrl_base_2v0,
+	.nu_value = NVME_FEATURE_SEL_CURRENT,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "get invalid cdw11 (1)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_CDW11,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = 0x100000000,
 	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
 }, {
-	.nu_desc = "invalid cdw11 (2)",
+	.nu_desc = "get invalid cdw11 (2)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_CDW11,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = 0x8765445678,
 	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
 }, {
-	.nu_desc = "valid cdw11 (1)",
+	.nu_desc = "get valid cdw11 (1)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_CDW11,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = 0x0,
 	.nu_ret = NVME_FIELD_ERR_OK
 }, {
-	.nu_desc = "valid cdw11 (2)",
+	.nu_desc = "get valid cdw11 (2)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_CDW11,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = 0xffffffff,
 	.nu_ret = NVME_FIELD_ERR_OK
 }, {
-	.nu_desc = "valid cdw11 (3)",
+	.nu_desc = "get valid cdw11 (3)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_CDW11,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = 0x6543210,
 	.nu_ret = NVME_FIELD_ERR_OK
 }, {
-	.nu_desc = "invalid nsid (1)",
+	.nu_desc = "get invalid nsid (1)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_NSID,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = 0x0,
 	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
 }, {
-	.nu_desc = "invalid nsid (2)",
+	.nu_desc = "get invalid nsid (2)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_NSID,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = 0xfffffffe,
 	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
 }, {
-	.nu_desc = "invalid nsid (3)",
+	.nu_desc = "get invalid nsid (3)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_NSID,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = 0x2,
 	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
 }, {
-	.nu_desc = "valid nsid (1)",
+	.nu_desc = "get valid nsid (1)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_NSID,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = 0x1,
 	.nu_ret = NVME_FIELD_ERR_OK
 }, {
-	.nu_desc = "valid nsid (2)",
+	.nu_desc = "get valid nsid (2)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_NSID,
 	.nu_data = &nvme_ctrl_base_1v0,
 	.nu_value = NVME_NSID_BCAST,
 	.nu_ret = NVME_FIELD_ERR_OK
 }, {
-	.nu_desc = "valid nsid (3)",
+	.nu_desc = "get valid nsid (3)",
 	.nu_fields = nvme_get_feat_fields,
 	.nu_index = NVME_GET_FEAT_REQ_FIELD_NSID,
+	.nu_data = &nvme_ctrl_ns_1v4,
+	.nu_value = 0x80,
+	.nu_ret = NVME_FIELD_ERR_OK
+} };
+
+static const nvme_unit_field_test_t set_feature_field_tests[] = { {
+	.nu_desc = "set invalid FID (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_FID,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0x100,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid FID (2)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_FID,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0x54321,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set valid FID (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_FID,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0x0,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid FID (2)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_FID,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0x78,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid FID (3)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_FID,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0xaa,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid FID (4)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_FID,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0xc0,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid FID (5)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_FID,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0xff,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set invalid save (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_SAVE,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0x1,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid save (2)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_SAVE,
+	.nu_data = &nvme_ctrl_base_1v1,
+	.nu_value = 0x1,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid save (3)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_SAVE,
+	.nu_data = &nvme_ctrl_base_2v2,
+	.nu_value = 0x1,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid save (4)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_SAVE,
+	.nu_data = &nvme_ctrl_ns_1v2,
+	.nu_value = 0x2,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid save (5)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_SAVE,
+	.nu_data = &nvme_ctrl_ns_1v2,
+	.nu_value = 0xf,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid save (6)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_SAVE,
+	.nu_data = &nvme_ctrl_ns_1v2,
+	.nu_value = 0x23,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid save (7)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_SAVE,
+	.nu_data = &nvme_ctrl_ns_1v2,
+	.nu_value = INT32_MAX,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set valid save (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_SAVE,
+	.nu_data = &nvme_ctrl_ns_1v2,
+	.nu_value = 0,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid save (2)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_SAVE,
+	.nu_data = &nvme_ctrl_ns_1v2,
+	.nu_value = 1,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid save (3)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_SAVE,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid save (4)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_SAVE,
+	.nu_data = &nvme_ctrl_base_2v2,
+	.nu_value = 0,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set invalid cdw11 (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW11,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 1ULL << 32,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid cdw11 (2)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW11,
+	.nu_data = &nvme_ctrl_base_2v0,
+	.nu_value = 1ULL << 32,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid cdw11 (3)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW11,
+	.nu_data = &nvme_ctrl_base_2v2,
+	.nu_value = INT64_MAX,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set valid cdw11 (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW11,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0x0,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid cdw11 (2)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW11,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = UINT32_MAX,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid cdw11 (3)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW11,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0x7777,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set unsupported cdw12 (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW12,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0x42,
+	.nu_ret = NVME_FIELD_ERR_UNSUP_VERSION
+}, {
+	.nu_desc = "set invalid cdw12 (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW12,
+	.nu_data = &nvme_ctrl_base_1v2,
+	.nu_value = 1ULL << 32,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid cdw12 (2)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW12,
+	.nu_data = &nvme_ctrl_base_2v0,
+	.nu_value = 1ULL << 32,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid cdw12 (3)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW12,
+	.nu_data = &nvme_ctrl_base_2v2,
+	.nu_value = INT64_MAX,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set valid cdw12 (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW12,
+	.nu_data = &nvme_ctrl_base_1v2,
+	.nu_value = 0x0,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid cdw12 (2)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW12,
+	.nu_data = &nvme_ctrl_base_1v2,
+	.nu_value = UINT32_MAX,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid cdw12 (3)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW12,
+	.nu_data = &nvme_ctrl_base_2v2,
+	.nu_value = 0x7777,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set unsupported cdw13 (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW13,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0x42,
+	.nu_ret = NVME_FIELD_ERR_UNSUP_VERSION
+}, {
+	.nu_desc = "set invalid cdw13 (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW13,
+	.nu_data = &nvme_ctrl_base_1v2,
+	.nu_value = 1ULL << 32,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid cdw13 (2)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW13,
+	.nu_data = &nvme_ctrl_base_2v0,
+	.nu_value = 1ULL << 32,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid cdw13 (3)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW13,
+	.nu_data = &nvme_ctrl_base_2v2,
+	.nu_value = INT64_MAX,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set valid cdw13 (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW13,
+	.nu_data = &nvme_ctrl_base_1v2,
+	.nu_value = 0x0,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid cdw13 (2)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW13,
+	.nu_data = &nvme_ctrl_base_1v2,
+	.nu_value = UINT32_MAX,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid cdw13 (3)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW13,
+	.nu_data = &nvme_ctrl_base_2v2,
+	.nu_value = 0x7777,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set unsupported cdw15 (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW15,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0x42,
+	.nu_ret = NVME_FIELD_ERR_UNSUP_VERSION
+}, {
+	.nu_desc = "set invalid cdw15 (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW15,
+	.nu_data = &nvme_ctrl_base_1v2,
+	.nu_value = 1ULL << 32,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid cdw15 (2)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW15,
+	.nu_data = &nvme_ctrl_base_2v0,
+	.nu_value = 1ULL << 32,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid cdw15 (3)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW15,
+	.nu_data = &nvme_ctrl_base_2v2,
+	.nu_value = INT64_MAX,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set valid cdw15 (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW15,
+	.nu_data = &nvme_ctrl_base_1v2,
+	.nu_value = 0x0,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid cdw15 (2)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW15,
+	.nu_data = &nvme_ctrl_base_1v2,
+	.nu_value = UINT32_MAX,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid cdw15 (3)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_CDW15,
+	.nu_data = &nvme_ctrl_base_2v2,
+	.nu_value = 0x7777,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set invalid nsid (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_NSID,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0x0,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid nsid (2)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_NSID,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0xfffffffe,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set invalid nsid (3)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_NSID,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0x2,
+	.nu_ret = NVME_FIELD_ERR_BAD_VALUE
+}, {
+	.nu_desc = "set valid nsid (1)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_NSID,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = 0x1,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid nsid (2)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_NSID,
+	.nu_data = &nvme_ctrl_base_1v0,
+	.nu_value = NVME_NSID_BCAST,
+	.nu_ret = NVME_FIELD_ERR_OK
+}, {
+	.nu_desc = "set valid nsid (3)",
+	.nu_fields = nvme_set_feat_fields,
+	.nu_index = NVME_SET_FEAT_REQ_FIELD_NSID,
 	.nu_data = &nvme_ctrl_ns_1v4,
 	.nu_value = 0x80,
 	.nu_ret = NVME_FIELD_ERR_OK
@@ -382,7 +735,22 @@ static const feature_impl_test_t feature_impl_tests[] = { {
 	.fit_fid = NVME_FEAT_PROGRESS,
 	.fit_data =  &nvme_ctrl_base_2v0,
 	.fit_impl = NVME_FEAT_IMPL_UNKNOWN
-} };
+}, {
+	.fit_desc = "host behavior unsupported",
+	.fit_fid = NVME_FEAT_HOST_BEHAVE,
+	.fit_data =  &nvme_ctrl_base_1v0,
+	.fit_impl = NVME_FEAT_IMPL_UNSUPPORTED
+}, {
+	.fit_desc = "host behavior unknown (1)",
+	.fit_fid = NVME_FEAT_HOST_BEHAVE,
+	.fit_data =  &nvme_ctrl_ns_1v4,
+	.fit_impl = NVME_FEAT_IMPL_UNKNOWN
+}, {
+	.fit_desc = "host behavior unknown (2)",
+	.fit_fid = NVME_FEAT_HOST_BEHAVE,
+	.fit_data =  &nvme_ctrl_base_2v2,
+	.fit_impl = NVME_FEAT_IMPL_UNKNOWN
+}  };
 
 static bool
 feature_impl_test_one(const feature_impl_test_t *test)
@@ -418,8 +786,13 @@ main(void)
 {
 	int ret = EXIT_SUCCESS;
 
-	if (!nvme_unit_field_test(feature_field_tests,
-	    ARRAY_SIZE(feature_field_tests))) {
+	if (!nvme_unit_field_test(get_feature_field_tests,
+	    ARRAY_SIZE(get_feature_field_tests))) {
+		ret = EXIT_FAILURE;
+	}
+
+	if (!nvme_unit_field_test(set_feature_field_tests,
+	    ARRAY_SIZE(set_feature_field_tests))) {
 		ret = EXIT_FAILURE;
 	}
 

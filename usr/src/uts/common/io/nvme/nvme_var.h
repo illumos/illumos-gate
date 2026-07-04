@@ -619,6 +619,8 @@ extern boolean_t nvme_validate_identify(nvme_t *, nvme_ioctl_identify_t *,
     boolean_t);
 extern boolean_t nvme_validate_get_feature(nvme_t *,
     nvme_ioctl_get_feature_t *);
+extern boolean_t nvme_validate_set_feature(nvme_t *,
+    nvme_ioctl_set_feature_t *);
 extern boolean_t nvme_validate_vuc(nvme_t *, nvme_ioctl_passthru_t *);
 extern boolean_t nvme_validate_format(nvme_t *, nvme_ioctl_format_t *);
 extern boolean_t nvme_validate_fw_load(nvme_t *, nvme_ioctl_fw_load_t *);

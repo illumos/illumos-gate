@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -77,6 +77,11 @@ const nvme_valid_ctrl_data_t nvme_ctrl_base_1v2 = {
 
 const nvme_valid_ctrl_data_t nvme_ctrl_base_2v0 = {
 	.vcd_vers = &nvme_vers_2v0,
+	.vcd_id = &nvme_ctrl_base
+};
+
+const nvme_valid_ctrl_data_t nvme_ctrl_base_2v2 = {
+	.vcd_vers = &nvme_vers_2v2,
 	.vcd_id = &nvme_ctrl_base
 };
 
