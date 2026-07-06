@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -59,6 +60,7 @@ static in_node_t *in_alloc_node(char *name, char *addr);
 static int in_eqstr(char *a, char *b);
 static char *in_name_addr(char **cpp, char **addrp);
 static in_node_t *in_devwalk(dev_info_t *dip, in_node_t **ap, char *addr);
+static in_node_t *in_devwalk_create(dev_info_t *dip);
 static void in_dealloc_node(in_node_t *np);
 static in_node_t *in_make_path(char *path);
 static void in_enlist(in_node_t *ap, in_node_t *np);
@@ -540,7 +542,6 @@ in_assign_instance_block(dev_info_t *dip)
 uint_t
 e_ddi_assign_instance(dev_info_t *dip)
 {
-	char *name;
 	in_node_t *ap, *np;
 	in_drv_t *dp;
 	major_t major;
@@ -554,12 +555,18 @@ e_ddi_assign_instance(dev_info_t *dip)
 		return (ret);
 
 	/*
-	 * If this is a pseudo-device, use the instance number
-	 * assigned by the pseudo nexus driver. The mutex is
-	 * not needed since the instance tree is not used.
+	 * If this is a pseudo-device to which the pseudo nexus driver
+	 * assigned an instance number (as happens for nodes enumerated from
+	 * driver.conf files) use that instance. A pseudo child that was
+	 * created without an instance, such as a node enumerated by a pseudo
+	 * nexus driver itself, falls through and is assigned an instance from
+	 * the instance tree like any other device.
 	 */
 	if (is_pseudo_device(dip)) {
-		return (ddi_get_instance(dip));
+		int instance = ddi_get_instance(dip);
+
+		if (instance != -1)
+			return (instance);
 	}
 
 	/*
@@ -576,10 +583,8 @@ e_ddi_assign_instance(dev_info_t *dip)
 		if (in_assign_instance_block(dip)) {
 			np = in_devwalk(dip, &ap, NULL);
 		} else {
-			name = ddi_node_name(dip);
-			np = in_alloc_node(name, ddi_get_name_addr(dip));
+			np = in_devwalk_create(dip);
 			ASSERT(np != NULL);
-			in_enlist(ap, np);	/* insert into tree */
 		}
 	}
 	ASSERT(np == in_devwalk(dip, &ap, NULL));
@@ -787,10 +792,11 @@ e_ddi_free_instance(dev_info_t *dip, char *addr)
 		return;
 
 	/*
-	 * If this is a pseudo-device, no instance number
-	 * was assigned.
+	 * A pseudo-device that was never entered into the instance tree,
+	 * because the pseudo nexus preassigned its instance, has nothing
+	 * to free.
 	 */
-	if (is_pseudo_device(dip)) {
+	if (is_pseudo_device(dip) && DEVI(dip)->devi_in_node == NULL) {
 		return;
 	}
 
@@ -850,9 +856,10 @@ e_ddi_keep_instance(dev_info_t *dip)
 		return;
 
 	/*
-	 * Nothing to do for pseudo devices.
+	 * Nothing to do for a pseudo device that was never entered into
+	 * the instance tree.
 	 */
-	if (is_pseudo_device(dip))
+	if (is_pseudo_device(dip) && DEVI(dip)->devi_in_node == NULL)
 		return;
 
 	/*
@@ -988,6 +995,43 @@ in_devwalk(dev_info_t *dip, in_node_t **ap, char *addr)
 		}
 		np = np->in_sibling;
 	}
+
+	return (np);
+}
+
+/*
+ * As in_devwalk(), but create any nodes that are missing from the tree
+ * along the way. A node whose ancestors were never entered into the tree,
+ * such as a child enumerated by a pseudo nexus driver whose own instance
+ * was preassigned from driver.conf, still takes its proper place in the
+ * tree this way. Intermediate nodes created here carry no driver entries,
+ * as with the intermediate path components created by in_pathin().
+ */
+static in_node_t *
+in_devwalk_create(dev_info_t *dip)
+{
+	in_node_t *pnp, *np;
+	char *name, *addr;
+
+	ASSERT(dip);
+	ASSERT(e_ddi_inst_state.ins_busy);
+	if (dip == ddi_root_node())
+		return (e_ddi_inst_state.ins_root);
+
+	pnp = in_devwalk_create(ddi_get_parent(dip));
+	name = ddi_node_name(dip);
+	addr = ddi_get_name_addr(dip);
+
+	for (np = pnp->in_child; np != NULL; np = np->in_sibling) {
+		if (in_eqstr(np->in_node_name, name) &&
+		    in_eqstr(np->in_unit_addr, addr)) {
+			return (np);
+		}
+	}
+
+	np = in_alloc_node(name, addr);
+	ASSERT(np != NULL);
+	in_enlist(pnp, np);
 
 	return (np);
 }
@@ -1556,8 +1600,8 @@ in_walk_instances(in_node_t *np, char *path, char *this,
  * calling a user-supplied callback for each node.
  */
 int
-e_ddi_walk_instances(int (*f)(const char *,
-	in_node_t *, in_drv_t *, void *), void *arg)
+e_ddi_walk_instances(int (*f)(const char *, in_node_t *, in_drv_t *, void *),
+    void *arg)
 {
 	in_node_t *root;
 	int rval;
@@ -1643,7 +1687,7 @@ void
 e_ddi_return_instance(dev_info_t *cdip, char *addr, in_node_t *cnp)
 {
 	in_node_t	*anp;
-	char 		*alias;
+	char		*alias;
 	char		*curr = kmem_alloc(MAXPATHLEN, KM_NOSLEEP);
 
 	if (curr == NULL) {
