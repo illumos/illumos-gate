@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2020 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 PROG= usmn udf
@@ -20,13 +20,23 @@ include ../Makefile.cmd
 ROOTCMDDIR = $(ROOTLIB)
 CPPFLAGS += -I$(SRC)/uts/intel/io/amdzen
 CFLAGS += $(CCVERBOSE)
+CSTD = $(CSTD_GNU17)
+COMMON_OBJS = amdzen_common.o
+LDLIBS += -ldevinfo
 
 .KEEP_STATE:
 
 all: $(PROG)
 
+$(PROG): $(COMMON_OBJS)
+
+%: %.o
+	$(LINK.c) -o $@ $< $(COMMON_OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
 install: all $(ROOTCMD)
 
 clean:
+	$(RM) $(COMMON_OBJS) $(PROG:%=%.o)
 
 include ../Makefile.targ

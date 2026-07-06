@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -26,6 +26,8 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <usmn.h>
+
+#include "amdzen_common.h"
 
 static boolean_t
 usmn_parse_uint32(const char *str, uint32_t *valp)
@@ -107,7 +109,7 @@ main(int argc, char *argv[])
 			(void) fprintf(stderr, "Usage: usmn -d device "
 			    "[-L length] [-w value] addr [addr]...\n"
 			    "Note: All addresses are interpreted as hex\n");
-			return (2);
+			return (EXIT_USAGE);
 		}
 	}
 
@@ -126,9 +128,9 @@ main(int argc, char *argv[])
 		errx(EXIT_FAILURE, "can only write to a single register");
 	}
 
-	if ((fd = open(device, do_write ? O_RDWR : O_RDONLY)) < 0) {
-		err(EXIT_FAILURE, "failed to open %s", device);
-	}
+	fd = amdzen_open_device("usmn", device, do_write ? O_RDWR : O_RDONLY);
+	if (fd < 0)
+		return (EXIT_FAILURE);
 
 	ret = EXIT_SUCCESS;
 	for (i = 0; i < argc; i++) {
