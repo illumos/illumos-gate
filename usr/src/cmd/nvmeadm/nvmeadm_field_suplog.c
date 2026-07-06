@@ -570,8 +570,8 @@ static const nvmeadm_field_bit_t supfeat_cs_bits[] = { {
 	.nfb_strs = { "unsupported", "supported" }
 }, {
 	.nfb_lowbit = 20, .nfb_hibit = 31,
-	.nfb_short = "csp",
-	.nfb_desc = "Command Scope",
+	.nfb_short = "fsp",
+	.nfb_desc = "FID Scope",
 	.nfb_vers = &nvme_vers_2v0,
 	NVMEADM_FB_BITS(supfeat_csp_bits)
 } };
