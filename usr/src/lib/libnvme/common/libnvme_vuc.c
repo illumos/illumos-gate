@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -535,7 +535,12 @@ nvme_vuc_req_exec(nvme_vuc_req_t *req)
 		pass.npc_flags = NVME_PASSTHRU_READ;
 	}
 
-	if ((req->nvr_impact & NVME_VUC_DISC_IMPACT_NS) != 0) {
+	/*
+	 * Combine any impact into the flag the kernel uses today, which
+	 * basically requires blkdev be detached from namespaces and implies a
+	 * rescan.
+	 */
+	if (req->nvr_impact != 0) {
 		pass.npc_impact |= NVME_IMPACT_NS;
 	}
 
