@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 set name=pkg.fmri value=pkg:/system/test/libproctest@$(PKGVERS)
@@ -25,6 +25,12 @@ file path=opt/libproc-tests/bin/libproctest mode=0555
 dir  path=opt/libproc-tests/runfiles
 file path=opt/libproc-tests/runfiles/default.run mode=0444
 dir  path=opt/libproc-tests/tests
+dir  path=opt/libproc-tests/tests/agent
+file path=opt/libproc-tests/tests/agent/agent_destroy mode=0555
+file path=opt/libproc-tests/tests/agent/agent_destroy.32 mode=0555
+file path=opt/libproc-tests/tests/agent/agent_destroy.64 mode=0555
+file path=opt/libproc-tests/tests/agent/agent_target.32 mode=0555
+file path=opt/libproc-tests/tests/agent/agent_target.64 mode=0555
 dir  path=opt/libproc-tests/tests/syscall
 file path=opt/libproc-tests/tests/syscall/pr_inject mode=0555
 file path=opt/libproc-tests/tests/syscall/pr_inject.32 mode=0555

@@ -13,8 +13,16 @@
 # Copyright 2026 Oxide Computer Company
 #
 
-.PARALLEL: $(SUBDIRS)
+PROGS = \
+	agent_destroy \
+	agent_target
 
-SUBDIRS = agent syscall
+SCRIPTS = \
+	agent_destroy
 
-include $(SRC)/test/Makefile.com
+TESTDIR = agent
+
+include $(SRC)/test/libproc-tests/Makefile.com
+
+agent_destroy.32 := LDLIBS += -lproc
+agent_destroy.64 := LDLIBS64 += -lproc

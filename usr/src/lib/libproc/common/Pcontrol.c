@@ -28,7 +28,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2015, Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <assert.h>
@@ -69,6 +69,7 @@ int	_libproc_debug;		/* set non-zero to enable debugging printfs */
 int	_libproc_no_qsort;	/* set non-zero to inhibit sorting */
 				/* of symbol tables */
 int	_libproc_incore_elf;	/* only use in-core elf data */
+int	_libproc_test_fail_copyinargs; /* make Psyscall_copyinargs() fail */
 
 sigset_t blockable_sigs;	/* signals to block when we need to be safe */
 static	int	minfd;	/* minimum file descriptor returned by dupfd(fd, 0) */

@@ -25,6 +25,7 @@
 
 /*
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -55,6 +56,7 @@
 #include "Pisadep.h"
 
 extern sigset_t blockable_sigs;
+extern int _libproc_test_fail_copyinargs;
 
 static void
 Pabort_agent(struct ps_prochandle *P)
@@ -200,10 +202,13 @@ Pdestroy_agent(struct ps_prochandle *P)
 		flags = P->status.pr_lwp.pr_flags;
 
 		/*
-		 * If the agent is currently asleep in a system call, attempt
-		 * to abort the system call so we can terminate the agent.
+		 * If the agent is currently asleep in a system call or stopped
+		 * on system call entry, attempt to abort the system call so we
+		 * can terminate the agent.
 		 */
-		if ((flags & (PR_AGENT|PR_ASLEEP)) == (PR_AGENT|PR_ASLEEP)) {
+		if ((flags & PR_AGENT) && ((flags & PR_ASLEEP) ||
+		    ((flags & PR_STOPPED) &&
+		    P->status.pr_lwp.pr_why == PR_SYSENTRY))) {
 			Pdprintf("Pdestroy_agent: aborting agent syscall\n");
 			Pabort_agent(P);
 		}
@@ -213,7 +218,10 @@ Pdestroy_agent(struct ps_prochandle *P)
 		 * the _lwp_exit(2) system call.  Close our agent descriptors
 		 * regardless of whether this is successful.
 		 */
-		(void) pr_lwp_exit(P);
+		if (pr_lwp_exit(P) != 0) {
+			Pdprintf("Pdestroy_agent: failed to terminate "
+			    "agent LWP: %s\n", strerror(errno));
+		}
 		(void) close(P->agentctlfd);
 		(void) close(P->agentstatfd);
 		P->agentctlfd = -1;
@@ -449,8 +457,36 @@ Psyscall(struct ps_prochandle *P,
 		}
 	}
 	rval->sys_rval1 = 0;			/* in case of error */
-	if (Psyscall_copyinargs(P, nargs, argp, ap) != 0)
-		goto bad18;
+
+	/*
+	 * The private _libproc_test_fail_copyinargs flag makes the following
+	 * write to the agent's stack behave as though it had failed. It
+	 * exists so that the test suite can exercise the failure handling
+	 * below, including during agent destruction, without requiring a
+	 * target process whose stack is genuinely unwritable.
+	 */
+	if (_libproc_test_fail_copyinargs ||
+	    Psyscall_copyinargs(P, nargs, argp, ap) != 0) {
+		/*
+		 * Constructing the fabricated stack frame failed. That is
+		 * fatal for a normal system call, but not for _lwp_exit().
+		 * The frame is only consumed on return to userland, and
+		 * _lwp_exit() does not return, so the call can safely
+		 * proceed without it. This matters when destroying an agent
+		 * whose stack cannot be written at all. The agent inherits
+		 * its stack from the representative lwp, and if that lwp was
+		 * caught early in process startup then the area below the
+		 * stack pointer may be unmapped. A write there through /proc
+		 * fails, since such writes do not grow the stack. Bailing
+		 * out here would orphan the agent, and the process could
+		 * then never be set running again because run-on-last-close
+		 * is skipped for a process which still has an agent lwp.
+		 */
+		if (sysindex != SYS_lwp_exit)
+			goto bad18;
+		Pdprintf("Psyscall(): ignoring copyinargs failure for "
+		    "_lwp_exit()\n");
+	}
 
 	/*
 	 * Complete the system call.

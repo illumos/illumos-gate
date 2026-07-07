@@ -23,6 +23,9 @@
  * Copyright 1997-2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -53,23 +56,23 @@ pr_exit(struct ps_prochandle *Pr, int status)
 	adp->arg_inout = AI_INPUT;
 	adp->arg_size = 0;
 
+	/*
+	 * The injected exit() call does not return. The expected result is
+	 * a local failure with ENOENT in errno, indicating that the process
+	 * has gone.
+	 */
 	error = Psyscall(Pr, &rval, SYS_exit, 1, &argd[0]);
-	/* actually -- never returns.  Expect ENOENT */
 
-	if (error < 0) {
-		if (errno == ENOENT)	/* expected case */
-			error = ENOENT;
-		else
-			error = ENOSYS;
-	}
-
-	if (error == 0)		/* can't happen? */
-		return (rval.sys_rval1);
-
-	if (error == ENOENT)	/* expected case */
+	if (error == 0 || (error < 0 && errno == ENOENT))
 		return (0);
 
-	errno = error;
+	/*
+	 * If the injected call failed in the subject process then errno is
+	 * set from that. Otherwise it is left as that of the operation
+	 * which failed locally while injecting the call.
+	 */
+	if (error > 0)
+		errno = error;
 	return (-1);
 }
 
@@ -87,22 +90,23 @@ pr_lwp_exit(struct ps_prochandle *Pr)
 		return (0);		/* not reached */
 	}
 
+	/*
+	 * The injected _lwp_exit() call does not return, and Psyscall()
+	 * reports success once it has observed the lwp disappear. A local
+	 * failure, indicated by a negative return with ENOENT in errno, is
+	 * another way of finding that the lwp has gone.
+	 */
 	error = Psyscall(Pr, &rval, SYS_lwp_exit, 0, NULL);
-	/* actually -- never returns.  Expect ENOENT */
 
-	if (error < 0) {
-		if (errno == ENOENT)	/* expected case */
-			error = ENOENT;
-		else
-			error = ENOSYS;
-	}
-
-	if (error == 0)		/* can't happen? */
-		return (rval.sys_rval1);
-
-	if (error == ENOENT)	/* expected case */
+	if (error == 0 || (error < 0 && errno == ENOENT))
 		return (0);
 
-	errno = error;
+	/*
+	 * If the injected call failed in the subject process then errno is
+	 * set from that. Otherwise it is left as that of the operation
+	 * which failed locally while injecting the call.
+	 */
+	if (error > 0)
+		errno = error;
 	return (-1);
 }

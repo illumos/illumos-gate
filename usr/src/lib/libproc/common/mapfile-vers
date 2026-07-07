@@ -25,7 +25,7 @@
 # Copyright (c) 2013 by Delphix. All rights reserved.
 # Copyright (c) 2019 Carlos Neira <cneirabustos@gmail.com>
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 #
@@ -83,6 +83,12 @@ SYMBOL_VERSION SUNWprivate_1.1 {
 	Lgrab;
 	Lgrab_error;
 	_libproc_debug	{ ASSERT = { TYPE = OBJECT; SIZE = 4; }; };
+	_libproc_test_fail_copyinargs	{
+				  ASSERT = {
+					  TYPE = OBJECT;
+					  SIZE = 4;
+					};
+				};
 	Lmain_stack;
 	Lprochandle;
 	Lpsinfo;

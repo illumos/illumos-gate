@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2024 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 [DEFAULT]
@@ -20,5 +20,7 @@ quiet = False
 timeout = 120
 post =
 outputdir = /var/tmp/test_results
+
+[/opt/libproc-tests/tests/agent/agent_destroy]
 
 [/opt/libproc-tests/tests/syscall/pr_inject]
