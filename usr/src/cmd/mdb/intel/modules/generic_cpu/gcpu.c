@@ -463,7 +463,7 @@ cmihdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			/* Native cpuid */
 			cb.mod_cpuid = (int)mdb_strtoull(buf);
 		} else {
-			/* Comma-separated triplet chip,core,strand. */
+			/* Slash-separated triplet chip/core/strand. */
 			char *q = buf;
 
 			*p = '\0';
@@ -680,7 +680,7 @@ gcpu_mptwalk_fini(mdb_walk_state_t *wsp)
 }
 
 static const mdb_dcmd_t dcmds[] = {
-	{ "cmihdl", ": -c <cpuid>|<chip,core,strand> ",
+	{ "cmihdl", ": -c <cpuid>|<chip/core/strand> ",
 	    "dump a cmi_handle_t", cmihdl },
 	{ "gcpu_poll_trace", ":", "dump a poll trace buffer", gcpu_mpt_dump },
 	{ NULL }
