@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -19,6 +19,9 @@
 
 #include <libdevinfo.h>
 #include <err.h>
+#include <fts.h>
+#include <limits.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -52,6 +55,32 @@ const bad_addr_t bad_addrs[] = {
 
 const size_t nbad_addrs = ARRAY_SIZE(bad_addrs);
 
+/*
+ * The children of an i2c nexus are constructed on demand. A devfs lookup or
+ * readdir causes the nexus to configure the nodes at that level, and system
+ * observers such as devfsadmd asynchronously create (and remove) them in
+ * response to fabric changes. A devinfo snapshot performs no configuration
+ * itself, so the set of nodes it captures would otherwise depend on a race
+ * with those observers. Explicitly walk the simulator's /devices subtree
+ * before taking a snapshot to synchronously construct each level of the tree.
+ */
+static void
+i2c_ioctl_test_config(void)
+{
+	char path[PATH_MAX];
+	char *const paths[] = { path, NULL };
+	FTS *fts;
+
+	(void) snprintf(path, sizeof (path), "/devices%s", i2c_sim_dipath);
+
+	fts = fts_open(paths, FTS_PHYSICAL | FTS_NOCHDIR, NULL);
+	if (fts == NULL)
+		return;
+	while (fts_read(fts) != NULL)
+		;
+	(void) fts_close(fts);
+}
+
 static di_node_t
 i2c_ioctl_test_init_devi(void)
 {
@@ -64,6 +93,8 @@ i2c_ioctl_test_init_devi(void)
 			    "to open /devices");
 		}
 	}
+
+	i2c_ioctl_test_config();
 
 	/*
 	 * We do not cache this as a global as some tests want to be able to
