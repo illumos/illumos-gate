@@ -76,7 +76,7 @@ const mdb_tgt_regdesc_t mdb_ia32_kregs[] = {
 	{ "esi", KREG_ESI, MDB_TGT_R_EXPORT },
 	{ "si", KREG_ESI, MDB_TGT_R_EXPORT | MDB_TGT_R_16 },
 	{ "edi", KREG_EDI, MDB_TGT_R_EXPORT },
-	{ "di",	EDI, MDB_TGT_R_EXPORT | MDB_TGT_R_16 },
+	{ "di", KREG_EDI, MDB_TGT_R_EXPORT | MDB_TGT_R_16 },
 	{ "ebp", KREG_EBP, MDB_TGT_R_EXPORT },
 	{ "bp", KREG_EBP, MDB_TGT_R_EXPORT | MDB_TGT_R_16 },
 	{ "esp", KREG_ESP, MDB_TGT_R_EXPORT },
