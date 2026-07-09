@@ -15,7 +15,7 @@
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
+# Copyright 2026 Bill Sommerfeld <sommerfeld@alum.mit.edu>
 # Copyright 2026 Oxide Computer Company
 #
 
@@ -72,20 +72,17 @@ file path=opt/libc-tests/tests/err/data/W.4.11.12 mode=0444
 file path=opt/libc-tests/tests/err/data/W.5.13.14 mode=0444
 file path=opt/libc-tests/tests/err/err mode=0555
 file path=opt/libc-tests/tests/err/err.ksh mode=0555
-file path=opt/libc-tests/tests/fexecve_test mode=0555
-file path=opt/libc-tests/tests/fexecve_test.$(ARCH) mode=0555
-file path=opt/libc-tests/tests/fexecve_test.$(ARCH64) mode=0555
+file path=opt/libc-tests/tests/fexecve_test.32 mode=0555
+file path=opt/libc-tests/tests/fexecve_test.64 mode=0555
 file path=opt/libc-tests/tests/fnmatch.32 mode=0555
 file path=opt/libc-tests/tests/fnmatch.64 mode=0555
-file path=opt/libc-tests/tests/fpround_test mode=0555
-file path=opt/libc-tests/tests/fpround_test.$(ARCH) mode=0555
-file path=opt/libc-tests/tests/fpround_test.$(ARCH64) mode=0555
+file path=opt/libc-tests/tests/fpround_test.32 mode=0555
+file path=opt/libc-tests/tests/fpround_test.64 mode=0555
 file path=opt/libc-tests/tests/getlocname.32 mode=0555
 file path=opt/libc-tests/tests/getlocname.64 mode=0555
 dir  path=opt/libc-tests/tests/i18n
-file path=opt/libc-tests/tests/i18n/bindtextdomain_test mode=0555
-file path=opt/libc-tests/tests/i18n/bindtextdomain_test.$(ARCH) mode=0555
-file path=opt/libc-tests/tests/i18n/bindtextdomain_test.$(ARCH64) mode=0555
+file path=opt/libc-tests/tests/i18n/bindtextdomain_test.32 mode=0555
+file path=opt/libc-tests/tests/i18n/bindtextdomain_test.64 mode=0555
 file path=opt/libc-tests/tests/isatty.32 mode=0555
 file path=opt/libc-tests/tests/isatty.64 mode=0555
 file path=opt/libc-tests/tests/localeconv.32 mode=0555
@@ -98,12 +95,10 @@ file path=opt/libc-tests/tests/mutex-16200.32 mode=0555
 file path=opt/libc-tests/tests/mutex-16200.64 mode=0555
 file path=opt/libc-tests/tests/mutex_attr.32 mode=0555
 file path=opt/libc-tests/tests/mutex_attr.64 mode=0555
-file path=opt/libc-tests/tests/newlocale_test mode=0555
-file path=opt/libc-tests/tests/newlocale_test.$(ARCH) mode=0555
-file path=opt/libc-tests/tests/newlocale_test.$(ARCH64) mode=0555
-file path=opt/libc-tests/tests/nl_langinfo_test mode=0555
-file path=opt/libc-tests/tests/nl_langinfo_test.$(ARCH) mode=0555
-file path=opt/libc-tests/tests/nl_langinfo_test.$(ARCH64) mode=0555
+file path=opt/libc-tests/tests/newlocale_test.32 mode=0555
+file path=opt/libc-tests/tests/newlocale_test.64 mode=0555
+file path=opt/libc-tests/tests/nl_langinfo_test.32 mode=0555
+file path=opt/libc-tests/tests/nl_langinfo_test.64 mode=0555
 file path=opt/libc-tests/tests/posix_memalign.32 mode=0555
 file path=opt/libc-tests/tests/posix_memalign.64 mode=0555
 dir  path=opt/libc-tests/tests/posix_spawn
@@ -143,9 +138,8 @@ file path=opt/libc-tests/tests/pthread_attr_get_np mode=0555
 file path=opt/libc-tests/tests/ptsname.32 mode=0555
 file path=opt/libc-tests/tests/ptsname.64 mode=0555
 dir  path=opt/libc-tests/tests/qsort
-file path=opt/libc-tests/tests/qsort/qsort_test mode=0555
-file path=opt/libc-tests/tests/qsort/qsort_test.$(ARCH) mode=0555
-file path=opt/libc-tests/tests/qsort/qsort_test.$(ARCH64) mode=0555
+file path=opt/libc-tests/tests/qsort/qsort_test.32 mode=0555
+file path=opt/libc-tests/tests/qsort/qsort_test.64 mode=0555
 file path=opt/libc-tests/tests/quick_exit mode=0555
 file path=opt/libc-tests/tests/quick_exit_order.32 mode=0555
 file path=opt/libc-tests/tests/quick_exit_order.64 mode=0555
@@ -253,12 +247,10 @@ file path=opt/libc-tests/tests/wcsncasecmp-7350.32 mode=0555
 file path=opt/libc-tests/tests/wcsncasecmp-7350.64 mode=0555
 file path=opt/libc-tests/tests/wcsncasecmp.32 mode=0555
 file path=opt/libc-tests/tests/wcsncasecmp.64 mode=0555
-file path=opt/libc-tests/tests/wcsrtombs_test mode=0555
-file path=opt/libc-tests/tests/wcsrtombs_test.$(ARCH) mode=0555
-file path=opt/libc-tests/tests/wcsrtombs_test.$(ARCH64) mode=0555
-file path=opt/libc-tests/tests/wctype_test mode=0555
-file path=opt/libc-tests/tests/wctype_test.$(ARCH) mode=0555
-file path=opt/libc-tests/tests/wctype_test.$(ARCH64) mode=0555
+file path=opt/libc-tests/tests/wcsrtombs_test.32 mode=0555
+file path=opt/libc-tests/tests/wcsrtombs_test.64 mode=0555
+file path=opt/libc-tests/tests/wctype_test.32 mode=0555
+file path=opt/libc-tests/tests/wctype_test.64 mode=0555
 dir  path=usr group=sys
 dir  path=usr/lib
 dir  path=usr/lib/locale

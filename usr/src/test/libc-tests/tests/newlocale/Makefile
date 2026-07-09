@@ -16,6 +16,5 @@
 include $(SRC)/Makefile.master
 
 PROG = newlocale_test
-ARCHPROG = newlocale_test
 
 include ../Makefile.com

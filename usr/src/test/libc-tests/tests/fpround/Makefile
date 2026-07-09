@@ -16,7 +16,6 @@
 include $(SRC)/Makefile.master
 
 PROG = fpround_test
-ARCHPROG = fpround_test
 
 include ../Makefile.com
 

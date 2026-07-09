@@ -17,7 +17,6 @@ include $(SRC)/Makefile.master
 
 TESTSUBDIR = i18n
 PROG = bindtextdomain_test
-ARCHPROG = bindtextdomain_test
 
 include ../Makefile.com
 

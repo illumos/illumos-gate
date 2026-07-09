@@ -14,7 +14,7 @@
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
 # Copyright 2019 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
+# Copyright 2026 Bill Sommerfeld <sommerfeld@hamachi.org>
 # Copyright 2026 Oxide Computer Company
 #
 
@@ -26,12 +26,18 @@ timeout = 120
 post =
 outputdir = /var/tmp/test_results
 
-[/opt/libc-tests/tests/fexecve_test]
-[/opt/libc-tests/tests/fpround_test]
-[/opt/libc-tests/tests/newlocale_test]
-[/opt/libc-tests/tests/nl_langinfo_test]
-[/opt/libc-tests/tests/wcsrtombs_test]
-[/opt/libc-tests/tests/wctype_test]
+[/opt/libc-tests/tests/fexecve_test.32]
+[/opt/libc-tests/tests/fexecve_test.64]
+[/opt/libc-tests/tests/fpround_test.32]
+[/opt/libc-tests/tests/fpround_test.64]
+[/opt/libc-tests/tests/newlocale_test.32]
+[/opt/libc-tests/tests/newlocale_test.64]
+[/opt/libc-tests/tests/nl_langinfo_test.32]
+[/opt/libc-tests/tests/nl_langinfo_test.64]
+[/opt/libc-tests/tests/wcsrtombs_test.32]
+[/opt/libc-tests/tests/wcsrtombs_test.64]
+[/opt/libc-tests/tests/wctype_test.32]
+[/opt/libc-tests/tests/wctype_test.64]
 
 [/opt/libc-tests/tests/strcoll-strxfrm-6907.32]
 [/opt/libc-tests/tests/strcoll-strxfrm-6907.64]
@@ -42,8 +48,10 @@ outputdir = /var/tmp/test_results
 [/opt/libc-tests/tests/wcsncasecmp-7350.32]
 [/opt/libc-tests/tests/wcsncasecmp-7350.64]
 
-[/opt/libc-tests/tests/i18n/bindtextdomain_test]
-[/opt/libc-tests/tests/qsort/qsort_test]
+[/opt/libc-tests/tests/i18n/bindtextdomain_test.32]
+[/opt/libc-tests/tests/i18n/bindtextdomain_test.64]
+[/opt/libc-tests/tests/qsort/qsort_test.32]
+[/opt/libc-tests/tests/qsort/qsort_test.64]
 
 [/opt/libc-tests/tests/random/getrandom]
 [/opt/libc-tests/tests/random/getentropy]

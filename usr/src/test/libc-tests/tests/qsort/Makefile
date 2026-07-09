@@ -15,7 +15,6 @@
 
 TESTSUBDIR = qsort
 PROG = qsort_test
-ARCHPROG = qsort_test
 OBJS_OVERRIDE=1
 OBJS = qsort_test.o merge.o antiqsort.o
 

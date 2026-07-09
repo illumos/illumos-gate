@@ -16,6 +16,5 @@
 include $(SRC)/Makefile.master
 
 PROG = fexecve_test
-ARCHPROG = fexecve_test
 
 include ../Makefile.com

@@ -16,6 +16,5 @@
 include $(SRC)/Makefile.master
 
 PROG = nl_langinfo_test
-ARCHPROG = nl_langinfo_test
 
 include ../Makefile.com

@@ -16,6 +16,5 @@
 include $(SRC)/Makefile.master
 
 PROG = wctype_test
-ARCHPROG = wctype_test
 
 include ../Makefile.com
