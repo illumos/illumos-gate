@@ -34,3 +34,4 @@ clobber: clean
 	-$(RM) $(PROG)
 
 clean:
+	-$(RM) -r __pycache__

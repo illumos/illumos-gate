@@ -22,9 +22,8 @@ verbose = False
 quiet = False
 timeout = 180
 post =
-outputdir = /var/tmp/test_results
 
-[/opt/header-tests/tests/c-symbols]
+[tests/c-symbols]
 pre = setup
 tests = [
 	'assert_h',
@@ -57,7 +56,7 @@ tests = [
 	 ]
 tags = ['c-symbols']
 
-[/opt/header-tests/tests/cxx-symbols]
+[tests/cxx-symbols]
 pre = setup
 tests = [
 	'cmath_h',

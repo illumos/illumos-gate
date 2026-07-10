@@ -138,12 +138,17 @@ Options:
     -C          Check compiler only, do not run tests
     -f          Force: continue after failures
     -d          Debug: print probe and compiler output on failures
-    -D          Extra debug: also print the compiler command (implies -d)
+    -D          Extra debug: also print the compiler command and probe
+                program for every test, not just failures (implies -d)
     -c compiler Use the specified compiler instead of auto-detecting
     -s sym      Run only the test for the named symbol
     -e ENV      Run only tests for the named environment
     -j N        Number of parallel compile jobs (default: 4 or
                 the environment variable SYMBOL_TEST_JOBS)
+    -R ROOT     Alternate root directory (e.g. a proto area) whose
+                ROOT/usr/include is tested instead of the default
+                (default: $HEADER_TEST_ROOT/usr/include if that
+                environment variable is set, else /usr/include)
 
 When running tests by hand (not via the `setup` script), you may
 pass `-f` to see all failures instead of stopping on errors.

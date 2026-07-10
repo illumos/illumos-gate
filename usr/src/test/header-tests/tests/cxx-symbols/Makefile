@@ -51,3 +51,13 @@ $(KSHPROG): $(KSHPROG).ksh
 $(LINKS:%=$(TESTDIR)/%): $(TESTDIR)/setup
 	-$(RM) $@
 	$(LN) $(TESTDIR)/setup $@
+
+# Handy rule for running tests from the proto area.
+# Eg. make ucontext_h.run RUNOPTS=-D
+RUNLINKS=$(LINKS:%=%.run)
+RUNOPTS=
+test: $(RUNLINKS)
+
+%.run: $(TESTDIR)/%
+	( export HEADER_TEST_ROOT=$(ROOT) ;\
+	cd $(TESTDIR) && ./$* $(RUNOPTS) )

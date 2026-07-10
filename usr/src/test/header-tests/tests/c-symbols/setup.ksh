@@ -30,10 +30,14 @@ esac
 
 for arg in $*
 do
-	if [[ $arg == "-d" ]]
-	then
-		debug="-d"
-	fi
+	case $arg in
+	-d|-D)
+		debug="$debug $arg"
+		;;
+	-f)
+		force="-f"
+		;;
+	esac
 done
 
 if [[ -d "$dir/../../cfg/c-symbols" ]] ; then
@@ -68,6 +72,8 @@ esac
 [[ -n $debug ]] && set -x
 for m in $mlist
 do
-	$driver $debug --lang c -m${m} $envcfg $symcfg || exit 1
+	$driver $debug $force --lang c -m${m} $envcfg $symcfg
+	rc=$?
+	[[ -n "$force" ]] || [[ $rc == 0 ]] || exit $rc
 done
 exit 0

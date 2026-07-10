@@ -17,8 +17,24 @@
 # Copyright 2016, Joyent, Inc.
 #
 
-export MY_TESTS="/opt/header-tests"
-runner="/opt/test-runner/bin/run"
+case $0 in
+/opt/header-tests/bin/headertest)
+	root=""
+	;;
+/*/opt/header-tests/bin/headertest)
+	root="${0%/opt/header-tests/bin/headertest}"
+	;;
+*/opt/header-tests/bin/headertest)
+	root="$PWD/${0%/opt/header-tests/bin/headertest}"
+	;;
+esac
+
+# See ../tests/common/symbol_test.py
+[[ -n "$root" ]] && export HEADER_TEST_ROOT="$root"
+
+export MY_TESTS="$root/opt/header-tests"
+runner="$root/opt/test-runner/bin/run"
+outdir="$root/var/tmp/test_results"
 
 function fail
 {
@@ -29,27 +45,27 @@ function fail
 function find_runfile
 {
 	typeset distro=
-	if [[ -f $MY_TESTS/runfiles/default.run ]]; then
+	if [[ -f "$MY_TESTS/runfiles/default.run" ]]; then
 		distro=default
 	fi
 
-	[[ -n $distro ]] && echo $MY_TESTS/runfiles/$distro.run
+	[[ -n "$distro" ]] && echo "$MY_TESTS/runfiles/$distro.run"
 }
 
 while getopts c:T: c; do
 	case $c in
 	'c')
-		runfile=$OPTARG
+		runfile="$OPTARG"
 		[[ -f $runfile ]] || fail "Cannot read file: $runfile"
 		;;
 	'T')
-		xargs+=" -T $OPTARG"
+		xargs+=( -T "$OPTARG" )
 		;;
 	esac
 done
 shift $((OPTIND - 1))
 
-[[ -z $runfile ]] && runfile=$(find_runfile)
-[[ -z $runfile ]] && fail "Couldn't determine distro"
+[[ -z "$runfile" ]] && runfile=$(find_runfile)
+[[ -z "$runfile" ]] && fail "Couldn't determine distro"
 
-$runner -c $runfile $xargs
+"$runner" -c "$runfile" -i "$MY_TESTS" -o "$outdir" "${xargs[@]}"
