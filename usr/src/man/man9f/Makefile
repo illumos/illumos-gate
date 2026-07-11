@@ -15,7 +15,7 @@
 # Copyright 2020-2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2016 Hans Rosenfeld <rosenfeld@grumpf.hope-2000.org>
 # Copyright 2022 RackTop Systems, Inc.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 # Copyright 2022 Garrett D'Amore
 # Copyright 2025 Peter Tribble
 #
@@ -295,6 +295,7 @@ MANFILES=	ASSERT.9f				\
 		id_space.9f				\
 		inb.9f					\
 		insq.9f					\
+		kcopy.9f				\
 		kiconv.9f				\
 		kiconv_close.9f				\
 		kiconv_open.9f				\
@@ -532,6 +533,7 @@ MANFILES=	ASSERT.9f				\
 		u8_textprep_str.9f			\
 		u8_validate.9f				\
 		uconv_u16tou32.9f			\
+		uio_copyin.9f				\
 		uiomove.9f				\
 		unbufcall.9f				\
 		unlinkb.9f				\

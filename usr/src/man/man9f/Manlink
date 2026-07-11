@@ -985,6 +985,8 @@ uconv_u16tou32.9f
 	uconv_u32tou8.9f
 	uconv_u8tou16.9f
 	uconv_u8tou32.9f
+uio_copyin.9f
+	uio_copyout.9f
 usb_alloc_request.9f
 	usb_alloc_bulk_req.9f
 	usb_alloc_ctrl_req.9f

@@ -1,0 +1,143 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2026 Oxide Computer Company
+.\"
+.Dd July 11, 2026
+.Dt UIO_COPYIN 9F
+.Os
+.Sh NAME
+.Nm uio_copyin ,
+.Nm uio_copyout
+.Nd copy data to or from an address space named by a uio_seg_t
+.Sh SYNOPSIS
+.In sys/uio.h
+.Ft int
+.Fo uio_copyin
+.Fa "const void *src"
+.Fa "void *dst"
+.Fa "size_t n"
+.Fa "uio_seg_t seg"
+.Fc
+.Ft int
+.Fo uio_copyout
+.Fa "const void *src"
+.Fa "void *dst"
+.Fa "size_t n"
+.Fa "uio_seg_t seg"
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa src
+Source address of the copy.
+.It Fa dst
+Destination address of the copy.
+.It Fa n
+Number of bytes to copy.
+.It Fa seg
+The address space in which the caller's buffer lies, one of
+.Dv UIO_USERSPACE ,
+.Dv UIO_USERISPACE
+or
+.Dv UIO_SYSSPACE .
+.El
+.Sh DESCRIPTION
+The
+.Fn uio_copyin
+function copies
+.Fa n
+bytes of data from
+.Fa src ,
+which lies in the address space named by
+.Fa seg ,
+to the kernel address
+.Fa dst .
+The
+.Fn uio_copyout
+function copies in the other direction, from the kernel address
+.Fa src
+to
+.Fa dst
+in the address space named by
+.Fa seg .
+.Pp
+These functions are for code which can be handed data in either user or
+kernel memory, with its location described by a
+.Vt uio_seg_t ,
+and which would otherwise have to select between
+.Xr copyin 9F
+and
+.Xr kcopy 9F
+itself.
+They are the
+.Vt uio_seg_t
+counterparts of
+.Xr ddi_copyin 9F
+and
+.Xr ddi_copyout 9F ,
+which provide the same service for the mode flags passed to an
+.Xr ioctl 9E
+entry point.
+.Pp
+When
+.Fa seg
+is
+.Dv UIO_USERSPACE
+or
+.Dv UIO_USERISPACE ,
+the caller's buffer lies in the user address space of the calling
+process and the copy behaves as
+.Xr copyin 9F
+or
+.Xr copyout 9F .
+When
+.Fa seg
+is
+.Dv UIO_SYSSPACE ,
+both addresses are kernel addresses and the copy is performed with
+.Xr kcopy 9F .
+In every case a fault taken during the copy is returned to the caller
+rather than causing the system to panic.
+Passing any other value as
+.Fa seg
+causes the system to panic.
+.Sh CONTEXT
+When
+.Fa seg
+is
+.Dv UIO_USERSPACE
+or
+.Dv UIO_USERISPACE ,
+these functions can be called from user context only.
+When
+.Fa seg
+is
+.Dv UIO_SYSSPACE ,
+they can be called from user or kernel context.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn uio_copyin
+and
+.Fn uio_copyout
+functions return 0.
+Otherwise, -1 is returned to indicate that a fault occurred and the copy
+did not complete.
+.Sh SEE ALSO
+.Xr ioctl 9E ,
+.Xr bcopy 9F ,
+.Xr copyin 9F ,
+.Xr copyout 9F ,
+.Xr ddi_copyin 9F ,
+.Xr ddi_copyout 9F ,
+.Xr kcopy 9F ,
+.Xr uiomove 9F

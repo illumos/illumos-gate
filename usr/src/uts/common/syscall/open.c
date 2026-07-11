@@ -95,9 +95,7 @@ copen(int startfd, char *fname, int filemode, int createmode, uio_seg_t seg)
 		/*
 		 * We're here via openat()
 		 */
-		if (seg == UIO_SYSSPACE)
-			startchar = *fname;
-		else if (copyin(fname, &startchar, sizeof (char)))
+		if (uio_copyin(fname, &startchar, sizeof (char), seg))
 			return (set_errno(EFAULT));
 
 		/*
@@ -134,9 +132,7 @@ copen(int startfd, char *fname, int filemode, int createmode, uio_seg_t seg)
 	 */
 	if (filemode & FXATTR) {
 		if (startfd == AT_FDCWD) {
-			if (seg == UIO_SYSSPACE)
-				startchar = *fname;
-			else if (copyin(fname, &startchar, sizeof (char)))
+			if (uio_copyin(fname, &startchar, sizeof (char), seg))
 				return (set_errno(EFAULT));
 
 			/*

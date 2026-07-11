@@ -1,0 +1,95 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2026 Oxide Computer Company
+.\"
+.Dd July 11, 2026
+.Dt KCOPY 9F
+.Os
+.Sh NAME
+.Nm kcopy
+.Nd copy data between kernel addresses, guarding against faults
+.Sh SYNOPSIS
+.In sys/types.h
+.In sys/systm.h
+.Ft int
+.Fo kcopy
+.Fa "const void *from"
+.Fa "void *to"
+.Fa "size_t count"
+.Fc
+.Sh INTERFACE LEVEL
+Architecture independent level 1 (DDI/DKI).
+.Sh PARAMETERS
+.Bl -tag -width Fa
+.It Fa from
+Source kernel address of the copy.
+.It Fa to
+Destination kernel address of the copy.
+.It Fa count
+Number of bytes to copy.
+.El
+.Sh DESCRIPTION
+The
+.Fn kcopy
+function copies
+.Fa count
+bytes from one kernel address to another.
+It performs the same copy as
+.Xr bcopy 9F ,
+but guards against faults for the duration of the copy.
+A fault taken while copying is first handled as an ordinary page fault,
+so a copy involving pageable kernel memory succeeds when the fault can
+be resolved.
+A fault which cannot be resolved causes
+.Fn kcopy
+to return an error, where
+.Xr bcopy 9F
+would panic the system.
+.Pp
+Both
+.Fa from
+and
+.Fa to
+must be kernel addresses.
+.Fn kcopy
+must not be used to copy data to or from user address space; use
+.Xr copyin 9F
+and
+.Xr copyout 9F
+for that.
+If the source and destination areas overlap, the behaviour is
+undefined.
+.Sh CONTEXT
+The
+.Fn kcopy
+function can be called from user or kernel context.
+.Sh RETURN VALUES
+Upon successful completion, the
+.Fn kcopy
+function returns 0.
+Otherwise, a fault occurred that could not be resolved, and an error
+number describing the fault, most commonly
+.Er EFAULT ,
+is returned.
+Note that this differs from
+.Xr copyin 9F
+and
+.Xr copyout 9F ,
+which return -1 on failure.
+.Sh SEE ALSO
+.Xr bcopy 9F ,
+.Xr copyin 9F ,
+.Xr copyout 9F ,
+.Xr ddi_copyin 9F ,
+.Xr ddi_copyout 9F ,
+.Xr uio_copyin 9F ,
+.Xr uio_copyout 9F

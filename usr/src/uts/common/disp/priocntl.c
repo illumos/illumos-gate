@@ -23,10 +23,11 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -89,8 +90,7 @@ copyin_vaparms32(caddr_t arg, pc_vaparms_t *vap, uio_seg_t seg)
 
 	ASSERT(get_udatamodel() == DATAMODEL_ILP32);
 
-	if ((seg == UIO_USERSPACE ? copyin : kcopy)(arg, &vaparms32,
-	    sizeof (vaparms32)))
+	if (uio_copyin(arg, &vaparms32, sizeof (vaparms32), seg) != 0)
 		return (EFAULT);
 
 	vap->pc_vaparmscnt = vaparms32.pc_vaparmscnt;
@@ -106,11 +106,11 @@ copyin_vaparms32(caddr_t arg, pc_vaparms_t *vap, uio_seg_t seg)
 
 #define	COPYIN_VAPARMS(arg, vap, size, seg)	\
 	(get_udatamodel() == DATAMODEL_NATIVE ?	\
-	(*copyinfn)(arg, vap, size) : copyin_vaparms32(arg, vap, seg))
+	uio_copyin(arg, vap, size, seg) : copyin_vaparms32(arg, vap, seg))
 
 #else
 
-#define	COPYIN_VAPARMS(arg, vap, size, seg)	(*copyinfn)(arg, vap, size)
+#define	COPYIN_VAPARMS(arg, vap, size, seg)	uio_copyin(arg, vap, size, seg)
 
 #endif
 
@@ -149,8 +149,6 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 	pid_t			saved_pid;
 	id_t			classid;
 	int			size;
-	int (*copyinfn)(const void *, void *, size_t);
-	int (*copyoutfn)(const void *, void *, size_t);
 
 	/*
 	 * First just check the version number. Right now there is only
@@ -163,14 +161,6 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 	 */
 	if (pc_version != PC_VERSION)
 		return (set_errno(EINVAL));
-
-	if (seg == UIO_USERSPACE) {
-		copyinfn = copyin;
-		copyoutfn = copyout;
-	} else {
-		copyinfn = kcopy;
-		copyoutfn = kcopy;
-	}
 
 	switch (cmd) {
 	case PC_GETCID:
@@ -186,7 +176,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 			rv = loaded_classes;
 			break;
 		} else {
-			if ((*copyinfn)(arg, &pcinfo, sizeof (pcinfo)))
+			if (uio_copyin(arg, &pcinfo, sizeof (pcinfo), seg))
 				return (set_errno(EFAULT));
 		}
 
@@ -219,7 +209,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 		if (error)
 			return (set_errno(error));
 
-		if ((*copyoutfn)(&pcinfo, arg, sizeof (pcinfo)))
+		if (uio_copyout(&pcinfo, arg, sizeof (pcinfo), seg))
 			return (set_errno(EFAULT));
 
 		rv = loaded_classes;
@@ -236,7 +226,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 			rv = loaded_classes;
 			break;
 		} else {
-			if ((*copyinfn)(arg, &pcinfo, sizeof (pcinfo)))
+			if (uio_copyin(arg, &pcinfo, sizeof (pcinfo), seg))
 				return (set_errno(EFAULT));
 		}
 
@@ -260,7 +250,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 		if (error)
 			return (set_errno(error));
 
-		if ((*copyoutfn)(&pcinfo, arg, sizeof (pcinfo)))
+		if (uio_copyout(&pcinfo, arg, sizeof (pcinfo), seg))
 			return (set_errno(EFAULT));
 
 		rv = loaded_classes;
@@ -274,12 +264,12 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 		 * because it's done on a per thread basis by parmsset().
 		 */
 		if (cmd == PC_SETPARMS) {
-			if ((*copyinfn)(arg, &pcparms, sizeof (pcparms)))
+			if (uio_copyin(arg, &pcparms, sizeof (pcparms), seg))
 				return (set_errno(EFAULT));
 
 			error = parmsin(&pcparms, NULL);
 		} else {
-			if ((*copyinfn)(arg, clname, PC_CLNMSZ) ||
+			if (uio_copyin(arg, clname, PC_CLNMSZ, seg) ||
 			    COPYIN_VAPARMS(arg2, &vaparms, sizeof (vaparms),
 			    seg))
 				return (set_errno(EFAULT));
@@ -297,7 +287,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 		/*
 		 * Get the procset from the user.
 		 */
-		if ((*copyinfn)(psp, &procset, sizeof (procset)))
+		if (uio_copyin(psp, &procset, sizeof (procset), seg))
 			return (set_errno(EFAULT));
 
 		/*
@@ -388,11 +378,11 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 	case PC_GETPARMS:
 	case PC_GETXPARMS:
 		if (cmd == PC_GETPARMS) {
-			if ((*copyinfn)(arg, &pcparms, sizeof (pcparms)))
+			if (uio_copyin(arg, &pcparms, sizeof (pcparms), seg))
 				return (set_errno(EFAULT));
 		} else {
 			if (arg != NULL) {
-				if ((*copyinfn)(arg, clname, PC_CLNMSZ))
+				if (uio_copyin(arg, clname, PC_CLNMSZ, seg))
 					return (set_errno(EFAULT));
 
 				clname[PC_CLNMSZ-1] = '\0';
@@ -411,7 +401,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 		    (pcparms.pc_cid < 1 && pcparms.pc_cid != PC_CLNULL))
 			return (set_errno(EINVAL));
 
-		if ((*copyinfn)(psp, &procset, sizeof (procset)))
+		if (uio_copyin(psp, &procset, sizeof (procset), seg))
 			return (set_errno(EFAULT));
 
 		/*
@@ -614,7 +604,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 			return (set_errno(error));
 
 		if (cmd == PC_GETPARMS) {
-			if ((*copyoutfn)(&pcparms, arg, sizeof (pcparms)))
+			if (uio_copyout(&pcparms, arg, sizeof (pcparms), seg))
 				return (set_errno(EFAULT));
 		} else if ((error = vaparmsout(arg, &pcparms, &vaparms,
 		    seg)) != 0)
@@ -628,15 +618,17 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 
 	case PC_ADMIN:
 		if (get_udatamodel() == DATAMODEL_NATIVE) {
-			if ((*copyinfn)(arg, &pcadmin, sizeof (pcadmin_t)))
+			if (uio_copyin(arg, &pcadmin, sizeof (pcadmin_t), seg))
 				return (set_errno(EFAULT));
 #ifdef _SYSCALL32_IMPL
 		} else {
 			/* pcadmin struct from ILP32 callers */
 			pcadmin32_t pcadmin32;
 
-			if ((*copyinfn)(arg, &pcadmin32, sizeof (pcadmin32_t)))
+			if (uio_copyin(arg, &pcadmin32, sizeof (pcadmin32_t),
+			    seg)) {
 				return (set_errno(EFAULT));
+			}
 			pcadmin.pc_cid = pcadmin32.pc_cid;
 			pcadmin.pc_cladmin = (caddr_t)(uintptr_t)
 			    pcadmin32.pc_cladmin;
@@ -657,7 +649,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 		break;
 
 	case PC_GETPRIRANGE:
-		if ((*copyinfn)(arg, &pcpri, sizeof (pcpri_t)))
+		if (uio_copyin(arg, &pcpri, sizeof (pcpri_t), seg))
 			return (set_errno(EFAULT));
 
 		if (pcpri.pc_cid >= loaded_classes || pcpri.pc_cid < 0)
@@ -665,7 +657,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 
 		error = CL_GETCLPRI(&sclass[pcpri.pc_cid], &pcpri);
 		if (!error) {
-			if ((*copyoutfn)(&pcpri, arg, sizeof (pcpri)))
+			if (uio_copyout(&pcpri, arg, sizeof (pcpri), seg))
 				return (set_errno(EFAULT));
 		}
 		break;
@@ -674,14 +666,14 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 		/*
 		 * Get pcnice and procset structures from the user.
 		 */
-		if ((*copyinfn)(arg, &pcnice, sizeof (pcnice)) ||
-		    (*copyinfn)(psp, &procset, sizeof (procset)))
+		if (uio_copyin(arg, &pcnice, sizeof (pcnice), seg) ||
+		    uio_copyin(psp, &procset, sizeof (procset), seg))
 			return (set_errno(EFAULT));
 
 		error = donice(&procset, &pcnice);
 
 		if (!error && (pcnice.pc_op == PC_GETNICE)) {
-			if ((*copyoutfn)(&pcnice, arg, sizeof (pcnice)))
+			if (uio_copyout(&pcnice, arg, sizeof (pcnice), seg))
 				return (set_errno(EFAULT));
 		}
 		break;
@@ -690,14 +682,14 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 		/*
 		 * Get pcprio and procset structures from the user.
 		 */
-		if ((*copyinfn)(arg, &pcprio, sizeof (pcprio)) ||
-		    (*copyinfn)(psp, &procset, sizeof (procset)))
+		if (uio_copyin(arg, &pcprio, sizeof (pcprio), seg) ||
+		    uio_copyin(psp, &procset, sizeof (procset), seg))
 			return (set_errno(EFAULT));
 
 		error = doprio(&procset, &pcprio);
 
 		if (!error && (pcprio.pc_op == PC_GETPRIO)) {
-			if ((*copyoutfn)(&pcprio, arg, sizeof (pcprio)))
+			if (uio_copyout(&pcprio, arg, sizeof (pcprio), seg))
 				return (set_errno(EFAULT));
 		}
 		break;
@@ -706,7 +698,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 		if (secpolicy_dispadm(CRED()) != 0)
 			return (set_errno(EPERM));
 
-		if (copyin(arg, (caddr_t)clname, PC_CLNMSZ) != 0)
+		if (uio_copyin(arg, clname, PC_CLNMSZ, seg) != 0)
 			return (set_errno(EFAULT));
 		clname[PC_CLNMSZ-1] = '\0';
 
@@ -727,7 +719,7 @@ priocntl_common(int pc_version, procset_t *psp, int cmd, caddr_t arg,
 			outstr = sclass[defaultcid].cl_name;
 		size = strlen(outstr) + 1;
 		if (arg != NULL)
-			if ((*copyoutfn)(outstr, arg, size) != 0)
+			if (uio_copyout(outstr, arg, size, seg) != 0)
 				error = EFAULT;
 
 		mutex_exit(&class_lock);

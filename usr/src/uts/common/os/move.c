@@ -21,10 +21,11 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved */
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -404,6 +405,44 @@ uiodup(uio_t *suio, uio_t *duio, iovec_t *diov, int diov_cnt)
 	}
 	duio->uio_iov = diov;
 	return (0);
+}
+
+/*
+ * Copy n bytes from src to dst, where src lies in the address space
+ * indicated by seg and dst is in kernel space. This is the equivalent
+ * of ddi_copyin() for code which describes an address space with a
+ * uio_seg_t rather than with ioctl(9E) mode flags. As with copyin(),
+ * 0 is returned on success and -1 on failure.
+ */
+int
+uio_copyin(const void *src, void *dst, size_t n, uio_seg_t seg)
+{
+	switch (seg) {
+	case UIO_USERSPACE:
+	case UIO_USERISPACE:
+		return (copyin(src, dst, n));
+	case UIO_SYSSPACE:
+		return (kcopy(src, dst, n) == 0 ? 0 : -1);
+	}
+	panic("uio_copyin: invalid segment type %d", seg);
+}
+
+/*
+ * The equivalent of ddi_copyout(), copying n bytes from the kernel
+ * address src to dst, which lies in the address space indicated by
+ * seg. Returns 0 on success and -1 on failure.
+ */
+int
+uio_copyout(const void *src, void *dst, size_t n, uio_seg_t seg)
+{
+	switch (seg) {
+	case UIO_USERSPACE:
+	case UIO_USERISPACE:
+		return (copyout(src, dst, n));
+	case UIO_SYSSPACE:
+		return (kcopy(src, dst, n) == 0 ? 0 : -1);
+	}
+	panic("uio_copyout: invalid segment type %d", seg);
 }
 
 /*

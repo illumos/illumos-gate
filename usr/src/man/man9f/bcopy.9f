@@ -1,14 +1,14 @@
 '\" te
 .\"  Copyright 1989 AT&T
 .\"  Copyright (c) 2006, Sun Microsystems, Inc.  All Rights Reserved
+.\"  Copyright 2026 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH BCOPY 9F "Jan 16, 2006"
+.TH BCOPY 9F "Jul 11, 2026"
 .SH NAME
 bcopy \- copy data between address locations in the kernel
 .SH SYNOPSIS
-.LP
 .nf
 #include <sys/types.h>
 #include <sys/sunddi.h>
@@ -20,11 +20,8 @@ bcopy \- copy data between address locations in the kernel
 .fi
 
 .SH INTERFACE LEVEL
-.sp
-.LP
 Architecture independent level 1 (DDI/DKI).
 .SH PARAMETERS
-.sp
 .ne 2
 .na
 \fB\fIfrom\fR\fR
@@ -52,8 +49,6 @@ The number of bytes moved.
 .RE
 
 .SH DESCRIPTION
-.sp
-.LP
 The \fBbcopy()\fR function copies \fIbcount\fR bytes from one kernel address to
 another. If the input and output addresses overlap, the command executes, but
 the results may not be as expected.
@@ -67,12 +62,9 @@ buffer when it is swapped out, the system will panic. It is safe to use
 \fBbcopy()\fR to move data within kernel space, since kernel space is never
 swapped out.
 .SH CONTEXT
-.sp
-.LP
 The \fBbcopy()\fR function can be called from user, interrupt, or kernel
 context.
 .SH EXAMPLES
-.LP
 \fBExample 1 \fRCopying data between address locations in the kernel:
 .sp
 .LP
@@ -107,16 +99,13 @@ disk and the buffer are part of the kernel address space.
 .in -2
 
 .SH SEE ALSO
-.sp
-.LP
 .BR copyin (9F),
-.BR copyout (9F)
+.BR copyout (9F),
+.BR kcopy (9F)
 .sp
 .LP
 \fIWriting Device Drivers\fR
 .SH WARNINGS
-.sp
-.LP
 The \fIfrom\fR and \fIto\fR addresses must be within the kernel space. No range
 checking is done. If an address outside of the kernel space is selected, the
 driver may corrupt the system in an unpredictable way.

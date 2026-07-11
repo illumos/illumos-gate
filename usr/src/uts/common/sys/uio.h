@@ -26,6 +26,7 @@
  *
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2015, Joyent, Inc.  All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -86,7 +87,7 @@ typedef	struct iovec32 {
 
 #endif	/* _SYSCALL32 */
 
-#if 	!defined(_XPG4_2) || defined(__EXTENSIONS__)
+#if	!defined(_XPG4_2) || defined(__EXTENSIONS__)
 /*
  * Segment flag values.
  */
@@ -246,6 +247,8 @@ int	ureadc(int, uio_t *);	/* should be errno_t in future */
 int	uwritec(struct uio *);
 void	uioskip(uio_t *, size_t);
 int	uiodup(uio_t *, uio_t *, iovec_t *, int);
+int	uio_copyin(const void *, void *, size_t, uio_seg_t);
+int	uio_copyout(const void *, void *, size_t, uio_seg_t);
 
 int	uioamove(void *, size_t, enum uio_rw, uioa_t *);
 int	uioainit(uio_t *, uioa_t *);
