@@ -44,6 +44,8 @@ nvme_scttostr(nvme_ctrl_t *ctrl __unused, uint32_t sc)
 		return ("command specific status");
 	case NVME_CQE_SCT_INTEGRITY:
 		return ("media and data integrity errors");
+	case NVME_CQE_SCT_PATH:
+		return ("path related status");
 	case NVME_CQE_SCT_VENDOR:
 		return ("vendor specific");
 	default:

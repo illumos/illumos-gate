@@ -51,150 +51,6 @@ static void nvme_print_eui64(int, const char *, const uint8_t *);
 static void nvme_print_guid(int, const char *, const uint8_t *);
 static void nvme_print_uuid(int, const char *, const uint8_t *);
 
-static const char *generic_status_codes[] = {
-	"Successful Completion",
-	"Invalid Command Opcode",
-	"Invalid Field in Command",
-	"Command ID Conflict",
-	"Data Transfer Error",
-	"Commands Aborted due to Power Loss Notification",
-	"Internal Error",
-	"Command Abort Requested",
-	"Command Aborted due to SQ Deletion",
-	"Command Aborted due to Failed Fused Command",
-	"Command Aborted due to Missing Fused Command",
-	"Invalid Namespace or Format",
-	"Command Sequence Error",
-	/* NVMe 1.1 -- 0xd */
-	"Invalid SGL Segment Descriptor",
-	"Invalid Number of SGL Descriptors",
-	"Data SGL Length Invalid",
-	"Metadata SGL Length Invalid",
-	"SGL Descriptor Type Invalid",
-	/* NVMe 1.2  -- 0x12 */
-	"Invalid Use of Controller Memory Buffer",
-	"PRP Offset Invalid",
-	"Atomic Write Unit Exceeded",
-	/* NVMe 1.3 -- 0x15 */
-	"Operation Denied",
-	"SGL Offset Invalid",
-	"Reserved",
-	"Host Identifier Inconsistent Format",
-	"Keep Alive Timeout Expired",
-	"Keep Alive Timeout Invalid",
-	"Command Aborted due to Preempt and Abort",
-	"Sanitize Failed",
-	"Sanitize in Progress",
-	"SGL Data Block Granularity Invalid",
-	"Command Not Supported for Queue in CMB",
-	/* NVMe 1.4 -- 0x20 */
-	"Namespace is Write Protected",
-	"Command Interrupted",
-	"Transient Transport Error"
-};
-
-static const char *specific_status_codes[] = {
-	"Completion Queue Invalid",
-	"Invalid Queue Identifier",
-	"Invalid Queue Size",
-	"Abort Command Limit Exceeded",
-	"Reserved",
-	"Asynchronous Event Request Limit Exceeded",
-	"Invalid Firmware Slot",
-	"Invalid Firmware Image",
-	"Invalid Interrupt Vector",
-	"Invalid Log Page",
-	"Invalid Format",
-	"Firmware Activation Requires Conventional Reset",
-	"Invalid Queue Deletion",
-	/* NVMe 1.1 -- 0xd */
-	"Feature Identifier Not Saveable",
-	"Feature Not Changeable",
-	"Feature Not Namespace Specific",
-	"Firmware Activation Requires NVM Subsystem Reset",
-	/* NVMe 1.2 -- 0x12 */
-	"Firmware Activation Requires Reset",
-	"Firmware Activation Requires Maximum Time Violation",
-	"Firmware Activation Prohibited",
-	"Overlapping Range",
-	"Namespace Insufficient Capacity",
-	"Namespace Identifier Unavailable",
-	"Reserved",
-	"Namespace Already Attached",
-	"Namespace Is Private",
-	"Namespace Not Attached",
-	"Thin Provisioning Not Supported",
-	"Controller List Invalid",
-	/* NVMe 1.3 -- 0x1e */
-	"Boot Partition Write Prohibited",
-	"Invalid Controller Identifier",
-	"Invalid Secondary Controller State",
-	"Invalid Number of Controller Resources",
-	"Invalid Resource Identifier",
-	/* NVMe 1.4 -- 0x23 */
-	"Sanitize Prohibited While Persistent Memory Region is Enabled",
-	"ANA Group Identifier Invalid",
-	"ANA Attach Failed"
-};
-
-static const char *generic_nvm_status_codes[] = {
-	"LBA Out Of Range",
-	"Capacity Exceeded",
-	"Namespace Not Ready",
-	/* NVMe 1.1 */
-	"Reservation Conflict",
-	/* NVMe 1.2 */
-	"Format In Progress",
-};
-
-static const char *specific_nvm_status_codes[] = {
-	"Conflicting Attributes",
-	"Invalid Protection Information",
-	"Attempted Write to Read Only Range"
-};
-
-static const char *media_nvm_status_codes[] = {
-	"Write Fault",
-	"Unrecovered Read Error",
-	"End-to-End Guard Check Error",
-	"End-to-End Application Tag Check Error",
-	"End-to-End Reference Tag Check Error",
-	"Compare Failure",
-	"Access Denied",
-	/* NVMe 1.2 -- 0x87 (0x7) */
-	"Deallocated or Unwritten Logical Block"
-};
-
-static const char *path_status_codes[] = {
-	/* NVMe 1.4 -- 0x00 */
-	"Internal Path Error",
-	"Asymmetric Access Persistent Loss",
-	"Asymmetric Access Inaccessible",
-	"Asymmetric Access Transition"
-};
-
-static const char *path_controller_codes[] = {
-	/* NVMe 1.4 -- 0x60 */
-	"Controller Pathing Error"
-};
-
-static const char *path_host_codes[] = {
-	/* NVMe 1.4 -- 0x70 */
-	"Host Pathing Error",
-	"Command Aborted by Host"
-};
-
-static const char *status_code_types[] = {
-	"Generic Command Status",
-	"Command Specific Status",
-	"Media and Data Integrity Errors",
-	"Path Related Status",
-	"Reserved",
-	"Reserved",
-	"Reserved",
-	"Vendor Specific"
-};
-
 static const char *lbaf_relative_performance[] = {
 	"Best", "Better", "Good", "Degraded"
 };
@@ -1909,52 +1765,15 @@ nvme_print_error_log(int nlog, const nvme_error_log_entry_t *elog,
 
 	for (i = 0; i != nlog; i++) {
 		int sc = elog[i].el_sf.sf_sc;
-		const char *sc_str = "Unknown";
+		const char *sc_str, *sct_str;
 
 		if (elog[i].el_count == 0 && verbose == 0)
 			break;
 
-		switch (elog[i].el_sf.sf_sct) {
-		case 0: /* Generic Command Status */
-			if (sc < ARRAY_SIZE(generic_status_codes)) {
-				sc_str = generic_status_codes[sc];
-			} else if (sc >= 0x80 &&
-			    sc - 0x80 < ARRAY_SIZE(generic_nvm_status_codes)) {
-				sc_str = generic_nvm_status_codes[sc - 0x80];
-			}
-			break;
-		case 1: /* Specific Command Status */
-			if (sc < ARRAY_SIZE(specific_status_codes)) {
-				sc_str = specific_status_codes[sc];
-			} else if (sc >= 0x80 &&
-			    sc - 0x80 < ARRAY_SIZE(specific_nvm_status_codes)) {
-				sc_str = specific_nvm_status_codes[sc - 0x80];
-			}
-			break;
-		case 2: /* Media Errors */
-			if (sc >= 0x80 &&
-			    sc - 0x80 < ARRAY_SIZE(media_nvm_status_codes)) {
-				sc_str = media_nvm_status_codes[sc - 0x80];
-			}
-			break;
-		case 3:	/* Path Related Status */
-			if (sc < ARRAY_SIZE(path_status_codes)) {
-				sc_str = path_status_codes[sc];
-			} else if (sc >= 0x60 &&
-			    sc - 0x60 < ARRAY_SIZE(path_controller_codes)) {
-				sc_str = path_controller_codes[sc - 0x60];
-			} else if (sc >= 0x70 &&
-			    sc - 0x70 < ARRAY_SIZE(path_host_codes)) {
-				sc_str = path_host_codes[sc - 0x70];
-			}
-			break;
-		case 7: /* Vendor Specific */
-			sc_str = "Unknown Vendor Specific";
-			break;
-		default:
-			sc_str = "Reserved";
-			break;
-		}
+		sct_str = nvme_scttostr(NULL, elog[i].el_sf.sf_sct);
+		sc_str = nvme_sctostr(NULL, NVME_CSI_NVM, elog[i].el_sf.sf_sct,
+		    elog[i].el_sf.sf_sc);
+
 
 		nvme_print(2, "Entry", i, NULL);
 		nvme_print_uint64(4, "Error Count",
@@ -1969,8 +1788,7 @@ nvme_print_error_log(int nlog, const nvme_error_log_entry_t *elog,
 		nvme_print(6, "Status Code", -1, "0x%0.2x (%s)",
 		    sc, sc_str);
 		nvme_print(6, "Status Code Type", -1, "0x%x (%s)",
-		    elog[i].el_sf.sf_sct,
-		    status_code_types[elog[i].el_sf.sf_sct]);
+		    elog[i].el_sf.sf_sct, sct_str);
 		nvme_print_bit(6, "More",
 		    nvme_vers_atleast(version, &nvme_vers_1v0),
 		    elog[i].el_sf.sf_m, "yes", "no");
