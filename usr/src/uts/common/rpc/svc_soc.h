@@ -62,7 +62,6 @@ extern "C" {
  * svc_register(xprt, prog, vers, dispatch, protocol)
  * svc_unregister(prog, vers);
  */
-#ifdef __STDC__
 extern bool_t svc_register(SVCXPRT *, rpcprog_t, rpcvers_t,
     void (*)(struct svc_req *, SVCXPRT *), int);
 extern void svc_unregister(rpcprog_t, rpcvers_t);
@@ -96,16 +95,6 @@ extern SVCXPRT *svcfd_create(int, uint_t, uint_t);
  */
 extern int registerrpc(rpcprog_t, rpcvers_t, rpcproc_t, char *(*)(),
 				xdrproc_t, xdrproc_t);
-#else	/* __STDC__ */
-extern bool_t svc_register();
-extern void svc_unregister();
-extern SVCXPRT *svcraw_create();
-extern SVCXPRT *svcudp_create();
-extern SVCXPRT *svcudp_bufcreate();
-extern SVCXPRT *svctcp_create();
-extern SVCXPRT *svcfd_create();
-extern int registerrpc();
-#endif	/* __STDC__ */
 
 #ifdef __cplusplus
 }

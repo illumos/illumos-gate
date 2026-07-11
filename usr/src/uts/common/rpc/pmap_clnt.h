@@ -41,9 +41,7 @@
 
 #include <netinet/in.h>
 
-#ifdef __STDC__
 #include <rpc/clnt.h>
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,7 +56,7 @@ extern "C" {
  *	clnt_stat = pmap_rmtcall(address, program, version, procedure,
  *		xdrargs, argsp, xdrres, resp, tout, port_ptr)
  *		(works for udp only.)
- * 	clnt_stat = clnt_broadcast(program, version, procedure,
+ *	clnt_stat = clnt_broadcast(program, version, procedure,
  *		xdrargs, argsp,	xdrres, resp, eachresult)
  *		(like pmap_rmtcall, except the call is broadcasted to all
  *		locally connected nets.  For each valid response received,
@@ -71,7 +69,6 @@ extern "C" {
  *		address if the responder to the broadcast.
  */
 
-#ifdef __STDC__
 extern bool_t pmap_set(rpcprog_t, rpcvers_t, rpcprot_t, unsigned short port);
 extern bool_t pmap_unset(rpcprog_t, rpcvers_t);
 extern struct pmaplist *pmap_getmaps(struct sockaddr_in *);
@@ -83,16 +80,6 @@ enum clnt_stat clnt_broadcast(rpcprog_t, rpcvers_t, rpcproc_t, xdrproc_t,
 enum clnt_stat pmap_rmtcall(struct sockaddr_in *, rpcprog_t, rpcvers_t,
     rpcproc_t, xdrproc_t, caddr_t, xdrproc_t, caddr_t, struct timeval,
     rpcport_t *);
-#endif
-#else
-extern bool_t pmap_set();
-extern bool_t pmap_unset();
-extern struct pmaplist *pmap_getmaps();
-extern ushort_t pmap_getport();
-#ifndef _KERNEL
-enum clnt_stat clnt_broadcast();
-enum clnt_stat pmap_rmtcall();
-#endif
 #endif
 
 #ifdef __cplusplus

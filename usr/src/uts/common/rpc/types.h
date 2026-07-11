@@ -114,11 +114,7 @@ extern uint_t	rpclog;
 
 /* messaging stuff. */
 #ifndef _KERNEL
-#ifdef __STDC__
 extern const char __nsl_dom[];
-#else
-extern char __nsl_dom[];
-#endif
 #endif
 
 #ifdef __cplusplus

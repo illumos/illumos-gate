@@ -81,21 +81,13 @@ extern "C" {
 /*
  * Cipher Block Chaining mode
  */
-#ifdef __STDC__
 int cbc_crypt(char *key, char *buf, size_t len, unsigned int mode, char *ivec);
-#else
-int cbc_crypt();
-#endif
 
 
 /*
  * Electronic Code Book mode
  */
-#ifdef __STDC__
 int ecb_crypt(char *key, char *buf, size_t len, unsigned int mode);
-#else
-int ecb_crypt();
-#endif
 
 
 #ifndef _KERNEL
@@ -103,11 +95,7 @@ int ecb_crypt();
  * Set des parity for a key.
  * DES parity is odd and in the low bit of each byte
  */
-#ifdef __STDC__
 void des_setparity(char *key);
-#else
-void des_setparity();
-#endif
 #endif	/* _KERNEL */
 
 #ifdef __cplusplus

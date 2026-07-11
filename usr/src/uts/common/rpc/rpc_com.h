@@ -74,7 +74,6 @@ extern "C" {
 #define	RPC_SERVER	2
 #define	RPC_TEST	3
 
-#ifdef __STDC__
 extern uint_t __rpc_get_t_size(t_scalar_t, t_scalar_t);
 extern uint_t __rpc_get_a_size(t_scalar_t);
 extern int __rpc_dtbsize(void);
@@ -82,23 +81,10 @@ extern struct netconfig *__rpcfd_to_nconf(int, int);
 extern int __rpc_matchserv(int, unsigned int);
 extern  int  __rpc_get_default_domain(char **);
 extern int __rpc_tli_set_options(int, int, int, int); /* internal use only */
-#else
-extern uint_t __rpc_get_t_size();
-extern uint_t __rpc_get_a_size();
-extern int __rpc_dtbsize();
-extern struct netconfig *__rpcfd_to_nconf();
-extern int __rpc_matchserv();
-extern  int __rpc_get_default_domain();
-extern int __rpc_tli_set_options(); /* internal use only */
-#endif
 
 #ifndef _KERNEL
 
-#ifdef __STDC__
 bool_t rpc_control(int, void *);
-#else
-bool_t rpc_control();
-#endif
 
 /*
  * rpc_control commands

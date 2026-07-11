@@ -91,11 +91,7 @@ struct authsys_parms {
  */
 #define	 NGRPS_LOOPBACK 92
 
-#ifdef __STDC__
 extern bool_t xdr_authsys_parms(XDR *, struct authsys_parms *);
-#else
-extern bool_t xdr_authsys_parms();
-#endif
 
 
 /* For backward compatibility */

@@ -173,11 +173,7 @@ union des_block {
 };
 typedef union des_block des_block;
 
-#ifdef __STDC__
 extern bool_t xdr_des_block(XDR *, des_block *);
-#else
-extern bool_t xdr_des_block();
-#endif
 
 
 /*
@@ -198,7 +194,6 @@ typedef struct __auth {
 	struct	opaque_auth	ah_verf;
 	union	des_block	ah_key;
 	struct auth_ops {
-#ifdef __STDC__
 		void	(*ah_nextverf)(struct __auth *);
 #ifdef _KERNEL
 		int	(*ah_marshal)(struct __auth *, XDR *, struct cred *);
@@ -224,18 +219,6 @@ typedef struct __auth {
 		    XDR *, xdrproc_t, caddr_t);
 		int	(*ah_unwrap)(struct __auth *, XDR *, xdrproc_t,
 		    caddr_t);
-#endif
-#else
-		void	(*ah_nextverf)();
-		int	(*ah_marshal)();	/* nextverf & serialize */
-		int	(*ah_validate)();	/* validate verifier */
-		int	(*ah_refresh)();	/* refresh credentials */
-		void	(*ah_destroy)();	/* destroy this structure */
-#ifdef _KERNEL
-		int	(*ah_wrap)();		/* encode XDR data */
-		int	(*ah_unwrap)();		/* decode XDR data */
-#endif
-
 #endif
 	} *ah_ops;
 	caddr_t ah_private;
@@ -338,16 +321,10 @@ extern AUTH *authloopback_create(void);		/* takes no parameters */
 extern int authloopback_init(void *, void *, int);
 extern struct kmem_cache *authloopback_cache;
 #else /* _KERNEL */
-#ifdef __STDC__
 extern AUTH *authsys_create(const char *, const uid_t, const gid_t, const int,
     const gid_t *);
 extern AUTH *authsys_create_default(void);	/* takes no parameters */
 extern AUTH *authnone_create(void);		/* takes no parameters */
-#else /* __STDC__ */
-extern AUTH *authsys_create();
-extern AUTH *authsys_create_default();	/* takes no parameters */
-extern AUTH *authnone_create();	/* takes no parameters */
-#endif /* __STDC__ */
 /* Will get obsolete in near future */
 #define	authunix_create		authsys_create
 #define	authunix_create_default authsys_create_default
@@ -366,12 +343,8 @@ extern AUTH *authnone_create();	/* takes no parameters */
 extern int authdes_create(char *, uint_t, struct netbuf *, struct knetconfig *,
     des_block *, int, AUTH **retauth);
 #else /* _KERNEL */
-#ifdef __STDC__
 extern AUTH *authdes_seccreate(const char *, const uint_t, const  char *,
     const des_block *);
-#else
-extern AUTH *authdes_seccreate();
-#endif /* __STDC__ */
 #endif /* _KERNEL */
 
 /*
@@ -381,7 +354,6 @@ extern AUTH *authdes_seccreate();
 #ifdef	_KERNEL
 extern enum clnt_stat netname2user(char *, uid_t *, gid_t *, int *, gid_t *);
 #endif
-#ifdef __STDC__
 extern int getnetname(char *);
 extern int host2netname(char *, const char *, const char *);
 extern int user2netname(char *, const uid_t, const char *);
@@ -389,12 +361,6 @@ extern int user2netname(char *, const uid_t, const char *);
 extern int netname2user(const char *, uid_t *, gid_t *, int *, gid_t *);
 #endif
 extern int netname2host(const char *, char *, const int);
-#else
-extern int getnetname();
-extern int host2netname();
-extern int user2netname();
-extern int netname2host();
-#endif
 
 /*
  * These routines interface to the keyserv daemon
@@ -408,7 +374,6 @@ extern enum clnt_stat key_getnetname();
 #endif
 
 #ifndef _KERNEL
-#ifdef	__STDC__
 extern int key_decryptsession(const char *, des_block *);
 extern int key_encryptsession(const char *, des_block *);
 extern int key_gendes(des_block *);
@@ -422,13 +387,6 @@ extern int key_setnet_g_ruid();
 extern int key_removesecret_g_ruid();
 extern int key_secretkey_is_set_g_ruid();
 extern AUTH *authsys_create_ruid();
-#else
-extern int key_decryptsession();
-extern int key_encryptsession();
-extern int key_gendes();
-extern int key_setsecret();
-extern int key_secretkey_is_set();
-#endif
 #endif
 
 
@@ -446,12 +404,8 @@ extern int key_secretkey_is_set();
 extern int    authkerb_create(char *, char *, char *, uint_t,
     struct netbuf *, int *, struct knetconfig *, int, AUTH **);
 #else
-#ifdef __STDC__
 extern AUTH *authkerb_seccreate(const char *, const char *, const  char *,
     const uint_t, const char *, int *);
-#else
-extern AUTH *authkerb_seccreate();
-#endif
 #endif /* _KERNEL */
 
 /*
@@ -465,13 +419,9 @@ extern AUTH *authkerb_seccreate();
  *	int   *groups;
  *
  */
-#ifdef __STDC__
 struct svc_req;
 extern int authkerb_getucred(struct svc_req *, uid_t *, gid_t *,
     short *, int *);
-#else
-extern int authkerb_getucred();
-#endif
 
 #ifdef _KERNEL
 /*

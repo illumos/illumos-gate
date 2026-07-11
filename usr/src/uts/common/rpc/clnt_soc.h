@@ -63,12 +63,8 @@ extern "C" {
  *	xdrproc_t inproc, outproc;
  *	char *in, *out;
  */
-#ifdef __STDC__
 extern int callrpc(char *, rpcprog_t, rpcvers_t, rpcproc_t, xdrproc_t, char *,
     xdrproc_t, char *);
-#else
-extern int callrpc();
-#endif
 
 
 /*
@@ -82,12 +78,8 @@ extern int callrpc();
  *	uint_t sendsz;
  *	uint_t recvsz;
  */
-#ifdef __STDC__
 extern CLIENT *clnttcp_create(struct sockaddr_in *, rpcprog_t, rpcvers_t,
     int *, uint_t, uint_t);
-#else
-extern CLIENT *clnttcp_create();
-#endif
 
 
 /*
@@ -112,15 +104,10 @@ extern CLIENT *clnttcp_create();
  *	uint_t recvsz;
  *
  */
-#ifdef __STDC__
 extern CLIENT *clntudp_create(struct sockaddr_in *, rpcprog_t, rpcvers_t,
     struct timeval, int *);
 extern CLIENT *clntudp_bufcreate(struct sockaddr_in *, rpcprog_t, rpcvers_t,
     struct timeval, int *, uint_t, uint_t);
-#else
-extern CLIENT *clntudp_create();
-extern CLIENT *clntudp_bufcreate();
-#endif
 
 /*
  * Memory based rpc (for speed check and testing)
@@ -129,39 +116,27 @@ extern CLIENT *clntudp_bufcreate();
  *	rpcprog_t prog;
  *	rpcvers_t vers;
  */
-#ifdef __STDC__
 extern CLIENT *clntraw_create(rpcprog_t, rpcvers_t);
-#else
-extern CLIENT *clntraw_create();
-#endif
 
 /*
  * get the local host's IP address without consulting
  * name service library functions
  * void
  * get_myaddress(addr)
- * 	struct sockaddr_in  *addr;
+ *	struct sockaddr_in  *addr;
  */
-#ifdef __STDC__
 extern void get_myaddress(struct sockaddr_in *);
-#else
-extern void get_myaddress();
-#endif
 
 /*
  * get the port number on the host for the rpc program, version and proto
  * void
  * getrpcport(host, prognum, versnum, proto)
- * 	char *host;
+ *	char *host;
  *	rpcprog_t prognum;
  *	rpcvers_t versnum;
  *	rpcprot_t proto;
  */
-#ifdef __STDC__
 extern ushort_t getrpcport(char *, rpcprog_t, rpcvers_t, rpcprot_t);
-#else
-extern ushort_t getrpcport();
-#endif
 
 #ifdef	__cplusplus
 }

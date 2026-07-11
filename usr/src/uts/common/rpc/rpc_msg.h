@@ -165,34 +165,26 @@ struct rpc_msg {
 /*
  * XDR routine to handle a rpc message.
  * xdr_callmsg(xdrs, cmsg)
- * 	XDR *xdrs;
- * 	struct rpc_msg *cmsg;
+ *	XDR *xdrs;
+ *	struct rpc_msg *cmsg;
  */
-#ifdef __STDC__
 extern bool_t	xdr_callmsg(XDR *, struct rpc_msg *);
-#else
-extern bool_t	xdr_callmsg();
-#endif
 
 
 /*
  * XDR routine to pre-serialize the static part of a rpc message.
  * xdr_callhdr(xdrs, cmsg)
- * 	XDR *xdrs;
- * 	struct rpc_msg *cmsg;
+ *	XDR *xdrs;
+ *	struct rpc_msg *cmsg;
  */
-#ifdef __STDC__
 extern bool_t	xdr_callhdr(XDR *, struct rpc_msg *);
-#else
-extern bool_t	xdr_callhdr();
-#endif
 
 
 /*
  * XDR routine to handle a rpc reply.
  * xdr_replymsg(xdrs, rmsg)
- * 	XDR *xdrs;
- * 	struct rpc_msg *rmsg;
+ *	XDR *xdrs;
+ *	struct rpc_msg *rmsg;
  *
  * xdr_accepted_reply(xdrs, ar)
  *	XDR *xdrs;
@@ -202,41 +194,27 @@ extern bool_t	xdr_callhdr();
  *	XDR *xdrs;
  *	const struct rejected_reply *rr;
  */
-#ifdef __STDC__
 extern bool_t	xdr_replymsg(XDR *, struct rpc_msg *);
 extern bool_t	xdr_accepted_reply(XDR *, struct accepted_reply *);
 extern bool_t	xdr_rejected_reply(XDR *, struct rejected_reply *);
-#else
-extern bool_t	xdr_replymsg();
-extern bool_t	xdr_accepted_reply();
-extern bool_t	xdr_rejected_reply();
-#endif
 
 
 #ifdef _KERNEL
 /*
  * Fills in the error part of a reply message.
  * _seterr_reply(msg, error)
- * 	struct rpc_msg *msg;
- * 	struct rpc_err *error;
+ *	struct rpc_msg *msg;
+ *	struct rpc_err *error;
  */
-#ifdef __STDC__
 extern void	_seterr_reply(struct rpc_msg *, struct rpc_err *);
-#else
-extern void	_seterr_reply();
-#endif
 #else
 /*
  * Fills in the error part of a reply message.
  * __seterr_reply(msg, error)
- * 	struct rpc_msg *msg;
- * 	struct rpc_err *error;
+ *	struct rpc_msg *msg;
+ *	struct rpc_err *error;
  */
-#ifdef __STDC__
 extern void	__seterr_reply(struct rpc_msg *, struct rpc_err *);
-#else
-extern void	__seterr_reply();
-#endif
 #endif
 
 #ifdef _KERNEL

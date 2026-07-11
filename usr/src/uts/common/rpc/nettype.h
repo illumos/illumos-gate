@@ -59,17 +59,10 @@ extern "C" {
 #define	_RPC_DOOR_LOCAL		11
 #define	_RPC_DOOR_NETPATH	12
 
-#ifdef __STDC__
 extern void *__rpc_setconf(char *);
 extern void __rpc_endconf(void *);
 extern struct netconfig *__rpc_getconf(void *);
 extern struct netconfig *__rpc_getconfip(char *);
-#else
-extern void *__rpc_setconf();
-extern void __rpc_endconf();
-extern struct netconfig *__rpc_getconf();
-extern struct netconfig *__rpc_getconfip();
-#endif
 
 #ifdef	__cplusplus
 }

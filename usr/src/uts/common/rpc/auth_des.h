@@ -125,27 +125,17 @@ struct authdes_verf {
 #ifdef _KERNEL
 extern int	kauthdes_getucred(const struct authdes_cred *, cred_t *);
 #else
-#ifdef __STDC__
 extern int	authdes_getucred(const struct authdes_cred *,
 			uid_t *, gid_t *, short *, gid_t *);
-#else
-extern int	authdes_getucred();
-#endif
 #endif
 
 #ifndef _KERNEL
-#ifdef __STDC__
 extern int	getpublickey(const char *, char *);
 extern int	getsecretkey(const char *, char *, const char *);
-#else
-extern int	getpublickey();
-extern int	getsecretkey();
-#endif
 #endif
 
 #ifdef _KERNEL
 
-#ifdef __STDC__
 extern int	authdes_create(char *, uint_t, struct netbuf *,
 			struct knetconfig *, des_block *, int, AUTH **);
 extern bool_t	xdr_authdes_cred(XDR *, struct authdes_cred *);
@@ -154,14 +144,6 @@ extern int	rtime(struct knetconfig *, struct netbuf *, int,
 			struct timeval *, struct timeval *);
 extern enum clnt_stat kgetnetname(char *);
 extern enum auth_stat _svcauth_des(struct svc_req *, struct rpc_msg *);
-#else
-extern int	authdes_create();
-extern bool_t	xdr_authdes_cred();
-extern bool_t	xdr_authdes_verf();
-extern int	rtime();
-extern enum clnt_stat	kgetnetname();
-extern enum auth_stat _svcauth_des();
-#endif
 
 extern kmutex_t	authdes_ops_lock;
 
