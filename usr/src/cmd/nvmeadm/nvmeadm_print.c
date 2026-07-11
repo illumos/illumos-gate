@@ -2571,7 +2571,7 @@ nvme_print_feat_ocp_plp_fail(uint32_t cdw0, void *b, size_t s,
 	case OCP_PLP_MODE_READ_ONLY:
 		mode = "read only mode";
 		break;
-	case OCP_PLP_MODE_WRITE_TRHOUGH:
+	case OCP_PLP_MODE_WRITE_THROUGH:
 		mode = "write through mode";
 		break;
 	case OCP_PLP_MODE_NORMAL:

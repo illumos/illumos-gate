@@ -53,8 +53,12 @@ typedef struct {
 	const char *fo_base;
 	const char *fo_short;
 	const char *fo_desc;
-	char fo_val[256];
-	char fo_hval[256];
+	/*
+	 * This is sized so it can hold an escaped 64-character string (256
+	 * bytes) plus a NUL.
+	 */
+	char fo_val[257];
+	char fo_hval[257];
 	uint32_t fo_off;
 	uint32_t fo_bitoff;
 	uint32_t fo_len;

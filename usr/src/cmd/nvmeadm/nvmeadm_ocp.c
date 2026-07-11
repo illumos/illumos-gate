@@ -100,6 +100,18 @@ static const nvmeadm_field_bit_t ocp_vul_smart_dssd_bits[] = { {
 	.nfb_type = NVMEADM_FT_HEX,
 } };
 
+static const nvmeadm_field_bit_t ocp_vul_smart_sa_bits[] = { {
+	.nfb_lowbit = 0, .nfb_hibit = 31,
+	.nfb_short = "raw",
+	.nfb_desc = "Raw Count",
+	.nfb_type = NVMEADM_FT_HEX,
+}, {
+	.nfb_lowbit = 32, .nfb_hibit = 39,
+	.nfb_short = "norm",
+	.nfb_desc = "Normalized Value",
+	.nfb_type = NVMEADM_FT_PERCENT,
+} };
+
 static const nvmeadm_field_t ocp_vul_smart_fields[] = { {
 	OCP_F_SMART(pmed_write),
 	.nf_short = "pmuw",
@@ -198,6 +210,19 @@ static const nvmeadm_field_t ocp_vul_smart_fields[] = { {
 	.nf_desc = "NVMe Command Set Errata Version",
 	.nf_rev = 4,
 	.nf_type = NVMEADM_FT_ASCII
+
+}, {
+	OCP_F_SMART(nvme_pcie_errata),
+	.nf_short = "pcieev",
+	.nf_desc = "NVMe Over PCIe Transport Errata Version",
+	.nf_rev = 5,
+	.nf_type = NVMEADM_FT_ASCII
+}, {
+	OCP_F_SMART(nvme_mi_errata),
+	.nf_short = "miev",
+	.nf_desc = "NVMe Management Interface Errata Version",
+	.nf_rev = 5,
+	.nf_type = NVMEADM_FT_ASCII
 }, {
 	OCP_F_SMART(unaligned),
 	.nf_short = "unalign",
@@ -238,6 +263,153 @@ static const nvmeadm_field_t ocp_vul_smart_fields[] = { {
 	.nf_short = "minfw",
 	.nf_desc = "Lowest Permitted Firmware Revision",
 	.nf_type = NVMEADM_FT_ASCII
+}, {
+	OCP_F_SMART(tmd),
+	.nf_short = "tmd",
+	.nf_desc = "Total Media Dies",
+	.nf_rev = 5,
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	OCP_F_SMART(mdft),
+	.nf_short = "mdft",
+	.nf_desc = "Media Die Failure Tolerance",
+	.nf_rev = 5,
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	OCP_F_SMART(mdo),
+	.nf_short = "mdo",
+	.nf_desc = "Media Dies Offline",
+	.nf_rev = 5,
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	OCP_F_SMART(max_temp),
+	.nf_short = "maxtemp",
+	.nf_desc = "Max Temperature Recorded",
+	.nf_rev = 5,
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	OCP_F_SMART(ff),
+	.nf_short = "ff",
+	.nf_desc = "Form Factor",
+	.nf_rev = 6,
+	.nf_type = NVMEADM_FT_STRMAP,
+	.nf_strs = {
+		/*
+		 * These values come from the NVMe-MI specification's
+		 * MultiRecord Area. It would be good if we had these in an enum
+		 * at some point in the future.
+		 */
+		[0] = "Other - unknown",
+		[1] = "PCIe: integrated",
+		[2] = "PCIe: Other - unknown",
+		[16] = "PCIe: 2.5\" - unknown",
+		[17] = "PCIe: 2.5\" - U.2 15mm",
+		[18] = "PCIe: 2.5\" - U.2 7mm",
+		[19] = "PCIe: 2.5\" - U.3 15mm",
+		[20] = "PCIe: 2.5\" - U.3 7mm",
+		[32] = "PCIe: CEM AIC - unknown",
+		[33] = "PCIe: CEM AIC - HHHL",
+		[34] = "PCIe: CEM AIC - FHHL",
+		[35] = "PCIe: CEM AIC - FHFL",
+		[48] = "PCIe: M.2 - unknown",
+		[49] = "PCIe: M.2 - 2230",
+		[50] = "PCIe: M.2 - 2242",
+		[51] = "PCIe: M.2 - 2260",
+		[52] = "PCIe: M.2 - 2280",
+		[53] = "PCIe: M.2 - 22110",
+		[64] = "PCIe: BGA - unknown",
+		[65] = "PCIe: BGA - 16x20mm (M.2 Type 1620)",
+		[66] = "PCIe: BGA - 11.5x13mm (M.2 Type 1113)",
+		[80] = "PCIe: EDSFF - unknown",
+		[81] = "PCIe: E1.S - 5.9mm",
+		[82] = "PCIe: E1.S - 8mm",
+		[83] = "PCIe: E1.L - 9.5mm",
+		[84] = "PCIe: E1.L - 18mm",
+		[85] = "PCIe: E3.S - 7.5mm",
+		[86] = "PCIe: E3.S - 16.8mm",
+		[87] = "PCIe: E3.L - 7.5mm",
+		[88] = "PCIe: E3.L - 16.8mm",
+		[89] = "PCIe: E1.S - 9.5mm",
+		[90] = "PCIe: E1.S - 15mm",
+		[91] = "PCIe: E1.S - 25mm",
+		[96] = "Ethernet: Other - unknown",
+		[97] = "Ethernet: 2.5\" NVMeoF 15mm",
+		[98] = "Ethernet: 2.5\" NVMeoF 7mm",
+		[99] = "Ethernet: E3.S NVMeoF 7.5mm",
+		[100] = "Ethernet: E3.S NVMeoF 16.8mm"
+	}
+}, {
+	OCP_F_SMART(naec),
+	.nf_short = "naec",
+	.nf_desc = "NAND Average Erase Count",
+	.nf_rev = 5,
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	OCP_F_SMART(ct),
+	.nf_short = "ct",
+	.nf_desc = "Command Timeouts",
+	.nf_rev = 5,
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	OCP_F_SMART(sapfc),
+	.nf_short = "sapfc",
+	.nf_desc = "System Area Program Fail Count",
+	.nf_rev = 5,
+	NVMEADM_F_BITS(ocp_vul_smart_sa_bits)
+}, {
+	OCP_F_SMART(saurc),
+	.nf_short = "saurc",
+	.nf_desc = "System Area Uncorrectable Read Count",
+	.nf_rev = 5,
+	NVMEADM_F_BITS(ocp_vul_smart_sa_bits)
+}, {
+	OCP_F_SMART(saefc),
+	.nf_short = "saefc",
+	.nf_desc = "System Area Erase Fail Count",
+	.nf_rev = 5,
+	NVMEADM_F_BITS(ocp_vul_smart_sa_bits)
+}, {
+	OCP_F_SMART(mppc),
+	.nf_short = "mppc",
+	.nf_desc = "Max Peak Power Capability",
+	.nf_rev = 5,
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	OCP_F_SMART(cap),
+	.nf_short = "cap",
+	.nf_desc = "Current Average Power",
+	.nf_rev = 5,
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	OCP_F_SMART(lpc),
+	.nf_short = "lpc",
+	.nf_desc = "Lifetime Power Consumed",
+	.nf_rev = 5,
+	.nf_type = NVMEADM_FT_HEX
+}, {
+	OCP_F_SMART(dfr),
+	.nf_short = "dfr",
+	.nf_desc = "DSSD Firmware Revision",
+	.nf_rev = 5,
+	.nf_type = NVMEADM_FT_ASCII
+}, {
+	OCP_F_SMART(dfbu),
+	.nf_short = "dfbu",
+	.nf_desc = "DSSD Firmware Build UUID",
+	.nf_rev = 5,
+	.nf_type = NVMEADM_FT_GUID
+}, {
+	OCP_F_SMART(dfbl),
+	.nf_short = "dfbl",
+	.nf_desc = "DSSD Firmware Build Label",
+	.nf_rev = 5,
+	.nf_type = NVMEADM_FT_ASCII
+}, {
+	OCP_F_SMART(diubnb),
+	.nf_short = "diubnb",
+	.nf_desc = "Dies In Use Bad NAND Blocks",
+	.nf_rev = 6,
+	NVMEADM_F_BITS(ocp_vul_smart_block_bits)
 }, {
 	OCP_F_SMART(vers),
 	.nf_short = "lpv",
@@ -681,6 +853,14 @@ static const nvmeadm_field_bit_t ocp_vul_devcap_psd_bits[] = {  {
 	.nfb_strs = { "no", "yes" }
 } };
 
+static const nvmeadm_field_bit_t ocp_vul_devcap_fips_bits[] = {  {
+	.nfb_lowbit = 0, .nfb_hibit = 3,
+	.nfb_short = "status",
+	.nfb_desc = "Validation Status",
+	.nfb_type = NVMEADM_FT_STRMAP,
+	.nfb_strs = { "none", "intended", "submitted", "interim", "full" }
+} };
+
 static const nvmeadm_field_t ocp_vul_devcap_fields[] = { {
 	OCP_F_DEVCAP(nports),
 	.nf_short = "nports",
@@ -766,6 +946,12 @@ static const nvmeadm_field_t ocp_vul_devcap_fields[] = { {
 	OCP_F_DEVCAP_PSD(124), OCP_F_DEVCAP_PSD(125), OCP_F_DEVCAP_PSD(126),
 	OCP_F_DEVCAP_PSD(127),
 {
+	OCP_F_DEVCAP(fips),
+	.nf_short = "fips",
+	.nf_desc = "FIPS 140 Validation",
+	.nf_rev = 2,
+	NVMEADM_F_BITS(ocp_vul_devcap_fips_bits)
+}, {
 	OCP_F_DEVCAP(vers),
 	.nf_short = "lpv",
 	.nf_desc = "Log Page Version",
