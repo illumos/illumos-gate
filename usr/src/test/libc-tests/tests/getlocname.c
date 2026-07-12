@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Bill Sommerfeld <sommerfeld@hamachi.org>
  */
 
 /*
@@ -149,6 +150,19 @@ locname_composite(void)
 		if (!locname_check(desc, loc, names))
 			ret = false;
 
+		locale_t loc2 = duplocale(loc);
+
+		if (loc2 == NULL) {
+			errx(EXIT_FAILURE, "INTERNAL TEST FAILURE: failed to "
+			    "duplicate composite locale");
+		}
+		(void) snprintf(desc, sizeof (desc), "dup composite %s (%d)",
+		    composite[i].lc_loc, composite[i].lc_cat);
+		if (!locname_check(desc, loc2, names))
+			ret = false;
+
+		freelocale(loc2);
+
 		if (setlocale(LC_ALL, getlocalename_l(LC_ALL, loc)) == NULL) {
 			err(EXIT_FAILURE, "INTERNAL TEST FAILURE: failed to "
 			    "set global locale to composite %s", cname);
@@ -213,7 +227,7 @@ main(void)
 	 */
 	for (size_t i = 0; i < ARRAY_SIZE(locales); i++) {
 		char desc[1024];
-		locale_t loc;
+		locale_t loc, loc2;
 
 		loc = newlocale(LC_ALL_MASK, locales[i], NULL);
 		if (loc == NULL) {
@@ -225,6 +239,18 @@ main(void)
 		    "%s: newlocale", locales[i]);
 		if (!locname_check_all(desc, loc, locales[i]))
 			ret = EXIT_FAILURE;
+
+		loc2 = duplocale(loc);
+		if (loc2 == NULL) {
+			err(EXIT_FAILURE, "INTERNAL TEST FAILURE: failed to "
+			    "duplicate locale %s", locales[i]);
+		}
+
+		(void) snprintf(desc, sizeof (desc),
+		    "%s: duplocale", locales[i]);
+		if (!locname_check_all(desc, loc2, locales[i]))
+			ret = EXIT_FAILURE;
+		freelocale(loc2);
 
 		(void) snprintf(desc, sizeof (desc),
 		    "%s: thread locale", locales[i]);

@@ -478,11 +478,11 @@ __mb_cur_max(void)
 }
 
 /*
- * Public interfaces.
+ * Do everything but set locname; used by duplocale and
+ * newlocale.
  */
-
-locale_t
-duplocale(locale_t src)
+static locale_t
+duplocale_noname(locale_t src)
 {
 	locale_t	loc;
 	int		i;
@@ -507,6 +507,18 @@ duplocale(locale_t src)
 	loc->numeric = loc->locdata[LC_NUMERIC]->l_data[0];
 	loc->time = loc->locdata[LC_TIME]->l_data[0];
 	return (loc);
+}
+
+/*
+ * Public interfaces.
+ */
+locale_t
+duplocale(locale_t src)
+{
+	locale_t loc = duplocale_noname(src);
+	if (loc == NULL)
+		return (NULL);
+	return (mklocname(loc));
 }
 
 void
@@ -537,9 +549,9 @@ newlocale(int catmask, const char *locname, locale_t base)
 	 * but we allow it.
 	 */
 	if (base == NULL || base == ___global_locale) {
-		loc = duplocale(___global_locale);
+		loc = duplocale_noname(___global_locale);
 	} else {
-		loc = duplocale(base);
+		loc = duplocale_noname(base);
 	}
 	if (loc == NULL) {
 		return (NULL);
