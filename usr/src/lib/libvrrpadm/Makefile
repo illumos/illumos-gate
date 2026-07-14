@@ -25,7 +25,7 @@
 
 include $(SRC)/lib/Makefile.lib
 
-HDRS =		netinet/vrrp.h libvrrpadm.h
+HDRS =		libvrrpadm.h
 HDRDIR =	common
 
 SUBDIRS =	$(MACH)

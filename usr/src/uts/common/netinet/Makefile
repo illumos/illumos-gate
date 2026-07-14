@@ -19,8 +19,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -32,7 +30,7 @@ include ../../../Makefile.master
 HDRS=	arp.h dhcp.h dhcp6.h icmp6.h icmp_var.h if_ether.h igmp.h igmp_var.h \
 	in.h inetutil.h in_pcb.h in_systm.h in_var.h ip.h ip6.h ip_icmp.h \
 	ip_mroute.h ip_var.h pim.h sctp.h tcp.h tcp_debug.h tcp_fsm.h \
-	tcp_seq.h tcp_timer.h tcp_var.h tcpip.h udp.h udp_var.h
+	tcp_seq.h tcp_timer.h tcp_var.h tcpip.h udp.h udp_var.h vrrp.h
 
 ROOTDIRS= $(ROOT)/usr/include/netinet
 
