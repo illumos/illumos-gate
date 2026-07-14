@@ -3,3 +3,8 @@ This tests the amd64 link-editor's handling of Initial Executable TLS sequences.
 The original C source files are in orig/ but unused, since we need to avoid
 any changes to the compiler influencing our tests.
 
+Further we have an object style2-with-badness.elf built from
+orig/style2-with-badness.s using "GNU assembler (GNU Binutils) 2.32" which is
+willing to assemble the bad instruction under test where modern assemblers are
+not.
+

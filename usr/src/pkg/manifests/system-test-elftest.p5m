@@ -146,7 +146,7 @@ file path=opt/elf-tests/tests/tls/amd64/ie/style1-func-with-r12.s mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/style1-func-with-r13.s mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/style1-func.s mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/style1-main.s mode=0444
-file path=opt/elf-tests/tests/tls/amd64/ie/style2-with-badness.s mode=0444
+file path=opt/elf-tests/tests/tls/amd64/ie/style2-with-badness.o mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/style2-with-r12.s mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/style2-with-r13.s mode=0444
 file path=opt/elf-tests/tests/tls/amd64/ie/style2.s mode=0444

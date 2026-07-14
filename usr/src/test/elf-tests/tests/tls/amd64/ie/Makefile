@@ -22,7 +22,7 @@ DATAFILES =			\
 	style1-func-with-r13.s	\
 	style1-func.s		\
 	style1-main.s		\
-	style2-with-badness.s	\
+	style2-with-badness.o	\
 	style2-with-r12.s	\
 	style2-with-r13.s	\
 	style2.s
@@ -41,8 +41,6 @@ all: $(PROG)
 
 install: all $(CMDS) $(DATA)
 
-lint:
-
 clobber: clean
 	-$(RM) $(PROG)
 
@@ -56,3 +54,7 @@ $(TESTDIR):
 
 $(TESTDIR)/%: %
 	$(INS.file)
+
+$(TESTDIR)/%.o: %.elf
+	$(INS.rename)
+

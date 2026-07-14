@@ -44,9 +44,10 @@ STYLE2R12OBJS =	style2-with-r12.o
 style2-with-r12: $(STYLE2R12OBJS)
 	$(LINK.c)
 
-# A copy of style2 that has a R_AMD64_GOTTPOFF relocation with a bad insn sequence
+# A copy of style2 that has a R_AMD64_GOTTPOFF relocation with a bad insn
+# sequence
 STYLE2BADNESSOBJS =	style2-with-badness.o
-style2-with-badness: $(STYLE2BADNESSOBJS)
+style2-with-badness: $(TESTDIR)/$(STYLE2BADNESSOBJS)
 	-$(LINK.c)
 
 # A basic use of TLS that uses the addq mem/reg --> leaq mem,reg variant
@@ -72,7 +73,7 @@ all:	$(PROGS)
 
 clobber clean:
 	rm -f $(PROGS) $(STYLE1OBJS) $(STYLE1R13OBJS) $(STYLE1R12OBJS) \
-	    $(STYLE2OBJS) $(STYLE2R13OBJS) $(STYLE2R12OBJS) $(STYLE2BADNESSOBJS)
+	    $(STYLE2OBJS) $(STYLE2R13OBJS) $(STYLE2R12OBJS)
 
 fail: style2-with-badness FRC
 

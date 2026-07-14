@@ -27,6 +27,7 @@ syntax: glob
 *.png
 *.snoop
 *.ucode
+*.elf
 
 #
 # Specific carve-outs, you would ideally add no more of these

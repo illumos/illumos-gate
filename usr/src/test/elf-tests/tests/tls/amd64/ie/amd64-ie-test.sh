@@ -60,5 +60,5 @@ dis_test "movq-->movq w/REX" main style2-with-r13 \
 dis_test "movq-->movq incase of SIB" main style2-with-r12 \
     'main+0x4:  49 c7 c4 f0 ff ff  movq   $-0x10,%r12	<0xfffffffffffffff0>'
 
-make -f ${TESTDIR}/Makefile.test fail TESTDIR=${TESTDIR} 2>&1 | grep_test "bad insn sequence" \
-   'ld: fatal: relocation error: R_AMD64_TPOFF32: file style2-with-badness.o: symbol foo: section .text: offset 0x7, relocation against unknown TLS instruction sequence'
+make -f ${TESTDIR}/Makefile.test fail TESTDIR=${TESTDIR} 2>&1 | grep_test "bad GOTTPOFF insn sequence" \
+   'ld: fatal: relocation error: R_AMD64_TPOFF32: file '${TESTDIR}'/style2-with-badness.o: symbol foo: section .text: offset 0x7, relocation against unknown TLS instruction sequence'
