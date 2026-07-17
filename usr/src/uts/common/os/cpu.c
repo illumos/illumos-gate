@@ -2238,6 +2238,7 @@ static struct {
 	kstat_named_t ci_curr_cstate;
 	kstat_named_t ci_cacheid;
 	kstat_named_t ci_sktstr;
+	kstat_named_t ci_apicid;
 #endif
 } cpu_info_template = {
 	{ "state",			KSTAT_DATA_CHAR },
@@ -2269,6 +2270,7 @@ static struct {
 	{ "current_cstate",		KSTAT_DATA_INT32 },
 	{ "cache_id",			KSTAT_DATA_INT32 },
 	{ "socket_type",		KSTAT_DATA_STRING },
+	{ "apic_id",			KSTAT_DATA_UINT32 },
 #endif
 };
 
@@ -2332,6 +2334,7 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	cpu_info_template.ci_cacheid.value.i32 = cpuid_get_cacheid(cp);
 	kstat_named_setstr(&cpu_info_template.ci_sktstr,
 	    cpuid_getsocketstr(cp));
+	cpu_info_template.ci_apicid.value.ui32 = cpuid_get_apicid(cp);
 #endif
 
 	return (0);
