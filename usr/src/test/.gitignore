@@ -193,6 +193,7 @@ os-tests/tests/pf_key/eacq-enabler
 os-tests/tests/pf_key/kmc-update
 os-tests/tests/pf_key/kmc-updater
 os-tests/tests/poll/epoll_test
+os-tests/tests/poll/poll_close_test
 os-tests/tests/poll/poll_test
 os-tests/tests/regression/illumos-15031
 os-tests/tests/regression/illumos-15036

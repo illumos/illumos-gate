@@ -779,7 +779,7 @@ closeandsetf(int fd, file_t *newfp)
 	 * catch a watchfd on device's pollhead list but not on fpollinfo list
 	 */
 	if (ufp->uf_fpollinfo != NULL)
-		checkwfdlist(fp->f_vnode, ufp->uf_fpollinfo);
+		checkwfdlist(fp->f_vnode, ufp->uf_fpollinfo, fd);
 #endif	/* DEBUG */
 
 	/*

@@ -12,12 +12,13 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2016 Joyent, Inc.
+# Copyright 2026 Oxide Computer Company
 #
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/test/Makefile.com
 
-PROG = poll_test epoll_test
+PROG = poll_test epoll_test poll_close_test
 OBJS = $(PROG:%=%.o)
 SRCS = $(OBJS:%.o=%.c)
 

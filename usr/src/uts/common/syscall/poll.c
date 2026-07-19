@@ -30,7 +30,7 @@
 /*
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  * Copyright 2015, Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -2867,11 +2867,16 @@ checkpolldat(pollstate_t *ps)
 }
 
 /*
- * every wfd element on ph_list must have a corresponding fpollinfo on the
- * uf_fpollinfo list. This is a variation of infpollinfo() w/o holding locks.
+ * Every wfd element on ph_list for the fd being closed must have a
+ * corresponding fpollinfo on the uf_fpollinfo list. This is a variation
+ * of infpollinfo() w/o holding locks. The pollhead is shared by every fd
+ * referencing the same vnode, e.g. via dup(2) or a separate open of the
+ * same device, while the uf_fpollinfo list belongs to a single uf_entry.
+ * Entries cached under a different fd would be checked against the wrong
+ * list, so they are skipped here.
  */
 void
-checkwfdlist(vnode_t *vp, fpollinfo_t *fpip)
+checkwfdlist(vnode_t *vp, fpollinfo_t *fpip, int fd)
 {
 	stdata_t *stp;
 	polldat_t *pdp;
@@ -2882,7 +2887,7 @@ checkwfdlist(vnode_t *vp, fpollinfo_t *fpip)
 	}
 	PH_ENTER(&stp->sd_pollist);
 	for (pdp = stp->sd_pollist.ph_list; pdp; pdp = pdp->pd_next) {
-		if (pdp->pd_thread != NULL &&
+		if (pdp->pd_fd == fd && pdp->pd_thread != NULL &&
 		    pdp->pd_thread->t_procp == curthread->t_procp) {
 			for (fpip2 = fpip; fpip2; fpip2 = fpip2->fp_next) {
 				if (pdp->pd_thread == fpip2->fp_thread) {

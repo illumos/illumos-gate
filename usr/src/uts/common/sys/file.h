@@ -243,7 +243,7 @@ extern int sock_getfasync(struct vnode *);
 extern int files_can_change_zones(void);
 #ifdef DEBUG
 /* The following functions are only used in ASSERT()s */
-extern void checkwfdlist(struct vnode *, fpollinfo_t *);
+extern void checkwfdlist(struct vnode *, fpollinfo_t *, int);
 extern void checkfpollinfo(void);
 extern int infpollinfo(int);
 #endif	/* DEBUG */
