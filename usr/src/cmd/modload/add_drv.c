@@ -833,7 +833,7 @@ check_dev_dir(int force)
 /*ARGSUSED1*/
 static int
 dev_node(const char *node, const struct stat *node_stat, int flags,
-	struct FTW *ftw_info)
+    struct FTW *ftw_info)
 {
 	char linkbuf[MAXPATHLEN];
 	struct dev_list *ptr;
@@ -1002,8 +1002,10 @@ remove_slashes(char *path)
 		remain_str = ++slash;
 		while (*remain_str == '/')
 			++remain_str;
-		if (slash != remain_str)
-			(void) strcpy(slash, remain_str);
+		if (slash != remain_str) {
+			(void) memmove(slash, remain_str,
+			    strlen(remain_str) + 1);
+		}
 	}
 
 	pathlen = strlen(path);
