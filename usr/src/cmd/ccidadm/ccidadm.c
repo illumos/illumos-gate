@@ -167,10 +167,10 @@ ccidadm_list_slot_status_str(uccid_cmd_status_t *ucs, ilstr_t *s)
 	}
 
 	if (!(ucs->ucs_status & UCCID_STATUS_F_CARD_ACTIVE)) {
-		ilstr_append_str(s, "un");
+		ilstr_append_str(s, "in");
 	}
 
-	ilstr_append_str(s, "activated");
+	ilstr_append_str(s, "active");
 }
 
 static void
@@ -214,18 +214,54 @@ ccidadm_list_slot_usable_str(uccid_cmd_status_t *ucs, ilstr_t *s)
 {
 	ccid_class_features_t feat;
 	uint_t prot = CCID_CLASS_F_SHORT_APDU_XCHG | CCID_CLASS_F_EXT_APDU_XCHG;
-	uint_t param = CCID_CLASS_F_AUTO_PARAM_NEG | CCID_CLASS_F_AUTO_PPS;
+	uint_t pps = CCID_CLASS_F_AUTO_PARAM_NEG | CCID_CLASS_F_AUTO_PPS;
+	uint_t param = CCID_CLASS_F_AUTO_PARAM_NEG |
+	    CCID_CLASS_F_AUTO_PARAM_ATR;
 	uint_t clock = CCID_CLASS_F_AUTO_BAUD | CCID_CLASS_F_AUTO_ICC_CLOCK;
 
 	feat = ucs->ucs_class.ccd_dwFeatures;
 
-	if ((feat & prot) == 0 ||
-	    (feat & param) != param ||
-	    (feat & clock) != clock) {
-		ilstr_append_str(s, "un");
+	/*
+	 * Start with an empty string and build a comma-separated list of any
+	 * issues that prevent the slot from being usable:
+	 */
+	ilstr_reset(s);
+	if ((feat & prot) == 0) {
+		/*
+		 * If the device does not support the APDU transport, we don't
+		 * care about anything else.
+		 */
+		ilstr_append_str(s, "non-APDU");
+	} else {
+		if ((feat & pps) == 0) {
+			ilstr_append_str(s, "PPS");
+		}
+		if ((feat & param) == 0) {
+			if (!ilstr_is_empty(s))
+				ilstr_append_str(s, ", ");
+			ilstr_append_str(s, "params");
+		}
+		if ((feat & clock) != clock) {
+			if (!ilstr_is_empty(s))
+				ilstr_append_str(s, ", ");
+			ilstr_append_str(s, "clock");
+		}
 	}
 
-	ilstr_append_str(s, "supported");
+	if (ilstr_is_empty(s)) {
+		/*
+		 * In the absence of any specific issues, the device is
+		 * considered supported:
+		 */
+		ilstr_append_str(s, "yes");
+	} else {
+		/*
+		 * Otherwise, surround the list of issues with parentheses and
+		 * report it as unsupported:
+		 */
+		ilstr_prepend_str(s, "no (");
+		ilstr_append_str(s, ")");
+	}
 }
 
 static boolean_t
@@ -285,10 +321,10 @@ ccidadm_list_slot(int slotfd, const char *name, void *arg)
 
 static ofmt_field_t ccidadm_list_fields[] = {
 	{ "PRODUCT",	24,	CCIDADM_LIST_PRODUCT,	ccidadm_list_ofmt_cb },
-	{ "DEVICE",	16,	CCIDADM_LIST_DEVICE,	ccidadm_list_ofmt_cb },
-	{ "CARD STATE",	12,	CCIDADM_LIST_STATE,	ccidadm_list_ofmt_cb },
+	{ "DEVICE",	15,	CCIDADM_LIST_DEVICE,	ccidadm_list_ofmt_cb },
+	{ "CARD",	8,	CCIDADM_LIST_STATE,	ccidadm_list_ofmt_cb },
 	{ "TRANSPORT",	12,	CCIDADM_LIST_TRANSPORT,	ccidadm_list_ofmt_cb },
-	{ "SUPPORTED",	12,	CCIDADM_LIST_SUPPORTED,	ccidadm_list_ofmt_cb },
+	{ "SUPPORTED",	23,	CCIDADM_LIST_SUPPORTED,	ccidadm_list_ofmt_cb },
 	{ NULL,		0,	0,			NULL	}
 };
 

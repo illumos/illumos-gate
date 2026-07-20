@@ -2767,7 +2767,8 @@ ccid_supported(ccid_t *ccid)
 		ccid->ccid_flags |= CCID_F_NEEDS_PPS;
 	}
 
-	if ((feat & CCID_CLASS_F_AUTO_PARAM_NEG) == 0) {
+	bits = CCID_CLASS_F_AUTO_PARAM_NEG | CCID_CLASS_F_AUTO_PARAM_ATR;
+	if ((feat & bits) == 0) {
 		ccid->ccid_flags |= CCID_F_NEEDS_PARAMS;
 	}
 
