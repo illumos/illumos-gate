@@ -158,7 +158,7 @@ mac_bcast_send(void *arg1, void *arg2, mblk_t *mp_chain, boolean_t is_loopback)
 		 * It is important to hold a reference on the
 		 * flow_ent here.
 		 */
-		if ((mp_chain1 = mac_copymsgchain_cksum(mp_chain)) == NULL)
+		if ((mp_chain1 = copymsgchain(mp_chain)) == NULL)
 			break;
 
 		FLOW_TRY_REFHOLD(flent, err);

@@ -24,8 +24,8 @@
  * Use is subject to license terms.
  * Copyright 2017 OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
  * Copyright 2025 Bill Sommerfeld <sommerfeld@hamachi.org>
+ * Copyright 2026 Oxide Computer Company
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -1291,12 +1291,6 @@ ip_postfrag_multirt_v6(mblk_t *mp, nce_t *nce, iaflags_t ixaflags,
 			error = ENOBUFS;
 			continue;
 		}
-		/* Preserve HW checksum for this copy */
-		DB_CKSUMSTART(mp1) = DB_CKSUMSTART(mp);
-		DB_CKSUMSTUFF(mp1) = DB_CKSUMSTUFF(mp);
-		DB_CKSUMEND(mp1) = DB_CKSUMEND(mp);
-		DB_CKSUMFLAGS(mp1) = DB_CKSUMFLAGS(mp);
-		DB_LSOMSS(mp1) = DB_LSOMSS(mp);
 
 		ire1->ire_ob_pkt_count++;
 		err = ip_xmit(mp1, nce1, ixaflags, pkt_len, xmit_hint, szone,

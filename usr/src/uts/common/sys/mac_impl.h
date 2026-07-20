@@ -697,7 +697,6 @@ extern void	mac_ndd_ioctl(mac_impl_t *, queue_t *, mblk_t *);
 extern boolean_t mac_ip_hdr_length_v6(ip6_t *, uint8_t *, uint16_t *,
     uint8_t *, ip6_frag_t **);
 
-extern mblk_t *mac_copymsgchain_cksum(mblk_t *);
 extern void mac_rx_deliver(void *, mac_resource_handle_t, mblk_t *,
     mac_header_info_t *);
 extern void mac_tx_notify(mac_impl_t *);

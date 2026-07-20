@@ -26,7 +26,7 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2021 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -8106,14 +8106,6 @@ ip_fix_dbref(mblk_t *mp, ip_recv_attr_t *ira)
 		ip_drop_input("ipIfStatsInDiscards", mp, ill);
 		freemsg(mp);
 		return (NULL);
-	}
-	/* preserve the hardware checksum flags and data, if present */
-	if (DB_CKSUMFLAGS(mp) != 0) {
-		DB_CKSUMFLAGS(mp1) = DB_CKSUMFLAGS(mp);
-		DB_CKSUMSTART(mp1) = DB_CKSUMSTART(mp);
-		DB_CKSUMSTUFF(mp1) = DB_CKSUMSTUFF(mp);
-		DB_CKSUMEND(mp1) = DB_CKSUMEND(mp);
-		DB_CKSUM16(mp1) = DB_CKSUM16(mp);
 	}
 	freemsg(mp);
 	return (mp1);

@@ -120,45 +120,6 @@ mac_drop_chain(mblk_t *chain, const char *fmt, ...)
 }
 
 /*
- * Copy an mblk, preserving its hardware checksum flags.
- */
-static mblk_t *
-mac_copymsg_cksum(mblk_t *mp)
-{
-	mblk_t *mp1;
-
-	mp1 = copymsg(mp);
-	if (mp1 == NULL)
-		return (NULL);
-
-	mac_hcksum_clone(mp, mp1);
-
-	return (mp1);
-}
-
-/*
- * Copy an mblk chain, presenting the hardware checksum flags of the
- * individual mblks.
- */
-mblk_t *
-mac_copymsgchain_cksum(mblk_t *mp)
-{
-	mblk_t *nmp = NULL;
-	mblk_t **nmpp = &nmp;
-
-	for (; mp != NULL; mp = mp->b_next) {
-		if ((*nmpp = mac_copymsg_cksum(mp)) == NULL) {
-			freemsgchain(nmp);
-			return (NULL);
-		}
-
-		nmpp = &((*nmpp)->b_next);
-	}
-
-	return (nmp);
-}
-
-/*
  * Perform software checksum on a single message, if needed. The emulation
  * performed is determined by an intersection of the mblk's flags and the emul
  * flags requested. The emul flags are documented in mac.h.
