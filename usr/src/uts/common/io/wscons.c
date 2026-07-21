@@ -23,6 +23,7 @@
  * Copyright (c) 1987, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Toomas Soome <tsoome@me.com>
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -115,7 +116,9 @@
 #include <sys/console.h>
 #include <sys/promif.h>
 #include <sys/note.h>
+#ifdef _HAVE_TEM_FIRMWARE
 #include <sys/polled_io.h>
+#endif /* _HAVE_TEM_FIRMWARE */
 #include <sys/systm.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>

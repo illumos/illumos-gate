@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2026 RackTop Systems, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -62,7 +63,6 @@
 #include <sys/console.h>
 #include <sys/promif.h>
 #include <sys/note.h>
-#include <sys/polled_io.h>
 #include <sys/systm.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>

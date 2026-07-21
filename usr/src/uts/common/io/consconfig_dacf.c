@@ -22,6 +22,8 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -125,7 +127,6 @@
 #include <sys/note.h>
 
 #include <sys/tem_impl.h>
-#include <sys/polled_io.h>
 #include <sys/kmem.h>
 #include <sys/dacf.h>
 #include <sys/consconfig_dacf.h>
@@ -596,8 +597,8 @@ consconfig_get_polledio(ldi_handle_t lh)
  * consconfig_setup_polledio:
  *	This routine does the setup work for polled I/O.  First we get
  *	the polled_io structure from the lower layers
- *	and then we register the polled I/O
- *	callbacks with the debugger that will be using them.
+ *	and then we make it available to the debugger and panic code
+ *	that will be using it.
  */
 static void
 consconfig_setup_polledio(cons_state_t *sp, dev_t dev)
@@ -630,13 +631,10 @@ consconfig_setup_polledio(cons_state_t *sp, dev_t dev)
 		return;
 	}
 
-	/* Initialize the polled input */
-	polled_io_init();
-
-	/* Register the callbacks */
+	/* Make the routines available to the debugger and to panic. */
 	DPRINTF(DPRINT_L0,
-	    "consconfig_setup_polledio: registering callbacks\n");
-	(void) polled_io_register_callbacks(polled_io, 0);
+	    "consconfig_setup_polledio: setting cons_polledio\n");
+	cons_polledio = polled_io;
 
 	(void) ldi_close(lh, FREAD|FWRITE, kcred);
 

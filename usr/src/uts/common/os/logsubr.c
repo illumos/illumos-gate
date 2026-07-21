@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright (c) 2013 Gary Mills
  * Copyright (c) 1998, 2010, Oracle and/or its affiliates. All rights reserved.
  */
@@ -30,6 +30,7 @@
 #include <sys/varargs.h>
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
+#include <sys/panic.h>
 #include <sys/stream.h>
 #include <sys/strsubr.h>
 #include <sys/strsun.h>
@@ -102,6 +103,8 @@ static void log_cons_destructor(void *, void *);
 void
 log_enter(void)
 {
+	if (panicstr != NULL)
+		return;
 	if (rw_owner(&log_rwlock) != curthread)
 		rw_enter(&log_rwlock, RW_WRITER);
 	log_rwlock_depth++;
@@ -110,6 +113,8 @@ log_enter(void)
 void
 log_exit(void)
 {
+	if (panicstr != NULL)
+		return;
 	if (--log_rwlock_depth == 0)
 		rw_exit(&log_rwlock);
 }
@@ -625,12 +630,22 @@ log_sendmsg(mblk_t *mp, zoneid_t zoneid)
 	 * from these log_ctl_t structures; it only uses ttime from log_ctl_t's
 	 * that contain good data.
 	 *
+	 * While panicking, use the timestamps that panicsys() captured once
+	 * the other CPUs had been stopped and hres_lock released, rather than
+	 * reading the clock again here. The clock readers are seqlock readers
+	 * of hres_lock, and getting a panic message to the console should not
+	 * depend on that lock.
 	 */
-	lc->ltime = ddi_get_lbolt();
-	if (timechanged) {
-		lc->ttime = gethrestime_sec();
+	if (panicstr != NULL) {
+		lc->ltime = (clock_t)panic_lbolt64;
+		lc->ttime = panic_hrestime.tv_sec;
 	} else {
-		lc->ttime = 0;
+		lc->ltime = ddi_get_lbolt();
+		if (timechanged) {
+			lc->ttime = gethrestime_sec();
+		} else {
+			lc->ttime = 0;
+		}
 	}
 
 	flags = lc->flags & lzp->lz_active;

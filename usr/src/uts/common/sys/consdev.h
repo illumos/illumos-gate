@@ -22,6 +22,8 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_SYS_CONSDEV_H
@@ -215,6 +217,9 @@ typedef struct cons_polledio {
 } cons_polledio_t;
 
 extern cons_polledio_t *cons_polledio;
+
+extern void console_polled_enter(void);
+extern void console_polled_exit(void);
 
 /*
  * Workstation Console

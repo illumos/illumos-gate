@@ -413,6 +413,10 @@ struct asycom {
 	uchar_t		asy_bidx;	/* console baud rate index */
 	tcflag_t	asy_cflag;	/* console mode bits */
 	struct cons_polledio	polledio;	/* polled I/O functions */
+	uint8_t		asy_polled_ier;		/* saved IER, polled mode */
+	uint8_t		asy_polled_lcr;		/* saved LCR, polled mode */
+	uint8_t		asy_polled_mcr;		/* saved MCR, polled mode */
+	uint_t		asy_polled_depth;	/* nested polled-mode entries */
 	ddi_acc_handle_t	asy_iohandle;	/* Data access handle */
 	tcflag_t	asy_ocflag;	/* old console mode bits */
 	uchar_t		asy_com_port;	/* COM port number, or zero */

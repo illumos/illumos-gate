@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2020 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 /*
  * Copyright (c) 2010, Intel Corporation.
@@ -955,6 +955,17 @@ panic_stopcpus(cpu_t *cp, kthread_t *t, int spl)
 		    (cpu[i]->cpu_flags & CPU_EXISTS))
 			cpu[i]->cpu_flags |= CPU_QUIESCED;
 	}
+
+	/*
+	 * The other CPUs are now stopped, so timekeeping is quiescent. If
+	 * hres_lock is held, the update it protects was caught in flight and
+	 * will never complete, and gethrtime() and the other hres_lock seqlock
+	 * readers would spin forever. Release it so that arbitrary code on the
+	 * panic and dump paths, device driver polled I/O in particular, can
+	 * read the clock.
+	 */
+	if ((hres_lock & 1) != 0)
+		unlock_hres_lock();
 }
 
 /*
@@ -1058,10 +1069,16 @@ tenmicrosec(void)
 
 	if (gethrtime_hires) {
 		hrtime_t start, end;
-		start = end =  gethrtime();
+
+		/*
+		 * This can be called from polled contexts which must make
+		 * progress even if hres_lock is never going to be released, so
+		 * it must not use the spinning gethrtime().
+		 */
+		start = end = gethrtime_waitfree();
 		while ((end - start) < (10 * (NANOSEC / MICROSEC))) {
 			SMT_PAUSE();
-			end = gethrtime();
+			end = gethrtime_waitfree();
 		}
 	} else {
 #if defined(__xpv)

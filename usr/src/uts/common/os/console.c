@@ -22,6 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -32,7 +34,6 @@
 #include <sys/consdev.h>
 #include <sys/promif.h>
 #include <sys/note.h>
-#include <sys/polled_io.h>
 #include <sys/systm.h>
 #include <sys/file.h>
 #include <sys/conf.h>
@@ -63,6 +64,33 @@ taskq_t *console_taskq;
  * The current set of polled I/O routines (if any)
  */
 struct cons_polledio *cons_polledio;
+
+/*
+ * Ask the console driver to prepare for polled use by the debugger or by
+ * panic, and to undo that afterwards. These may be called with the system in
+ * an arbitrary state, including from the debugger with every other CPU
+ * stopped, so the driver hooks behind them must not take any locks nor
+ * depend on any other kernel service.
+ */
+void
+console_polled_enter(void)
+{
+	if (cons_polledio != NULL &&
+	    cons_polledio->cons_polledio_enter != NULL) {
+		cons_polledio->cons_polledio_enter(
+		    cons_polledio->cons_polledio_argument);
+	}
+}
+
+void
+console_polled_exit(void)
+{
+	if (cons_polledio != NULL &&
+	    cons_polledio->cons_polledio_exit != NULL) {
+		cons_polledio->cons_polledio_exit(
+		    cons_polledio->cons_polledio_argument);
+	}
+}
 
 /*
  * Console I/O Routines

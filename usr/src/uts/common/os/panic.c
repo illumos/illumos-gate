@@ -25,6 +25,7 @@
 /*
  * Copyright (c) 2011, Joyent, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -147,6 +148,7 @@
 #include <sys/panic.h>
 #include <sys/fm/util.h>
 #include <sys/clock_impl.h>
+#include <sys/consdev.h>
 #include <sys/sunddi.h>
 
 /*
@@ -304,6 +306,16 @@ panicsys(const char *format, va_list alist, struct regs *rp, int on_panic_stack)
 			panic_cpu.cpu_intr_stack = intr_stack;
 			panic_cpu.cpu_intr_actv = intr_actv;
 		}
+
+		/*
+		 * From here on, the banner, the stack trace, and the dump all
+		 * use polled console I/O, so give the console driver the
+		 * chance to make itself ready. This is done only now that the
+		 * other CPUs are stopped and panicstr is set, so the driver's
+		 * hook can neither race the driver on another CPU nor block on
+		 * a lock. There is no matching exit; we are not coming back.
+		 */
+		console_polled_enter();
 
 		/*
 		 * Lower ipl to 10 to keep clock() from running, but allow

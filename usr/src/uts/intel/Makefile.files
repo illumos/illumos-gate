@@ -55,7 +55,6 @@ CORE_OBJS +=		\
 	lock_prim.o	\
 	ovbcopy.o	\
 	pic.o		\
-	polled_io.o	\
 	retpoline.o	\
 	sseblk.o	\
 	sundep.o	\
