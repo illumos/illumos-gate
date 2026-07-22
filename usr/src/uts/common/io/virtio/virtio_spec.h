@@ -12,7 +12,7 @@
 /*
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _VIRTIO_SPEC_H
@@ -237,6 +237,7 @@ struct virtio_vq_device {
  */
 #define	VIRTIO_F_ANY_LAYOUT		(1ULL << 27)	/* Legacy only */
 #define	VIRTIO_F_RING_INDIRECT_DESC	(1ULL << 28)
+#define	VIRTIO_F_RING_EVENT_IDX		(1ULL << 29)
 #define	VIRTIO_F_VERSION_1		(1ULL << 32)
 
 /*

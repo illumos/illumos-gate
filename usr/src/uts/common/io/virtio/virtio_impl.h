@@ -12,7 +12,7 @@
 /*
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _VIRTIO_IMPL_H
@@ -181,6 +181,22 @@ struct virtio_queue {
 	uint_t				viq_max_segs;
 
 	/*
+	 * Set when VIRTIO_F_RING_EVENT_IDX was negotiated for the device, in
+	 * which case interrupt suppression and device notification decisions
+	 * use the "used_event" and "avail_event" ring entries rather than the
+	 * suppression flags.
+	 */
+	boolean_t			viq_event_idx;
+
+	/*
+	 * The most recent interrupt disposition requested by the client
+	 * driver, protected by "viq_mutex". With the event index mechanism
+	 * this is needed when returned chains are collected, to decide
+	 * whether to request an event for the next chain.
+	 */
+	boolean_t			viq_no_interrupt;
+
+	/*
 	 * Each Virtio device type has some set of queues for data transfer to
 	 * and from the host.  This index is described in the specification for
 	 * the particular device and queue type, and written to QUEUE_SELECT to
@@ -262,6 +278,15 @@ struct virtio_chain {
  */
 
 /*
+ * The offset of the device-owned portion within the queue DMA allocation,
+ * which also serves as the length of the driver-owned portion that precedes
+ * it.
+ */
+#define	VIRTQ_DMA_DEVICE_OFFSET(viq)	\
+					((uintptr_t)(viq)->viq_dma_device - \
+					(uintptr_t)(viq)->viq_dma_descs)
+
+/*
  * Synchronise the driver-owned portion of the queue so that the device can see
  * our writes.  This covers the memory accessed via the "viq_dma_descs" and
  * "viq_dma_driver" members.
@@ -269,8 +294,7 @@ struct virtio_chain {
 #define	VIRTQ_DMA_SYNC_FORDEV(viq)	VERIFY0(ddi_dma_sync( \
 					    (viq)->viq_dma.vidma_dma_handle, \
 					    0, \
-					    (uintptr_t)(viq)->viq_dma_device - \
-					    (uintptr_t)(viq)->viq_dma_descs, \
+					    VIRTQ_DMA_DEVICE_OFFSET(viq), \
 					    DDI_DMA_SYNC_FORDEV))
 
 /*
@@ -280,11 +304,9 @@ struct virtio_chain {
  */
 #define	VIRTQ_DMA_SYNC_FORKERNEL(viq)	VERIFY0(ddi_dma_sync( \
 					    (viq)->viq_dma.vidma_dma_handle, \
-					    (uintptr_t)(viq)->viq_dma_device - \
-					    (uintptr_t)(viq)->viq_dma_descs, \
+					    VIRTQ_DMA_DEVICE_OFFSET(viq), \
 					    (viq)->viq_dma.vidma_size - \
-					    (uintptr_t)(viq)->viq_dma_device - \
-					    (uintptr_t)(viq)->viq_dma_descs, \
+					    VIRTQ_DMA_DEVICE_OFFSET(viq), \
 					    DDI_DMA_SYNC_FORKERNEL))
 
 #ifdef __cplusplus

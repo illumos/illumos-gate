@@ -55,7 +55,7 @@
  *
  * The framework will additionally negotiate some set of features that are not
  * specific to a device type on behalf of the client driver; e.g., support for
- * indirect descriptors.
+ * indirect descriptors and the ring event index notification mechanism.
  *
  * Some features allow the driver to read additional configuration values from
  * the device-specific regions of the device register space.  These can be
@@ -184,14 +184,22 @@
  * framework will insert an appropriate memory barrier to ensure that writes by
  * the host are complete before returning the chain to the client driver.
  *
- * The NO_INTERRUPT flag on a queue may be set or cleared with
- * virtio_queue_no_interrupt().  Note that this flag is purely advisory, and
+ * A single interrupt may cover several returned chains. In particular, when
+ * the ring event index feature is in use, no further interrupt is generated
+ * for chains the device returns while earlier ones remain uncollected. On
+ * each queue interrupt the driver must therefore call virtio_queue_poll()
+ * repeatedly until it returns NULL.
+ *
+ * Interrupts from a queue may be suppressed or re-enabled with
+ * virtio_queue_no_interrupt().  This is implemented with the ring event index
+ * mechanism when that feature was negotiated with the device, and with the
+ * NO_INTERRUPT flag otherwise.  Note that suppression is purely advisory, and
  * may not actually stop interrupts from the device in a timely fashion.
- * Additionally, the device consults the flag only at the moment it returns a
- * chain, i.e. clearing the flag does not produce an interrupt for chains that
- * were returned while it was set. After clearing the flag, a driver can call
- * virtio_queue_pending() to discover whether returned chains are waiting to be
- * collected with virtio_queue_poll().
+ * Additionally, the device makes the decision only at the moment it returns a
+ * chain, i.e. re-enabling interrupts does not produce an interrupt for chains
+ * that were returned while they were suppressed. After re-enabling interrupts,
+ * a driver can call virtio_queue_pending() to discover whether returned chains
+ * are waiting to be collected with virtio_queue_poll().
  *
  * INTERRUPT MANAGEMENT
  *
