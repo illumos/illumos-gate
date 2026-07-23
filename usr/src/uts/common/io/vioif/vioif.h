@@ -330,12 +330,12 @@ struct virtio_net_ctrl_mq {
 #define	VIOIF_MAX_QPAIRS		8
 
 /*
- * The control queue has a single buffer, which also serves to serialise
- * control queue requests. Increasing this value requires the request path
- * to be reworked first. With more than one request outstanding, a caller
- * polling for completion could otherwise collect another caller's response.
+ * The number of buffers allocated for control queue requests. Each request
+ * occupies one buffer until its response arrives. Responses are routed back
+ * to the buffer used to submit the request, so several requests may be
+ * outstanding at once and responses may be collected in any order.
  */
-#define	VIRTIO_NET_CTRL_BUFS		1
+#define	VIRTIO_NET_CTRL_BUFS		4
 
 /*
  * The virtio net header and the first buffer segment share the same DMA
@@ -419,11 +419,31 @@ typedef struct vioif_rxbuf {
 	list_node_t			rb_link;
 } vioif_rxbuf_t;
 
+/*
+ * The stages of a control queue request's life, tracked in the buffer used
+ * to submit it. A buffer moves from FREE to ACTIVE when it is allocated
+ * for a request. Collecting its response from the device moves the buffer
+ * to DONE, and the submitter then reads the result and frees it. A
+ * submitter that gives up waiting for a response moves the buffer to
+ * ABANDONED instead. Ownership of an abandoned buffer rests with the
+ * device and is recovered when the response eventually arrives, or
+ * once the device has been reset during teardown.
+ */
+typedef enum vioif_ctrlbuf_state {
+	VIOIF_CTRLBUF_FREE = 1,
+	VIOIF_CTRLBUF_ACTIVE,
+	VIOIF_CTRLBUF_DONE,
+	VIOIF_CTRLBUF_ABANDONED
+} vioif_ctrlbuf_state_t;
+
 typedef struct vioif_ctrlbuf {
 	vioif_t				*cb_vioif;
+	vioif_ctrlbuf_state_t		cb_state;
 
 	virtio_dma_t			*cb_dma;
 	virtio_chain_t			*cb_chain;
+
+	uint8_t				*cb_ack;
 
 	list_node_t			cb_link;
 } vioif_ctrlbuf_t;
@@ -654,11 +674,23 @@ struct vioif {
 
 	list_t				vif_ctrlbufs;
 	uint_t				vif_nctrlbufs_alloc;
+	uint_t				vif_nctrlbufs_abandoned;
 	uint_t				vif_ctrlbufs_capacity;
 	vioif_ctrlbuf_t			*vif_ctrlbufs_mem;
 
+	/*
+	 * Signalled when a control queue response is collected and when a
+	 * control buffer is returned to the free list. Since a single wakeup
+	 * could be consumed by a waiter whose condition has not been met,
+	 * wakeups must be broadcast. The pool size bounds the number of
+	 * waiters.
+	 */
+	kcondvar_t			vif_ctrlq_cv;
+
 	uint64_t			vif_noctrlbuf;
 	uint64_t			vif_ctrlbuf_toosmall;
+	uint64_t			vif_ctrlq_abandoned;
+	uint64_t			vif_ctrlq_recovered;
 };
 
 /*

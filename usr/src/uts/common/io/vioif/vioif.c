@@ -376,20 +376,6 @@ static char *vioif_priv_props[] = {
 };
 
 
-static vioif_ctrlbuf_t *
-vioif_ctrlbuf_alloc(vioif_t *vif)
-{
-	vioif_ctrlbuf_t *cb;
-
-	VERIFY(MUTEX_HELD(&vif->vif_mutex));
-
-	if ((cb = list_remove_head(&vif->vif_ctrlbufs)) != NULL) {
-		vif->vif_nctrlbufs_alloc++;
-	}
-
-	return (cb);
-}
-
 static void
 vioif_ctrlbuf_free(vioif_t *vif, vioif_ctrlbuf_t *cb)
 {
@@ -398,8 +384,128 @@ vioif_ctrlbuf_free(vioif_t *vif, vioif_ctrlbuf_t *cb)
 	VERIFY3U(vif->vif_nctrlbufs_alloc, >, 0);
 	vif->vif_nctrlbufs_alloc--;
 
+	if (cb->cb_state == VIOIF_CTRLBUF_ABANDONED) {
+		VERIFY3U(vif->vif_nctrlbufs_abandoned, >, 0);
+		vif->vif_nctrlbufs_abandoned--;
+	}
+
 	virtio_chain_clear(cb->cb_chain);
+	cb->cb_state = VIOIF_CTRLBUF_FREE;
 	list_insert_head(&vif->vif_ctrlbufs, cb);
+
+	/*
+	 * Wake any request that is waiting for a free buffer. Wakeups must
+	 * be broadcast; see the notes for "vif_ctrlq_cv".
+	 */
+	cv_broadcast(&vif->vif_ctrlq_cv);
+}
+
+/*
+ * Collect any responses that the device has returned on the control queue.
+ * Buffers whose requests were abandoned by their submitter are returned to
+ * the free pool. Returns true if any response was collected.
+ */
+static bool
+vioif_ctrlq_collect(vioif_t *vif)
+{
+	virtio_chain_t *vic;
+	bool collected = false;
+
+	VERIFY(MUTEX_HELD(&vif->vif_mutex));
+
+	while ((vic = virtio_queue_poll(vif->vif_ctrl_vq)) != NULL) {
+		vioif_ctrlbuf_t *cb = virtio_chain_data(vic);
+
+		switch (cb->cb_state) {
+		case VIOIF_CTRLBUF_ACTIVE:
+			/*
+			 * The submitter is waiting for this response, and will
+			 * read the result and free the buffer.
+			 */
+			cb->cb_state = VIOIF_CTRLBUF_DONE;
+			break;
+		case VIOIF_CTRLBUF_ABANDONED: {
+			const struct virtio_net_ctrlq_hdr *hdr =
+			    virtio_dma_va(cb->cb_dma, 0);
+			uint8_t class, command, status;
+
+			/*
+			 * The submitter gave up waiting for this response and
+			 * has already reported failure, but the command may
+			 * still have taken effect.
+			 */
+			virtio_dma_sync(cb->cb_dma, DDI_DMA_SYNC_FORCPU);
+			class = hdr->vnch_class;
+			command = hdr->vnch_command;
+			status = *cb->cb_ack;
+			vif->vif_ctrlq_recovered++;
+			vioif_ctrlbuf_free(vif, cb);
+
+			dev_err(vif->vif_dip, CE_WARN, "!belated control "
+			    "queue response (class %u, command %u, status %u)",
+			    (uint_t)class, (uint_t)command, (uint_t)status);
+			break;
+		}
+		default:
+			panic("control queue buffer in unexpected state %d",
+			    cb->cb_state);
+		}
+		collected = true;
+	}
+
+	/*
+	 * Wake the submitters of the collected responses. Wakeups must be
+	 * broadcast; see the notes for "vif_ctrlq_cv".
+	 */
+	if (collected)
+		cv_broadcast(&vif->vif_ctrlq_cv);
+
+	return (collected);
+}
+
+/*
+ * Allocate a buffer for a control queue request, waiting until no later
+ * than "deadline" for one to become free. Returns NULL if the deadline
+ * passes with every buffer still occupied.
+ */
+static vioif_ctrlbuf_t *
+vioif_ctrlbuf_alloc(vioif_t *vif, hrtime_t deadline)
+{
+	vioif_ctrlbuf_t *cb;
+
+	VERIFY(MUTEX_HELD(&vif->vif_mutex));
+
+	while ((cb = list_remove_head(&vif->vif_ctrlbufs)) == NULL) {
+		if (gethrtime() > deadline)
+			return (NULL);
+
+		/*
+		 * No buffer is free. The device may have responses that have
+		 * not yet been collected, including for requests that were
+		 * abandoned after a timeout. Collecting them may replenish
+		 * the pool.
+		 */
+		if (vioif_ctrlq_collect(vif))
+			continue;
+
+		/*
+		 * If every buffer is held by an abandoned request then each
+		 * of those requests already waited out its full timeout
+		 * without the device returning a single buffer. Treat the
+		 * device as wedged. If it comes back the collection above
+		 * will reap the late responses.
+		 */
+		if (vif->vif_nctrlbufs_abandoned == vif->vif_ctrlbufs_capacity)
+			return (NULL);
+
+		(void) cv_reltimedwait(&vif->vif_ctrlq_cv, &vif->vif_mutex,
+		    drv_usectohz(1000), TR_CLOCK_TICK);
+	}
+
+	vif->vif_nctrlbufs_alloc++;
+	cb->cb_state = VIOIF_CTRLBUF_ACTIVE;
+
+	return (cb);
 }
 
 static void
@@ -447,15 +553,25 @@ vioif_alloc_ctrl_bufs(vioif_t *vif)
 	if (!vif->vif_has_ctrlq)
 		return (0);
 
+	/*
+	 * Each request occupies three ring descriptors - one each for the
+	 * header, the data and the ack byte. Size the pool so that every
+	 * buffer can hold its descriptors at once, even when the queue does
+	 * not use indirect descriptors.
+	 */
 	vif->vif_ctrlbufs_capacity = MIN(VIRTIO_NET_CTRL_BUFS,
-	    virtio_queue_size(vif->vif_ctrl_vq));
+	    MAX(virtio_queue_size(vif->vif_ctrl_vq) / 3, 1));
 	vif->vif_ctrlbufs_mem = kmem_zalloc(
 	    sizeof (vioif_ctrlbuf_t) * vif->vif_ctrlbufs_capacity, KM_SLEEP);
 	list_create(&vif->vif_ctrlbufs, sizeof (vioif_ctrlbuf_t),
 	    offsetof(vioif_ctrlbuf_t, cb_link));
 
 	for (uint_t i = 0; i < vif->vif_ctrlbufs_capacity; i++) {
-		list_insert_tail(&vif->vif_ctrlbufs, &vif->vif_ctrlbufs_mem[i]);
+		vioif_ctrlbuf_t *cb = &vif->vif_ctrlbufs_mem[i];
+
+		cb->cb_vioif = vif;
+		cb->cb_state = VIOIF_CTRLBUF_FREE;
+		list_insert_tail(&vif->vif_ctrlbufs, cb);
 	}
 
 	/*
@@ -505,23 +621,17 @@ fail:
 }
 
 /*
- * Submit a request on the control queue and spin awaiting its completion.
- * Returns 0 on success; EBUSY if no request buffer is available, which
- * includes the case where an earlier request timed out; EIO if the request
- * could not be constructed or the device rejected it; and ETIMEDOUT if the
- * device did not respond within "vioif_ctrlq_timeout_ms".
- *
- * The buffer pool intentionally contains a single entry
- * (VIRTIO_NET_CTRL_BUFS), which also serialises requests. Only one request
- * can be outstanding at a time, so the response collected in the wait loop
- * below can only belong to this request.
+ * Submit a request on the control queue and await its completion. Returns 0
+ * on success. Returns EBUSY if no request buffer became available within the
+ * timeout, EIO if the request could not be constructed or the device
+ * rejected it, and ETIMEDOUT if the device did not respond in time. The
+ * "vioif_ctrlq_timeout_ms" budget covers the request as a whole.
  */
 static int
 vioif_ctrlq_req(vioif_t *vif, uint8_t class, uint8_t cmd, void *data,
     size_t datalen)
 {
 	vioif_ctrlbuf_t *cb = NULL;
-	virtio_chain_t *vic = NULL;
 	uint8_t *p = NULL;
 	uint64_t pa = 0;
 	uint8_t *ackp = NULL;
@@ -540,10 +650,25 @@ vioif_ctrlq_req(vioif_t *vif, uint8_t class, uint8_t cmd, void *data,
 	 */
 	VERIFY(vif->vif_has_ctrlq);
 
+	const hrtime_t deadline = gethrtime() +
+	    MSEC2NSEC(vioif_ctrlq_timeout_ms);
+
 	mutex_enter(&vif->vif_mutex);
-	cb = vioif_ctrlbuf_alloc(vif);
+	cb = vioif_ctrlbuf_alloc(vif, deadline);
 	if (cb == NULL) {
 		vif->vif_noctrlbuf++;
+		mutex_exit(&vif->vif_mutex);
+		return (EBUSY);
+	}
+
+	if (gethrtime() > deadline) {
+		/*
+		 * Waiting for the buffer consumed the whole budget. Fail now
+		 * rather than submit a request that the device would be given
+		 * no time to answer.
+		 */
+		vif->vif_noctrlbuf++;
+		vioif_ctrlbuf_free(vif, cb);
 		mutex_exit(&vif->vif_mutex);
 		return (EBUSY);
 	}
@@ -605,6 +730,7 @@ vioif_ctrlq_req(vioif_t *vif, uint8_t class, uint8_t cmd, void *data,
 	 * the ack byte. Just add a descriptor for that spot.
 	 */
 	ackp = virtio_dma_va(cb->cb_dma, hdrlen + datalen);
+	cb->cb_ack = ackp;
 	if (virtio_chain_append(cb->cb_chain,
 	    pa + hdrlen + datalen, acklen,
 	    VIRTIO_DIR_DEVICE_WRITES) != DDI_SUCCESS) {
@@ -616,42 +742,41 @@ vioif_ctrlq_req(vioif_t *vif, uint8_t class, uint8_t cmd, void *data,
 	virtio_chain_submit(cb->cb_chain, B_TRUE);
 
 	/*
-	 * Spin waiting for the response, for up to
-	 * "vioif_ctrlq_timeout_ms" milliseconds.
+	 * The control queue has no interrupt handler, so wait for the
+	 * response by polling periodically. Responses for other requests may
+	 * arrive first. Each response is routed to the buffer associated with
+	 * the request, and whichever caller collects a response wakes the
+	 * waiting submitter.
 	 */
-	const hrtime_t deadline = gethrtime() +
-	    MSEC2NSEC(vioif_ctrlq_timeout_ms);
-
 	mutex_enter(&vif->vif_mutex);
-	while ((vic = virtio_queue_poll(vif->vif_ctrl_vq)) == NULL) {
+	while (cb->cb_state != VIOIF_CTRLBUF_DONE) {
+		(void) vioif_ctrlq_collect(vif);
+		if (cb->cb_state == VIOIF_CTRLBUF_DONE)
+			break;
+
 		if (gethrtime() > deadline) {
+			/*
+			 * The device has not responded, and the buffer cannot
+			 * be revoked. Mark it as abandoned so that it is
+			 * recovered if the response eventually arrives, or
+			 * otherwise once the device has been reset during
+			 * teardown.
+			 */
+			cb->cb_state = VIOIF_CTRLBUF_ABANDONED;
+			vif->vif_nctrlbufs_abandoned++;
+			vif->vif_ctrlq_abandoned++;
 			mutex_exit(&vif->vif_mutex);
 			dev_err(vif->vif_dip, CE_WARN, "!control queue "
 			    "request (class %u, command %u) timed out",
 			    (uint_t)class, (uint_t)cmd);
-
-			/*
-			 * The buffer has been submitted to the device and
-			 * there is no way to revoke it, so it cannot be
-			 * returned to the free list. It is recovered once
-			 * the device has been reset during detach. Until
-			 * then, with the buffer pool exhausted, further
-			 * control queue requests fail with EBUSY.
-			 */
 			return (ETIMEDOUT);
 		}
-		mutex_exit(&vif->vif_mutex);
-		delay(drv_usectohz(1000));
-		mutex_enter(&vif->vif_mutex);
+
+		(void) cv_reltimedwait(&vif->vif_ctrlq_cv, &vif->vif_mutex,
+		    drv_usectohz(1000), TR_CLOCK_TICK);
 	}
 
 	virtio_dma_sync(cb->cb_dma, DDI_DMA_SYNC_FORCPU);
-
-	/*
-	 * The single-entry buffer pool serialises requests, so the completion
-	 * collected above can only be for this request.
-	 */
-	VERIFY3P(virtio_chain_data(vic), ==, cb);
 	mutex_exit(&vif->vif_mutex);
 
 	if (*ackp != VIRTIO_NET_CQ_OK) {
@@ -1656,6 +1781,7 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	mutex_init(&vif->vif_mutex, NULL, MUTEX_DRIVER, virtio_intr_pri(vio));
+	cv_init(&vif->vif_ctrlq_cv, NULL, CV_DRIVER, NULL);
 	for (uint_t i = 0; i < vif->vif_nqpairs_alloc; i++) {
 		mutex_init(&vif->vif_rxqs[i].vrq_mutex, NULL, MUTEX_DRIVER,
 		    virtio_intr_pri(vio));
@@ -1765,10 +1891,14 @@ fail_shutdown:
 	mutex_enter(&vif->vif_mutex);
 	for (;;) {
 		virtio_chain_t *vic;
+		vioif_ctrlbuf_t *cb;
 
 		if ((vic = virtio_queue_evacuate(vif->vif_ctrl_vq)) == NULL)
 			break;
-		vioif_ctrlbuf_free(vif, virtio_chain_data(vic));
+
+		cb = virtio_chain_data(vic);
+		VERIFY3S(cb->cb_state, ==, VIOIF_CTRLBUF_ABANDONED);
+		vioif_ctrlbuf_free(vif, cb);
 	}
 	mutex_exit(&vif->vif_mutex);
 
@@ -1789,6 +1919,7 @@ fail:
 			mutex_destroy(&vif->vif_rxqs[i].vrq_mutex);
 			mutex_destroy(&vif->vif_txqs[i].vtq_mutex);
 		}
+		cv_destroy(&vif->vif_ctrlq_cv);
 		mutex_destroy(&vif->vif_mutex);
 	}
 	kmem_free(vif->vif_rxqs,
@@ -1901,7 +2032,10 @@ vioif_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		mutex_enter(&vif->vif_mutex);
 		while ((vic = virtio_queue_evacuate(vif->vif_ctrl_vq)) !=
 		    NULL) {
-			vioif_ctrlbuf_free(vif, virtio_chain_data(vic));
+			vioif_ctrlbuf_t *cb = virtio_chain_data(vic);
+
+			VERIFY3S(cb->cb_state, ==, VIOIF_CTRLBUF_ABANDONED);
+			vioif_ctrlbuf_free(vif, cb);
 		}
 		mutex_exit(&vif->vif_mutex);
 	}
@@ -1918,6 +2052,7 @@ vioif_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		mutex_destroy(&vif->vif_rxqs[i].vrq_mutex);
 		mutex_destroy(&vif->vif_txqs[i].vtq_mutex);
 	}
+	cv_destroy(&vif->vif_ctrlq_cv);
 	mutex_destroy(&vif->vif_mutex);
 
 	kmem_free(vif->vif_rxqs,
