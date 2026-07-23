@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -148,6 +149,7 @@
 #include <sys/swap.h>
 #include <sys/synch.h>
 #include <sys/systm.h>
+#include <sys/uio.h>
 #include <sys/var.h>
 #include <sys/vm_usage.h>
 #include <sys/zone.h>
@@ -773,7 +775,7 @@ vmu_insert_lookup_object_bounds(vmu_object_t *ro, pgcnt_t start, pgcnt_t
  * tree: avl_tree in which first and last hang.
  *
  * first, last:	list of continuous bounds, of which zero or more are of
- * 		type VMUSAGE_BOUND_UNKNOWN.
+ *		type VMUSAGE_BOUND_UNKNOWN.
  *
  * new_tree: avl_tree in which new_first and new_last hang.
  *
@@ -790,7 +792,7 @@ vmu_insert_lookup_object_bounds(vmu_object_t *ro, pgcnt_t start, pgcnt_t
  * (new_first, new_last), it will be split into multiple bounds.
  *
  * Return value:
- * 	The number of pages in the list of bounds (first,last) that were of
+ *	The number of pages in the list of bounds (first,last) that were of
  *	type VMUSAGE_BOUND_UNKNOWN, which have been updated to be of type
  *	VMUSAGE_BOUND_INCORE.
  *
@@ -1747,7 +1749,7 @@ vmu_cache_rele(vmu_cache_t *cache)
  */
 static int
 vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
-    uint_t flags, int cpflg)
+    uint_t flags, uio_seg_t seg)
 {
 	vmusage_t *result, *out_result;
 	vmusage_t dummy;
@@ -1757,7 +1759,7 @@ vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
 	uint_t types = 0;
 
 	if (nres != NULL) {
-		if (ddi_copyin((caddr_t)nres, &bufsize, sizeof (size_t), cpflg))
+		if (uio_copyin(nres, &bufsize, sizeof (size_t), seg) != 0)
 			return (set_errno(EFAULT));
 	} else {
 		bufsize = 0;
@@ -1804,8 +1806,8 @@ vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
 					dummy.vmu_zoneid = ALL_ZONES;
 					dummy.vmu_id = 0;
 					dummy.vmu_type = VMUSAGE_SYSTEM;
-					if (ddi_copyout(&dummy, out_result,
-					    sizeof (vmusage_t), cpflg))
+					if (uio_copyout(&dummy, out_result,
+					    sizeof (vmusage_t), seg) != 0)
 						return (set_errno(EFAULT));
 					out_result++;
 				}
@@ -1855,15 +1857,15 @@ vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
 			if (bufsize < count) {
 				ret = set_errno(EOVERFLOW);
 			} else {
-				if (ddi_copyout(result, out_result,
-				    sizeof (vmusage_t), cpflg))
+				if (uio_copyout(result, out_result,
+				    sizeof (vmusage_t), seg) != 0)
 					return (set_errno(EFAULT));
 				out_result++;
 			}
 		}
 	}
 	if (nres != NULL)
-		if (ddi_copyout(&count, (void *)nres, sizeof (size_t), cpflg))
+		if (uio_copyout(&count, nres, sizeof (size_t), seg) != 0)
 			return (set_errno(EFAULT));
 
 	return (ret);
@@ -1888,6 +1890,8 @@ vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
  *		before calling vm_getusage().
  *		On return 0 (success) or ENOSPC, is set to the number of result
  *		structures returned or attempted to return.
+ *	seg:	address space in which buf and nres reside, either
+ *		UIO_USERSPACE or UIO_SYSSPACE.
  *
  * returns 0 on success, -1 on failure:
  *	EINTR (interrupted)
@@ -1896,7 +1900,8 @@ vmu_copyout_results(vmu_cache_t *cache, vmusage_t *buf, size_t *nres,
  *	EFAULT (bad address for buf or nres)
  */
 int
-vm_getusage(uint_t flags, time_t age, vmusage_t *buf, size_t *nres, int cpflg)
+vm_getusage(uint_t flags, time_t age, vmusage_t *buf, size_t *nres,
+    uio_seg_t seg)
 {
 	vmu_entity_t *entity;
 	vmusage_t *result;
@@ -1956,7 +1961,7 @@ start:
 			mutex_exit(&vmu_data.vmu_lock);
 
 			ret = vmu_copyout_results(cache, buf, nres, flags_orig,
-			    cpflg);
+			    seg);
 			mutex_enter(&vmu_data.vmu_lock);
 			vmu_cache_rele(cache);
 			if (vmu_data.vmu_pending_waiters > 0)
@@ -2013,7 +2018,7 @@ start:
 		mutex_exit(&vmu_data.vmu_lock);
 
 		/* copy cache */
-		ret = vmu_copyout_results(cache, buf, nres, flags_orig, cpflg);
+		ret = vmu_copyout_results(cache, buf, nres, flags_orig, seg);
 		mutex_enter(&vmu_data.vmu_lock);
 		vmu_cache_rele(cache);
 		mutex_exit(&vmu_data.vmu_lock);

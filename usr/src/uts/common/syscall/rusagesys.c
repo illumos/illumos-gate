@@ -21,6 +21,7 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -32,6 +33,7 @@
 #include <sys/time.h>
 #include <sys/errno.h>
 #include <sys/resource.h>
+#include <sys/uio.h>
 #include <sys/vm_usage.h>
 
 static int
@@ -256,7 +258,7 @@ rusagesys(int code, void *arg1, void *arg2, void *arg3, void *arg4)
 		return (getrusage_lwp(arg1));
 	case _RUSAGESYS_GETVMUSAGE:
 		return (vm_getusage((uint_t)(uintptr_t)arg1, (time_t)arg2,
-		    (vmusage_t *)arg3, (size_t *)arg4, 0));
+		    (vmusage_t *)arg3, (size_t *)arg4, UIO_USERSPACE));
 	default:
 		return (set_errno(EINVAL));
 	}

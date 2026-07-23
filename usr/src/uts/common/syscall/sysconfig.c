@@ -23,6 +23,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2016 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -45,6 +46,7 @@
 #include <sys/cpuvar.h>
 #include <sys/mman.h>
 #include <sys/timer.h>
+#include <sys/uio.h>
 #include <sys/zone.h>
 #include <sys/vm_usage.h>
 #include <vm/as.h>
@@ -199,7 +201,7 @@ sysconfig(int which)
 				return (freemem);
 
 			if (vm_getusage(VMUSAGE_ZONE, 1, &in_use, &cnt,
-			    FKIOCTL) != 0)
+			    UIO_SYSSPACE) != 0)
 				in_use.vmu_rss_all = 0;
 			rss = btop(in_use.vmu_rss_all);
 			/*
