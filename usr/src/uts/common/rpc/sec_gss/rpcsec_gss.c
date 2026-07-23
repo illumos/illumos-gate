@@ -45,35 +45,6 @@
 #include  <sys/cmn_err.h>
 #include  <sys/ddi.h>
 
-static	void	rpc_gss_nextverf();
-static	bool_t	rpc_gss_marshall();
-static	bool_t	rpc_gss_validate();
-static	bool_t	rpc_gss_refresh();
-static	void	rpc_gss_destroy();
-#if 0
-static	void	rpc_gss_destroy_pvt();
-#endif
-static	void	rpc_gss_free_pvt();
-static	int	rpc_gss_seccreate_pvt();
-static  bool_t	rpc_gss_wrap();
-static  bool_t	rpc_gss_unwrap();
-static	bool_t	validate_seqwin();
-
-
-#ifdef	DEBUG
-#include <sys/promif.h>
-#endif
-
-static struct auth_ops rpc_gss_ops = {
-	rpc_gss_nextverf,
-	rpc_gss_marshall,
-	rpc_gss_validate,
-	rpc_gss_refresh,
-	rpc_gss_destroy,
-	rpc_gss_wrap,
-	rpc_gss_unwrap,
-};
-
 /*
  * Private data for RPCSEC_GSS.
  */
@@ -99,6 +70,37 @@ typedef struct _rpc_gss_data {
 	gss_channel_bindings_t	icb;
 } rpc_gss_data;
 #define	AUTH_PRIVATE(auth)	((rpc_gss_data *)auth->ah_private)
+
+static	void	rpc_gss_nextverf(AUTH *);
+static	bool_t	rpc_gss_marshal(AUTH *, XDR *, cred_t *);
+static	bool_t	rpc_gss_validate(AUTH *, struct opaque_auth *);
+static	bool_t	rpc_gss_refresh(AUTH *, struct rpc_msg *, cred_t *);
+static	void	rpc_gss_destroy(AUTH *);
+#if 0
+static	void	rpc_gss_destroy_pvt(AUTH *);
+#endif
+static	void	rpc_gss_free_pvt(AUTH *);
+static	int	rpc_gss_seccreate_pvt(OM_uint32 *, OM_uint32 *, AUTH *,
+    rpc_gss_data *, gss_OID, gss_OID *, int *, OM_uint32 *, cred_t *, int);
+static  bool_t	rpc_gss_wrap(AUTH *, caddr_t, uint_t,
+    XDR *, xdrproc_t, caddr_t);
+static  bool_t	rpc_gss_unwrap(AUTH *, XDR *, xdrproc_t, caddr_t);
+static	bool_t	validate_seqwin();
+
+
+#ifdef	DEBUG
+#include <sys/promif.h>
+#endif
+
+static struct auth_ops rpc_gss_ops = {
+	.ah_nextverf = rpc_gss_nextverf,
+	.ah_marshal = rpc_gss_marshal,
+	.ah_validate = rpc_gss_validate,
+	.ah_refresh = rpc_gss_refresh,
+	.ah_destroy = rpc_gss_destroy,
+	.ah_wrap = rpc_gss_wrap,
+	.ah_unwrap = rpc_gss_unwrap,
+};
 
 #define	INTERRUPT_OK	1	/* allow interrupt */
 
@@ -256,16 +258,11 @@ gssauth_cache_reclaim(void *cdrarg)
  *  a new one by calling rpc_gss_seccreate().
  */
 int
-rpc_gss_secget(CLIENT *clnt,
-	char	*principal,
-	rpc_gss_OID	mechanism,
-	rpc_gss_service_t service_type,
-	uint_t	qop,
-	rpc_gss_options_req_t *options_req,
-	rpc_gss_options_ret_t *options_ret,
-	void *cache_key,
-	cred_t *cr,
-	AUTH **retauth)
+rpc_gss_secget(CLIENT *clnt, char *principal, rpc_gss_OID mechanism,
+    rpc_gss_service_t service_type, uint_t qop,
+    rpc_gss_options_req_t *options_req,
+    rpc_gss_options_ret_t *options_ret,
+    void *cache_key, cred_t *cr, AUTH **retauth)
 {
 	struct ga_cache_entry **head, *current, *new, *prev;
 	AUTH *auth = NULL;
@@ -303,8 +300,8 @@ rpc_gss_secget(CLIENT *clnt,
 		NOT_NULL(current);
 		IS_ALIGNED(current);
 		if ((cache_key == current->cache_key) &&
-			(uid == current->uid) && (zoneid == current->zoneid) &&
-			!current->in_use) {
+		    (uid == current->uid) && (zoneid == current->zoneid) &&
+		    !current->in_use) {
 			current->in_use = TRUE;
 			current->ref_time = gethrestime_sec();
 			ap = AUTH_PRIVATE(current->auth);
@@ -314,18 +311,18 @@ rpc_gss_secget(CLIENT *clnt,
 			    ((current->ctx_expired_time != GSS_C_INDEFINITE) &&
 			    (gethrestime_sec() >=
 			    current->ctx_expired_time))) {
-			    RPCGSS_LOG0(1, "NOTICE: rpc_gss_secget: time to "
-					"refresh the auth\n");
-			    if (prev == NULL) {
-				*head = current->next;
-			    } else {
-				prev->next = current->next;
-			    }
-			    rpc_gss_destroy(current->auth);
-			    kmem_cache_free(ga_cache_handle, (void *) current);
-			    auth = NULL;
+				RPCGSS_LOG0(1, "NOTICE: rpc_gss_secget: time "
+				    "to refresh the auth\n");
+				if (prev == NULL) {
+					*head = current->next;
+				} else {
+					prev->next = current->next;
+				}
+				rpc_gss_destroy(current->auth);
+				kmem_cache_free(ga_cache_handle, current);
+				auth = NULL;
 			} else {
-			    auth = current->auth;
+				auth = current->auth;
 			}
 			break;
 		} else {
@@ -344,10 +341,10 @@ rpc_gss_secget(CLIENT *clnt,
 			options_ret = &opt_ret;
 
 		status = rpc_gss_seccreate(clnt, principal, mechanism,
-			service_type, qop, options_req, options_ret, cr, &auth);
+		    service_type, qop, options_req, options_ret, cr, &auth);
 		if (status == 0) {
 			RPCGSS_LOG(2, "rpc_gss_secget: new auth %p\n",
-					(void *)auth);
+			    (void *)auth);
 			new = kmem_cache_alloc(ga_cache_handle, KM_NOSLEEP);
 			IS_ALIGNED(new);
 			NOT_DEAD(new);
@@ -358,10 +355,11 @@ rpc_gss_secget(CLIENT *clnt,
 				new->in_use = TRUE;
 				new->ref_time = gethrestime_sec();
 				if (options_ret->time_ret != GSS_C_INDEFINITE) {
-				    new->ctx_expired_time = new->ref_time +
-					options_ret->time_ret;
+					new->ctx_expired_time = new->ref_time +
+					    options_ret->time_ret;
 				} else {
-				    new->ctx_expired_time = GSS_C_INDEFINITE;
+					new->ctx_expired_time =
+					    GSS_C_INDEFINITE;
 				}
 				new->auth = auth;
 				rw_enter(&ga_cache_table_lock, RW_WRITER);
@@ -373,7 +371,8 @@ rpc_gss_secget(CLIENT *clnt,
 			}
 			/* done with opt_ret */
 			if (options_ret == &opt_ret) {
-			    kgss_free_oid((gss_OID) opt_ret.actual_mechanism);
+				kgss_free_oid(
+				    (gss_OID)opt_ret.actual_mechanism);
 			}
 		}
 	}
@@ -423,14 +422,14 @@ rpc_gss_secfree(AUTH *auth)
  */
 int
 rpc_gss_seccreate(CLIENT *clnt,
-	char			*principal,	/* target service@server */
-	rpc_gss_OID		mechanism,	/* security mechanism */
-	rpc_gss_service_t	service_type,	/* security service */
-	uint_t			qop,		/* requested QOP */
-	rpc_gss_options_req_t	*options_req,	/* requested options */
-	rpc_gss_options_ret_t	*options_ret,	/* returned options */
-	cred_t			*cr,		/* client's unix cred */
-	AUTH			**retauth)	/* auth handle */
+    char			*principal,	/* target service@server */
+    rpc_gss_OID			mechanism,	/* security mechanism */
+    rpc_gss_service_t		service_type,	/* security service */
+    uint_t			qop,		/* requested QOP */
+    rpc_gss_options_req_t	*options_req,	/* requested options */
+    rpc_gss_options_ret_t	*options_ret,	/* returned options */
+    cred_t			*cr,		/* client's unix cred */
+    AUTH			**retauth)	/* auth handle */
 {
 	OM_uint32		gssstat;
 	OM_uint32		minor_stat;
@@ -558,18 +557,10 @@ rpc_gss_seccreate(CLIENT *clnt,
  * that's invoked when the context has to be refreshed.
  */
 static int
-rpc_gss_seccreate_pvt(gssstat, minor_stat, auth, ap, desired_mech_type,
-			actual_mech_type, ret_flags, time_rec, cr, isrefresh)
-	OM_uint32		*gssstat;
-	OM_uint32		*minor_stat;
-	AUTH			*auth;
-	rpc_gss_data		*ap;
-	gss_OID			desired_mech_type;
-	gss_OID			*actual_mech_type;
-	int			*ret_flags;
-	OM_uint32		*time_rec;
-	cred_t			*cr;
-	int			isrefresh;
+rpc_gss_seccreate_pvt(OM_uint32 *gssstat, OM_uint32 *minor_stat,
+    AUTH *auth, rpc_gss_data *ap, gss_OID desired_mech_type,
+    gss_OID *actual_mech_type, int *ret_flags, OM_uint32 *time_rec,
+    cred_t *cr, int isrefresh)
 {
 	CLIENT			*clnt = ap->clnt;
 	AUTH			*save_auth;
@@ -611,19 +602,19 @@ rpc_gss_seccreate_pvt(gssstat, minor_stat, auth, ap, desired_mech_type,
 
 next_token:
 	*gssstat = kgss_init_sec_context(minor_stat,
-					ap->my_cred,
-					&ap->context,
-					ap->target_name,
-					desired_mech_type,
-					ap->req_flags,
-					ap->time_req,
-					NULL,
-					input_token_p,
-					actual_mech_type,
-					&call_arg,
-					ret_flags,
-					time_rec,
-					crgetuid(cr));
+	    ap->my_cred,
+	    &ap->context,
+	    ap->target_name,
+	    desired_mech_type,
+	    ap->req_flags,
+	    ap->time_req,
+	    NULL,
+	    input_token_p,
+	    actual_mech_type,
+	    &call_arg,
+	    ret_flags,
+	    time_rec,
+	    crgetuid(cr));
 
 	if (input_token_p != GSS_C_NO_BUFFER) {
 		OM_uint32 minor_stat2;
@@ -634,8 +625,8 @@ next_token:
 
 	if (*gssstat != GSS_S_COMPLETE && *gssstat != GSS_S_CONTINUE_NEEDED) {
 		rpc_gss_display_status(*gssstat, *minor_stat,
-			desired_mech_type, crgetuid(cr),
-			"rpcsec_gss_secreate_pvt:gss_init_sec_context");
+		    desired_mech_type, crgetuid(cr),
+		    "rpcsec_gss_secreate_pvt:gss_init_sec_context");
 		error = EACCES;
 		goto cleanup;
 	}
@@ -646,7 +637,7 @@ next_token:
 	if (call_arg.length != 0) {
 		struct timeval timeout = {30, 0};
 		int	 rpcsec_retry = isrefresh ?
-			RPCSEC_GSS_REFRESH_ATTEMPTS : 1;
+		    RPCSEC_GSS_REFRESH_ATTEMPTS : 1;
 		uint32_t oldxid;
 		uint32_t zeroxid = 0;
 
@@ -662,9 +653,9 @@ next_token:
 			sigintr(&smask, INTERRUPT_OK);
 
 			callstat = clnt_call(clnt, NULLPROC,
-				__xdr_rpc_gss_init_arg, (caddr_t)&call_arg,
-				__xdr_rpc_gss_init_res, (caddr_t)&call_res,
-				timeout);
+			    __xdr_rpc_gss_init_arg, (caddr_t)&call_arg,
+			    __xdr_rpc_gss_init_res, (caddr_t)&call_res,
+			    timeout);
 
 			sigunintr(&smask);
 
@@ -737,8 +728,8 @@ next_token:
 		if ((call_res.gss_major != GSS_S_COMPLETE) &&
 		    (call_res.gss_major != GSS_S_CONTINUE_NEEDED)) {
 			RPCGSS_LOG1(1, "rpc_gss_seccreate_pvt: "
-				"call_res gss_major %x, gss_minor %x\n",
-				call_res.gss_major, call_res.gss_minor);
+			    "call_res gss_major %x, gss_minor %x\n",
+			    call_res.gss_major, call_res.gss_minor);
 			error = EACCES;
 			goto cleanup;
 		}
@@ -751,14 +742,14 @@ next_token:
 		if (ap->ctx_handle.length == 0) {
 			if (call_res.ctx_handle.length == 0) {
 				RPCGSS_LOG0(1, "rpc_gss_seccreate_pvt: zero "
-					"length handle in response\n");
+				    "length handle in response\n");
 				error = EACCES;
 				goto cleanup;
 			}
 			GSS_DUP_BUFFER(ap->ctx_handle,
-					call_res.ctx_handle);
+			    call_res.ctx_handle);
 		} else if (!GSS_BUFFERS_EQUAL(ap->ctx_handle,
-						call_res.ctx_handle)) {
+		    call_res.ctx_handle)) {
 			RPCGSS_LOG0(1,
 			"rpc_gss_seccreate_pvt: ctx_handle not the same\n");
 			error = EACCES;
@@ -771,8 +762,8 @@ next_token:
 		if (call_res.token.length != 0) {
 			if (*gssstat == GSS_S_COMPLETE) {
 				RPCGSS_LOG0(1, "rpc_gss_seccreate_pvt: non "
-					"zero length token in response, but "
-					"gsstat == GSS_S_COMPLETE\n");
+				    "zero length token in response, but "
+				    "gsstat == GSS_S_COMPLETE\n");
 				error = EACCES;
 				goto cleanup;
 			}
@@ -781,8 +772,8 @@ next_token:
 
 		} else if (*gssstat != GSS_S_COMPLETE) {
 			RPCGSS_LOG0(1, "rpc_gss_seccreate_pvt:zero length "
-				"token in response, but "
-				"gsstat != GSS_S_COMPLETE\n");
+			    "token in response, but "
+			    "gsstat != GSS_S_COMPLETE\n");
 			error = EACCES;
 			goto cleanup;
 		}
@@ -807,41 +798,41 @@ next_token:
 	 * available.
 	 */
 	*gssstat  = kgss_export_sec_context(minor_stat, ap->context,
-						&process_token);
+	    &process_token);
 	if (*gssstat == GSS_S_NAME_NOT_MN) {
 		RPCGSS_LOG(2, "rpc_gss_seccreate_pvt: export_sec_context "
-			"Kernel Module unavailable  gssstat = 0x%x\n",
-			*gssstat);
+		    "Kernel Module unavailable  gssstat = 0x%x\n",
+		    *gssstat);
 		goto done;
 	} else if (*gssstat != GSS_S_COMPLETE) {
 		(void) rpc_gss_display_status(*gssstat, *minor_stat,
-			isrefresh ? GSS_C_NULL_OID : *actual_mech_type,
-					crgetuid(cr),
-			"rpcsec_gss_secreate_pvt:gss_export_sec_context");
+		    isrefresh ? GSS_C_NULL_OID : *actual_mech_type,
+		    crgetuid(cr),
+		    "rpcsec_gss_secreate_pvt:gss_export_sec_context");
 		(void) kgss_delete_sec_context(minor_stat,
-					&ap->context, NULL);
+		    &ap->context, NULL);
 		error = EACCES;
 		goto cleanup;
 	} else if (process_token.length == 0) {
 		RPCGSS_LOG0(1, "rpc_gss_seccreate_pvt:zero length "
-				"token in response for export_sec_context, but "
-				"gsstat == GSS_S_COMPLETE\n");
+		    "token in response for export_sec_context, but "
+		    "gsstat == GSS_S_COMPLETE\n");
 		(void) kgss_delete_sec_context(minor_stat,
-					&ap->context, NULL);
+		    &ap->context, NULL);
 		error = EACCES;
 		goto cleanup;
 	} else
 		*gssstat = kgss_import_sec_context(minor_stat, &process_token,
-							ap->context);
+		    ap->context);
 
 	if (*gssstat == GSS_S_COMPLETE) {
 		(void) gss_release_buffer(minor_stat, &process_token);
 	} else {
 		rpc_gss_display_status(*gssstat, *minor_stat,
-			desired_mech_type, crgetuid(cr),
-			"rpcsec_gss_secreate_pvt:gss_import_sec_context");
+		    desired_mech_type, crgetuid(cr),
+		    "rpcsec_gss_secreate_pvt:gss_import_sec_context");
 		(void) kgss_delete_sec_context(minor_stat,
-					&ap->context, NULL);
+		    &ap->context, NULL);
 		(void) gss_release_buffer(minor_stat, &process_token);
 		error = EACCES;
 		goto cleanup;
@@ -893,10 +884,7 @@ cleanup:
  * Marshall credentials.
  */
 static bool_t
-marshall_creds(ap, xdrs, cred_buf_len)
-	rpc_gss_data		*ap;
-	XDR			*xdrs;
-	uint_t			cred_buf_len;
+marshall_creds(rpc_gss_data *ap, XDR *xdrs, uint_t cred_buf_len)
 {
 	rpc_gss_creds		ag_creds;
 	char			*cred_buf;
@@ -919,8 +907,7 @@ marshall_creds(ap, xdrs, cred_buf_len)
 	}
 
 	cred_buf = kmem_alloc(cred_buf_len, KM_SLEEP);
-	xdrmem_create(&cred_xdrs, (caddr_t)cred_buf, cred_buf_len,
-								XDR_ENCODE);
+	xdrmem_create(&cred_xdrs, (caddr_t)cred_buf, cred_buf_len, XDR_ENCODE);
 	if (!__xdr_rpc_gss_creds(&cred_xdrs, &ag_creds)) {
 		kmem_free(cred_buf, MAX_AUTH_BYTES);
 		XDR_DESTROY(&cred_xdrs);
@@ -948,10 +935,7 @@ marshall_creds(ap, xdrs, cred_buf_len)
  * encoded.  A pointer to the transmit buffer is also passed in.
  */
 static bool_t
-marshall_verf(ap, xdrs, buf)
-	rpc_gss_data		*ap;
-	XDR			*xdrs;	/* send XDR */
-	char			*buf;	/* pointer of send buffer */
+marshall_verf(rpc_gss_data *ap, XDR *xdrs, char *buf)
 {
 	struct opaque_auth	verf;
 	OM_uint32		major, minor;
@@ -972,7 +956,7 @@ marshall_verf(ap, xdrs, buf)
 	in_buf.length = xdr_getpos(xdrs);
 	in_buf.value = buf;
 	if ((major = kgss_sign(&minor, ap->context, ap->qop, &in_buf,
-				&out_buf)) != GSS_S_COMPLETE) {
+	    &out_buf)) != GSS_S_COMPLETE) {
 		if (major == GSS_S_CONTEXT_EXPIRED) {
 			ap->invalid = TRUE;
 		}
@@ -1028,9 +1012,7 @@ validate_seqwin(rpc_gss_data *ap)
  * is the checksum of the request sequence number.
  */
 static bool_t
-rpc_gss_validate(auth, verf)
-	AUTH			*auth;
-	struct opaque_auth	*verf;
+rpc_gss_validate(AUTH *auth, struct opaque_auth *verf)
 {
 	rpc_gss_data		*ap = AUTH_PRIVATE(auth);
 	uint_t			seq_num_net;
@@ -1044,22 +1026,23 @@ rpc_gss_validate(auth, verf)
 	 * creation session.
 	 */
 	if (!ap->established) {
-	    if (ap->verifier == NULL) {
-		ap->verifier = kmem_zalloc(sizeof (struct opaque_auth),
-						KM_SLEEP);
-		if (verf->oa_length > 0)
-		    ap->verifier->oa_base = kmem_zalloc(verf->oa_length,
-						KM_SLEEP);
-	    } else {
-		if (ap->verifier->oa_length > 0)
-		    kmem_free(ap->verifier->oa_base, ap->verifier->oa_length);
-		if (verf->oa_length > 0)
-		    ap->verifier->oa_base = kmem_zalloc(verf->oa_length,
-						KM_SLEEP);
-	    }
-	    ap->verifier->oa_length = verf->oa_length;
-	    bcopy(verf->oa_base, ap->verifier->oa_base, verf->oa_length);
-	    return (TRUE);
+		if (ap->verifier == NULL) {
+			ap->verifier = kmem_zalloc(sizeof (struct opaque_auth),
+			    KM_SLEEP);
+			if (verf->oa_length > 0)
+				ap->verifier->oa_base =
+				    kmem_zalloc(verf->oa_length, KM_SLEEP);
+		} else {
+			if (ap->verifier->oa_length > 0)
+				kmem_free(ap->verifier->oa_base,
+				    ap->verifier->oa_length);
+			if (verf->oa_length > 0)
+				ap->verifier->oa_base =
+				    kmem_zalloc(verf->oa_length, KM_SLEEP);
+		}
+		ap->verifier->oa_length = verf->oa_length;
+		bcopy(verf->oa_base, ap->verifier->oa_base, verf->oa_length);
+		return (TRUE);
 	}
 
 	seq_num_net = (uint_t)htonl(ap->seq_num);
@@ -1068,11 +1051,12 @@ rpc_gss_validate(auth, verf)
 	tok_buf.length = verf->oa_length;
 	tok_buf.value = verf->oa_base;
 	major = kgss_verify(&minor, ap->context, &msg_buf, &tok_buf,
-				&qop_state);
+	    &qop_state);
 	if (major != GSS_S_COMPLETE) {
 		RPCGSS_LOG1(1,
-		"rpc_gss_validate: kgss_verify failed GSS Major %x Minor %x\n",
-		major, minor);
+		    "rpc_gss_validate: kgss_verify failed GSS "
+		    "Major %x Minor %x\n",
+		    major, minor);
 		return (FALSE);
 	}
 	return (TRUE);
@@ -1084,10 +1068,7 @@ rpc_gss_validate(auth, verf)
  * because of expired credentials.
  */
 static bool_t
-rpc_gss_refresh(auth, msg, cr)
-	AUTH		*auth;
-	struct rpc_msg	*msg;
-	cred_t		*cr;
+rpc_gss_refresh(AUTH *auth, struct rpc_msg *msg, cred_t *cr)
 {
 	rpc_gss_data	*ap = AUTH_PRIVATE(auth);
 	gss_ctx_id_t	ctx_sav = NULL;
@@ -1107,8 +1088,8 @@ rpc_gss_refresh(auth, msg, cr)
 	 */
 
 	if (msg->rjcted_rply.rj_why == RPCSEC_GSS_NOCRED ||
-			msg->rjcted_rply.rj_why == RPCSEC_GSS_FAILED ||
-							!ap->established) {
+	    msg->rjcted_rply.rj_why == RPCSEC_GSS_FAILED ||
+	    !ap->established) {
 		/*
 		 * Destroy the context if necessary.  Use the same memory
 		 * for the new context since we've already passed a pointer
@@ -1132,7 +1113,7 @@ rpc_gss_refresh(auth, msg, cr)
 		if (!ap->established) {
 			ap->invalid = TRUE;
 			RPCGSS_LOG0(1,
-			"rpc_gss_refresh: context was not established\n");
+			    "rpc_gss_refresh: context was not established\n");
 			error = EINVAL;
 			goto out;
 		}
@@ -1145,8 +1126,7 @@ rpc_gss_refresh(auth, msg, cr)
 		 * Recreate context.
 		 */
 		error = rpc_gss_seccreate_pvt(&gssstat, &minor_stat, auth,
-				ap, ap->mech_type, (gss_OID *)NULL, (int *)NULL,
-				(OM_uint32 *)NULL, cr, 1);
+		    ap, ap->mech_type, NULL, NULL, NULL, cr, 1);
 
 		switch (error) {
 		case 0:
@@ -1159,12 +1139,12 @@ rpc_gss_refresh(auth, msg, cr)
 			RPCGSS_LOG0(1, "rpc_gss_refresh: try again\n");
 
 			if (ap->context != NULL) {
-			    (void) kgss_delete_sec_context(&minor_stat,
-					&ap->context, NULL);
+				(void) kgss_delete_sec_context(&minor_stat,
+				    &ap->context, NULL);
 			}
 			if (ap->ctx_handle.length != 0) {
-			    (void) gss_release_buffer(&minor_stat,
-					&ap->ctx_handle);
+				(void) gss_release_buffer(&minor_stat,
+				    &ap->ctx_handle);
 			}
 
 			/*
@@ -1183,7 +1163,7 @@ rpc_gss_refresh(auth, msg, cr)
 		default:
 			ap->invalid = TRUE;
 			RPCGSS_LOG(1, "rpc_gss_refresh: can't refresh this "
-				"auth, error=%d\n", error);
+			    "auth, error=%d\n", error);
 			goto out;
 		}
 	}
@@ -1192,8 +1172,7 @@ rpc_gss_refresh(auth, msg, cr)
 
 out:
 	if (ctx_sav != NULL) {
-		(void) kgss_delete_sec_context(&minor_stat,
-				&ctx_sav, NULL);
+		(void) kgss_delete_sec_context(&minor_stat, &ctx_sav, NULL);
 	}
 	if (ctx_hdle_sav.length != 0) {
 		(void) gss_release_buffer(&minor_stat, &ctx_hdle_sav);
@@ -1206,8 +1185,7 @@ out:
  * Destroy a context.
  */
 static void
-rpc_gss_destroy(auth)
-	AUTH		*auth;
+rpc_gss_destroy(AUTH *auth)
 {
 	rpc_gss_data	*ap = AUTH_PRIVATE(auth);
 
@@ -1227,8 +1205,7 @@ rpc_gss_destroy(auth)
  * data structure (rpc_gss_data).
  */
 static void
-rpc_gss_free_pvt(auth)
-	AUTH		*auth;
+rpc_gss_free_pvt(AUTH *auth)
 {
 	OM_uint32	minor_stat;
 	rpc_gss_data	*ap = AUTH_PRIVATE(auth);
@@ -1253,7 +1230,7 @@ rpc_gss_free_pvt(auth)
 	 */
 	if (ap->my_cred == GSS_C_NO_CREDENTIAL)
 		(void) kgss_release_cred(&minor_stat, &ap->my_cred,
-					crgetuid(CRED()));
+		    crgetuid(CRED()));
 
 	/*
 	 * Release any internal name structures.
@@ -1275,11 +1252,12 @@ rpc_gss_free_pvt(auth)
 	 * Free the verifier saved for sequence window checking.
 	 */
 	if (ap->verifier != NULL) {
-	    if (ap->verifier->oa_length > 0) {
-		kmem_free(ap->verifier->oa_base, ap->verifier->oa_length);
-	    }
-	    kmem_free(ap->verifier, sizeof (struct opaque_auth));
-	    ap->verifier = NULL;
+		if (ap->verifier->oa_length > 0) {
+			kmem_free(ap->verifier->oa_base,
+			    ap->verifier->oa_length);
+		}
+		kmem_free(ap->verifier, sizeof (struct opaque_auth));
+		ap->verifier = NULL;
 	}
 }
 
@@ -1293,8 +1271,7 @@ rpc_gss_free_pvt(auth)
  * a refresh fails, for example, so the user will still have a handle.
  */
 static void
-rpc_gss_destroy_pvt(auth)
-	AUTH		*auth;
+rpc_gss_destroy_pvt(AUTH *auth)
 {
 	struct timeval	timeout;
 	rpc_gss_data	*ap = AUTH_PRIVATE(auth);
@@ -1313,7 +1290,7 @@ rpc_gss_destroy_pvt(auth)
 		(void) CLNT_CONTROL(ap->clnt, CLGET_XID, (char *)&oldxid);
 		(void) CLNT_CONTROL(ap->clnt, CLSET_XID, (char *)&zeroxid);
 		(void) clnt_call(ap->clnt, NULLPROC, xdr_void, NULL,
-						xdr_void, NULL, timeout);
+		    xdr_void, NULL, timeout);
 		(void) CLNT_CONTROL(ap->clnt, CLSET_XID, (char *)&oldxid);
 	}
 
@@ -1327,14 +1304,8 @@ rpc_gss_destroy_pvt(auth)
  * credential field.
  */
 bool_t
-rpc_gss_wrap(auth, buf, buflen, out_xdrs, xdr_func, xdr_ptr)
-	AUTH			*auth;
-	char			*buf;		/* encoded header */
-/* has been changed to u_int in the user land */
-	uint_t			buflen;		/* encoded header length */
-	XDR			*out_xdrs;
-	xdrproc_t		xdr_func;
-	caddr_t			xdr_ptr;
+rpc_gss_wrap(AUTH *auth, char *buf, uint_t buflen, XDR *out_xdrs,
+    xdrproc_t xdr_func, caddr_t xdr_ptr)
 {
 	rpc_gss_data		*ap = AUTH_PRIVATE(auth);
 	XDR			xdrs;
@@ -1369,11 +1340,11 @@ rpc_gss_wrap(auth, buf, buflen, out_xdrs, xdr_func, xdr_ptr)
 	 * before putting it out.
 	 */
 	cred_buf_len = RNDUP(sizeof (ap->version) + sizeof (ap->gss_proc) +
-			sizeof (ap->seq_num) + sizeof (ap->service) +
-			sizeof (ap->ctx_handle) + ap->ctx_handle.length);
+	    sizeof (ap->seq_num) + sizeof (ap->service) +
+	    sizeof (ap->ctx_handle) + ap->ctx_handle.length);
 
 	xdr_buf_len = buflen + cred_buf_len + sizeof (struct opaque_auth) +
-			MAX_SIGNED_LEN;
+	    MAX_SIGNED_LEN;
 	tmp_buf = kmem_alloc(xdr_buf_len, KM_SLEEP);
 	xdrmem_create(&xdrs, tmp_buf, xdr_buf_len, XDR_ENCODE);
 	if (!XDR_PUTBYTES(&xdrs, buf, buflen)) {
@@ -1420,18 +1391,14 @@ rpc_gss_wrap(auth, buf, buflen, out_xdrs, xdr_func, xdr_ptr)
 	}
 
 	return (__rpc_gss_wrap_data(ap->service, ap->qop, ap->context,
-				ap->seq_num, out_xdrs, xdr_func, xdr_ptr));
+	    ap->seq_num, out_xdrs, xdr_func, xdr_ptr));
 }
 
 /*
  * Unwrap received data.
  */
 bool_t
-rpc_gss_unwrap(auth, in_xdrs, xdr_func, xdr_ptr)
-	AUTH			*auth;
-	XDR			*in_xdrs;
-	bool_t			(*xdr_func)();
-	caddr_t			xdr_ptr;
+rpc_gss_unwrap(AUTH *auth, XDR *in_xdrs, bool_t (*xdr_func)(), caddr_t xdr_ptr)
 {
 	rpc_gss_data		*ap = AUTH_PRIVATE(auth);
 
@@ -1442,11 +1409,8 @@ rpc_gss_unwrap(auth, in_xdrs, xdr_func, xdr_ptr)
 	if (!ap->established || ap->service == rpc_gss_svc_none)
 		return ((*xdr_func)(in_xdrs, xdr_ptr));
 
-	return (__rpc_gss_unwrap_data(ap->service,
-				ap->context,
-				ap->seq_num,
-				ap->qop,
-				in_xdrs, xdr_func, xdr_ptr));
+	return (__rpc_gss_unwrap_data(ap->service, ap->context,
+	    ap->seq_num, ap->qop, in_xdrs, xdr_func, xdr_ptr));
 }
 
 /*
@@ -1551,19 +1515,16 @@ rpc_gss_secpurge(void *cache_key)
  * Function: rpc_gss_nextverf.  Not used.
  */
 static void
-rpc_gss_nextverf()
+rpc_gss_nextverf(AUTH *auth __unused)
 {
 }
 
 /*
- * Function: rpc_gss_marshall - no op routine.
+ * Function: rpc_gss_marshal - no op routine.
  *		rpc_gss_wrap() is doing the marshalling.
  */
-/*ARGSUSED*/
 static bool_t
-rpc_gss_marshall(auth, xdrs)
-	AUTH		*auth;
-	XDR		*xdrs;
+rpc_gss_marshal(AUTH *auth __unused, XDR *xdrs __unused, cred_t *cr __unused)
 {
 	return (TRUE);
 }
@@ -1572,19 +1533,16 @@ rpc_gss_marshall(auth, xdrs)
  * Set service defaults.
  * Not supported yet.
  */
-/* ARGSUSED */
 bool_t
-rpc_gss_set_defaults(auth, service, qop)
-	AUTH			*auth;
-	rpc_gss_service_t	service;
-	uint_t			qop;
+rpc_gss_set_defaults(AUTH *auth __unused, rpc_gss_service_t service __unused,
+    uint_t qop __unused)
 {
 	return (FALSE);
 }
 
-/* ARGSUSED */
 int
-rpc_gss_max_data_length(AUTH *rpcgss_handle, int max_tp_unit_len)
+rpc_gss_max_data_length(AUTH *rpcgss_handle __unused,
+    int max_tp_unit_len __unused)
 {
 	return (0);
 }
