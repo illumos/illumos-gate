@@ -15,7 +15,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 SUBDIRS = \
@@ -148,6 +148,9 @@ timespec_get.32 :=	CSTD=$(CSTD_GNU17)
 timespec_get.64 :=	CSTD=$(CSTD_GNU17)
 timespec_getres.32 :=	CSTD=$(CSTD_GNU17)
 timespec_getres.64 :=	CSTD=$(CSTD_GNU17)
+
+uchar.32 :=		CSTD=$(CSTD_GNU17)
+uchar.64 :=		CSTD=$(CSTD_GNU17)
 
 wcsftime.32 :=		CSTD=$(CSTD_GNU17)
 wcsftime.64 :=		CSTD=$(CSTD_GNU17)

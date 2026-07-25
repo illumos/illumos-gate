@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Robert Mustacchi
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _UNICODE_H
@@ -60,6 +60,20 @@ extern "C" {
 #define	UNICODE_SUR_LVALUE(x)	((x) & 0x3ff)
 #define	UNICODE_SUR_UMASK(x)	(((x) >> 10) & 0x3ff)
 #define	UNICODE_SUR_LMASK(x)	((x) & 0x3ff)
+
+/*
+ * The following macros are thresholds for determining the number of UTF-8
+ * characters that are required to represent a given code point.
+ */
+#define	UTF8_MAX_1B	0x7f
+#define	UTF8_MAX_2B	0x7ff
+#define	UTF8_MAX_3B	0xffff
+#define	UTF8_MAX_4B	0x10ffff
+
+#define	UTF8_CONT_PREFIX	0x80
+#define	UTF8_2B_PREFIX		0xc0
+#define	UTF8_3B_PREFIX		0xe0
+#define	UTF8_4B_PREFIX		0xf0
 
 #ifdef __cplusplus
 }

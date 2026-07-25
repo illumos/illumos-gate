@@ -9,19 +9,36 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2020 Robert Mustacchi
+.\" Copyright 2026 Oxide Computer Company
 .\"
-.Dd December 2, 2023
+.Dd July 25, 2026
 .Dt C16RTOMB 3C
 .Os
 .Sh NAME
+.Nm c8rtomb ,
+.Nm c8rtomb_l ,
 .Nm c16rtomb ,
+.Nm c16rtomb_l ,
 .Nm c32rtomb ,
+.Nm c32rtomb_l ,
 .Nm wcrtomb ,
 .Nm wcrtomb_l
 .Nd convert wide-characters to character sequences
 .Sh SYNOPSIS
 .In uchar.h
+.Ft size_t
+.Fo c8rtomb
+.Fa "char *restrict str"
+.Fa "char8_t c8"
+.Fa "mbstate_t *restrict ps"
+.Fc
+.Ft size_t
+.Fo c8rtomb_l
+.Fa "char *restrict str"
+.Fa "char8_t c8"
+.Fa "mbstate_t *restrict ps"
+.Fa "locale_t restrict loc"
+.Fc
 .Ft size_t
 .Fo c16rtomb
 .Fa "char *restrict str"
@@ -29,10 +46,24 @@
 .Fa "mbstate_t *restrict ps"
 .Fc
 .Ft size_t
+.Fo c16rtomb_l
+.Fa "char *restrict str"
+.Fa "char16_t c16"
+.Fa "mbstate_t *restrict ps"
+.Fa "locale_t restrict loc"
+.Fc
+.Ft size_t
 .Fo c32rtomb
 .Fa "char *restrict str"
 .Fa "char32_t c32"
 .Fa "mbstate_t *restrict ps"
+.Fc
+.Ft size_t
+.Fo c32rtomb_l
+.Fa "char *restrict str"
+.Fa "char32_t c32"
+.Fa "mbstate_t *restrict ps"
+.Fa "locale_t restrict loc"
 .Fc
 .In stdio.h
 .Ft size_t
@@ -52,8 +83,12 @@
 .Fc
 .Sh DESCRIPTION
 The
+.Fn c8rtomb ,
+.Fn c8rtomb_l ,
 .Fn c16rtomb ,
+.Fn c16rtomb_l ,
 .Fn c32rtomb ,
+.Fn c32rtomb_l ,
 .Fn wcrtomb ,
 and
 .Fn wcrtomb_l
@@ -61,13 +96,17 @@ functions convert wide-character sequences into a series of multi-byte
 characters.
 The functions work in the following formats:
 .Bl -tag -width wcrtomb_l
-.It Fn c16rtomb
+.It Fn c8rtomb , Fn c8rtomb_l
+A UTF-8 code sequence, where every code point is represented by one to
+four
+.Vt char8_t .
+.It Fn c16rtomb , Fn c16rtomb_l
 A UTF-16 code sequence, where every code point is represented by one or
 two
 .Vt char16_t .
 The UTF-16 encoding will encode certain Unicode code points as a pair of
 two 16-bit code sequences, commonly referred to as a surrogate pair.
-.It Fn c32rtomb
+.It Fn c32rtomb , Fn c32rtomb32_l
 A UTF-32 code sequence, where every code point is represented by a
 single
 .Vt char32_t .
@@ -80,11 +119,13 @@ While the
 .Vt wchar_t
 and
 .Vt char32_t
-are different types, in this implementation, they are similar encodings.
+may have similar encodings depending on the locale, they should not be
+assumed to be the same.
 .El
 .Pp
 The functions all work by looking at the passed in wide-character
 .Po
+.Fa c8 ,
 .Fa c16 ,
 .Fa c32 ,
 .Fa wc
@@ -146,6 +187,7 @@ is passed for
 .Fa str .
 They instead will treat it as though a the NULL wide-character was
 passed in
+.Fa c8 ,
 .Fa c16 ,
 .Fa c32 ,
 or
@@ -156,39 +198,40 @@ will be used to write out the results of the
 conversion.
 In other words, the functions would be called as:
 .Bd -literal -offset indent
+c8rtomb(buf, '\e0', ps)
 c16rtomb(buf, L'\e0', ps)
 c32rtomb(buf, L'\e0', ps)
 wcrtomb(buf, L'\e0', ps)
 wcrtomb_l(buf, L'\e0', ps, loc)
 .Ed
+.Pp
+The
+.Fn c8rtomb_l ,
+.Fn c16rtomb_l ,
+and
+.Fn c32rtomb_l
+functions operate identically to their counterparts; however, they operate on
+the passed in locale
+.Fa loc
+rather than the calling thread's.
 .Ss Locale Details
 Not all locales in the system are Unicode based locales.
 For example, ISO 8859 family locales have code points with values that
 do not match their counterparts in Unicode.
-When using these functions with non-Unicode based locales, the code
-points returned will be those determined by the locale.
-They will not be converted from the corresponding Unicode code point.
-For example, if using the Euro sign in ISO 8859-15, these functions
-will not encode the Unicode value 0x20ac into the ISO 8859-15 value
-0xa4.
-.Pp
-Regardless of the locale, the characters returned will be encoded as
-though the code point were the corresponding value in Unicode.
-This means that when using UTF-16, if the corresponding code point were
-in the range for surrogate pairs, then the
-.Fn c16rtomb
-function will expect to receive that code point in that fashion.
-.Pp
-This behavior of the
-.Fn c16rtomb
-and
-.Fn c32rtomb
-functions should not be relied upon, is not portable, and subject to
-change for non-Unicode locales.
+When using these functions with non-Unicode based locales, the characters will
+be converted accordingly as though
+.Xr iconv 3C
+were called.
+If the corresponding iconv module is missing for the locale, then these
+functions will fail.
 .Sh RETURN VALUES
 Upon successful completion, the
+.Fn c8rtomb ,
+.Fn c8rtomb_l ,
 .Fn c16rtomb ,
+.Fn c16rtomb_l ,
 .Fn c32rtomb ,
+.Fn c32rtomb_l ,
 .Fn wcrtomb ,
 and
 .Fn wcrtomb_l
@@ -237,8 +280,12 @@ main(void)
 .Ed
 .Sh ERRORS
 The
+.Fn c8rtomb ,
+.Fn c8rtomb_l ,
 .Fn c16rtomb ,
+.Fn c16rtomb_l ,
 .Fn c32rtomb ,
+.Fn c32rtomb_l ,
 .Fn wcrtomb ,
 and
 .Fn wcrtomb_l
@@ -253,8 +300,12 @@ An invalid character sequence has been detected.
 .El
 .Sh MT-LEVEL
 The
+.Fn c8rtomb ,
+.Fn c8rtomb_l ,
 .Fn c16rtomb ,
+.Fn c16rtomb_l ,
 .Fn c32rtomb ,
+.Fn c32rtomb_l ,
 .Fn wcrtomb ,
 and
 .Fn wcrtomb_l
@@ -275,8 +326,10 @@ then the functions are
 .Sh INTERFACE STABILITY
 .Sy Committed
 .Sh SEE ALSO
+.Xr iconv 3C ,
 .Xr mbrtoc16 3C ,
 .Xr mbrtoc32 3C ,
+.Xr mbrtoc8 3C ,
 .Xr mbrtowc 3C ,
 .Xr newlocale 3C ,
 .Xr setlocale 3C ,

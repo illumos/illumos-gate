@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Robert Mustacchi
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -39,11 +39,11 @@ CTASSERT(sizeof (_CHAR16State) <= sizeof (mbstate_t));
 static mbstate_t mbrtoc16_state;
 
 size_t
-mbrtoc16(char16_t *restrict pc16, const char *restrict str, size_t len,
-    mbstate_t *restrict ps)
+mbrtoc16_l(char16_t *restrict pc16, const char *restrict str, size_t len,
+    mbstate_t *restrict ps, locale_t restrict loc)
 {
-	wchar_t wc;
 	size_t ret;
+	char32_t c32;
 	char16_t out;
 	_CHAR16State *c16s;
 
@@ -66,9 +66,17 @@ mbrtoc16(char16_t *restrict pc16, const char *restrict str, size_t len,
 		return ((size_t)-3);
 	}
 
-	ret = mbrtowc_l(&wc, str, len, ps, __curlocale());
-	if ((ssize_t)ret < 0) {
+	ret = mbrtoc32_l(&c32, str, len, ps, loc);
+	switch (ret) {
+	case 0:
+		c32 = 0;
+		break;
+	case (size_t)-1:
+	case (size_t)-2:
 		return (ret);
+	case (size_t)-3:
+	default:
+		break;
 	}
 
 	/*
@@ -76,12 +84,13 @@ mbrtoc16(char16_t *restrict pc16, const char *restrict str, size_t len,
 	 * a surrogate character to represent it in UTF-16 and we will need to
 	 * write that out on the next iteration.
 	 */
-	if (wc >= UNICODE_SUP_START) {
-		wc -= UNICODE_SUP_START;
-		c16s->c16_surrogate = UNICODE_SUR_LOWER | UNICODE_SUR_LMASK(wc);
-		out = UNICODE_SUR_UPPER | UNICODE_SUR_UMASK(wc);
+	if (c32 >= UNICODE_SUP_START) {
+		c32 -= UNICODE_SUP_START;
+		c16s->c16_surrogate = UNICODE_SUR_LOWER |
+		    UNICODE_SUR_LMASK(c32);
+		out = UNICODE_SUR_UPPER | UNICODE_SUR_UMASK(c32);
 	} else {
-		out = (char16_t)wc;
+		out = (char16_t)c32;
 	}
 
 	if (pc16 != NULL) {
@@ -89,4 +98,11 @@ mbrtoc16(char16_t *restrict pc16, const char *restrict str, size_t len,
 	}
 
 	return (ret);
+}
+
+size_t
+mbrtoc16(char16_t *restrict pc16, const char *restrict str, size_t len,
+    mbstate_t *restrict ps)
+{
+	return (mbrtoc16_l(pc16, str, len, ps, __curlocale()));
 }

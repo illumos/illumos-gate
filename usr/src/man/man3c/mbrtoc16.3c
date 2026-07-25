@@ -9,15 +9,19 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2020 Robert Mustacchi
+.\" Copyright 2026 Oxide Computer Company
 .\" Copyright 2023 Bill Sommerfeld
 .\"
 .Dd June 5, 2023
 .Dt MBRTOC16 3C
 .Os
 .Sh NAME
+.Nm mbrtoc8 ,
+.Nm mbrtoc8_l ,
 .Nm mbrtoc16 ,
+.Nm mbrtoc16_l ,
 .Nm mbrtoc32 ,
+.Nm mbrtoc32_l ,
 .Nm mbrtowc ,
 .Nm mbrtowc_l
 .Nd convert characters to wide characters
@@ -42,11 +46,34 @@
 .Fc
 .In uchar.h
 .Ft size_t
+.Fo mbrtoc8
+.Fa "char8_t *restrict p8c"
+.Fa "const char *restrict str"
+.Fa "size_t len"
+.Fa "mbstate_t *restrict ps"
+.Fc
+.Ft size_t
+.Fo mbrtoc8_l
+.Fa "char8_t *restrict p8c"
+.Fa "const char *restrict str"
+.Fa "size_t len"
+.Fa "mbstate_t *restrict ps"
+.Fa "locale_t restrict loc"
+.Fc
+.Ft size_t
 .Fo mbrtoc16
 .Fa "char16_t *restrict p16c"
 .Fa "const char *restrict str"
 .Fa "size_t len"
 .Fa "mbstate_t *restrict ps"
+.Fc
+.Ft size_t
+.Fo mbrtoc16_l
+.Fa "char16_t *restrict p16c"
+.Fa "const char *restrict str"
+.Fa "size_t len"
+.Fa "mbstate_t *restrict ps"
+.Fa "locale_t restrict loc"
 .Fc
 .Ft size_t
 .Fo mbrtoc32
@@ -55,10 +82,22 @@
 .Fa "size_t len"
 .Fa "mbstate_t *restrict ps"
 .Fc
+.Ft size_t
+.Fo mbrtoc32_l
+.Fa "char32_t *restrict p32c"
+.Fa "const char *restrict str"
+.Fa "size_t len"
+.Fa "mbstate_t *restrict ps"
+.Fa "locale_t restrict loc"
+.Fc
 .Sh DESCRIPTION
 The
+.Fn mbrtoc8 ,
+.Fn mbrtoc8_l ,
 .Fn mbrtoc16 ,
+.Fn mbrtoc16_l ,
 .Fn mbrtoc32 ,
+.Fn mbrtoc32_l ,
 .Fn mbrtowc ,
 and
 .Fn mbrtowc_l
@@ -66,13 +105,17 @@ functions convert character sequences, which may contain multi-byte
 characters, into different character formats.
 The functions work in the following formats:
 .Bl -tag -width mbrtowc_l
-.It Fn mbrtoc16
+.It Fn mbrtoc8 , Fn mbrtoc8_l
+A UTF-8 code sequence, where every code point is represented by anywhere
+from one to four
+.Vt char8_t .
+.It Fn mbrtoc16 , Fn mbrtoc16_l
 A UTF-16 code sequence, where every code point is represented by one or
 two
 .Vt char16_t .
 The UTF-16 encoding will encode certain Unicode code points as a pair of
 two 16-bit code sequences, commonly referred to as a surrogate pair.
-.It Fn mbrtoc32
+.It Fn mbrtoc32 , Fn mbrtoc32_l
 A UTF-32 code sequence, where every code point is represented by a
 single
 .Vt char32_t .
@@ -84,7 +127,8 @@ While the
 .Vt wchar_t
 and
 .Vt char32_t
-are different types, in this implementation, they are similar encodings.
+may have similar encodings depending on the locale, they should not be
+assumed to be the same.
 .El
 .Pp
 The functions consume up to
@@ -112,12 +156,15 @@ function uses the locale passed in
 rather than the locale of the current thread.
 .Pp
 When a valid character sequence has been found, it is converted to
-either a 16-bit character sequence for
-.Fn mbrtoc16
+either an 8-bit character sequence for
+.Fn mbrtoc8 ,
+a 16-bit character sequence for
+.Fn mbrtoc16 ,
 or a 32-bit character sequence for
 .Fn mbrtoc32
 and will be stored in
-.Fa p16c
+.Fa p8c ,
+.Fa p16c ,
 and
 .Fa p32c
 respectively.
@@ -155,6 +202,7 @@ is passed for
 .Fa str .
 They instead will treat it as though
 .Fa pwc ,
+.Fa p8c ,
 .Fa p16c ,
 or
 .Fa p32c
@@ -168,35 +216,38 @@ In other words, the functions would be called as:
 .Bd -literal -offset indent
 mbrtowc(NULL, "", 1, ps)
 mbrtowc_l(NULL, "", 1, ps)
+mbrtoc8(NULL, "", 1, ps)
 mbrtoc16(NULL, "", 1, ps)
 mbrtoc32(NULL, "", 1, ps)
 .Ed
+.Pp
+The
+.Fn mbrtoc8_l ,
+.Fn mbrtoc16_l ,
+and
+.Fn mbrtoc32_l
+functions operate identically to their counterparts; however, they operate on
+the passed in locale
+.Fa loc
+rather than the calling thread's.
 .Ss Locale Details
 Not all locales in the system are Unicode based locales.
 For example, ISO 8859 family locales have code points with values that
 do not match their counterparts in Unicode.
-When using these functions with non-Unicode based locales, the code
-points returned will be those determined by the locale.
-They will not be converted to the corresponding Unicode code point.
-For example, if using the Euro sign in ISO 8859-15, these functions
-might return the code point 0xa4 and not the Unicode value 0x20ac.
-.Pp
-Regardless of the locale, the characters returned will be encoded as
-though the code point were the corresponding value in Unicode.
-This means that if a locale returns a value that would be a surrogate
-pair in the UTF-16 encoding, it will still be encoded as a UTF-16
-character.
-.Pp
-This behavior of the
-.Fn mbrtoc16
-and
-.Fn mbrtoc32
-functions should not be relied upon, is not portable, and subject to
-change for non-Unicode locales.
+When using these functions with non-Unicode based locales, the characters will
+be converted accordingly as though
+.Xr iconv 3C
+were called.
+If the corresponding iconv module is missing for the locale, then these
+functions will fail.
 .Sh RETURN VALUES
 The
+.Fn mbrtoc8 ,
+.Fn mbrtoc8_l ,
 .Fn mbrtoc16 ,
+.Fn mbrtoc16_l ,
 .Fn mbrtoc32 ,
+.Fn mbrtoc32_l ,
 .Fn mbrtowc ,
 and
 .Fn mbrtowc_l
@@ -210,6 +261,7 @@ were consumed and the null wide character was written into the wide
 character buffer
 .Po
 .Fa pwc ,
+.Fa p8c ,
 .Fa p16c ,
 .Fa p32c
 .Pc .
@@ -218,6 +270,7 @@ The specified number of bytes were consumed and a single character was
 written into the wide character buffer
 .Po
 .Fa pwc ,
+.Fa p8c ,
 .Fa p16c ,
 .Fa p32c
 .Pc .
@@ -234,6 +287,7 @@ has been set to
 No data was written into the wide character buffer
 .Po
 .Fa pwc ,
+.Fa p8c ,
 .Fa p16c ,
 .Fa p32c
 .Pc .
@@ -245,6 +299,7 @@ were consumed, but a complete multi-byte character sequence has not been
 found and no data was written into the wide character buffer
 .Po
 .Fa pwc ,
+.Fa p8c ,
 .Fa p16c ,
 .Fa p32c
 .Pc .
@@ -252,15 +307,20 @@ found and no data was written into the wide character buffer
 A character has been written into the wide character buffer
 .Po
 .Fa pwc ,
+.Fa p8c ,
 .Fa p16c ,
 .Fa p32c
 .Pc .
 This character was from a previous call (such as another part of a
 UTF-16 surrogate pair) and no input was consumed.
 This is limited to the
-.Fn mbrtoc16
+.Fn mbrtoc8 ,
+.Fn mbrtoc8_l ,
+.Fn mbrtoc16 ,
+.Fn mbrtoc16_l ,
+.Fn mbrtoc32 ,
 and
-.Fn mbrtoc32
+.Fn mbrtoc32_l
 functions.
 .El
 .Sh EXAMPLES
@@ -350,8 +410,12 @@ UTF-16 surrogates: 0xd83d 0xdca9
 .Ed
 .Sh ERRORS
 The
+.Fn mbrtoc8 ,
+.Fn mbrtoc8_l ,
 .Fn mbrtoc16 ,
+.Fn mbrtoc16_l ,
 .Fn mbrtoc32 ,
+.Fn mbrtoc32_l ,
 .Fn mbrtowc ,
 and
 .Fn mbrtowc_l
@@ -366,8 +430,12 @@ An invalid character sequence has been detected.
 .El
 .Sh MT-LEVEL
 The
+.Fn mbrtoc8 ,
+.Fn mbrtoc8_l ,
 .Fn mbrtoc16 ,
+.Fn mbrtoc16_l ,
 .Fn mbrtoc32 ,
+.Fn mbrtoc32_l ,
 .Fn mbrtowc ,
 and
 .Fn mbrtowc_l
@@ -390,6 +458,8 @@ then the functions are
 .Sh SEE ALSO
 .Xr c16rtomb 3C ,
 .Xr c32rtomb 3C ,
+.Xr c8rtomb 3C ,
+.Xr iconv 3C ,
 .Xr newlocale 3C ,
 .Xr setlocale 3C ,
 .Xr uselocale 3C ,

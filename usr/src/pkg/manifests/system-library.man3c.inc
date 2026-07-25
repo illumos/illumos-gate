@@ -216,7 +216,11 @@ link path=usr/share/man/man3c/btowc_l.3c target=btowc.3c
 file path=usr/share/man/man3c/byteorder.3c
 link path=usr/share/man/man3c/bzero.3c target=bstring.3c
 file path=usr/share/man/man3c/c16rtomb.3c
+link path=usr/share/man/man3c/c16rtomb_l.3c target=c16rtomb.3c
 link path=usr/share/man/man3c/c32rtomb.3c target=c16rtomb.3c
+link path=usr/share/man/man3c/c32rtomb_l.3c target=c16rtomb.3c
+link path=usr/share/man/man3c/c8rtomb.3c target=c16rtomb.3c
+link path=usr/share/man/man3c/c8rtomb_l.3c target=c16rtomb.3c
 file path=usr/share/man/man3c/call_once.3c
 link path=usr/share/man/man3c/calloc.3c target=malloc.3c
 link path=usr/share/man/man3c/canonicalize_file_name.3c target=realpath.3c
@@ -684,7 +688,11 @@ link path=usr/share/man/man3c/mblen_l.3c target=mblen.3c
 file path=usr/share/man/man3c/mbrlen.3c
 link path=usr/share/man/man3c/mbrlen_l.3c target=mbrlen.3c
 file path=usr/share/man/man3c/mbrtoc16.3c
+link path=usr/share/man/man3c/mbrtoc16_l.3c target=mbrtoc16.3c
 link path=usr/share/man/man3c/mbrtoc32.3c target=mbrtoc16.3c
+link path=usr/share/man/man3c/mbrtoc32_l.3c target=mbrtoc16.3c
+link path=usr/share/man/man3c/mbrtoc8.3c target=mbrtoc16.3c
+link path=usr/share/man/man3c/mbrtoc8_l.3c target=mbrtoc16.3c
 link path=usr/share/man/man3c/mbrtowc.3c target=mbrtoc16.3c
 link path=usr/share/man/man3c/mbrtowc_l.3c target=mbrtoc16.3c
 file path=usr/share/man/man3c/mbsinit.3c

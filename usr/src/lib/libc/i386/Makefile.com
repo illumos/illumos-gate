@@ -803,6 +803,7 @@ PORTI18N_COND=			\
 PORTLOCALE=			\
 	big5.o			\
 	btowc.o			\
+	c8rtomb.o		\
 	c16rtomb.o		\
 	c32rtomb.o		\
 	collate.o		\
@@ -830,6 +831,7 @@ PORTLOCALE=			\
 	mbftowc.o		\
 	mblen.o			\
 	mbrlen.o		\
+	mbrtoc8.o		\
 	mbrtoc16.o		\
 	mbrtoc32.o		\
 	mbrtowc.o		\
@@ -1017,6 +1019,7 @@ PORTREGEX64=			\
 	glob64.o
 
 BITOBJS=			\
+	bitext.o		\
 	stdbit.o
 
 MOSTOBJS=			\

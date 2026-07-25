@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2020 Robert Mustacchi
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -21,6 +21,7 @@
  * the interim.
  */
 
+#include "thr_uberdata.h"
 #include <uchar.h>
 #include <errno.h>
 #include "mblocal.h"
@@ -29,7 +30,8 @@
 static mbstate_t c16rtomb_state;
 
 size_t
-c16rtomb(char *restrict str, char16_t c16, mbstate_t *restrict ps)
+c16rtomb_l(char *restrict str, char16_t c16, mbstate_t *restrict ps,
+    locale_t restrict loc)
 {
 	char32_t c32;
 	_CHAR16State *c16s;
@@ -70,9 +72,11 @@ c16rtomb(char *restrict str, char16_t c16, mbstate_t *restrict ps)
 		c32 = c16;
 	}
 
-	/*
-	 * Call c32rtomb() and not wcrtomb() so that way all of the unicode code
-	 * point validation is performed.
-	 */
-	return (c32rtomb(str, c32, ps));
+	return (c32rtomb_l(str, c32, ps, loc));
+}
+
+size_t
+c16rtomb(char *restrict str, char16_t c16, mbstate_t *restrict ps)
+{
+	return (c16rtomb_l(str, c16, ps, __curlocale()));
 }

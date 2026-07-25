@@ -22,7 +22,7 @@
 /*
  * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2016 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -534,6 +534,20 @@ extern "C" {
  * integer that corresponds to the major version number for DTrace.
  */
 #define	_DTRACE_VERSION	1
+
+/*
+ * The following macros indicate that the char16_t and char32_t types are UTF-16
+ * and UTF-32 encoded respectively. It is generally expected that compilers are
+ * setting these. However, if they are not for whatever reason, we define them
+ * here to the correct value.
+ */
+#ifndef __STDC_UTF_16__
+#define	__STDC_UTF_16__	1
+#endif
+
+#ifndef __STDC_UTF_32__
+#define	__STDC_UTF_32__	1
+#endif
 
 #ifdef	__cplusplus
 }

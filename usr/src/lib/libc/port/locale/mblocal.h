@@ -1,4 +1,5 @@
 /*
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2013 Garrett D'Amore <garrett@damore.org>
  * Copyright 2011 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2004 Tim J. Robbins.
@@ -37,11 +38,13 @@
  * Actual implementation structures for mbstate_t data.
  *
  * All of the conversion states are independent of one another, with the
- * exception of that used for mbrtoc16(). That needs to encode data not as a
- * wide-character but as UTF-16 data, which means handling surrogate pairs. To
- * minimize the amount of state in each locale, we instead have a conversion
- * state for this which includes all the other conversion states, plus extra
- * data to accomodate this.
+ * exception of those used for the C standard unicode transformations:
+ * c8rtomb(), c16rtomb(), mbrtoc8(), and mbrtoc16(). These need state to be able
+ * to consume and handle their own intermediate representations (e.g. UTF-16
+ * surrogate pairs) as well as all of the state to convert them to and from the
+ * corresponding wide character format in their own locale. To simplify things,
+ * these have a union of all the existing required state and then their own
+ * additional state.
  */
 typedef struct {
 	wchar_t	ch;
@@ -89,6 +92,21 @@ typedef struct {
 	} c16_state;
 	char16_t c16_surrogate;
 } _CHAR16State;
+
+typedef struct {
+	union {
+		_BIG5State	c16_big5;
+		_EucState	c16_euc;
+		_GB18030State	c16_gb18030;
+		_GB2312State	c16_gb2312;
+		_GBKState	c16_gbk;
+		_MSKanjiState	c16_mskanji;
+		_UTF8State	c16_utf8;
+	} c8_state;
+	char8_t c8_bytes[4];
+	uint8_t c8_count:4;
+	uint8_t c8_exp:4;
+} _CHAR8State;
 
 /*
  * Rune initialization function prototypes.

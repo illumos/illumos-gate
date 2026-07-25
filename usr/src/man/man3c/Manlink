@@ -10,7 +10,7 @@
 #
 
 #
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 __fbufsize.3c
@@ -164,7 +164,11 @@ byteorder.3c
 	ntohll.3c
 	ntohs.3c
 c16rtomb.3c
+	c8rtomb.3c
+	c8rtomb_l.3c
+	c16rtomb_l.3c
 	c32rtomb.3c
+	c32rtomb_l.3c
 	wcrtomb.3c
 	wcrtomb_l.3c
 catopen.3c
@@ -593,7 +597,11 @@ mblen.3c
 mbrlen.3c
 	mbrlen_l.3c
 mbrtoc16.3c
+	mbrtoc8.3c
+	mbrtoc8_l.3c
+	mbrtoc16_l.3c
 	mbrtoc32.3c
+	mbrtoc32_l.3c
 	mbrtowc.3c
 	mbrtowc_l.3c
 mbsinit.3c

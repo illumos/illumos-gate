@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2020 Robert Mustacchi
+.\" Copyright 2026 Oxide Computer Company
 .\"
-.Dd April 22, 2020
+.Dd July 25, 2026
 .Dt UCHAR.H 3HEAD
 .Os
 .Sh NAME
@@ -22,16 +22,17 @@
 .Sh DESCRIPTION
 The
 .In uchar.h
-header provides support for the C11 Unicode utilities.
+header provides support for the C11 and C23 Unicode utilities.
 The types and functions provide means for working with data encoded as
-UTF-16 and UTF-32.
-When working in non-Unicode locales, these types may not represent
-Unicode code points.
+UTF-8, UTF-16, and UTF-32.
 .Pp
 The
 .In uchar.h
 header defines the following types:
 .Bl -tag -width Vt
+.It Vt char8_t
+An unsigned integer that can represent 8-bit characters encoded in
+UTF-8.
 .It Vt char16_t
 An unsigned integer that can represent 16-bit characters, generally a
 single single UTF-16 code unit.
@@ -58,28 +59,43 @@ sequences and wide characters
 See also,
 .Xr wchar.h 3HEAD .
 .El
+.Pp
 The
 .In uchar.h
 header also defines the following functions which are used to convert
 between
-.Vt char16_t
+.Vt char8_t ,
+.Vt char16_t ,
 and
 .Vt char32_t
-sequences and other character sequences:
+sequences and other character sequences.
+The functions that end in
+.Sy _l
+are extensions and not part of the C standard.
+They take an arbitray locale to operate on rather than using the current
+locale.
 .Bl -tag -width cr16rtomb
-.It Xr c16rtomb 3C
+.It Xr c8rtomb 3C , Xr cr8tomb_l 3C
+Convert
+.Vt char8_t
+sequences to multi-byte character sequences.
+.It Xr c16rtomb 3C , Xr cr16tomb_l 3C
 Convert
 .Vt char16_t
 sequences to multi-byte character sequences.
-.It Xr c32rtomb 3C
+.It Xr c32rtomb 3C , Xr cr32tomb_l 3C
 Convert
 .Vt char32_t
 sequences to multi-byte character sequences.
-.It Xr mbrtoc16 3C
+.It Xr mbrtoc8 3C , Xr mbrtoc8_l 3C
+Convert multi-byte character sequences to
+.Vt char8_t
+sequences.
+.It Xr mbrtoc16 3C , Xr mbrtoc16_l 3C
 Convert multi-byte character sequences to
 .Vt char16_t
 sequences.
-.It Xr mbrtoc32 3C
+.It Xr mbrtoc32 3C , Xr mbrtoc16_l 3C
 Convert multi-byte character sequences to
 .Vt char32_t
 sequences.
