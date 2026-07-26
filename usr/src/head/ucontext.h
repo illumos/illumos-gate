@@ -33,6 +33,24 @@
 #ifndef _UCONTEXT_H
 #define	_UCONTEXT_H
 
+/*
+ * The header <ucontext.h> and the functions: getcontext(), setcontext(),
+ * makecontext(), swapcontext(), were introduced by X/Open XPG4 Version 2
+ * (XPG4v2/SUSv1).  They were not defined in POSIX.1-1990 - POSIX.1-1995.
+ * They were carried into POSIX.1-2001 (SUSv3) but marked obsolescent,
+ * and where removed entirely from POSIX.1-2008 (SUSv4) and later.
+ * In summary, no version of POSIX predating XPG4v2 states any
+ * requirements about <ucontext.h> or its content.
+ *
+ * Note in particular that the standard does not require that we "hide"
+ * anything here for those older POSIX standards.  Programs written to
+ * those old standards shoud not include <ucontext.h>, and if they did,
+ * the result would be "implementation defined" behvior.
+ *
+ * The historical practice for this system is to expose the same content
+ * from this header for XPG4v2 and all earlier environments.
+ */
+
 #include <sys/ucontext.h>
 /*
  * The file sys/regset.h defines indices in the gregset_t array,
@@ -85,7 +103,16 @@ extern int setustack(stack_t *);
 extern int stack_getbounds(stack_t *);
 extern int stack_setbounds(const stack_t *);
 extern int stack_inbounds(void *);
+
+/*
+ * Can only declare this if siginfo_t is declared.
+ * See <sys/signal.h> above and the conditions under which
+ * that includes <sys/siginfo.h> to give us siginfo_t.
+ */
+#if defined(__EXTENSIONS__) || \
+	!defined(_POSIX_C_SOURCE) || (_POSIX_C_SOURCE > 2)
 extern int stack_violation(int, const siginfo_t *, const ucontext_t *);
+#endif
 
 extern void *_stack_grow(void *);
 #endif	/* !_XPG4_2 || __EXTENSIONS__ */
