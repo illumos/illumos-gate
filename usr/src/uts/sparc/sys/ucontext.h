@@ -27,7 +27,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 #ifndef _SYS_UCONTEXT_H
 #define	_SYS_UCONTEXT_H
@@ -47,10 +47,11 @@ extern "C" {
 /*
  * Inclusion of <sys/signal.h> for sigset_t and stack_t definitions
  * breaks XPG4v2 namespace.  Therefore we must duplicate the defines
- * for these types here when _XPG4_2 is defined.
+ * for these types here when we did not include <sys/signal.h> OR
+ * when <sys/signal.h> would not have declared them.
  */
 
-#if defined(_XPG4_2) && !defined(__EXTENSIONS__)
+/* Need sigset_t for ucontext below */
 #ifndef	_SIGSET_T
 #define	_SIGSET_T
 typedef	struct {	/* signal set type */
@@ -58,6 +59,7 @@ typedef	struct {	/* signal set type */
 } sigset_t;
 #endif /* _SIGSET_T */
 
+/* Need stack_t for ucontext below */
 #ifndef	_STACK_T
 #define	_STACK_T
 typedef	struct {
@@ -67,7 +69,6 @@ typedef	struct {
 } stack_t;
 
 #endif /* _STACK_T */
-#endif /* defined(_XPG4_2) && !defined(__EXTENSIONS__) */
 
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 typedef	struct ucontext ucontext_t;
@@ -82,8 +83,8 @@ struct	__ucontext {
 #endif
 	uint_t		uc_flags;
 	ucontext_t	*uc_link;
-	sigset_t   	uc_sigmask;
-	stack_t 	uc_stack;
+	sigset_t	uc_sigmask;
+	stack_t		uc_stack;
 	mcontext_t	uc_mcontext;
 #ifdef	__sparcv9
 	long		uc_filler[4];

@@ -25,7 +25,7 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -59,7 +59,7 @@ extern "C" {
 /* ---- <signal.h> ---- */
 
 /*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #ifndef _SIGNAL_H
@@ -68,7 +68,7 @@ extern "C" {
 /* ---- <sys/signal.h> ---- */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #ifndef _SYS_SIGNAL_H
@@ -201,7 +201,10 @@ struct sigaltstack {
 	int	ss_flags;
 };
 
+#ifndef	_STACK_T
+#define	_STACK_T
 typedef struct sigaltstack stack_t;
+#endif /* _STACK_T */
 
 #endif /* __STDC__ && !POSIX */
 
