@@ -40,6 +40,14 @@ def make_entry(directive, symbol, headers, rtype=None, atypes=None, defval=None)
 class TestGenProbeC(unittest.TestCase):
     """Probe generation for lang='c'."""
 
+    def test_include_only(self):
+        e = make_entry('include-only', 'include-only <test.h>', ['test.h'])
+        expected = (
+            '#include <test.h>\n'
+            'int header_compile_test;\n'
+        )
+        self.assertEqual(ProbeGen.gen_probe(e, 'c'), expected)
+
     def test_type(self):
         e = make_entry('type', 'size_t', ['stddef.h'], rtype='size_t')
         expected = (

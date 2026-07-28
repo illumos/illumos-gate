@@ -225,6 +225,10 @@ class EnvConfig:
             return self.groups[name]
         sys.exit(f'error: reference to undefined env or group {name!r}')
 
+    def expand(self, name):
+        """Return the set of environments named by one env or group."""
+        return set(self._expand(name))
+
 
 # ---------------------------------------------------------------------------
 # SymEntry - one symbol entry from a symbols config file
@@ -255,10 +259,12 @@ class SymConfig:
 
     Public attributes:
       entries: list of SymEntry, in file order
+      primary_header: first header named by the loaded configuration files
     """
 
     def __init__(self):
         self.entries = []
+        self.primary_header = None
 
     def load(self, path):
         """Load symbols config from a file path, with STF_SUITE search."""
@@ -278,6 +284,8 @@ class SymConfig:
 
     def _parse(self, fileobj, filename='<input>'):
         """Parse a file-like object as a symbols config file."""
+        self._file_primary_header = None
+        self._warned_primary_headers = set()
         handlers = {
             'type':   self._do_type,
             'value':  self._do_value,
@@ -285,11 +293,44 @@ class SymConfig:
             'func':   self._do_func,
         }
         parse_cfg(fileobj, filename, handlers)
+        if self._file_primary_header is None:
+            sys.exit(f'error: {filename}: symbols configuration is empty')
 
     @staticmethod
     def _split_list(s):
         """Split a semicolon-separated field, stripping each item."""
         return [item.strip() for item in s.split(';') if item.strip()]
+
+    def _add_entry(self, entry, filename, lineno):
+        if not entry.headers:
+            sys.exit(f'error: {filename}:{lineno}: no header specified')
+
+        # A configuration describes one primary header.  Later headers in an
+        # entry are there to support its probe, but only the first identifies
+        # the header whose positive coverage we track.
+        header = entry.headers[0]
+        if self._file_primary_header is None:
+            self._file_primary_header = header
+            if self.primary_header is None:
+                self.primary_header = header
+            elif header != self.primary_header:
+                sys.exit(
+                    f'error: {filename}:{lineno}: primary header {header!r} '
+                    f'differs from {self.primary_header!r}\n'
+                    'Only one primary header per invocation is supported')
+        elif header != self._file_primary_header:
+            # Keep the entry for its ordinary symbol test, but it does not
+            # establish positive coverage for the primary header.
+            if header not in self._warned_primary_headers:
+                print(
+                    f'warning: {filename}:{lineno}: primary header {header!r} '
+                    f'differs from {self._file_primary_header!r}\n'
+                    'Only one primary header per configuration file is '
+                    'expected',
+                    file=sys.stderr)
+                self._warned_primary_headers.add(header)
+
+        self.entries.append(entry)
 
     def _do_type(self, fields, filename, lineno):
         # type | decl | headers | envs
@@ -298,13 +339,13 @@ class SymConfig:
                 f'error: {filename}:{lineno}: type: expected 3 fields, '
                 f'got {len(fields)}')
         decl, hdrs, envs = fields
-        self.entries.append(SymEntry(
+        self._add_entry(SymEntry(
             directive='type',
             symbol=decl,
             rtype=decl,
             headers=self._split_list(hdrs),
             env_spec=envs,
-        ))
+        ), filename, lineno)
 
     def _do_value(self, fields, filename, lineno):
         # value | name | type | headers | envs
@@ -313,13 +354,13 @@ class SymConfig:
                 f'error: {filename}:{lineno}: value: expected 4 fields, '
                 f'got {len(fields)}')
         name, rtype, hdrs, envs = fields
-        self.entries.append(SymEntry(
+        self._add_entry(SymEntry(
             directive='value',
             symbol=name,
             rtype=rtype,
             headers=self._split_list(hdrs),
             env_spec=envs,
-        ))
+        ), filename, lineno)
 
     def _do_define(self, fields, filename, lineno):
         # define | name | value | headers | envs  (value may be empty)
@@ -328,13 +369,13 @@ class SymConfig:
                 f'error: {filename}:{lineno}: define: expected 4 fields, '
                 f'got {len(fields)}')
         name, defval, hdrs, envs = fields
-        self.entries.append(SymEntry(
+        self._add_entry(SymEntry(
             directive='define',
             symbol=name,
             defval=defval if defval else None,
             headers=self._split_list(hdrs),
             env_spec=envs,
-        ))
+        ), filename, lineno)
 
     def _do_func(self, fields, filename, lineno):
         # func | name | rtype | atypes | headers | envs
@@ -343,14 +384,14 @@ class SymConfig:
                 f'error: {filename}:{lineno}: func: expected 5 fields, '
                 f'got {len(fields)}')
         name, rtype, atypes, hdrs, envs = fields
-        self.entries.append(SymEntry(
+        self._add_entry(SymEntry(
             directive='func',
             symbol=name,
             rtype=rtype,
             atypes=self._split_list(atypes),
             headers=self._split_list(hdrs),
             env_spec=envs,
-        ))
+        ), filename, lineno)
 
 
 # ---------------------------------------------------------------------------
@@ -398,7 +439,12 @@ class ProbeGen:
         if rtype:
             out.append(prefix + ' ')
 
-        if entry.directive == 'type':
+        # Special "include-only" tests are used to ensure that a header
+        # (at least) compiles in a trivial C program.
+        if entry.directive == 'include-only':
+            out.append('int header_compile_test;\n')
+
+        elif entry.directive == 'type':
             out.append('test_type;\n')
 
         elif entry.directive == 'value':
@@ -516,8 +562,8 @@ class TestDriver:
     pool, and reports results.
     """
 
-    def run(self, entries, env_config, compiler, mflag, arch,
-                base_flags, tmpdir, opts):
+    def run(self, sym_config, env_config, positive_coverage,
+                compiler, mflag, arch, base_flags, tmpdir, opts):
         """
         Run all (symbol, env) compilations.
 
@@ -622,8 +668,60 @@ class TestDriver:
                 drain()
 
         # Build the list of jobs to run.
+        # Order jobs by configuration entry and then environment name
         jobs = []
-        for entry in entries:
+
+        # First add the synthetic include-only test configurations.
+        # These are added when there is no positive test case for some
+        # compilation environment.  That ensures that negative cases
+        # don't pass by accident if a header does not compile at all.
+        #
+        # Note that with symbol filtering (opts.sym) we skip this,
+        # and with (opts.env) filter the envoronments the same as
+        # how normal jobs from the test config would do.
+
+        if not opts.sym:
+            covered = set()
+            for entry in sym_config.entries:
+                if entry.headers[0] == sym_config.primary_header:
+                    _, need_set = env_config.resolve(entry.env_spec)
+                    covered |= need_set
+            missing = positive_coverage - covered
+            if opts.env:
+                narrow, _ = env_config.resolve(opts.env)
+                missing &= narrow
+            entry = SymEntry(
+                directive='include-only',
+                symbol=f'include-only <{sym_config.primary_header}>',
+                env_spec='',
+                headers=[sym_config.primary_header],
+            )
+            for env_name in sorted(missing):
+                env = env_config.envs[env_name]
+                jobs.append(Job(
+                    index=len(jobs),
+                    entry=entry,
+                    env=env,
+                    expect_pass=True,
+                    lang=opts.lang,
+                    compiler=compiler,
+                    mflag=mflag,
+                    arch=arch,
+                    std_flag=f'-std={env.lang}',
+                    base_flags=base_flags,
+                    tmpdir=tmpdir,
+                    debug=opts.debug,
+                    extra_debug=opts.extra_debug,
+                    force=opts.force,
+                ))
+
+        #
+        # Now add jobs from the normal config file rows.
+        # These may be filtered by symbol and/or environment
+        # using opts.sym or opts.env
+        #
+
+        for entry in sym_config.entries:
             if opts.sym and entry.symbol != opts.sym:
                 continue
             test_set, need_set = env_config.resolve(entry.env_spec)
@@ -950,6 +1048,10 @@ def _parse_args():
                    help='Continue after failures')
     p.add_argument('-j', dest='j', metavar='N', type=int, default=None,
                    help='Number of parallel jobs (default: SYMBOL_TEST_JOBS or 4)')
+    p.add_argument('--positive-coverage', metavar='NAME', default=None,
+                   help='Ensure an expected-success test compiles the primary '
+                        'header in every environment named by NAME; by default '
+                        'all declared environments require positive coverage')
     p.add_argument('-s', dest='sym', metavar='SYM', default=None,
                    help='Narrow to one symbol name')
 
@@ -1013,8 +1115,17 @@ def main():
         for path in args.sym_cfgs:
             sym_cfg.load(path)
 
+        # Named groups may intentionally omit declared environments, so the
+        # default is the complete environment configuration.  One could
+        # also make "ALL" the default but that would encode expectations
+        # on that being defined in the environment config file.
+        if args.positive_coverage is None:
+            positive_coverage = set(env_cfg.envs)
+        else:
+            positive_coverage = env_cfg.expand(args.positive_coverage)
+
         ok = TestDriver().run(
-            sym_cfg.entries, env_cfg, compiler,
+            sym_cfg, env_cfg, positive_coverage, compiler,
             mflag, arch, base_flags, tmpdir, args)
 
     sys.exit(0 if ok else 1)

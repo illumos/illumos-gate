@@ -20,6 +20,7 @@ Unit tests for SymConfig._parse() - the symbols config file parser.
 Tests use canned string input via io.StringIO so no external files are needed.
 """
 
+import contextlib
 import io
 import unittest
 
@@ -37,31 +38,31 @@ CANNED_SYM = """\
 #
 
 # A type test.
-type | size_t | stddef.h | C11+
+type | size_t | test.h | C11+
 
 # A value test.
-value | M_PI | double | math.h | C99+
+value | M_PI | double | test.h | C99+
 
 # A define test with no expected value.
-define | INFINITY | | math.h | C99+
+define | INFINITY | | test.h | C99+
 
 # A define test with an expected value.
-define | FLT_RADIX | 2 | float.h | C99+
+define | FLT_RADIX | 2 | test.h | C99+
 
 # A simple func test (single arg, single header).
-func | log | double | double | math.h | C99+
+func | log | double | double | test.h | C99+
 
 # A func test with continuation lines and multiple args.
 func | hypot			|\
 	double				|\
 	double; double			|\
-	math.h | C99+
+	test.h | C99+
 
 # A func test with multiple headers (;-separated).
 func | acosh			|\
 	double				|\
 	double				|\
-	math.h; iso/math_c99.h | C99+
+	test.h; helper.h | C99+
 """
 
 # ---------------------------------------------------------------------------
@@ -70,19 +71,19 @@ func | acosh			|\
 
 EXPECTED = [
     dict(directive='type',   symbol='size_t',   rtype='size_t',
-         atypes=[],                headers=['stddef.h'],              env_spec='C11+'),
+         atypes=[],                headers=['test.h'],                env_spec='C11+'),
     dict(directive='value',  symbol='M_PI',     rtype='double',
-         atypes=[],                headers=['math.h'],                env_spec='C99+'),
+         atypes=[],                headers=['test.h'],                env_spec='C99+'),
     dict(directive='define', symbol='INFINITY',  rtype=None,
-         atypes=[],                headers=['math.h'],   defval=None, env_spec='C99+'),
+         atypes=[],                headers=['test.h'],   defval=None, env_spec='C99+'),
     dict(directive='define', symbol='FLT_RADIX', rtype=None,
-         atypes=[],                headers=['float.h'],  defval='2',  env_spec='C99+'),
+         atypes=[],                headers=['test.h'],   defval='2',  env_spec='C99+'),
     dict(directive='func',   symbol='log',       rtype='double',
-         atypes=['double'],        headers=['math.h'],                env_spec='C99+'),
+         atypes=['double'],        headers=['test.h'],                env_spec='C99+'),
     dict(directive='func',   symbol='hypot',     rtype='double',
-         atypes=['double', 'double'], headers=['math.h'],             env_spec='C99+'),
+         atypes=['double', 'double'], headers=['test.h'],             env_spec='C99+'),
     dict(directive='func',   symbol='acosh',     rtype='double',
-         atypes=['double'],        headers=['math.h', 'iso/math_c99.h'], env_spec='C99+'),
+         atypes=['double'],        headers=['test.h', 'helper.h'],     env_spec='C99+'),
 ]
 
 
@@ -94,6 +95,9 @@ class TestParseSymCfg(unittest.TestCase):
 
     def test_entry_count(self):
         self.assertEqual(len(self.cfg.entries), len(EXPECTED))
+
+    def test_primary_header(self):
+        self.assertEqual(self.cfg.primary_header, 'test.h')
 
     def test_entries(self):
         for i, exp in enumerate(EXPECTED):
@@ -109,6 +113,22 @@ class TestParseSymCfg(unittest.TestCase):
                 else:
                     self.assertEqual(e.rtype,  exp['rtype'])
 
+    def test_primary_header_mismatch(self):
+        text = (
+            'type | int | first.h | ALL\n'
+            'type | int | second.h | ALL\n'
+        )
+        cfg = SymConfig()
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            cfg._parse(io.StringIO(text), filename='one.cfg')
+        self.assertIn('Only one primary header per configuration file',
+                      err.getvalue())
+        self.assertNotEqual(cfg.entries[1].headers[0], cfg.primary_header)
+
+        with self.assertRaises(SystemExit):
+            cfg._parse(io.StringIO('type | int | other.h | ALL\n'),
+                       filename='two.cfg')
 
 if __name__ == '__main__':
     unittest.main()

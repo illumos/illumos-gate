@@ -47,9 +47,10 @@ env | CXX11_C99\t\t| c++11 | -D_STDC_C99
 
 env_group | CXX98+\t| CXX17 CXX11 CXX98
 env_group | CXX_C99+\t| CXX11_C99 CXX98_C99
+env_group | ALL\t\t| CXX98+
 """
 
-# Expected envs: name → (lang, defs)
+# Expected envs: name -> (lang, defs)
 EXPECTED_ENVS = {
     'CXX98':     ('c++98', ''),
     'CXX11':     ('c++11', ''),
@@ -58,10 +59,11 @@ EXPECTED_ENVS = {
     'CXX11_C99': ('c++11', '-D_STDC_C99'),
 }
 
-# Expected groups: name → frozenset of member env names
+# Expected groups: name -> frozenset of member env names
 EXPECTED_GROUPS = {
     'CXX98+':   frozenset({'CXX17', 'CXX11', 'CXX98'}),
     'CXX_C99+': frozenset({'CXX11_C99', 'CXX98_C99'}),
+    'ALL':       frozenset({'CXX17', 'CXX11', 'CXX98'}),
 }
 
 
@@ -95,6 +97,16 @@ class TestParseEnvCfg(unittest.TestCase):
         for name, members in EXPECTED_GROUPS.items():
             with self.subTest(group=name):
                 self.assertEqual(self.cfg.groups[name], members)
+
+    def test_positive_coverage_sets(self):
+        self.assertEqual(set(self.cfg.envs), set(EXPECTED_ENVS))
+        self.assertEqual(self.cfg.expand('ALL'), set(EXPECTED_GROUPS['ALL']))
+        self.assertNotEqual(set(self.cfg.envs), self.cfg.expand('ALL'))
+
+    def test_resolve_expected_success(self):
+        test_set, need_set = self.cfg.resolve('-CXX98+ +CXX11')
+        self.assertEqual(test_set, set(EXPECTED_GROUPS['CXX98+']))
+        self.assertEqual(need_set, {'CXX11'})
 
     def test_lang_mismatch_raises(self):
         """--lang=c should be rejected when env lines use c++ standards."""
