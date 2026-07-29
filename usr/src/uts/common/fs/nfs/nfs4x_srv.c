@@ -1435,7 +1435,7 @@ rfs4x_op_test_stateid(nfs_argop4 *argop, nfs_resop4 *resop,
 		st = rfs4_get_all_state(sid, &sp, &dsp, &lsp);
 		if (st == NFS4_OK) {
 			if (sp != NULL)
-				rfs4_state_rele(sp);
+				rfs4_state_rele_nounlock(sp);
 			if (dsp != NULL)
 				rfs4_deleg_state_rele(dsp);
 			if (lsp != NULL)
