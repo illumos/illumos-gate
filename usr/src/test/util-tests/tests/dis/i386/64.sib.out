@@ -1,0 +1,42 @@
+    libdis_test:      48 8b 34 58        movq   (%rax,%rbx,2),%rsi
+    libdis_test+0x4:  4a 8b 34 80        movq   (%rax,%r8,4),%rsi
+    libdis_test+0x8:  4a 8b 34 f8        movq   (%rax,%r15,8),%rsi
+    libdis_test+0xc:  48 8b 34 59        movq   (%rcx,%rbx,2),%rsi
+    libdis_test+0x10: 4a 8b 34 81        movq   (%rcx,%r8,4),%rsi
+    libdis_test+0x14: 4a 8b 34 f9        movq   (%rcx,%r15,8),%rsi
+    libdis_test+0x18: 48 8b b4 58 77 77  movq   0x7777(%rax,%rbx,2),%rsi
+                      00 00 
+    libdis_test+0x20: 4a 8b b4 80 77 77  movq   0x7777(%rax,%r8,4),%rsi
+                      00 00 
+    libdis_test+0x28: 4a 8b b4 f8 77 77  movq   0x7777(%rax,%r15,8),%rsi
+                      00 00 
+    libdis_test+0x30: 48 8b b4 59 77 77  movq   0x7777(%rcx,%rbx,2),%rsi
+                      00 00 
+    libdis_test+0x38: 4a 8b b4 81 77 77  movq   0x7777(%rcx,%r8,4),%rsi
+                      00 00 
+    libdis_test+0x40: 4a 8b b4 f9 77 77  movq   0x7777(%rcx,%r15,8),%rsi
+                      00 00 
+    libdis_test+0x48: 62 e1 7c 48 10 24  vmovups (%rax,%rbx,2),%zmm20
+                      58 
+    libdis_test+0x4f: 62 a1 7c 48 10 24  vmovups (%rax,%r8,4),%zmm20
+                      80 
+    libdis_test+0x56: 62 a1 7c 48 10 24  vmovups (%rax,%r15,8),%zmm20
+                      f8 
+    libdis_test+0x5d: 62 e1 7c 48 10 24  vmovups (%rcx,%rbx,2),%zmm20
+                      59 
+    libdis_test+0x64: 62 a1 7c 48 10 24  vmovups (%rcx,%r8,4),%zmm20
+                      81 
+    libdis_test+0x6b: 62 a1 7c 48 10 24  vmovups (%rcx,%r15,8),%zmm20
+                      f9 
+    libdis_test+0x72: 62 e1 7c 48 10 a4  vmovups 0x7777(%rax,%rbx,2),%zmm20
+                      58 77 77 00 00 
+    libdis_test+0x7d: 62 a1 7c 48 10 a4  vmovups 0x7777(%rax,%r8,4),%zmm20
+                      80 77 77 00 00 
+    libdis_test+0x88: 62 a1 7c 48 10 a4  vmovups 0x7777(%rax,%r15,8),%zmm20
+                      f8 77 77 00 00 
+    libdis_test+0x93: 62 e1 7c 48 10 a4  vmovups 0x7777(%rcx,%rbx,2),%zmm20
+                      59 77 77 00 00 
+    libdis_test+0x9e: 62 a1 7c 48 10 a4  vmovups 0x7777(%rcx,%r8,4),%zmm20
+                      81 77 77 00 00 
+    libdis_test+0xa9: 62 a1 7c 48 10 a4  vmovups 0x7777(%rcx,%r15,8),%zmm20
+                      f9 77 77 00 00 
