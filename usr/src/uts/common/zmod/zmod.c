@@ -22,6 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/modctl.h>
@@ -36,13 +38,15 @@
  * The resulting decompressed size is then returned through dstlen.  This
  * function return Z_OK on success, or another error code on failure.
  */
-int
-z_uncompress(void *dst, size_t *dstlen, const void *src, size_t srclen)
+static int
+z_uncompress_impl(void *dst, size_t *dstlen, const void *src, size_t srclen,
+    alloc_func zalloc)
 {
 	z_stream zs;
 	int err;
 
 	bzero(&zs, sizeof (zs));
+	zs.zalloc = zalloc;
 	zs.next_in = (uchar_t *)src;
 	zs.avail_in = srclen;
 	zs.next_out = dst;
@@ -63,6 +67,24 @@ z_uncompress(void *dst, size_t *dstlen, const void *src, size_t srclen)
 
 	*dstlen = zs.total_out;
 	return (inflateEnd(&zs));
+}
+
+int
+z_uncompress(void *dst, size_t *dstlen, const void *src, size_t srclen)
+{
+	return (z_uncompress_impl(dst, dstlen, src, srclen, NULL));
+}
+
+/*
+ * Variant of z_uncompress which uses the KM_SLEEP allocator so callers
+ * will block waiting for memory rather than failing immediately.  This is
+ * intended for callers (such as ZFS read-path) that expect to wait for
+ * memory instead of returning an error.
+ */
+int
+z_uncompress_sleep(void *dst, size_t *dstlen, const void *src, size_t srclen)
+{
+	return (z_uncompress_impl(dst, dstlen, src, srclen, zcalloc_sleep));
 }
 
 int

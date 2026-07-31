@@ -22,6 +22,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/debug.h>
@@ -60,7 +62,7 @@ gzip_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len, int n)
 
 	ASSERT(d_len >= s_len);
 
-	if (z_uncompress(d_start, &dstlen, s_start, s_len) != Z_OK)
+	if (z_uncompress_sleep(d_start, &dstlen, s_start, s_len) != Z_OK)
 		return (-1);
 
 	return (0);

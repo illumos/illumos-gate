@@ -3,6 +3,10 @@
  * For conditions of distribution and use, see copyright notice in zlib.h
  */
 
+ /*
+  * Copyright 2026 Oxide Computer Company
+  */
+
 /* WARNING: this file should *not* be used by applications. It is
    part of the implementation of the compression library and is
    subject to change. Applications should only use zlib.h.
@@ -258,6 +262,10 @@ extern z_const char * const z_errmsg[10]; /* indexed by 2-zlib_error */
    voidpf ZLIB_INTERNAL zcalloc OF((voidpf opaque, unsigned items,
                                     unsigned size));
    void ZLIB_INTERNAL zcfree  OF((voidpf opaque, voidpf ptr));
+
+   /* KM_SLEEP variant used by kernel callers that need to block for memory */
+   voidpf ZLIB_INTERNAL zcalloc_sleep OF((voidpf opaque, unsigned items,
+                                        unsigned size));
 #endif
 
 #define ZALLOC(strm, items, size) \

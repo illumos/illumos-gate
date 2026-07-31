@@ -46,6 +46,7 @@ SYMBOL_SCOPE {
 		z_compress_level;
 		z_strerror;
 		z_uncompress;
+		z_uncompress_sleep;
 
 		# private interfaces used by dboot
 		z_inflate;

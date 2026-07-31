@@ -22,6 +22,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/systm.h>
@@ -37,11 +39,11 @@ struct zchdr {
 
 #define	ZCH_MAGIC	0x3cc13cc1
 
-void *
-zcalloc(void *opaque __unused, uint_t items, uint_t size)
+static void *
+zcalloc_impl(uint_t items, uint_t size, int kmflag)
 {
 	size_t nbytes = sizeof (struct zchdr) + items * size;
-	struct zchdr *z = kobj_zalloc(nbytes, KM_NOWAIT|KM_TMP);
+	struct zchdr *z = kobj_zalloc(nbytes, kmflag);
 
 	if (z == NULL)
 		return (NULL);
@@ -50,6 +52,25 @@ zcalloc(void *opaque __unused, uint_t items, uint_t size)
 	z->zch_size = nbytes;
 
 	return (z + 1);
+}
+
+
+void *
+zcalloc(void *opaque __unused, uint_t items, uint_t size)
+{
+	return (zcalloc_impl(items, size, KM_NOWAIT|KM_TMP));
+}
+
+/*
+ * Variant of zcalloc which uses KM_SLEEP so callers will block until memory
+ * becomes available instead of failing immediately.  This is useful for
+ * decompression paths which are expected to wait for memory (e.g. during
+ * ZFS reads) rather than fail and return errors.
+ */
+void *
+zcalloc_sleep(void *opaque __unused, uint_t items, uint_t size)
+{
+	return (zcalloc_impl(items, size, KM_SLEEP));
 }
 
 void

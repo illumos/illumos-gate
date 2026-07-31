@@ -22,6 +22,8 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_ZMOD_H
@@ -55,6 +57,7 @@ extern "C" {
 #define	Z_DEFAULT_COMPRESSION	(-1)
 
 extern int z_uncompress(void *, size_t *, const void *, size_t);
+extern int z_uncompress_sleep(void *, size_t *, const void *, size_t);
 extern int z_compress(void *, size_t *, const void *, size_t);
 extern int z_compress_level(void *, size_t *, const void *, size_t, int);
 extern const char *z_strerror(int);

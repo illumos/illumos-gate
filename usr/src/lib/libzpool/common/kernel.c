@@ -23,6 +23,7 @@
  * Copyright (c) 2012, 2015 by Delphix. All rights reserved.
  * Copyright 2020 Joyent, Inc.
  * Copyright 2017 RackTop Systems.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <assert.h>
@@ -569,6 +570,12 @@ z_uncompress(void *dst, size_t *dstlen, const void *src, size_t srclen)
 		*dstlen = (size_t)len;
 
 	return (ret);
+}
+
+int
+z_uncompress_sleep(void *dst, size_t *dstlen, const void *src, size_t srclen)
+{
+	return (z_uncompress(dst, dstlen, src, srclen));
 }
 
 int
