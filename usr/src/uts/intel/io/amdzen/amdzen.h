@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _AMDZEN_H
@@ -142,6 +142,7 @@ typedef struct {
 	uint32_t	adf_mask1;
 	uint32_t	adf_mask2;
 	uint32_t	adf_nccm;
+	uint32_t	adf_nphys_ccds;
 	df_fabric_decomp_t	adf_decomp;
 } amdzen_df_t;
 

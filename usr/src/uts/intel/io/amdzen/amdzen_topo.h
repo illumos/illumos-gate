@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _AMDZEN_TOPO_H
@@ -100,6 +100,12 @@ typedef struct amdzen_topo_df {
 	uint32_t atd_minor;
 	uint_t atd_nb_busno;
 	/*
+	 * The number of physical CCD sites on this node, whether or not a CCD
+	 * is present at each. This is an upper bound on the physical CCD
+	 * numbers found in atcd_ccd_ids[].
+	 */
+	uint32_t atd_nphys_ccds;
+	/*
 	 * atd_ndf_buf_nents should be set to the size of the number of DF
 	 * entries that are present in atd_df_ents. atd_ndf_buf_valid will
 	 * determine the number of entries that are considered valid in the
@@ -123,6 +129,7 @@ typedef struct {
 	uint32_t atd_major;
 	uint32_t atd_minor;
 	uint32_t atd_nb_busno;
+	uint32_t atd_nphys_ccds;
 	uint32_t atd_df_buf_nents;
 	uint32_t atd_df_buf_nvalid;
 	uint32_t atd_df_act_nents;

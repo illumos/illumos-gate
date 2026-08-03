@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -431,8 +431,13 @@ topo_zen_build_ccds(topo_mod_t *mod, zen_topo_enum_sock_t *sock)
 {
 	tnode_t *chip = sock->ztes_tn;
 
-	if (topo_node_range_create(mod, chip, CCD, 0, sock->ztes_nccd - 1) !=
-	    0) {
+	/*
+	 * The range covers the physical CCD sites that the package supports,
+	 * whether or not each is populated, so that the nodes within it can
+	 * be bound by their physical number.
+	 */
+	if (topo_node_range_create(mod, chip, CCD, 0,
+	    sock->ztes_df->atd_nphys_ccds - 1) != 0) {
 		topo_mod_dprintf(mod, "failed to create CCD range: %s\n",
 		    topo_mod_errmsg(mod));
 		return (-1);
@@ -449,8 +454,17 @@ topo_zen_build_ccds(topo_mod_t *mod, zen_topo_enum_sock_t *sock)
 			continue;
 		}
 
-		zt_ccd->ztccd_tn = topo_zen_create_tn(mod, sock, chip, ccdno,
-		    CCD);
+		/*
+		 * The CCD node instance is the physical CCD number, matching
+		 * the CCX and core nodes below which are also bound by their
+		 * physical position. This gives each CCD site a stable
+		 * identity regardless of how the package is populated, with
+		 * gaps in the instance space where sites are empty or fused
+		 * off. Both the physical and logical numbers are available
+		 * as properties at each level.
+		 */
+		zt_ccd->ztccd_tn = topo_zen_create_tn(mod, sock, chip,
+		    ccd->atccd_phys_no, CCD);
 		if (zt_ccd->ztccd_tn == NULL) {
 			return (-1);
 		}

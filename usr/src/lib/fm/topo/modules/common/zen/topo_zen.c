@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -198,7 +198,8 @@ topo_zen_enum_chip_gather(topo_mod_t *mod, const zen_topo_t *zen,
 	sock->ztes_tn_ccd = topo_mod_zalloc(mod, sizeof (zen_topo_enum_ccd_t) *
 	    sock->ztes_nccd);
 
-	for (uint32_t i = 0, ccdno = 0; i < df->atd_df_buf_nvalid; i++) {
+	uint32_t ccdno = 0;
+	for (uint32_t i = 0; i < df->atd_df_buf_nvalid; i++) {
 		const amdzen_topo_df_ent_t *dfe = &df->atd_df_ents[i];
 		const amdzen_topo_ccm_data_t *ccm;
 
@@ -207,7 +208,16 @@ topo_zen_enum_chip_gather(topo_mod_t *mod, const zen_topo_t *zen,
 		}
 
 		ccm = &dfe->atde_data.atded_ccm;
-		for (uint32_t ccm_ccdno = 0; ccm_ccdno < ccm->atcd_nccds;
+
+		/*
+		 * The CCD enable array is indexed by the CCM's SDP ports and
+		 * may be sparse. A CCM whose sole CCD is connected to the
+		 * second port reports atcd_ccd_en[] as [0, 1]. atcd_nccds is
+		 * the number of enabled CCDs, not the number of valid entries
+		 * in atcd_ccd_en[], so it cannot be used as the loop bound
+		 * here.
+		 */
+		for (uint32_t ccm_ccdno = 0; ccm_ccdno < DF_MAX_CCDS_PER_CCM;
 		    ccm_ccdno++) {
 			if (ccm->atcd_ccd_en[ccm_ccdno] == 0) {
 				continue;
@@ -220,6 +230,18 @@ topo_zen_enum_chip_gather(topo_mod_t *mod, const zen_topo_t *zen,
 
 			ccdno++;
 		}
+	}
+
+	/*
+	 * Check that we visited as many CCDs as were counted when sizing
+	 * ztes_ccd[] above. If these disagree then some entries were never
+	 * filled in, and they would otherwise appear valid because a zeroed
+	 * atccd_err is AMDZEN_TOPO_CCD_E_OK.
+	 */
+	if (ccdno != sock->ztes_nccd) {
+		topo_mod_dprintf(mod, "gathered information for %u CCDs, but "
+		    "expected %u: cannot continue\n", ccdno, sock->ztes_nccd);
+		return (topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM));
 	}
 
 	topo_mod_dprintf(mod, "found %u CCDs\n", sock->ztes_nccd_valid);
