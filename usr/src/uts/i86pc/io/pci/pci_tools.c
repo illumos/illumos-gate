@@ -269,6 +269,7 @@ pcitool_get_intr(dev_info_t *dip, void *arg, int mode)
 	pcitool_intr_get_t *iget = &partial_iget;
 	size_t	iget_kmem_alloc_size = 0;
 	uint8_t num_devs_ret = 0;
+	boolean_t entered = B_FALSE;
 	int copyout_rval;
 	int rval = SUCCESS;
 	int i;
@@ -366,6 +367,7 @@ pcitool_get_intr(dev_info_t *dip, void *arg, int mode)
 	 */
 	if (intr_info.avgi_req_flags & PSMGI_REQ_GET_DEVS) {
 		ndi_devi_enter(dip);
+		entered = B_TRUE;
 	}
 
 	/* Call psm_intr_ops(PSM_INTR_OP_GET_INTR) to get information. */
@@ -414,9 +416,8 @@ pcitool_get_intr(dev_info_t *dip, void *arg, int mode)
 
 done_get_intr:
 
-	if (intr_info.avgi_req_flags & PSMGI_REQ_GET_DEVS) {
+	if (entered)
 		ndi_devi_exit(dip);
-	}
 
 	iget->drvr_version = PCITOOL_VERSION;
 	copyout_rval = ddi_copyout(iget, arg,
