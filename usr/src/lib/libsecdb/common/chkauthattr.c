@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <alloca.h>
@@ -116,7 +117,9 @@ _enum_common_p(const char *cprofiles,
 			return (-1);
 
 		/* Add it */
-		profs[(*pcnt)++] = strdup(prof);
+		if ((profs[*pcnt] = strdup(prof)) == NULL)
+			return (-1);
+		(*pcnt)++;
 
 		if (strcmp(profs[*pcnt - 1], PROFILE_STOP) == 0)
 			break;

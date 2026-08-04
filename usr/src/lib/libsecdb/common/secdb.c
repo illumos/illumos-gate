@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 
@@ -365,10 +366,17 @@ _csl_to_argv(char *csl)
 	if ((spc = (char **)malloc((ncommas + 2) * sizeof (char *))) == NULL) {
 		return (NULL);
 	}
-	copy = strdup(csl);
+	if ((copy = strdup(csl)) == NULL) {
+		free(spc);
+		return (NULL);
+	}
 	for (pc = strtok_r(copy, ",", &lasts), i = 0; pc != NULL;
 	    pc = strtok_r(NULL, ",", &lasts), i++) {
-		spc[i] = strdup(pc);
+		if ((spc[i] = strdup(pc)) == NULL) {
+			_free_argv(spc);
+			free(copy);
+			return (NULL);
+		}
 	}
 	spc[i] = NULL;
 	free(copy);
