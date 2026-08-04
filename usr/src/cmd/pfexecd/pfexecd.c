@@ -20,10 +20,12 @@
  *
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #define	_POSIX_PTHREAD_SEMANTICS 1
 
+#include <sys/ccompile.h>
 #include <sys/param.h>
 #include <sys/klpd.h>
 #include <sys/syscall.h>
@@ -33,9 +35,11 @@
 #include <ctype.h>
 #include <deflt.h>
 #include <door.h>
+#include <err.h>
 #include <errno.h>
 #include <grp.h>
 #include <priv.h>
+#include <pthread.h>
 #include <pwd.h>
 #include <regex.h>
 #include <secdb.h>
@@ -173,9 +177,8 @@ register_pfexec(int fd)
 	return (ret);
 }
 
-/* ARGSUSED */
 static void
-unregister_pfexec(int sig)
+unregister_pfexec(int sig __unused)
 {
 	if (doorfd != -1)
 		(void) syscall(SYS_privsys, PRIVSYS_PFEXEC_UNREG, doorfd);
@@ -246,9 +249,9 @@ get_privset(const char *s, boolean_t *ok, char *path)
 	return (res);
 }
 
-/*ARGSUSED*/
 static int
-ggp_callback(const char *prof, kva_t *attr, void *ctxt, void *vres)
+ggp_callback(const char *prof __unused, kva_t *attr, void *ctxt __unused,
+    void *vres)
 {
 	priv_set_t *res = vres;
 	char *privs;
@@ -473,11 +476,10 @@ stdexec:
 	(void) door_return((char *)res, mysz, NULL, 0);
 }
 
-/* ARGSUSED */
 static void
-callback(void *cookie, char *argp, size_t asz, door_desc_t *dp, uint_t ndesc)
+callback(void *cookie __unused, char *argp, size_t asz,
+    door_desc_t *dp __unused, uint_t ndesc __unused)
 {
-	/* LINTED ALIGNMENT */
 	pfexec_arg_t *pap = (pfexec_arg_t *)argp;
 
 	if (asz < sizeof (pfexec_arg_t) || pap->pfa_vers != PFEXEC_ARG_VERS) {
@@ -507,10 +509,43 @@ callback(void *cookie, char *argp, size_t asz, door_desc_t *dp, uint_t ndesc)
 	(void) door_return(NULL, 0, NULL, 0);
 }
 
+/*
+ * Door server threads. The default door server thread creation function in
+ * libc places no limit on the number of threads it will create and gives
+ * each one a default sized (1 MiB) stack. Instead, create a private door
+ * with a fixed pool of server threads that have smaller stacks. The door
+ * is created with DOOR_NO_DEPLETION_CB so the pool never grows beyond its
+ * initial size; the kernel queues further door invocations until a server
+ * thread becomes available.
+ *
+ * The stack size must accommodate libsecdb's profile enumeration, which
+ * keeps MAXPROFS-sized pointer arrays and copies of profile lists on
+ * the stack, with headroom for nested profiles.
+ */
+#define	DOOR_THREADS		16
+#define	DOOR_THREAD_STACKSIZE	(256 * 1024)
+
+/* Initialised in main() before the door is created, then never modified. */
+static pthread_attr_t door_attr;
+
+/*
+ * Since the door uses DOOR_NO_DEPLETION_CB, this is only called from
+ * door_xcreate() to populate the initial thread pool.
+ */
+static int
+create_door_thread(door_info_t *dip __unused, void *(*startf)(void *),
+    void *startfarg, void *cookie __unused)
+{
+	if (pthread_create(NULL, &door_attr, startf, startfarg) != 0)
+		return (-1);
+	return (1);
+}
+
 int
 main(void)
 {
 	const priv_impl_info_t *info;
+	int ret;
 
 	(void) signal(SIGINT, unregister_pfexec);
 	(void) signal(SIGQUIT, unregister_pfexec);
@@ -530,14 +565,24 @@ main(void)
 
 	init_isa_regex();
 
-	doorfd = door_create(callback, NULL, DOOR_REFUSE_DESC);
+	if ((ret = pthread_attr_init(&door_attr)) != 0 ||
+	    (ret = pthread_attr_setdetachstate(&door_attr,
+	    PTHREAD_CREATE_DETACHED)) != 0 ||
+	    (ret = pthread_attr_setstacksize(&door_attr,
+	    DOOR_THREAD_STACKSIZE)) != 0) {
+		errc(EXIT_FAILURE, ret,
+		    "failed to configure door thread attributes");
+	}
+
+	doorfd = door_xcreate(callback, NULL,
+	    DOOR_REFUSE_DESC | DOOR_NO_DEPLETION_CB, create_door_thread,
+	    NULL, NULL, DOOR_THREADS);
 
 	if (doorfd == -1 || register_pfexec(doorfd) != 0) {
 		perror("doorfd");
 		exit(1);
 	}
 
-	/* LINTED CONSTCOND */
 	while (1)
 		(void) sigpause(SIGINT);
 
