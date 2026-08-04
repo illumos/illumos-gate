@@ -266,6 +266,7 @@ struct virtio_net_ctrlq_hdr {
  * Control Queue Classes
  */
 #define	VIRTIO_NET_CTRL_RX		0
+#define	VIRTIO_NET_CTRL_MAC		1
 #define	VIRTIO_NET_CTRL_MQ		4
 
 /*
@@ -277,6 +278,22 @@ struct virtio_net_ctrlq_hdr {
 #define	VIRTIO_NET_CTRL_RX_NOMULTI	3
 #define	VIRTIO_NET_CTRL_RX_NOUNI	4
 #define	VIRTIO_NET_CTRL_RX_NOBCAST	5
+
+/*
+ * CTRL_MAC commands
+ */
+#define	VIRTIO_NET_CTRL_MAC_TABLE_SET	0
+#define	VIRTIO_NET_CTRL_MAC_ADDR_SET	1
+
+/*
+ * The body of a VIRTIO_NET_CTRL_MAC_TABLE_SET request is two of these
+ * variable length tables back to back, holding unicast addresses first and
+ * multicast addresses second. The entry counts are little-endian.
+ */
+struct virtio_net_ctrl_mac {
+	uint32_t	vncmt_entries;
+	uint8_t		vncmt_macs[][ETHERADDRL];
+} __packed;
 
 /*
  * CTRL_MQ commands
@@ -384,11 +401,22 @@ struct virtio_net_ctrl_mq {
 #define	VIOIF_TX_INLINE_SIZE		(2 * 1024)
 
 /*
- * Control queue messages are very small. This is a rather arbitrary small
- * bufer size that should be sufficiently large for any control queue
- * messages we will send.
+ * The maximum number of unicast and multicast addresses that we will ask the
+ * device to filter on. If the networking stack needs more unicast addresses
+ * than this, MAC falls back to enabling promiscuous mode on the device. If it
+ * needs more multicast addresses, we ask the device to deliver all multicast
+ * traffic instead of filtering it.
  */
-#define	VIOIF_CTRL_SIZE			256
+#define	VIOIF_MACTAB_UC			32
+#define	VIOIF_MACTAB_MC			64
+
+/*
+ * The size of the DMA buffer used for control queue requests. It must be able
+ * to hold the largest request we construct, which is a filter table update
+ * carrying both address tables at full capacity. There is a compile time
+ * check of this where that request is built.
+ */
+#define	VIOIF_CTRL_SIZE			1024
 
 /*
  * TYPE DEFINITIONS
@@ -691,6 +719,36 @@ struct vioif {
 	uint64_t			vif_ctrlbuf_toosmall;
 	uint64_t			vif_ctrlq_abandoned;
 	uint64_t			vif_ctrlq_recovered;
+
+	/*
+	 * The unicast and multicast address filter tables programmed into
+	 * the device. The mutex is held across both a table update and the
+	 * control queue request that programs it into the device, and is
+	 * acquired before "vif_mutex".
+	 */
+	kmutex_t			vif_mactab_mutex;
+	uint32_t			vif_nuctab;
+	uint32_t			vif_nmctab;
+	uint8_t				vif_uctab[VIOIF_MACTAB_UC][ETHERADDRL];
+	uint8_t				vif_mctab[VIOIF_MACTAB_MC][ETHERADDRL];
+
+	/*
+	 * The number of multicast addresses added after the table filled.
+	 * While this is non-zero the device is asked to deliver all
+	 * multicast traffic, tracked by "vif_allmulti", instead of
+	 * filtering it.
+	 */
+	uint_t				vif_mc_overflow;
+	bool				vif_allmulti;
+
+	/*
+	 * "vif_mactab_active" is set once the device has accepted a filter
+	 * table. "vif_mactab_rejected" is set when the device rejects a
+	 * table before ever accepting one, from which we conclude that it
+	 * does not implement the command and stop trying.
+	 */
+	bool				vif_mactab_active;
+	bool				vif_mactab_rejected;
 };
 
 /*

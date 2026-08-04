@@ -123,11 +123,16 @@
  * performs flow classification and fanout across the rings, and transmits
  * on a particular ring through vioif_ring_tx().
  *
- * The device filters received frames on its own primary MAC address, so our
- * group "addmac" entrypoint accepts that address alone, and returns ENOSPC
- * for any other. MAC responds to ENOSPC by enabling promiscuous mode on the
- * device and falling back to software classification, which is how VNICs
- * and other additional unicast addresses are supported.
+ * When VIRTIO_NET_F_CTRL_RX is negotiated, the device filters received
+ * frames using tables of unicast and multicast addresses that we maintain
+ * via the VIRTIO_NET_CTRL_MAC_TABLE_SET command. Updates are sent as MAC adds
+ * and removes addresses. These tables have a fixed capacity. If the unicast
+ * table fills, or if the device refuses an update, the group "addmac"
+ * entrypoint returns ENOSPC. MAC responds to that by enabling promiscuous mode
+ * on the device and falling back to software classification, which is also how
+ * all additional unicast addresses are supported on devices without
+ * VIRTIO_NET_F_CTRL_RX. If the multicast table fills, the device is asked to
+ * deliver all multicast traffic instead of filtering it.
  *
  * MAC may take a receive ring out of interrupt mode and poll it. Virtqueue
  * interrupt suppression is only advisory and the device may continue to
@@ -173,13 +178,18 @@
  * ("vrq_mutex", "vtq_mutex") protecting its buffer free list, accounting,
  * flags and statistics; the queues operate independently of one another.
  * Device-wide state (the run state, link state and the control queue
- * buffers) is protected by "vif_mutex".
+ * buffers) is protected by "vif_mutex". The address filter tables are
+ * protected by "vif_mactab_mutex", which is held across both a table update
+ * and the control queue request that programs it into the device, so that
+ * concurrent updates cannot reach the device out of order. It is therefore
+ * acquired before "vif_mutex", and never while holding it.
  *
  * A queue mutex may be held while calling into the virtio framework, which
  * has a per-virtqueue mutex of its own. The framework enters the driver only
  * through the registered interrupt handlers, and never does so while holding
- * a virtqueue mutex, so the reverse ordering never occurs. No path requires
- * holding more than one of the driver's mutexes at once.
+ * a virtqueue mutex, so the reverse ordering never occurs. Other than the
+ * filter table path described above, no path requires holding more than one
+ * of the driver's mutexes at once.
  */
 
 #include <sys/types.h>
@@ -698,11 +708,10 @@ vioif_ctrlq_req(vioif_t *vif, uint8_t class, uint8_t cmd, void *data,
 	 * reference (respectively) the header, the data, and the ack byte
 	 * within that memory to adhere to the virtio spec.
 	 *
-	 * If we add support for control queue features such as custom
-	 * MAC filtering tables, which might require larger amounts of
-	 * memory, we likely will want to add more sophistication here
-	 * and optionally use additional allocated memory to hold that
-	 * data instead of a fixed size buffer.
+	 * The buffer is sized to hold the largest request we construct,
+	 * which is a filter table update carrying both address tables at
+	 * full capacity. This is checked at compile time where that request
+	 * is built.
 	 *
 	 * Copy the header.
 	 */
@@ -791,17 +800,170 @@ done:
 	return (r);
 }
 
+/*
+ * A control queue buffer must be able to hold the largest request that we
+ * construct, which is a filter table update carrying both address tables at
+ * full capacity, along with the request header and the ack byte.
+ */
+CTASSERT(VIOIF_CTRL_SIZE >= sizeof (struct virtio_net_ctrlq_hdr) +
+    2 * sizeof (struct virtio_net_ctrl_mac) +
+    ETHERADDRL * (VIOIF_MACTAB_UC + VIOIF_MACTAB_MC) + 1);
+
+/*
+ * Ask the device to deliver all multicast traffic rather than filtering it,
+ * or to resume filtering, used when the multicast address table overflows.
+ */
+static int
+vioif_set_allmulti(vioif_t *vif, bool on)
+{
+	uint8_t val = on ? 1 : 0;
+	int r;
+
+	VERIFY(MUTEX_HELD(&vif->vif_mactab_mutex));
+
+	r = vioif_ctrlq_req(vif, VIRTIO_NET_CTRL_RX,
+	    VIRTIO_NET_CTRL_RX_ALLMULTI, &val, sizeof (val));
+
+	/*
+	 * Enabling is recorded only once the device accepts the command.
+	 * Disabling is recorded even if the command fails, which at worst
+	 * leaves the device delivering multicast traffic that is not strictly
+	 * needed until the next enable request.
+	 */
+	if (r == 0 || !on)
+		vif->vif_allmulti = on;
+
+	return (r);
+}
+
+/*
+ * Programme the device's address filter tables with the current unicast and
+ * multicast address lists.
+ */
+static int
+vioif_mac_table_set(vioif_t *vif)
+{
+	struct virtio_net_ctrl_mac *tbl;
+	const size_t len = 2 * sizeof (*tbl) +
+	    (vif->vif_nuctab + vif->vif_nmctab) * ETHERADDRL;
+	uint8_t *buf = kmem_zalloc(len, KM_SLEEP);
+	uint8_t *p = buf;
+	int r;
+
+	VERIFY(MUTEX_HELD(&vif->vif_mactab_mutex));
+
+	tbl = (struct virtio_net_ctrl_mac *)p;
+	tbl->vncmt_entries = LE_32(vif->vif_nuctab);
+	bcopy(vif->vif_uctab, tbl->vncmt_macs, vif->vif_nuctab * ETHERADDRL);
+	p += sizeof (*tbl) + vif->vif_nuctab * ETHERADDRL;
+
+	tbl = (struct virtio_net_ctrl_mac *)p;
+	tbl->vncmt_entries = LE_32(vif->vif_nmctab);
+	bcopy(vif->vif_mctab, tbl->vncmt_macs, vif->vif_nmctab * ETHERADDRL);
+
+	r = vioif_ctrlq_req(vif, VIRTIO_NET_CTRL_MAC,
+	    VIRTIO_NET_CTRL_MAC_TABLE_SET, buf, len);
+	kmem_free(buf, len);
+
+	if (r == 0) {
+		vif->vif_mactab_active = true;
+	} else if (r == EIO && !vif->vif_mactab_active) {
+		/*
+		 * The device rejected a filter table without ever having
+		 * accepted one, so it most likely does not implement the
+		 * command.
+		 */
+		vif->vif_mactab_rejected = true;
+	}
+
+	return (r);
+}
+
+/*
+ * Remove entry "i" from an address table holding "n" entries. The tables are
+ * unordered, so we just move the last entry into the vacated slot.
+ */
+static void
+vioif_mactab_remove(uint8_t (*tab)[ETHERADDRL], uint32_t n, uint32_t i)
+{
+	if (i != n - 1)
+		bcopy(tab[n - 1], tab[i], ETHERADDRL);
+}
+
 static int
 vioif_m_multicst(void *arg, boolean_t add, const uint8_t *mcst_addr)
 {
+	vioif_t *vif = arg;
+
 	/*
-	 * Even though we currently do not have support for programming
-	 * multicast filters, or even enabling promiscuous mode, we return
-	 * success here to avoid the networking stack falling back to link
-	 * layer broadcast for multicast traffic.  Some hypervisors already
-	 * pass received multicast frames onto the guest, so at least on those
-	 * systems multicast will work as expected anyway.
+	 * If we cannot program the device's multicast filter table, return
+	 * success anyway, to avoid the networking stack falling back to link
+	 * layer broadcast for multicast traffic. Some hypervisors pass
+	 * received multicast frames onto the guest regardless, so at least
+	 * on those systems multicast will work as expected.
 	 */
+	if (!vif->vif_has_ctrlq_rx || vif->vif_mactab_rejected)
+		return (0);
+
+	mutex_enter(&vif->vif_mactab_mutex);
+	if (add) {
+		bool intable = false;
+
+		if (vif->vif_nmctab < VIOIF_MACTAB_MC) {
+			bcopy(mcst_addr, vif->vif_mctab[vif->vif_nmctab],
+			    ETHERADDRL);
+			vif->vif_nmctab++;
+			if (vioif_mac_table_set(vif) == 0)
+				intable = true;
+			else
+				vif->vif_nmctab--;
+		}
+
+		/*
+		 * If the address could not be placed in the filter table,
+		 * whether because the table is full or because the device
+		 * did not accept the update, ask the device to deliver all
+		 * multicast traffic rather than filtering. Count the addresses
+		 * concerned so that filtering can resume once they have all
+		 * been removed. No error is returned to MAC as the stack
+		 * treats a failed join as fatal, in the worst case by
+		 * permanently falling back to link layer broadcast for the
+		 * interface, whereas the fail-open request preserves delivery
+		 * even when the device applies an abandoned request late.
+		 */
+		if (!intable && !vif->vif_mactab_rejected) {
+			if (!vif->vif_allmulti)
+				(void) vioif_set_allmulti(vif, true);
+			vif->vif_mc_overflow++;
+		}
+	} else {
+		uint32_t i;
+
+		for (i = 0; i < vif->vif_nmctab; i++) {
+			if (bcmp(mcst_addr, vif->vif_mctab[i], ETHERADDRL) == 0)
+				break;
+		}
+
+		if (i < vif->vif_nmctab) {
+			vioif_mactab_remove(vif->vif_mctab, vif->vif_nmctab, i);
+			vif->vif_nmctab--;
+			/*
+			 * If this update fails, the device just continues
+			 * to accept traffic for the removed address.
+			 */
+			(void) vioif_mac_table_set(vif);
+		} else if (vif->vif_mc_overflow > 0) {
+			/*
+			 * The address was added after the table filled. Once
+			 * the last such address has been removed the device
+			 * can resume filtering.
+			 */
+			if (--vif->vif_mc_overflow == 0 && vif->vif_allmulti)
+				(void) vioif_set_allmulti(vif, false);
+		}
+	}
+	mutex_exit(&vif->vif_mactab_mutex);
+
 	return (0);
 }
 
@@ -1209,31 +1371,70 @@ vioif_m_propinfo(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 }
 
 /*
- * The device always delivers frames destined for its own primary MAC
- * address, so we accept that one and report that we are out of filter
- * resources for anything else. MAC responds to ENOSPC by enabling
- * promiscuous mode on the device and using software classification.
+ * Add a unicast address to the device's filter table. The device always
+ * accepts frames for the address in its configuration space, so the primary
+ * address is not placed in the table. If the table is full, or the device
+ * cannot be given the address, we report that we are out of filter resources.
+ * MAC responds to ENOSPC by enabling promiscuous mode on the device and using
+ * software classification.
  */
 static int
 vioif_group_addmac(void *arg, const uint8_t *mac_addr)
 {
 	vioif_t *vif = arg;
+	int r;
 
 	if (bcmp(mac_addr, vif->vif_mac, ETHERADDRL) == 0)
-		return (0);
+		return (0); /* Primary MAC */
 
-	return (ENOSPC);
+	if (!vif->vif_has_ctrlq_rx || vif->vif_mactab_rejected)
+		return (ENOSPC);
+
+	mutex_enter(&vif->vif_mactab_mutex);
+	if (vif->vif_nuctab == VIOIF_MACTAB_UC) {
+		mutex_exit(&vif->vif_mactab_mutex);
+		return (ENOSPC);
+	}
+	bcopy(mac_addr, vif->vif_uctab[vif->vif_nuctab], ETHERADDRL);
+	vif->vif_nuctab++;
+	if ((r = vioif_mac_table_set(vif)) != 0)
+		vif->vif_nuctab--;
+	mutex_exit(&vif->vif_mactab_mutex);
+
+	return (r == 0 ? 0 : ENOSPC);
 }
 
 static int
 vioif_group_remmac(void *arg, const uint8_t *mac_addr)
 {
 	vioif_t *vif = arg;
+	uint32_t i;
 
 	if (bcmp(mac_addr, vif->vif_mac, ETHERADDRL) == 0)
-		return (0);
+		return (0); /* Primary MAC */
 
-	return (ENOENT);
+	if (!vif->vif_has_ctrlq_rx || vif->vif_mactab_rejected)
+		return (ENOENT);
+
+	mutex_enter(&vif->vif_mactab_mutex);
+	for (i = 0; i < vif->vif_nuctab; i++) {
+		if (bcmp(mac_addr, vif->vif_uctab[i], ETHERADDRL) == 0)
+			break;
+	}
+	if (i == vif->vif_nuctab) {
+		mutex_exit(&vif->vif_mactab_mutex);
+		return (ENOENT);
+	}
+	vioif_mactab_remove(vif->vif_uctab, vif->vif_nuctab, i);
+	vif->vif_nuctab--;
+	/*
+	 * If this update fails, the device just continues to accept traffic
+	 * for the removed address.
+	 */
+	(void) vioif_mac_table_set(vif);
+	mutex_exit(&vif->vif_mactab_mutex);
+
+	return (0);
 }
 
 static void
@@ -1781,6 +1982,7 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	mutex_init(&vif->vif_mutex, NULL, MUTEX_DRIVER, virtio_intr_pri(vio));
+	mutex_init(&vif->vif_mactab_mutex, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&vif->vif_ctrlq_cv, NULL, CV_DRIVER, NULL);
 	for (uint_t i = 0; i < vif->vif_nqpairs_alloc; i++) {
 		mutex_init(&vif->vif_rxqs[i].vrq_mutex, NULL, MUTEX_DRIVER,
@@ -1920,6 +2122,7 @@ fail:
 			mutex_destroy(&vif->vif_txqs[i].vtq_mutex);
 		}
 		cv_destroy(&vif->vif_ctrlq_cv);
+		mutex_destroy(&vif->vif_mactab_mutex);
 		mutex_destroy(&vif->vif_mutex);
 	}
 	kmem_free(vif->vif_rxqs,
@@ -2053,6 +2256,7 @@ vioif_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		mutex_destroy(&vif->vif_txqs[i].vtq_mutex);
 	}
 	cv_destroy(&vif->vif_ctrlq_cv);
+	mutex_destroy(&vif->vif_mactab_mutex);
 	mutex_destroy(&vif->vif_mutex);
 
 	kmem_free(vif->vif_rxqs,
