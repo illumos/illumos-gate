@@ -222,6 +222,18 @@
  * be retrieved with virtio_queue_intr_handle(). This is useful with interrupt
  * management interfaces that operate on specific vectors.
  *
+ * By default, each queue configured with a handler function receives its own
+ * MSI-X vector. A driver that would otherwise exhaust the available vectors
+ * can instead direct a queue to share the vector assigned to another queue
+ * by calling virtio_queue_share_interrupt() during the initialisation phase.
+ * When an interrupt arrives on a shared vector, the framework calls the
+ * handler of every queue sharing that vector, so a handler may be called
+ * when its own queue has no work, just as with the shared fixed interrupt
+ * fallback. Queues that share a vector return the same handle from
+ * virtio_queue_intr_handle(). Interrupt suppression through
+ * virtio_queue_no_interrupt() is a property of the queue rather than the
+ * vector, and is unaffected by sharing.
+ *
  * DMA MEMORY MANAGEMENT: ALLOCATION AND FREE
  *
  * Client drivers may allocate memory suitable for communication with the
@@ -348,6 +360,7 @@ boolean_t virtio_modern(virtio_t *);
 
 virtio_queue_t *virtio_queue_alloc(virtio_t *, uint16_t, const char *,
     ddi_intr_handler_t *, void *, boolean_t, uint_t);
+void virtio_queue_share_interrupt(virtio_queue_t *, virtio_queue_t *);
 
 virtio_chain_t *virtio_queue_poll(virtio_queue_t *);
 virtio_chain_t *virtio_queue_evacuate(virtio_queue_t *);

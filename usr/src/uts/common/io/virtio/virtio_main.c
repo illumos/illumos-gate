@@ -89,6 +89,7 @@ static int virtio_interrupts_setup(virtio_t *, int);
 static void virtio_interrupts_teardown(virtio_t *);
 static void virtio_interrupts_disable_locked(virtio_t *);
 static void virtio_queue_free(virtio_queue_t *);
+static virtio_queue_t *virtio_queue_intr_owner(virtio_queue_t *);
 static int virtio_bar_to_rnumber(virtio_t *, uint8_t);
 
 /*
@@ -876,6 +877,8 @@ virtio_queue_alloc(virtio_t *vio, uint16_t qidx, const char *name,
 	viq->viq_max_segs = max_segs;
 	avl_create(&viq->viq_inflight, virtio_inflight_compar,
 	    sizeof (virtio_chain_t), offsetof(virtio_chain_t, vic_node));
+	list_create(&viq->viq_intr_sharers, sizeof (virtio_queue_t),
+	    offsetof(virtio_queue_t, viq_intr_sharers_link));
 
 	/*
 	 * Allocate the mutex without an interrupt priority for now, as we do
@@ -993,12 +996,26 @@ static void
 virtio_queue_free(virtio_queue_t *viq)
 {
 	virtio_t *vio = viq->viq_virtio;
+	virtio_queue_t *sharer;
 
 	/*
 	 * We are going to destroy the queue mutex.  Make sure we've already
 	 * removed the interrupt handlers.
 	 */
 	VERIFY(!(vio->vio_initlevel & VIRTIO_INITLEVEL_INT_ADDED));
+
+	/*
+	 * Remove any vector sharing relationships in both directions. Queues
+	 * are freed one at a time and in no particular order, so whichever
+	 * end of a relationship is freed first detaches the other.
+	 */
+	if (viq->viq_intr_owner != NULL) {
+		list_remove(&viq->viq_intr_owner->viq_intr_sharers, viq);
+		viq->viq_intr_owner = NULL;
+	}
+	while ((sharer = list_remove_head(&viq->viq_intr_sharers)) != NULL)
+		sharer->viq_intr_owner = NULL;
+	list_destroy(&viq->viq_intr_sharers);
 
 	mutex_enter(&viq->viq_mutex);
 
@@ -1023,6 +1040,44 @@ virtio_queue_free(virtio_queue_t *viq)
 	mutex_destroy(&viq->viq_mutex);
 
 	kmem_free(viq, sizeof (*viq));
+}
+
+/*
+ * Direct the queue "viq" to share the interrupt vector that will be assigned
+ * to the queue "owner", rather than receiving a vector of its own. When an
+ * interrupt arrives on the shared vector, the handlers of both queues are
+ * called and so a queue handler must tolerate being called when its own
+ * queue has no work. This should already be the case since the same thing
+ * happens with the shared fixed interrupt fallback. Any number of queues may
+ * share the vector of one owning queue, but sharing relationships must not be
+ * chained. This function may only be called during the initialisation phase,
+ * and both queues must have been configured with handler functions.
+ */
+void
+virtio_queue_share_interrupt(virtio_queue_t *viq, virtio_queue_t *owner)
+{
+	virtio_t *vio = viq->viq_virtio;
+
+	VERIFY3P(vio, ==, owner->viq_virtio);
+	VERIFY3P(viq, !=, owner);
+	VERIFY3P(viq->viq_func, !=, NULL);
+	VERIFY3P(owner->viq_func, !=, NULL);
+
+	mutex_enter(&vio->vio_mutex);
+	VERIFY(!(vio->vio_initlevel & VIRTIO_INITLEVEL_PROVIDER));
+
+	/*
+	 * Sharing relationships cannot be chained. The owning queue must
+	 * hold its own vector, and a queue that itself has sharers cannot
+	 * also share the vector of another queue.
+	 */
+	VERIFY3P(owner->viq_intr_owner, ==, NULL);
+	VERIFY3P(viq->viq_intr_owner, ==, NULL);
+	VERIFY(list_is_empty(&viq->viq_intr_sharers));
+
+	viq->viq_intr_owner = owner;
+	list_insert_tail(&owner->viq_intr_sharers, viq);
+	mutex_exit(&vio->vio_mutex);
 }
 
 static inline uint16_t *
@@ -1194,23 +1249,24 @@ virtio_queue_pending(virtio_queue_t *viq)
 
 /*
  * Return the interrupt handle for the MSI-X vector assigned to a queue, or
- * NULL if the queue has no dedicated vector. This is the case when the
- * framework fell back to a shared fixed interrupt, or when the queue was
- * configured without a handler.
+ * NULL if the queue has no vector. This is the case when the framework fell
+ * back to a shared fixed interrupt, or when the queue was configured without
+ * a handler. Queues that share a vector return the same handle.
  */
 ddi_intr_handle_t
 virtio_queue_intr_handle(virtio_queue_t *viq)
 {
 	virtio_t *vio = viq->viq_virtio;
+	virtio_queue_t *owner = virtio_queue_intr_owner(viq);
 
 	VERIFY(vio->vio_initlevel & VIRTIO_INITLEVEL_INT_ADDED);
 
 	if (vio->vio_interrupt_type != DDI_INTR_TYPE_MSIX ||
-	    !viq->viq_handler_added) {
+	    !owner->viq_handler_added) {
 		return (NULL);
 	}
 
-	return (vio->vio_interrupts[viq->viq_handler_index]);
+	return (vio->vio_interrupts[owner->viq_handler_index]);
 }
 
 virtio_chain_t *
@@ -1788,6 +1844,35 @@ virtio_interrupts_alloc(virtio_t *vio, int type, int nrequired)
 	return (DDI_SUCCESS);
 }
 
+/*
+ * The queue whose vector this queue's interrupts arrive on.
+ */
+static virtio_queue_t *
+virtio_queue_intr_owner(virtio_queue_t *viq)
+{
+	return (viq->viq_intr_owner != NULL ? viq->viq_intr_owner : viq);
+}
+
+/*
+ * The interrupt handler installed for an MSI-X vector that is shared between
+ * queues. The device gives no indication of which queue an interrupt was for,
+ * so the handler of every queue on the vector is called.
+ */
+static uint_t
+virtio_shared_vector_isr(caddr_t arg0, caddr_t arg1)
+{
+	virtio_queue_t *viq = (virtio_queue_t *)arg0;
+
+	(void) viq->viq_func(viq->viq_funcarg, arg1);
+	for (virtio_queue_t *sharer = list_head(&viq->viq_intr_sharers);
+	    sharer != NULL;
+	    sharer = list_next(&viq->viq_intr_sharers, sharer)) {
+		(void) sharer->viq_func(sharer->viq_funcarg, arg1);
+	}
+
+	return (DDI_INTR_CLAIMED);
+}
+
 static uint_t
 virtio_shared_isr(caddr_t arg0, caddr_t arg1)
 {
@@ -1855,11 +1940,12 @@ virtio_interrupts_setup(virtio_t *vio, int allow_types)
 
 	/*
 	 * Determine the number of interrupts we'd like based on the number of
-	 * virtqueues.
+	 * virtqueues, not counting queues that will share the vector assigned
+	 * to another queue.
 	 */
 	for (virtio_queue_t *viq = list_head(&vio->vio_queues); viq != NULL;
 	    viq = list_next(&vio->vio_queues, viq)) {
-		if (viq->viq_func != NULL) {
+		if (viq->viq_func != NULL && viq->viq_intr_owner == NULL) {
 			count++;
 		}
 	}
@@ -1990,13 +2076,28 @@ add_handlers:
 
 	for (virtio_queue_t *viq = list_head(&vio->vio_queues); viq != NULL;
 	    viq = list_next(&vio->vio_queues, viq)) {
-		if (viq->viq_func == NULL) {
+		if (viq->viq_func == NULL || viq->viq_intr_owner != NULL) {
 			continue;
 		}
 
+		/*
+		 * A queue whose vector is shared with other queues needs a
+		 * handler that multiplexes across all of them. Otherwise the
+		 * queue's own handler is installed directly.
+		 */
+		ddi_intr_handler_t *func;
+		caddr_t funcarg;
+
+		if (list_is_empty(&viq->viq_intr_sharers)) {
+			func = viq->viq_func;
+			funcarg = (caddr_t)viq->viq_funcarg;
+		} else {
+			func = virtio_shared_vector_isr;
+			funcarg = (caddr_t)viq;
+		}
+
 		if (ddi_intr_add_handler(vio->vio_interrupts[n],
-		    viq->viq_func, (caddr_t)viq->viq_funcarg,
-		    (caddr_t)vio) != DDI_SUCCESS) {
+		    func, funcarg, (caddr_t)vio) != DDI_SUCCESS) {
 			dev_err(dip, CE_WARN, "adding interrupt %u (%s) failed",
 			    n, viq->viq_name);
 			goto fail;
@@ -2107,7 +2208,7 @@ virtio_interrupts_unwind(virtio_t *vio)
 	if (vio->vio_interrupt_type == DDI_INTR_TYPE_MSIX) {
 		for (virtio_queue_t *viq = list_head(&vio->vio_queues);
 		    viq != NULL; viq = list_next(&vio->vio_queues, viq)) {
-			if (!viq->viq_handler_added) {
+			if (!virtio_queue_intr_owner(viq)->viq_handler_added) {
 				continue;
 			}
 
@@ -2202,16 +2303,19 @@ virtio_interrupts_enable(virtio_t *vio)
 
 		for (virtio_queue_t *viq = list_head(&vio->vio_queues);
 		    viq != NULL; viq = list_next(&vio->vio_queues, viq)) {
-			if (!viq->viq_handler_added) {
+			virtio_queue_t *owner = virtio_queue_intr_owner(viq);
+
+			if (!owner->viq_handler_added) {
 				continue;
 			}
 
 			uint16_t qi = viq->viq_index;
-			uint16_t msi = viq->viq_handler_index;
+			uint16_t msi = owner->viq_handler_index;
 
 			/*
 			 * Route interrupts for this queue to the assigned
-			 * MSI-X vector number.
+			 * MSI-X vector number, which is that of the owning
+			 * queue when the vector is shared.
 			 */
 			vio->vio_ops->vop_msix_queue_set(vio, qi, msi);
 

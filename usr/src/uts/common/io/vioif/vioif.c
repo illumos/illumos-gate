@@ -96,9 +96,10 @@
  * reports in the "max_virtqueue_pairs" configuration field. The number of
  * pairs we use is the smallest of: the device maximum, the number of CPUs,
  * the "vioif_max_qpairs" tuneable, and the number of pairs for which MSI-X
- * vectors are available. Each virtqueue requires its own MSI-X vector, with
- * one more needed for configuration change notifications. If MSI-X is not
- * available we use a single pair serviced by a shared fixed interrupt.
+ * vectors are available. The receive and transmit queues of a pair share one
+ * MSI-X vector, with one more needed for configuration change notifications.
+ * If MSI-X is not available we use a single pair serviced by a shared fixed
+ * interrupt.
  *
  * The device will not use any pair beyond the first until we send a
  * VIRTIO_NET_CTRL_MQ_VQ_PAIRS_SET command on the control queue, which we do
@@ -164,11 +165,12 @@
  * is held until the device returns the descriptors.
  *
  * Transmit descriptors are reclaimed lazily: on each transmit, from a
- * periodic timeout while a queue is active, and from the queue interrupt
- * when a queue runs out of descriptors. In that last case the ring is
- * "corked": MAC stops transmitting on it, the queue interrupt is enabled,
- * and MAC is notified with mac_tx_ring_update() once descriptors have been
- * reclaimed.
+ * periodic timeout while a queue is active, from receive interrupts
+ * arriving on the vector that the pair shares, and from the queue
+ * interrupt when a queue runs out of descriptors. In that last case the
+ * ring is "corked": MAC stops transmitting on it, the queue interrupt is
+ * enabled, and MAC is notified with mac_tx_ring_update() once descriptors
+ * have been reclaimed.
  *
  * -------
  * Locking
@@ -1795,7 +1797,7 @@ vioif_calculate_qpairs(vioif_t *vif, int itypes, uint16_t *maxpairsp)
 	npairs = MIN(npairs, vioif_max_qpairs);
 
 	/*
-	 * Each virtqueue requires its own MSI-X vector, and we need one more
+	 * Each virtqueue pair shares one MSI-X vector, and we need one more
 	 * for configuration change notifications. If there are not enough
 	 * vectors available we use a single pair rather than have the virtio
 	 * framework fall back to a shared fixed interrupt for every queue.
@@ -1809,9 +1811,9 @@ vioif_calculate_qpairs(vioif_t *vif, int itypes, uint16_t *maxpairsp)
 	    DDI_SUCCESS) {
 		return (1);
 	}
-	if (navail < 3)
+	if (navail < 2)
 		return (1);
-	npairs = MIN(npairs, (uint_t)(navail - 1) / 2);
+	npairs = MIN(npairs, (uint_t)(navail - 1));
 
 	return (MAX(npairs, 1));
 }
@@ -1939,6 +1941,18 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    txq, B_FALSE, VIOIF_MAX_SEGS)) == NULL) {
 			goto fail;
 		}
+
+		/*
+		 * The queues of a pair share one MSI-X vector, which halves
+		 * the number of vectors needed to support a given number of
+		 * pairs. Receive interrupts are the frequent ones, so the
+		 * receive queue owns the vector. Transmit interrupts are
+		 * only enabled while a transmit ring is out of descriptors,
+		 * and the transmit handler called for a receive interrupt
+		 * just performs an early reclaim of any descriptors that the
+		 * device has returned.
+		 */
+		virtio_queue_share_interrupt(txq->vtq_vq, rxq->vrq_vq);
 	}
 
 	/*

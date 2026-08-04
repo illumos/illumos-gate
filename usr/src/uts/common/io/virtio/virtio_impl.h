@@ -242,6 +242,19 @@ struct virtio_queue {
 	uint_t				viq_handler_index;
 
 	/*
+	 * MSI-X vector sharing. A queue that has been directed to share the
+	 * vector assigned to another queue points at that queue through
+	 * "viq_intr_owner", and is linked onto the owning queue's
+	 * "viq_intr_sharers" list. The list is walked without locks from the
+	 * owning vector's interrupt handler. It can only change during the
+	 * initialisation phase, before any handler has been added, and
+	 * during teardown, after every handler has been removed.
+	 */
+	virtio_queue_t			*viq_intr_owner;
+	list_t				viq_intr_sharers;
+	list_node_t			viq_intr_sharers_link;
+
+	/*
 	 * When a chain is submitted to the queue, it is also stored in this
 	 * AVL tree keyed by the index of the first descriptor in the chain.
 	 */

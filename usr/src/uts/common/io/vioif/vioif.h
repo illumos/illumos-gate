@@ -337,7 +337,7 @@ struct virtio_net_ctrl_mq {
 
 /*
  * The maximum number of virtqueue pairs we are prepared to use. Each
- * additional pair consumes two MSI-X vectors and its own pools of transmit
+ * additional pair consumes an MSI-X vector and its own pools of transmit
  * and receive buffers, of which the receive pool in particular is a
  * significant allocation (VIRTIO_NET_RX_BUFS buffers of VIOIF_RX_BUF_SIZE
  * bytes; around 16MB per pair). The number of pairs used is also limited by
