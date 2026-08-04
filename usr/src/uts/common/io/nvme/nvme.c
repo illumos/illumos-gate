@@ -4887,13 +4887,9 @@ nvme_init(nvme_t *nvme)
 	/*
 	 * Assign taskq threads per completion queue based on CPU budget.
 	 * Note: if n_completion_queues exceeds the number of CPUs, the
-	 * MAX(1, ...) rule will oversubscribe CPUs (one thread per CQ). If we
-	 * attach early, ncpus may be 1 even on an SMP system. In that case
-	 * max_ncpus can be used as a sizing proxy.
+	 * MAX(1, ...) rule will oversubscribe CPUs (one thread per CQ).
 	 */
-	uint_t ncpus_eff = ncpus;
-	if (ncpus_eff < 2)
-		ncpus_eff = (boot_max_ncpus == -1) ? max_ncpus : boot_max_ncpus;
+	const uint_t ncpus_eff = ddi_ncpus_expected();
 
 	tq_threads = ncpus_eff / nvme->n_completion_queues;
 

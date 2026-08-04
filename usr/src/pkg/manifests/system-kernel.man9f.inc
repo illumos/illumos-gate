@@ -512,6 +512,7 @@ link path=usr/share/man/man9f/ddi_modclose.9f target=ddi_modopen.9f
 file path=usr/share/man/man9f/ddi_model_convert_from.9f
 file path=usr/share/man/man9f/ddi_modopen.9f
 link path=usr/share/man/man9f/ddi_modsym.9f target=ddi_modopen.9f
+file path=usr/share/man/man9f/ddi_ncpus_expected.9f
 file path=usr/share/man/man9f/ddi_no_info.9f
 file path=usr/share/man/man9f/ddi_node_name.9f
 file path=usr/share/man/man9f/ddi_peek.9f

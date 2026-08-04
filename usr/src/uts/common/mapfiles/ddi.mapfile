@@ -155,6 +155,7 @@ SYMBOL_SCOPE {
 	ddi_intr_get_supported_types	{ FLAGS = EXTERN };
 	ddi_intr_remove_handler		{ FLAGS = EXTERN };
 	ddi_name_to_major		{ FLAGS = EXTERN };
+	ddi_ncpus_expected		{ FLAGS = EXTERN };
 	ddi_node_name			{ FLAGS = EXTERN };
 	ddi_periodic_add		{ FLAGS = EXTERN };
 	ddi_periodic_delete		{ FLAGS = EXTERN };

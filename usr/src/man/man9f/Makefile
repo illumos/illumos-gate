@@ -220,6 +220,7 @@ MANFILES=	ASSERT.9f				\
 		ddi_mmap_get_model.9f			\
 		ddi_model_convert_from.9f		\
 		ddi_modopen.9f				\
+		ddi_ncpus_expected.9f			\
 		ddi_no_info.9f				\
 		ddi_node_name.9f			\
 		ddi_peek.9f				\

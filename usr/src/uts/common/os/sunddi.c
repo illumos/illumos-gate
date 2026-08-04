@@ -24,7 +24,7 @@
  * Copyright 2022 Garrett D'Amore
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
  * Copyright 2023 MNX Cloud, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/note.h>
@@ -5235,6 +5235,34 @@ int64_t
 ddi_get_lbolt64(void)
 {
 	return (lbolt_hybrid());
+}
+
+/*
+ * The number of CPUs that the system is expected to have once boot has
+ * completed, for use when sizing per-CPU resources at any point in boot.
+ * Early in boot only the boot processor is running, and "ncpus" does not
+ * yet reflect the processors that have still to be started.
+ *
+ * The value counts processors that are present, whether online or not,
+ * and so does not change as processors are taken offline and brought
+ * back online. A processor that is physically added to, or removed from,
+ * a running system does change the count, but a caller will usually not
+ * observe that either, having sized its resources once at attach time.
+ * That is acceptable for the intended use since the value is a sizing
+ * estimate.
+ */
+uint_t
+ddi_ncpus_expected(void)
+{
+	if (ncpus >= 2)
+		return ((uint_t)ncpus);
+
+	/*
+	 * Size for the number of processors that boot is expected to start,
+	 * where the platform has recorded that, and for the maximum number
+	 * that it could start otherwise.
+	 */
+	return ((uint_t)((boot_max_ncpus == -1) ? max_ncpus : boot_max_ncpus));
 }
 
 time_t

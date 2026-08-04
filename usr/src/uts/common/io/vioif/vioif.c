@@ -199,7 +199,6 @@
 #include <sys/sysmacros.h>
 #include <sys/smbios.h>
 #include <sys/dlpi.h>
-#include <sys/cpuvar.h>
 #include <sys/disp.h>
 #include <sys/byteorder.h>
 #include <sys/random.h>
@@ -1460,16 +1459,9 @@ vioif_calculate_qpairs(vioif_t *vif, int itypes, uint16_t *maxpairsp)
 	 * Once every CPU can be servicing a different pair, additional pairs
 	 * only divide the same flows across more rings, while each one costs
 	 * an interrupt vector and a significant amount of receive buffer
-	 * memory. The operator may have constrained us further. If we attach
-	 * early in boot, as the driver for a network boot device, the other
-	 * CPUs may not have started yet and "ncpus" underreports. Size for the
-	 * number of CPUs the boot processor advertises instead.
+	 * memory. The operator may have constrained us further.
 	 */
-	ncpu = (uint_t)ncpus;
-	if (ncpus < 2) {
-		ncpu = (uint_t)((boot_max_ncpus == -1) ?
-		    max_ncpus : boot_max_ncpus);
-	}
+	ncpu = ddi_ncpus_expected();
 	npairs = MIN(maxpairs, ncpu);
 	npairs = MIN(npairs, vioif_max_qpairs);
 

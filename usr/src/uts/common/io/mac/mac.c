@@ -404,8 +404,7 @@ typedef struct netinfo_s {
 void
 mac_init(void)
 {
-	mac_tx_percpu_cnt = ((boot_max_ncpus == -1) ? max_ncpus :
-	    boot_max_ncpus);
+	mac_tx_percpu_cnt = ddi_ncpus_expected();
 
 	/* Upper bound is mac_tx_percpu_cnt_max */
 	if (mac_tx_percpu_cnt > mac_tx_percpu_cnt_max)

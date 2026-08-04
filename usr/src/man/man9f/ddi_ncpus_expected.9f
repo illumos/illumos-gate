@@ -1,0 +1,70 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\"
+.\" Copyright 2026 Oxide Computer Company
+.\"
+.Dd August 4, 2026
+.Dt DDI_NCPUS_EXPECTED 9F
+.Os
+.Sh NAME
+.Nm ddi_ncpus_expected
+.Nd obtain the expected number of CPUs in the system
+.Sh SYNOPSIS
+.In sys/sunddi.h
+.Ft uint_t
+.Fo ddi_ncpus_expected
+.Fa void
+.Fc
+.Sh INTERFACE LEVEL
+illumos DDI specific
+.Pq illumos DDI .
+.Sh DESCRIPTION
+The
+.Fn ddi_ncpus_expected
+function returns the number of CPUs that the system is expected to have
+once it has finished booting.
+.Pp
+Device drivers commonly size resources such as interrupt vectors, queues,
+and worker threads based on the number of CPUs in the system.
+A driver that attaches while the system is booting, such as the driver for
+a boot device, may attach before the additional processors have been
+started, at a time when only the boot processor is running.
+Counting the running CPUs at that point would size such resources for a
+single CPU.
+While only the boot processor is running, the
+.Fn ddi_ncpus_expected
+function therefore returns the number of processors that the system is
+expected to start during boot.
+Once further processors are running, it returns the number of CPUs that
+are present.
+.Pp
+The returned value is an estimate that is intended for sizing purposes.
+The number of CPUs that are present can change over the lifetime of the
+system
+.Pq for example, through processor hotplug ,
+and not every CPU that is present is necessarily online.
+.Sh CONTEXT
+The
+.Fn ddi_ncpus_expected
+function may be called from
+.Sy user ,
+.Sy kernel ,
+or
+.Sy interrupt
+context.
+.Sh RETURN VALUES
+The
+.Fn ddi_ncpus_expected
+function always succeeds.
+It returns the expected number of CPUs, which is never less than 1.
+.Sh SEE ALSO
+.Xr attach 9E ,
+.Xr ddi_intr_get_navail 9F

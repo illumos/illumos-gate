@@ -9,10 +9,10 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2024 Oxide Computer Company
+.\" Copyright 2026 Oxide Computer Company
 .\" Copyright 2023 Peter Tribble
 .\"
-.Dd October 27, 2024
+.Dd August 4, 2026
 .Dt INTRO 9F
 .Os
 .Sh NAME
@@ -2350,7 +2350,8 @@ Almost all values exposed by say
 have more usable first-class methods of getting at the data.
 .Bl -column -offset indent "net_instance_protocol_unregister" "net_instance_protocol_unregister"
 .It Xr ddi_get_kt_did 9F Ta Xr ddi_get_pid 9F
-.It Xr ddi_in_panic 9F Ta Xr drv_getparm 9F
+.It Xr ddi_in_panic 9F Ta Xr ddi_ncpus_expected 9F
+.It Xr drv_getparm 9F Ta
 .El
 .Ss Driver Memory Mapping
 These functions are present for device drivers that implement the
