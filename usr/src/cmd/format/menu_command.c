@@ -372,7 +372,7 @@ c_type(void)
 	struct dk_label		label;
 	struct efi_info		efi_info;
 	uint64_t		maxLBA;
-	char			volname[LEN_DKL_VVOL];
+	char			volname[LEN_DKL_VVOL + 1];
 	int			volinit = 0;
 
 	/*
@@ -476,9 +476,10 @@ c_type(void)
 			    nparts++) {
 				if (cur_parts->etoc->efi_parts[nparts].p_tag ==
 				    V_RESERVED) {
-					(void) strcpy(volname,
+					(void) memcpy(volname,
 					    cur_parts->etoc->efi_parts
-					    [nparts].p_name);
+					    [nparts].p_name, LEN_DKL_VVOL);
+					volname[LEN_DKL_VVOL] = '\0';
 					volinit = 1;
 					break;
 				}
@@ -500,7 +501,7 @@ c_type(void)
 				(void) strcpy(
 				    cur_parts->etoc->efi_parts[nparts].p_name,
 				    volname);
-				(void) strlcpy(cur_disk->v_volume, volname,
+				(void) memcpy(cur_disk->v_volume, volname,
 				    LEN_DKL_VVOL);
 				break;
 				}
@@ -1288,9 +1289,9 @@ c_repair(void)
 	 * check for partitions being used for swapping in format zone
 	 */
 	if (checkswap(bn, bn)) {
-		if (check("Repair is in a partition which is currently \
-being used for swapping.\ncontinue"))
-		return (-1);
+		if (check("Repair is in a partition which is currently "
+		    "being used for swapping.\ncontinue"))
+			return (-1);
 	}
 
 	if (checkdevinuse(cur_disk->disk_name, bn, bn, 0, 0)) {
@@ -1413,7 +1414,7 @@ This block doesn't appear to be bad.  Repair it anyway")) {
 		} else if (cur_ctype->ctype_flags & CF_WLIST) {
 			kill_deflist(&cur_list);
 			if (*cur_ops->op_ex_cur != NULL) {
-				(*cur_ops->op_ex_cur)(&cur_list);
+				(void) (*cur_ops->op_ex_cur)(&cur_list);
 				fmt_print("Current list updated\n");
 			}
 		} else {
@@ -1607,7 +1608,7 @@ c_label(void)
 			    "Changing to SMI label will erase all\n"
 			    "current partitions.\n");
 			if (check("Continue"))
-			return (-1);
+				return (-1);
 #if defined(_FIRMWARE_NEEDS_FDISK)
 			fmt_print("You must use fdisk to delete the current "
 			    "EFI partition and create a new\n"
@@ -1618,16 +1619,16 @@ c_label(void)
 		}
 
 #if defined(_FIRMWARE_NEEDS_FDISK)
-		if (!(((cur_disk->fdisk_part.systid != SUNIXOS) ||
-		    (cur_disk->fdisk_part.systid != SUNIXOS2)) &&
-		    (cur_disk->fdisk_part.numsect > 0))) {
+		if ((cur_disk->fdisk_part.systid != SUNIXOS &&
+		    cur_disk->fdisk_part.systid != SUNIXOS2) ||
+		    cur_disk->fdisk_part.numsect == 0) {
 			fmt_print("You must use fdisk to create a Solaris "
 			    "partition before you can convert the label.\n");
 			return (-1);
 		}
 #endif
 
-		(void) memset((char *)&label, 0, sizeof (struct dk_label));
+		(void) memset(&label, 0, sizeof (struct dk_label));
 
 		(void) strcpy(x86_devname, cur_disk->disk_name);
 		if (cur_ctype->ctype_ctype == DKC_DIRECT ||
@@ -1847,11 +1848,11 @@ c_defect(void)
 	 */
 	if (work_list.flags & LIST_DIRTY) {
 		if (!EMBEDDED_SCSI) {
-			err_print(
-		"Warning: working defect list modified; but not committed.\n");
-			if (!check(
-		"Do you wish to commit changes to current defect list"))
-			(void) do_commit();
+			err_print("Warning: working defect list modified; "
+			    "but not committed.\n");
+			if (!check("Do you wish to commit changes to current "
+			    "defect list"))
+				(void) do_commit();
 		}
 	}
 	return (0);

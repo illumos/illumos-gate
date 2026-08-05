@@ -63,7 +63,7 @@ get_ncyl(void)
 	u_ioparam_t	ioparam;
 
 	ioparam.io_bounds.lower = 1;
-	ioparam.io_bounds.upper = MAX_CYLS;
+	ioparam.io_bounds.upper = MAX_CYLS - 2;
 	return (input(FIO_INT, "Enter number of data cylinders",
 	    ':', &ioparam, NULL, DATA_INPUT));
 }
@@ -78,7 +78,11 @@ get_acyl(int n_cyls)
 	int		deflt;
 
 	ioparam.io_bounds.lower = 2;
-	ioparam.io_bounds.upper = MAX_CYLS - n_cyls;
+	/* n_cyls is at least 1, see get_ncyl() above. */
+	if (n_cyls >= 1 && MAX_CYLS - n_cyls >= 2)
+		ioparam.io_bounds.upper = MAX_CYLS - n_cyls;
+	else
+		ioparam.io_bounds.upper = 2;
 	deflt = 2;
 	return (input(FIO_INT, "Enter number of alternate cylinders", ':',
 	    &ioparam, &deflt, DATA_INPUT));

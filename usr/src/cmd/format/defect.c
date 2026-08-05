@@ -341,7 +341,8 @@ write_deflist(struct defect_list *list)
 	 * Panther's working list is maintained by the controller
 	 */
 	if (cur_ctype->ctype_flags & CF_WLIST) {
-		(*cur_ops->op_wr_cur)(list);
+		if (*cur_ops->op_wr_cur != NULL)
+			(void) (*cur_ops->op_wr_cur)(list);
 		return;
 	}
 
@@ -363,7 +364,7 @@ write_deflist(struct defect_list *list)
 			    (char *)&list->header, F_NORMAL, NULL);
 			if (status) {
 				err_print(
-"Warning: error saving defect list.\n");
+				    "Warning: error saving defect list.\n");
 				continue;
 			}
 			status = (*cur_ops->op_rdwr)(DIR_WRITE, cur_file,
@@ -371,7 +372,7 @@ write_deflist(struct defect_list *list)
 			    (char *)list->list, F_NORMAL, NULL);
 			if (status)
 				err_print(
-"Warning: error saving defect list.\n");
+				    "Warning: error saving defect list.\n");
 		}
 	}
 	if (!(cur_ctlr->ctlr_flags & DKI_BAD144))

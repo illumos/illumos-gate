@@ -466,12 +466,27 @@ auto_label_init(struct dk_label *label)
 	efi_gpt_t	*backsigp;
 	int		fd = cur_file;
 	int		rval = -1;
-	int		efisize = EFI_LABEL_SIZE * 2;
+	int		efisize;
 	int		success = 0;
 	uint64_t	sig;
 	uint64_t	backsig;
 
-	if ((data = calloc(efisize, 1)) == NULL) {
+	/* get the LBA size and capacity */
+	if (ioctl(fd, DKIOCGMEDIAINFO, (caddr_t)&disk_info) == -1) {
+		err_print("auto_label_init: dkiocgmediainfo failed\n");
+		goto auto_label_init_out;
+	}
+
+	if (disk_info.dki_lbsize == 0) {
+		if (option_msg && diag_msg) {
+			err_print("auto_label_init: assuming 512 byte "
+			    "block size\n");
+		}
+		disk_info.dki_lbsize = DEV_BSIZE;
+	}
+
+	efisize = 2 * disk_info.dki_lbsize;
+	if ((data = calloc(1, efisize)) == NULL) {
 		err_print("auto_label_init: calloc failed\n");
 		goto auto_label_init_out;
 	}
@@ -485,23 +500,9 @@ auto_label_init(struct dk_label *label)
 		goto auto_label_init_out;
 	}
 
-	if ((databack = calloc(efisize, 1)) == NULL) {
-		err_print("auto_label_init calloc2 failed");
+	if ((databack = calloc(2, disk_info.dki_lbsize)) == NULL) {
+		err_print("auto_label_init calloc2 failed\n");
 		goto auto_label_init_out;
-	}
-
-	/* get the LBA size and capacity */
-	if (ioctl(fd, DKIOCGMEDIAINFO, (caddr_t)&disk_info) == -1) {
-		err_print("auto_label_init: dkiocgmediainfo failed\n");
-		goto auto_label_init_out;
-	}
-
-	if (disk_info.dki_lbsize == 0) {
-		if (option_msg && diag_msg) {
-			err_print("auto_lbal_init: assuming 512 byte"
-			    "block size");
-		}
-		disk_info.dki_lbsize = DEV_BSIZE;
 	}
 
 	dk_ioc_back.dki_data = databack;
@@ -511,7 +512,7 @@ auto_label_init(struct dk_label *label)
 	 * before the back up label.
 	 */
 	dk_ioc_back.dki_lba = disk_info.dki_capacity - 1 - 1;
-	dk_ioc_back.dki_length = efisize;
+	dk_ioc_back.dki_length = 2 * disk_info.dki_lbsize;
 
 	if (efi_ioctl(fd, DKIOCGETEFI, &dk_ioc_back) != 0) {
 		err_print("auto_label_init: GETEFI backup failed\n");
@@ -529,7 +530,8 @@ auto_label_init(struct dk_label *label)
 		goto auto_label_init_out;
 	}
 
-	backsigp = (efi_gpt_t *)((uintptr_t)dk_ioc_back.dki_data + cur_blksz);
+	backsigp = (efi_gpt_t *)((uintptr_t)dk_ioc_back.dki_data +
+	    disk_info.dki_lbsize);
 
 	backsig = backsigp->efi_gpt_Signature;
 
@@ -596,12 +598,9 @@ auto_label_init(struct dk_label *label)
 
 	(void) checksum(label, CK_MAKESUM);
 
-
 auto_label_init_out:
-	if (data)
-		free(data);
-	if (databack)
-		free(databack);
+	free(data);
+	free(databack);
 
 	return (rval);
 }

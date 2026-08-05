@@ -43,7 +43,10 @@ static int	check_map(struct dk_map32 *map);
 static void	get_user_map(struct dk_map32 *map, int float_part);
 static void	get_user_map_efi(struct dk_gpt *map, int float_part);
 
-static char *partn_list[] = { "0", "1", "2", "3", "4", "5", "6", "7", NULL };
+/* Padded to 16 entries to quiesce smatch. */
+static char *partn_list[] = {
+	"0", "1", "2", "3", "4", "5", "6", "7",
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 
 static char *sel_list[] = { "0", "1", "2", "3", NULL };
 
@@ -377,15 +380,14 @@ static int
 check_map(struct dk_map32 *map)
 {
 	int		i;
-	int		cyloffset = 0;
-	blkaddr32_t	tot_blks = 0;
+	diskaddr_t	cyloffset = 0;
+	diskaddr_t	tot_blks = 0;
 
 #ifdef i386
 	/*
 	 * On x86, we must account for the boot and alternates
 	 */
 	cyloffset = map[0].dkl_cylno;
-	tot_blks = map[0].dkl_nblk;
 #endif
 
 	/*
@@ -400,7 +402,7 @@ check_map(struct dk_map32 *map)
 			return (-1);
 		}
 		if (map[i].dkl_nblk >
-		    (blkaddr32_t)(ncyl - map[i].dkl_cylno) * spc()) {
+		    (diskaddr_t)(ncyl - map[i].dkl_cylno) * spc()) {
 			err_print("Warning: Partition %c, specified # of "
 			    "blocks, %u, is out of range.\n",
 			    (PARTITION_BASE+i), map[i].dkl_nblk);
@@ -419,15 +421,16 @@ check_map(struct dk_map32 *map)
 				err_print("Warning: Non-contiguous partition "
 				    "(%c) in table.\n", PARTITION_BASE+i);
 			}
-			cyloffset += (map[i].dkl_nblk + (spc()-1))/spc();
-			tot_blks = map[i].dkl_nblk;
+			cyloffset +=
+			    ((diskaddr_t)map[i].dkl_nblk + (spc() - 1)) / spc();
+			tot_blks += map[i].dkl_nblk;
 		}
 	}
 	if (tot_blks > map[C_PARTITION].dkl_nblk) {
 		err_print("Warning: Total blocks used is greater than number "
 		    "of blocks in '%c'\n\tpartition.\n",
 		    C_PARTITION + PARTITION_BASE);
-	return (-1);
+		return (-1);
 	}
 	return (0);
 }

@@ -46,9 +46,6 @@ DATA= format.dat
 
 include ../Makefile.cmd
 
-# not linted
-SMATCH=off
-
 ROOTSYMLINK= $(ROOTETCPROG)
 ROOTETCDATA= $(ROOTETC)/$(DATA)
 

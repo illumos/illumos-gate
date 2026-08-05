@@ -2424,7 +2424,7 @@ search_duplicate_dtypes(void)
 			}
 			dp1 = dp1->dtype_next;
 		}
-	mlp = mlp->next;
+		mlp = mlp->next;
 	}
 }
 
@@ -2462,7 +2462,7 @@ search_duplicate_pinfo(void)
 			}
 			dp = dp->dtype_next;
 		}
-	mlp = mlp->next;
+		mlp = mlp->next;
 	}
 }
 
