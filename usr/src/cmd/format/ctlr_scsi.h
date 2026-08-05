@@ -126,11 +126,6 @@ struct scsi_ms_header {
  */
 #define	MAX_MODE_SENSE_SIZE		255
 
-
-#ifdef	__STDC__
-/*
- *	Local prototypes for ANSI C compilers
- */
 int	scsi_rdwr(int, int, diskaddr_t, int, caddr_t, int, int *);
 int	scsi_ex_man(struct defect_list *);
 int	scsi_ex_cur(struct defect_list *);
@@ -150,35 +145,6 @@ int	scsi_supported_page(int);
 int	apply_chg_list(int, int, uchar_t *, uchar_t *, struct chg_list *);
 int	scsi_format_time(void);
 uint8_t	get_cur_protection_type(struct scsi_capacity_16 *);
-
-#else
-
-#ifdef sparc
-int	scsi_ms_page1();
-int	scsi_ms_page2();
-int	scsi_ms_page3();
-int	scsi_ms_page4();
-int	scsi_read_defect_data();
-int	scsi_repair();
-#endif /* sparc */
-
-int	scsi_rdwr();
-int	scsi_ck_format();
-int	scsi_ex_man();
-int	scsi_ex_cur();
-int	scsi_ex_grown();
-int	uscsi_cmd();
-int	uscsi_mode_sense();
-int	uscsi_mode_select();
-int	uscsi_inquiry();
-int	uscsi_read_capacity();
-int	scsi_translate();
-int	scsi_dump_mode_sense_pages();
-int	scsi_supported_page();
-int	apply_chg_list();
-int	scsi_format_time();
-
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

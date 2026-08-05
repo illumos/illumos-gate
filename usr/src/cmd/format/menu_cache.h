@@ -31,9 +31,6 @@
 extern "C" {
 #endif
 
-/*
- *	Prototypes for ANSI
- */
 int	c_cache(void);
 int	ca_write_cache(void);
 int	ca_read_cache(void);

@@ -34,10 +34,6 @@ extern "C" {
 
 struct scsi_inquiry;	/* anonymous struct */
 
-#ifdef	__STDC__
-/*
- *	Prototypes for ANSI C compilers
- */
 struct disk_type	*auto_sense(
 				int		fd,
 				int		can_prompt,
@@ -57,16 +53,6 @@ struct disk_type *auto_direct_get_geom_label(int fd, struct dk_label *label);
 char			*get_generic_disk_name(
 				char *disk_name,
 				struct scsi_inquiry *inquiry);
-#else
-
-struct disk_type	*auto_sense();
-struct disk_type	*auto_efi_sense();
-int			build_default_partition();
-struct disk_type *auto_direct_get_geom_label();
-char			*get_generic_disk_name();
-
-
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }

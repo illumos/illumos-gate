@@ -95,9 +95,6 @@ extern	int disk_error;
 #define	DISK_STAT_UNAVAILABLE		0x03	/* disk is being formatted */
 #define	DISK_STAT_DATA_PROTECT		0x04	/* disk is write protected */
 
-/*
- *	Prototypes for ANSI C compilers
- */
 int	do_scan(int flags, int mode);
 
 #ifdef	__cplusplus

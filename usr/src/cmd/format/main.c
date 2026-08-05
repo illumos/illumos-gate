@@ -82,22 +82,7 @@ uint_t	phead;
 uint_t	nsect;
 uint_t	psect;
 
-#ifdef	__STDC__
-
-/*
- *	Local prototypes for ANSI C compilers
- */
 static void	get_disk_characteristics(void);
-
-
-#else	/* __STDC__ */
-
-/*
- *	Local prototypes for non-ANSI C compilers
- */
-static void	get_disk_characteristics();
-
-#endif	/* __STDC__ */
 
 /*
  * This is the main entry point.

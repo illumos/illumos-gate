@@ -82,9 +82,6 @@ struct mctlr_list	*controlp;
 char	x86_devname[MAXNAMELEN];
 FILE	*data_file;
 
-#ifdef __STDC__
-
-/* Function prototypes for ANSI C Compilers */
 static void	usage(void);
 static int	sup_prxfile(void);
 static void	sup_setpath(void);
@@ -109,34 +106,6 @@ static void	sort_disk_list(void);
 static int	disk_name_compare(const void *, const void *);
 static void	make_controller_list(void);
 static void	check_for_duplicate_disknames(char *arglist[]);
-
-#else	/* __STDC__ */
-
-/* Function prototypes for non-ANSI C Compilers */
-static void	usage();
-static int	sup_prxfile();
-static void	sup_setpath();
-static void	sup_setdtype();
-static int	sup_change_spec();
-static void	sup_setpart();
-static void	search_for_logical_dev();
-static void	add_device_to_disklist();
-static int	disk_is_known();
-static void	datafile_error();
-static void	search_duplicate_dtypes();
-static void	search_duplicate_pinfo();
-static void	check_dtypes_for_inconsistency();
-static void	check_pinfo_for_inconsistency();
-static uint_t	str2blks();
-static int	str2cyls();
-static struct	chg_list *new_chg_list();
-static char	*get_physical_name();
-static void	sort_disk_list();
-static int	disk_name_compare();
-static void	make_controller_list();
-static void	check_for_duplicate_disknames();
-
-#endif	/* __STDC__ */
 
 #if defined(sparc)
 static char *other_ctlrs[] = {

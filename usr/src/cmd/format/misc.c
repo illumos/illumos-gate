@@ -44,7 +44,6 @@
 #include "label.h"
 #include "startup.h"
 
-/* Function prototypes for ANSI C Compilers */
 static void	cleanup(int sig);
 
 struct	env *current_env = NULL;	/* ptr to current environment */

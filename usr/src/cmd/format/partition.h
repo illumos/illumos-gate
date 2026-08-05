@@ -51,9 +51,6 @@ extern "C" {
 #define	J_PARTITION		9
 #endif		/* defined(i386) */
 
-/*
- *	Prototypes for ANSI C compilers
- */
 void	change_partition(int num);
 int	get_partition(void);
 void	make_partition(void);

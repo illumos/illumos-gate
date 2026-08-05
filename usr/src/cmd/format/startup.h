@@ -91,10 +91,6 @@ extern "C" {
 
 #define	SUP_MIN_PART	0x0003			/* for maps */
 
-
-/*
- *	Prototypes for ANSI C compilers
- */
 int	do_options(int argc, char *argv[]);
 void	sup_init(void);
 int	open_disk(char *diskname, int flags);
@@ -102,8 +98,6 @@ void	do_search(char *arglist[]);
 int	dtype_match(struct dk_label *label, struct disk_type *dtype);
 int	parts_match(struct dk_label *label, struct partition_info *pinfo);
 int	diskname_match(char *name, struct disk_info *disk);
-
-
 
 #ifdef	__cplusplus
 }

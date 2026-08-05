@@ -32,10 +32,6 @@
 extern "C" {
 #endif
 
-
-/*
- *	Prototypes for ANSI C compilers
- */
 int	p_modify(void);
 
 void	new_partitiontable(struct disk_type *tptr, struct  disk_type *oldtype);

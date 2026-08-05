@@ -104,10 +104,6 @@ struct defect_list {
  */
 #define	BAD_LISTCNT	5
 
-
-/*
- * Prototypes for ANSI C compilers
- */
 void	read_list(struct defect_list *list);
 int	makebfi(struct defect_list *list, struct defect_entry *def);
 void	calc_bfi(struct defect_list *list, struct defect_entry *def,

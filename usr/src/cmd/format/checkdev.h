@@ -31,9 +31,6 @@
 extern "C" {
 #endif
 
-/*
- *	Prototypes for ANSI C
- */
 int	checkmount(diskaddr_t start, diskaddr_t end);
 int	checkswap(diskaddr_t start, diskaddr_t end);
 int	check_label_with_mount(void);

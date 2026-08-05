@@ -48,11 +48,6 @@ struct menu_item {
 	int	(*menu_state)();
 };
 
-
-/*
- *	Prototypes for ANSI C compilers
- */
-
 char	**create_menu_list(struct menu_item *menu);
 void	display_menu_list(char **list);
 void	redisplay_menu_list(char **list);

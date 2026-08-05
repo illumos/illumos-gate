@@ -31,9 +31,6 @@
 extern "C" {
 #endif
 
-/*
- *	Prototypes for ANSI
- */
 int	c_scsi(void);
 
 #ifdef	__cplusplus

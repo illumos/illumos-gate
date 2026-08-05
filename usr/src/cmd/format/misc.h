@@ -133,9 +133,6 @@ struct ttystate {
 #define	HEX_ASCII	1			/* hex and ascii */
 
 
-/*
- *	Prototypes for ANSI C
- */
 void	*zalloc(int count);
 void	*rezalloc(void *ptr, int count);
 void	destroy_data(char *data);

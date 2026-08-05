@@ -49,10 +49,6 @@ extern "C" {
 extern diskaddr_t	altsec_offset;	/* Alternate sector offset */
 #endif	/* defined(i386) */
 
-/*
- *	Local prototypes for ANSI C compilers
- */
-
 #if	defined(i386)
 #define	_STATIC
 #else

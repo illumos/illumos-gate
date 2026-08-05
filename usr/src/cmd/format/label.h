@@ -31,9 +31,6 @@
 extern "C" {
 #endif
 
-/*
- *	Prototypes for ANSI C compilers
- */
 int	checklabel(struct dk_label *);
 int	checksum(struct dk_label *, int);
 int	trim_id(char *);

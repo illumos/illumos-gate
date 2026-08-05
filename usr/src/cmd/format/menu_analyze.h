@@ -30,10 +30,6 @@
 extern "C" {
 #endif
 
-/*
- *	Prototypes for ANSI
- */
-
 int	a_read(void);
 int	a_refresh(void);
 int	a_test(void);

@@ -32,13 +32,9 @@
 extern "C" {
 #endif
 
-/*
- *	Prototypes for ANSI
- */
 int	copy_solaris_part(struct ipart *ipart);
 void	open_cur_file(int);
 int	auto_solaris_part(struct dk_label *);
-
 
 /*
  * These flags are used to open file descriptor for current

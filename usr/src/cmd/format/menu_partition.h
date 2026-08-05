@@ -30,10 +30,6 @@
 extern "C" {
 #endif
 
-
-/*
- *	Prototypes for ANSI C compilers
- */
 int	p_apart(void);
 int	p_bpart(void);
 int	p_cpart(void);

@@ -31,9 +31,6 @@
 extern "C" {
 #endif
 
-/*
- *	Prototypes for ANSI C compilers
- */
 int	add_definition(void);
 
 #ifdef	__cplusplus

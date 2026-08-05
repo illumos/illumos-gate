@@ -55,20 +55,10 @@ extern	int	nctypes;
 extern	int	errno;
 
 /* Function prototypes */
-#ifdef	__STDC__
-
 static void	add_disktype(FILE *fd, struct disk_info *disk_info);
 static void	add_partition(FILE *fd, struct disk_info *,
 		struct partition_info *);
 static int	add_entry(int col, FILE *fd, char *format, ...);
-
-#else	/* __STDC__ */
-
-static void	add_disktype();
-static void	add_partition();
-static int	add_entry();
-
-#endif	/* __STDC__ */
 
 /*
  * Add new definitions for the current disk/partition to a format data file.

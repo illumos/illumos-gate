@@ -97,9 +97,6 @@ typedef	char TOKEN[TOKEN_SIZE+1];		/* token type */
 #define	COMMENT_CHAR	'#'			/* comment character */
 
 
-/*
- *	Prototypes for ANSI C
- */
 char	*gettoken(char *inbuf);
 void	clean_token(char *cleantoken, char *token);
 int	geti(char *str, int *iptr, int *wild);

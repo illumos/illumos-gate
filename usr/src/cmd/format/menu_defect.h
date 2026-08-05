@@ -31,9 +31,6 @@
 extern "C" {
 #endif
 
-/*
- *	Prototypes for ANSI C compilers
- */
 int	d_restore(void);
 int	d_original(void);
 int	d_extract(void);

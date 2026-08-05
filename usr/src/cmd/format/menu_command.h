@@ -31,10 +31,6 @@
 extern "C" {
 #endif
 
-
-/*
- *	Prototypes for ANSI
- */
 int	c_disk(void);
 int	c_type(void);
 int	c_partition(void);

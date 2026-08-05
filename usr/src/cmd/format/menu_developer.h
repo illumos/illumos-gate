@@ -31,9 +31,6 @@
 extern "C" {
 #endif
 
-/*
- *	Prototypes for ANSI
- */
 int	c_developer(void);
 int	dv_disk(void);
 int	dv_cont(void);

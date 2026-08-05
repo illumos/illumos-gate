@@ -86,7 +86,6 @@ uint_t	xstart;
 
 
 /* Function prototypes */
-#ifdef	__STDC__
 
 #if	defined(sparc)
 
@@ -96,19 +95,6 @@ static int getlong(uchar_t **);
 #endif	/* defined(sparc) */
 
 static int get_solaris_part(int fd, struct ipart *ipart);
-
-#else	/* __STDC__ */
-
-#if	defined(sparc)
-
-static int getbyte();
-static int getlong();
-
-#endif	/* defined(sparc) */
-
-static int get_solaris_part();
-
-#endif	/* __STDC__ */
 
 #ifdef i386
 int extpart_init(ext_part_t **epp);

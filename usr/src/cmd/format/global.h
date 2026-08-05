@@ -272,22 +272,9 @@ extern struct	mctlr_list	*controlp;	/* master controller list ptr */
 #define	PROT_TYPE_3	3
 #define	NUM_PROT_TYPE	4
 
-/*
- * Function prototypes ... Both for ANSI and non-ANSI C compilers
- */
-#ifdef	__STDC__
-
 int copy_solaris_part(struct ipart *);
 int good_fdisk(void);
 int fdisk_physical_name(char *);
-
-#else	/* __STDC__ */
-
-int copy_solaris_part();
-int good_fdisk();
-int fdisk_physical_name();
-
-#endif	/* __STDC__ */
 
 #ifdef	__cplusplus
 }
