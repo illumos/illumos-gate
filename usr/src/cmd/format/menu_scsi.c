@@ -149,7 +149,7 @@ c_scsi(void)
 	char			*p2;
 	int			cmd;
 	int			pageno;
-	int			help = 1;
+	volatile int		help = 1;
 
 	/*
 	 * Warn casual users that maybe they should not be
