@@ -120,7 +120,7 @@ retoke:
 	/*
 	 * Loop on each character until we hit unquoted white-space.
 	 */
-	while (!isspace(c) || quoted && (c != '\n')) {
+	while (!isspace(c) || (quoted && (c != '\n'))) {
 		/*
 		 * If we hit eof, get out.
 		 */
