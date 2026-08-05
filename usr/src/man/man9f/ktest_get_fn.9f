@@ -9,9 +9,9 @@
 .\" http://www.illumos.org/license/CDDL.
 .\"
 .\"
-.\" Copyright 2023 Oxide Computer Company
+.\" Copyright 2026 Oxide Computer Company
 .\"
-.Dd February 15, 2023
+.Dd August 4, 2026
 .Dt KTEST_GET_FN 9F
 .Os
 .Sh NAME
@@ -97,7 +97,7 @@ then you should declare a local
 .Sy typedef
 as follows:
 .Bd -literal -offset 4m
-typedef int (*omnislash_t)(uint64_t);
+typedef uint64_t (*omnislash_t)(uint64_t);
 .Ed
 .Pp
 Notice the use of the "_t" suffix for the typedef.
