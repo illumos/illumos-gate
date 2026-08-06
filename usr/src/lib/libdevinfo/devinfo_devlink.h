@@ -20,6 +20,7 @@
  *
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Oxide Computer Company
  */
 
 
@@ -54,6 +55,10 @@ extern "C" {
 #include <door.h>
 #include <signal.h>
 #include <sys/statvfs.h>
+#include <sys/ccompile.h>
+#include <stdbool.h>
+#include <time.h>
+#include <sys/crc32.h>
 
 struct db_link {
 	uint32_t attr;		/* primary or secondary */
@@ -93,6 +98,18 @@ struct db_hdr {
 	uint32_t page_sz;		/* page size for mmap alignment	*/
 	uint32_t update_count;		/* updates since last /dev synch up */
 	uint32_t nelems[DB_TYPES];	/* Number of elements of each type */
+	/*
+	 * The following fields allow database corruption to be detected.
+	 * The CRCs cover each segment's data and are stored by the writer.
+	 * The writer identity fields allow a reader which detects
+	 * corruption to report which process produced the database, and
+	 * when.
+	 */
+	uint32_t crc[DB_TYPES];		/* CRC32 of each segment */
+	uint32_t writer_pid;		/* process which wrote the DB */
+	uint32_t hdr_pad;		/* explicit padding, always zero */
+	uint64_t writer_time;		/* write time, seconds since epoch */
+	char writer_exec[24];		/* basename of writer's executable */
 };
 
 
@@ -137,6 +154,7 @@ struct db {
 	struct db_hdr *hdr;		/* DB header */
 	int  seg_prot[DB_TYPES];	/* protection for  segments */
 	caddr_t seg_base[DB_TYPES];	/* base address for segments */
+	uint32_t str_crc;		/* running CRC of written strings */
 };
 
 struct di_devlink_handle {
@@ -192,9 +210,10 @@ typedef enum {
 #define	DB_FILE		".devlink_db"
 #define	DB_TMP		".devlink_db_tmp"
 #define	DB_LOCK		".devlink_db_lock"
+#define	DB_CORRUPT	".devlink_db_corrupt"
 #define	DB_PERMS	(S_IRUSR | S_IRGRP | S_IROTH | S_IWUSR)
 #define	DB_LOCK_PERMS	DB_PERMS
-#define	DB_VERSION	1
+#define	DB_VERSION	2	/* version 2 added CRCs and writer identity */
 
 #define	DB_NIL		0
 
@@ -321,6 +340,13 @@ static void rm_link_from_hash(struct di_devlink_handle *hdp, cache_link_t *clp);
 static uint32_t write_string(struct di_devlink_handle *hdp, const char *str,
     uint32_t *next);
 static int close_db(struct di_devlink_handle *hdp);
+static uint32_t devlink_crc32(uint32_t crc, const void *buf, size_t len);
+static uint32_t segment_crc(struct di_devlink_handle *hdp, db_seg_t seg,
+    int prot);
+static bool verify_db_crc(struct di_devlink_handle *hdp);
+static void seal_db(struct di_devlink_handle *hdp, uint32_t *next);
+static void devlink_db_fault(struct di_devlink_handle *hdp,
+    const char *fmt, ...) __PRINTFLIKE(2) __NORETURN;
 static void cache_free(struct di_devlink_handle *hdp);
 static void handle_free(struct di_devlink_handle **pp);
 static void resolve_dangling_links(struct di_devlink_handle *hdp);
