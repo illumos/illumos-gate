@@ -26,6 +26,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #ifndef	_SVM_SOFTC_H_
 #define	_SVM_SOFTC_H_
 
@@ -53,6 +57,7 @@ struct svm_vcpu {
 	uint32_t	dirty;	 /* state cache bits that must be cleared */
 	uint64_t	nptgen;	 /* page table gen when the vcpu last ran */
 	hma_svm_asid_t	hma_asid;
+	boolean_t	flush_req; /* guest TLB flush due at next entry */
 	boolean_t	loaded;
 	struct svm_pmu_vcpu pmu;
 } __aligned(PAGE_SIZE);

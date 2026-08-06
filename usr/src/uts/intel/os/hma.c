@@ -12,7 +12,7 @@
 /*
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/cpuvar.h>
@@ -594,13 +594,13 @@ hma_svm_asid_update(hma_svm_asid_t *vcp, boolean_t flush_by_asid,
     boolean_t npt_flush)
 {
 	/*
-	 * Most ASID resource updates are expected to be performed as part of
-	 * VMM entry into guest context, where interrupts would be disabled for
-	 * the sake of state consistency.
-	 *
-	 * We demand this be the case, even though other situations which might
-	 * incur an ASID update, such as userspace manipulation of guest vCPU
-	 * state, may not require such consistency.
+	 * ASID resource updates are performed only as part of VMM entry into
+	 * guest context, via check_asid(), with interrupts disabled and on
+	 * the CPU which is about to run the vcpu. The per-CPU ASID state
+	 * consulted here is meaningful only on that CPU. Any other event
+	 * which requires a TLB flush for a vcpu must defer it to the next
+	 * guest entry (see flush_asid() in svm.c) rather than calling this
+	 * function directly.
 	 */
 	ASSERT(!interrupts_enabled());
 

@@ -40,7 +40,7 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -1771,10 +1771,12 @@ check_asid(struct svm_softc *sc, int vcpuid, uint_t thiscpu, uint64_t nptgen)
 {
 	struct svm_vcpu *vcpustate = svm_get_vcpu(sc, vcpuid);
 	struct vmcb_ctrl *ctrl = svm_get_vmcb_ctrl(sc, vcpuid);
+	const boolean_t flush_req = vcpustate->flush_req;
 	uint8_t flush;
 
+	vcpustate->flush_req = B_FALSE;
 	flush = hma_svm_asid_update(&vcpustate->hma_asid, has_flush_by_asid(),
-	    vcpustate->nptgen != nptgen);
+	    vcpustate->nptgen != nptgen || flush_req);
 
 	if (flush != VMCB_TLB_FLUSH_NOTHING) {
 		ctrl->asid = vcpustate->hma_asid.hsa_asid;
@@ -1784,28 +1786,15 @@ check_asid(struct svm_softc *sc, int vcpuid, uint_t thiscpu, uint64_t nptgen)
 	vcpustate->nptgen = nptgen;
 }
 
+/*
+ * Request a flush on the next guest entry. Acting on the request here would
+ * consult the HMA ASID state of the calling CPU, which is not necessarily
+ * where the vcpu will next run.
+ */
 static void
 flush_asid(struct svm_softc *sc, int vcpuid)
 {
-	struct svm_vcpu *vcpustate = svm_get_vcpu(sc, vcpuid);
-	struct vmcb_ctrl *ctrl = svm_get_vmcb_ctrl(sc, vcpuid);
-	uint8_t flush;
-
-	/* HMA ASID updates are expected to be done with interrupts disabled */
-	const ulong_t iflag = intr_clear();
-	flush = hma_svm_asid_update(&vcpustate->hma_asid, has_flush_by_asid(),
-	    true);
-	intr_restore(iflag);
-
-	ASSERT(flush != VMCB_TLB_FLUSH_NOTHING);
-	ctrl->asid = vcpustate->hma_asid.hsa_asid;
-	ctrl->tlb_ctrl = flush;
-	svm_set_dirty(sc, vcpuid, VMCB_CACHE_ASID);
-	/*
-	 * A potential future optimization: We could choose to update the nptgen
-	 * associated with the vCPU, since any pending nptgen change requiring a
-	 * flush will be satisfied by the one which has just now been queued.
-	 */
+	svm_get_vcpu(sc, vcpuid)->flush_req = B_TRUE;
 }
 
 static __inline void
