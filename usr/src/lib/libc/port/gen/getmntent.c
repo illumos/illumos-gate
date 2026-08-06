@@ -25,6 +25,7 @@
 /*
  * Copyright (c) 1989, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2025 Edgecast Cloud LLC.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "lint.h"
@@ -261,8 +262,13 @@ getmntent_common(FILE *fp, struct extmnttab *emp, int command)
 		/* EOF. */
 		return (-1);
 	default:
-		/* A non-mntfs file. */
-		if (command == MNTIOC_GETMNTENT)
+		/*
+		 * If the file is not provided by mntfs then the ioctl()
+		 * fails with ENOTTY and we fall back to parsing the file
+		 * as text. Any other error, such as a transient EFAULT,
+		 * is returned to the caller.
+		 */
+		if (command == MNTIOC_GETMNTENT && errno == ENOTTY)
 			return (getmntent_compat(fp, (struct mnttab *)emp));
 		else
 			return (ret);
