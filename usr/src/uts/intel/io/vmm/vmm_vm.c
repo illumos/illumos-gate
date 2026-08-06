@@ -1247,7 +1247,8 @@ vmc_space_unmap(vm_client_t *vmc, uintptr_t addr, size_t size,
 	 */
 	for (vm_page_t *vmp = list_head(&vmc->vmc_held_pages);
 	    vmp != NULL;
-	    vmp = list_next(&vmc->vmc_held_pages, vmc)) {
+	    vmp = list_next(&vmc->vmc_held_pages, vmp)) {
+		ASSERT3P(vmp->vmp_client, ==, vmc);
 		if (vmp->vmp_gpa < addr ||
 		    vmp->vmp_gpa >= (addr + size)) {
 			/* Hold outside region in question */
@@ -1296,6 +1297,7 @@ vmc_space_orphan(vm_client_t *vmc, vmspace_t *vms)
 		for (vm_page_t *vmp = list_head(&vmc->vmc_held_pages);
 		    vmp != NULL;
 		    vmp = list_next(&vmc->vmc_held_pages, vmp)) {
+			ASSERT3P(vmp->vmp_client, ==, vmc);
 			ASSERT3P(vmp->vmp_ptep, ==, NULL);
 			ASSERT3P(vmp->vmp_obj_ref, !=, NULL);
 		}
