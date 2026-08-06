@@ -177,6 +177,78 @@ test_newlocale_threaded(void)
 	test_run(NUMTHR, testlocale_thr_one, NULL, "newlocale_threaded");
 }
 
+/*
+ * Test what happens when a thread exits with a thread-specific locale set.
+ */
+static void *
+useandexit(void *loc)
+{
+	locale_t l = *(locale_t *)loc;
+
+	(void) uselocale(l);
+	return (NULL);
+}
+
+static void
+test_newlocale_thread_exit(void)
+{
+	locale_t l1, l2;
+	int err;
+	pthread_t thr;
+	const char *lname;
+	char *tname = "newlocale_thread_exit";
+	test_t t;
+
+	t = test_start(tname);
+	/*
+	 * Create a new locale, then pass it to a newly-created thread
+	 * which sets it as its thread-local locale and exits.
+	 */
+	l1 = newlocale(LC_ALL_MASK, "C", (locale_t)0);
+	if (l1 == NULL)
+		test_failed(t, "cannot get locale C");
+
+	lname = getlocalename_l(LC_ALL, l1);
+	if (strcmp("C", lname) != 0)
+		test_failed(t, "incorrect locale name '%s' (expected 'C')",
+		    lname);
+
+	err = pthread_create(&thr, NULL, useandexit, (void *)&l1);
+	if (err != 0)
+		test_failed(t, "pthread_create failed: errno %d", err);
+
+	err = pthread_join(thr, NULL);
+	if (err != 0)
+		test_failed(t, "pthread_join failed: errno %d", err);
+
+	/*
+	 * Allocate a second new locale and verify that the first locale
+	 * is distinct and intact.
+	 */
+	l2 = newlocale(LC_ALL_MASK, "de_DE.UTF-8", (locale_t)0);
+	if (l2 == NULL)
+		test_failed(t, "cannot get locale de_DE.UTF-8");
+
+	if (l1 == l2)
+		test_failed(t, "reused locale pointer");
+
+	lname = getlocalename_l(LC_ALL, l2);
+	if (strcmp("de_DE.UTF-8", lname) != 0)
+		test_failed(t, "incorrect locale name '%s'"
+		    " (expected 'de_DE.UTF-8')", lname);
+
+	lname = getlocalename_l(LC_ALL, l1);
+	if (strcmp("C", lname) != 0)
+		test_failed(t, "l1 locale name changed to '%s'"
+		    " (expected 'C')", lname);
+
+	freelocale(l1);
+	freelocale(l2);
+
+	test_passed(t);
+}
+
+
 static void
 test_newlocale_negative(void)
 {
@@ -553,6 +625,7 @@ main(int argc, char **argv)
 	}
 
 	test_newlocale_threaded();
+	test_newlocale_thread_exit();
 	test_newlocale_negative();
 	test_newlocale_categories();
 	test_newlocale_composite();

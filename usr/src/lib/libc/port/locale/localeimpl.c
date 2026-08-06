@@ -59,10 +59,8 @@
  * was previously global.  We still have global data because some applications
  * have had those global objects compiled into them.  (Such applications will
  * be unable to benefit from uselocale(), btw.)  The legacy routines are
- * reimplemented as wrappers that use the appropriate locale object by
- * calling uselocale().  uselocale() when passed a NULL pointer returns the
- * thread-specific locale object if one is present, or the global locale
- * object otherwise.  Note that once the TSD data is set, the only way
+ * reimplemented as wrappers that retrieve the appropriate locale object by
+ * calling __curlocale().  Note that once the TSD data is set, the only way
  * to revert to the global locale is to pass the global locale LC_GLOBAL_LOCALE
  * to uselocale().
  *
@@ -80,6 +78,10 @@
  * Locale objects (global locales) established by setlocale() are also
  * never freed (for MT safety), but we will save previous locale objects
  * and reuse them when we can.
+ *
+ * We once used the tsdalloc() destructor callback to free
+ * thread-specific locales on thread exit, but that is at odds with
+ * both the POSIX spec and the behavior of other implementations.
  */
 
 typedef struct locdata *(*loadfn_t)(const char *);
@@ -427,15 +429,6 @@ locdata_get(int category, const char *locname)
 	return (locdata_get_cache(category, locname));
 }
 
-/* tsd destructor */
-static void
-freelocptr(void *arg)
-{
-	locale_t *locptr = arg;
-	if (*locptr != NULL)
-		freelocale(*locptr);
-}
-
 static const char *
 get_locale_env(int category)
 {
@@ -597,7 +590,7 @@ __curlocale(void)
 {
 	locale_t *locptr;
 
-	locptr = tsdalloc(_T_SETLOCALE, sizeof (locale_t), freelocptr);
+	locptr = tsdalloc(_T_SETLOCALE, sizeof (locale_t), NULL);
 	/* Should never occur */
 	if (locptr == NULL) {
 		errno = EINVAL;
@@ -616,7 +609,7 @@ uselocale(locale_t loc)
 	locale_t lastloc = ___global_locale;
 	locale_t *locptr;
 
-	locptr = tsdalloc(_T_SETLOCALE, sizeof (locale_t), freelocptr);
+	locptr = tsdalloc(_T_SETLOCALE, sizeof (locale_t), NULL);
 	/* Should never occur */
 	if (locptr == NULL) {
 		errno = EINVAL;
