@@ -252,6 +252,8 @@ dlopen.3c
 	dlmopen.3c
 door_bind.3c
 	door_unbind.3c
+door_create.3c
+	door_xcreate.3c
 door_getparam.3c
 	door_setparam.3c
 drand48.3c
