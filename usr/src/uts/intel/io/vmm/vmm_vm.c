@@ -12,7 +12,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -430,7 +430,6 @@ vmspace_bits_operate(vmspace_t *vms, const uint64_t gpa, size_t len,
 	 * cache.
 	 */
 	vmspace_hold_enter(vms);
-	vms->vms_pt_gen++;
 	vmspace_clients_invalidate(vms, gpa, len);
 	vmspace_hold_exit(vms, true);
 }
@@ -480,7 +479,6 @@ vmspace_set_tracking(vmspace_t *vms, bool enable_dirty_tracking)
 	 * Notify all clients of what is considered an invalidation of the
 	 * entire vmspace.
 	 */
-	vms->vms_pt_gen++;
 	vmspace_clients_invalidate(vms, 0, vms->vms_size);
 
 	vmspace_hold_exit(vms, true);
@@ -771,6 +769,12 @@ vmspace_clients_invalidate(vmspace_t *vms, uintptr_t gpa, size_t len)
 	ASSERT(MUTEX_HELD(&vms->vms_lock));
 	VERIFY(vms->vms_held);
 
+	/*
+	 * Advance the page table generation, which vCPUs consult (and flush
+	 * against) at their next entry into guest context.
+	 */
+	vms->vms_pt_gen++;
+
 	for (vm_client_t *vmc = list_head(&vms->vms_clients);
 	    vmc != NULL;
 	    vmc = list_next(&vms->vms_clients, vmc)) {
@@ -840,7 +844,6 @@ vmspace_unmap(vmspace_t *vms, uintptr_t addr, uintptr_t len)
 	const uintptr_t end = addr + len;
 	vmspace_mapping_t *vmsm;
 	vm_client_t *vmc;
-	uint64_t gen = 0;
 
 	ASSERT3U(addr, <, end);
 
@@ -858,21 +861,28 @@ vmspace_unmap(vmspace_t *vms, uintptr_t addr, uintptr_t len)
 		vmc_space_unmap(vmc, addr, len, vmsm->vmsm_object);
 	}
 
-	/* Clear all PTEs for region */
-	if (vmm_gpt_unmap_region(vms->vms_gpt, addr, len) != 0) {
-		vms->vms_pt_gen++;
-		gen = vms->vms_pt_gen;
-	}
-	/* ... and the intermediate (directory) PTEs as well */
-	vmm_gpt_vacate_region(vms->vms_gpt, addr, len);
+	/*
+	 * Clear the leaf PTEs for the region, then unlink any now-empty
+	 * intermediate (directory) page-table pages, staging them for a
+	 * deferred free.
+	 *
+	 * Clients must be invalidated if either step removed anything from
+	 * the GPT. A region which was mapped but never faulted in has no
+	 * present leaf PTEs, so the unmapped-page count alone does not catch
+	 * that case.
+	 */
+	const size_t unmapped = vmm_gpt_unmap_region(vms->vms_gpt, addr, len);
+	const size_t vacated = vmm_gpt_vacate_region(vms->vms_gpt, addr, len);
+	if (unmapped != 0 || vacated != 0)
+		vmspace_clients_invalidate(vms, addr, len);
 
 	/*
-	 * If pages were actually unmapped from the GPT, provide clients with
-	 * an invalidation notice.
+	 * Only now, with every vcpu fenced off the old page-table generation
+	 * by vmspace_clients_invalidate(), is it safe to return the unlinked
+	 * intermediate pages to the general pool.
 	 */
-	if (gen != 0) {
-		vmspace_clients_invalidate(vms, addr, len);
-	}
+	if (vacated != 0)
+		vmm_gpt_free_pending(vms->vms_gpt);
 
 	vm_mapping_remove(vms, vmsm);
 	vmspace_hold_exit(vms, true);

@@ -12,7 +12,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _VMM_GPT_H
@@ -66,7 +66,8 @@ void vmm_gpt_iter_init(vmm_gpt_iter_t *, vmm_gpt_t *, uint64_t, uint64_t);
 bool vmm_gpt_iter_next(vmm_gpt_iter_t *, vmm_gpt_iter_entry_t *);
 void vmm_gpt_populate_region(vmm_gpt_t *, uint64_t, uint64_t);
 bool vmm_gpt_map_at(vmm_gpt_t *, vmm_gpt_entry_t *, pfn_t, uint_t, uint8_t);
-void vmm_gpt_vacate_region(vmm_gpt_t *, uint64_t, uint64_t);
+size_t vmm_gpt_vacate_region(vmm_gpt_t *, uint64_t, uint64_t);
+void vmm_gpt_free_pending(vmm_gpt_t *);
 bool vmm_gpt_unmap(vmm_gpt_t *, uint64_t);
 size_t vmm_gpt_unmap_region(vmm_gpt_t *, uint64_t, uint64_t);
 uint64_t vmm_gpt_get_pmtp(vmm_gpt_t *, bool);

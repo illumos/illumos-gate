@@ -12,7 +12,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -117,6 +117,7 @@ struct vmm_gpt_node {
  */
 struct vmm_gpt {
 	vmm_gpt_node_t	*vgpt_root;
+	vmm_gpt_node_t	*vgpt_pending_free;
 };
 
 void
@@ -383,8 +384,13 @@ vmm_gpt_node_free(vmm_gpt_node_t *node)
 void
 vmm_gpt_free(vmm_gpt_t *gpt)
 {
-	/* Empty anything remaining in the tree */
-	vmm_gpt_vacate_region(gpt, 0, UINT64_MAX & PAGEMASK);
+	/*
+	 * Empty anything remaining in the tree. As the vmm_gpt_t is being
+	 * destroyed, no vcpu can still be walking it, so the unlinked inner
+	 * node pages can be released immediately.
+	 */
+	(void) vmm_gpt_vacate_region(gpt, 0, UINT64_MAX & PAGEMASK);
+	vmm_gpt_free_pending(gpt);
 
 	VERIFY(gpt->vgpt_root != NULL);
 	VERIFY3U(gpt->vgpt_root->vgn_ref_cnt, ==, 0);
@@ -620,10 +626,11 @@ vmm_gpt_node_add(vmm_gpt_t *gpt, vmm_gpt_node_t *parent,
 }
 
 /*
- * Remove a child node from its relatives (parent, siblings) and free it.
+ * Detach a child node from its relatives (parent, siblings). The node is
+ * unlinked from the table but deliberately not freed.
  */
 static void
-vmm_gpt_node_remove(vmm_gpt_node_t *child)
+vmm_gpt_node_unlink(vmm_gpt_node_t *child)
 {
 	ASSERT3P(child->vgn_children, ==, NULL);
 	ASSERT3U(child->vgn_ref_cnt, ==, 0);
@@ -650,8 +657,26 @@ vmm_gpt_node_remove(vmm_gpt_node_t *child)
 	child->vgn_sib_prev = NULL;
 	parent->vgn_entries[child->vgn_index] = 0;
 	parent->vgn_ref_cnt--;
+}
 
-	vmm_gpt_node_free(child);
+/*
+ * Free the inner node pages which were previously unlinked.
+ * The caller must issue this only once it has ensured that no CPU can still
+ * walk into those pages.
+ */
+void
+vmm_gpt_free_pending(vmm_gpt_t *gpt)
+{
+	vmm_gpt_node_t *node = gpt->vgpt_pending_free;
+
+	gpt->vgpt_pending_free = NULL;
+	while (node != NULL) {
+		vmm_gpt_node_t *next = node->vgn_sib_next;
+
+		node->vgn_sib_next = NULL;
+		vmm_gpt_node_free(node);
+		node = next;
+	}
 }
 
 /*
@@ -976,14 +1001,17 @@ vmm_gpt_map_at(vmm_gpt_t *gpt, vmm_gpt_entry_t *ptep, pfn_t pfn, uint_t prot,
 /*
  * Cleans up the unused inner nodes in the GPT for a region of guest physical
  * address space of [addr, addr + len).  The region must map no pages.
+ *
+ * Returns the number of inner node pages that were unlinked.
  */
-void
+size_t
 vmm_gpt_vacate_region(vmm_gpt_t *gpt, uint64_t addr, uint64_t len)
 {
 	ASSERT0(addr & PAGEOFFSET);
 	ASSERT0(len & PAGEOFFSET);
 
 	const uint64_t end = addr + len;
+	size_t nodes_vacated = 0;
 	vmm_gpt_node_t *node, *starts[MAX_GPT_LEVEL] = {
 		[LEVEL4] = gpt->vgpt_root,
 	};
@@ -1031,7 +1059,10 @@ vmm_gpt_vacate_region(vmm_gpt_t *gpt, uint64_t addr, uint64_t len)
 			vmm_gpt_node_t *next = vmm_gpt_node_next(node, false);
 
 			if (node->vgn_ref_cnt == 0) {
-				vmm_gpt_node_remove(node);
+				vmm_gpt_node_unlink(node);
+				node->vgn_sib_next = gpt->vgpt_pending_free;
+				gpt->vgpt_pending_free = node;
+				nodes_vacated++;
 			}
 			if (next != NULL) {
 				gpa = next->vgn_gpa;
@@ -1039,6 +1070,8 @@ vmm_gpt_vacate_region(vmm_gpt_t *gpt, uint64_t addr, uint64_t len)
 			node = next;
 		}
 	}
+
+	return (nodes_vacated);
 }
 
 /*
