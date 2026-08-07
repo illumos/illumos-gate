@@ -10,7 +10,7 @@
 # http://www.illumos.org/license/CDDL.
 
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 
 # A simple update script that checks out the upstream AMD firmware
 # repository, extracts the microcode into separate files within the amd/
@@ -94,7 +94,7 @@ done
 
 rm -f amd/*-*
 
-cp $tmp/ucode/LICENSE.amd-ucode amd/THIRDPARTYLICENSE
+cp $tmp/ucode/LICENSES/LICENSE.amd-ucode amd/THIRDPARTYLICENSE
 echo AMD Processor Microcode Data Files > amd/THIRDPARTYLICENSE.descrip
 
 for f in $tmp/ucode/amd-ucode/*.bin; do
