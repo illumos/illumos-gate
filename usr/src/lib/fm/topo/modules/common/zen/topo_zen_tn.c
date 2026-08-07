@@ -259,6 +259,34 @@ topo_zen_build_strand(topo_mod_t *mod, zen_topo_enum_sock_t *sock,
 	}
 
 	/*
+	 * A hardware thread does not always have a corresponding logical CPU.
+	 * The operating system may have started fewer CPUs than the processor
+	 * has threads, whether because the processor has more threads than
+	 * the platform maximum or because the administrator has constrained
+	 * things with boot_ncpus. The thread is still present as hardware, so
+	 * we create its node, but without the ASRU and the cpuid property
+	 * that would tie it to its logical CPU.
+	 */
+	if (zt_core->ztcore_nvls[tid] == NULL) {
+		topo_mod_dprintf(mod, "no logical CPU for thread %u (APIC ID "
+		    "0x%x); creating strand without CPU properties\n",
+		    tid, core->atcore_apicids[tid]);
+
+		if (topo_create_props(mod, tn, TOPO_PROP_IMMUTABLE,
+		    &topo_zen_strand_pgroup,
+		    TOPO_PGROUP_STRAND_APICID, TOPO_TYPE_UINT32,
+		    core->atcore_apicids[tid], NULL) != 0) {
+			topo_mod_dprintf(mod,
+			    "failed to set strand properties\n");
+			topo_node_unbind(tn);
+			return (-1);
+		}
+
+		zt_core->ztcore_thr_tn[tid] = tn;
+		return (0);
+	}
+
+	/*
 	 * Strands (hardware threads) have an ASRU that relates to their logical
 	 * CPU. Set that up now. We currently only opt to set it on the strand
 	 * because if we want to offline the core, it seems like that needs
