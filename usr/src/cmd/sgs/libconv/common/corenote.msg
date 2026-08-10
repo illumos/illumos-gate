@@ -874,7 +874,8 @@
 @ MSG_SYS_SETEUID_ALT			"seteuid"
 @ MSG_SYS_FORKSYS			"[ forksys ]"			# 142
 @ MSG_SYS_FORKSYS_ALT			"forksys"
-@ MSG_SYS_143				"143"				# 143(u)
+@ MSG_SYS_SPAWN				"[ spawn ]"			# 143
+@ MSG_SYS_SPAWN_ALT			"spawn"
 @ MSG_SYS_SIGTIMEDWAIT			"[ sigtimedwait ]"		# 144
 @ MSG_SYS_SIGTIMEDWAIT_ALT		"sigtimedwait"
 @ MSG_SYS_LWP_INFO			"[ lwp_info ]"			# 145
