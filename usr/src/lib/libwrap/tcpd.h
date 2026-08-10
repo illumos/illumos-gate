@@ -24,6 +24,7 @@
 
 #define	STRING_LENGTH	128		/* hosts, users, processes */
 
+#include <stdio_tag.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 
@@ -152,21 +153,45 @@ extern void fromhost();			/* get/validate client host info */
 #define	fromhost sock_host		/* no TLI support needed */
 #endif
 
-extern int hosts_ctl();			/* wrapper around request_init() */
-extern int hosts_access();		/* access control */
-extern void shell_cmd();		/* execute shell command */
-extern char *percent_x();		/* do %<char> expansion */
-extern void rfc931();			/* client name from RFC 931 daemon */
-extern void clean_exit();		/* clean up and exit */
-extern void refuse();			/* clean up and exit */
-extern char *xgets();			/* fgets() on steroids */
-extern char *split_at();		/* strchr() and split */
-extern unsigned long dot_quad_addr();	/* restricted inet_addr() */
-extern int numeric_addr();		/* IP4/IP6 inet_addr (restricted) */
-extern struct hostent *tcpd_gethostbyname();
-					/* IP4/IP6 gethostbyname */
+/* wrapper around request_init() */
+extern int hosts_ctl(const char *, const char *, const char *, const char *);
+
+/* access control */
+extern int hosts_access(struct request_info *);
+
+/* execute shell command */
+extern void shell_cmd(char *);
+
+/* do %<char> expansion */
+extern char *percent_x(char *, int, char *, struct request_info *);
+
+/* client name from RFC 931 daemon */
+extern void rfc931(struct sockaddr_gen *, struct sockaddr_gen *, char *);
+
+/* clean up and exit */
+extern void clean_exit(struct request_info *);
+
+/* clean up and exit */
+extern void refuse(struct request_info *);
+
+/* fgets() on steroids */
+extern char *xgets(char *, int, __FILE *);
+
+/* strchr() and split */
+extern char *split_at(char *, int);
+
+/* restricted inet_addr() */
+extern unsigned long dot_quad_addr(char *);
+
+/* IP4/IP6 inet_addr (restricted) */
+extern int numeric_addr(char *, union gen_addr *, int *, int *);
+
+/* IP4/IP6 gethostbyname */
+extern struct hostent *tcpd_gethostbyname(char *, int);
+
+/* skip over colons in IPv6 addrs */
 #ifdef HAVE_IPV6
-extern char *skip_ipv6_addrs();		/* skip over colons in IPv6 addrs */
+extern char *skip_ipv6_addrs(char *);
 #else
 #define	skip_ipv6_addrs(x)	x
 #endif
@@ -186,13 +211,8 @@ extern int resident;			/* > 0 if resident process */
  * attributes. Each attribute has its own key.
  */
 
-#ifdef __STDC__
 extern struct request_info *request_init(struct request_info *, ...);
 extern struct request_info *request_set(struct request_info *, ...);
-#else
-extern struct request_info *request_init();	/* initialize request */
-extern struct request_info *request_set();	/* update request structure */
-#endif
 
 #define	RQ_FILE		1		/* file descriptor */
 #define	RQ_DAEMON	2		/* server process (argv[0]) */

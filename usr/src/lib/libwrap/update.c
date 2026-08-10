@@ -82,7 +82,7 @@ va_list ap;
 	    ptr = request->server->addr;
 	    break;
 	}
-	STRN_CPY(ptr, va_arg(ap, char *), STRING_LENGTH);
+	STRN_CPY(ptr, va_arg(ap, const char *), STRING_LENGTH);
     }
     return (request);
 }

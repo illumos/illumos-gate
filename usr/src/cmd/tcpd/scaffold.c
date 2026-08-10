@@ -179,11 +179,10 @@ struct request_info *request;
 /* dummy function  to intercept the real rfc931() */
 
 /* ARGSUSED */
-
-void    rfc931(request)
-struct request_info *request;
+void
+rfc931(struct sockaddr_gen *rmt_sin, struct sockaddr_gen *our_sin, char *dest)
 {
-    strcpy(request->user, unknown);
+    strcpy(dest, unknown);
 }
 
 /* check_path - examine accessibility */

@@ -26,11 +26,9 @@ static char sccsid[] = "@(#) hosts_ctl.c 1.4 94/12/28 17:42:27";
 
 /* hosts_ctl - limited interface to the hosts_access() routine */
 
-int     hosts_ctl(daemon, name, addr, user)
-char   *daemon;
-char   *name;
-char   *addr;
-char   *user;
+int
+hosts_ctl(const char *daemon, const char *name,
+    const char *addr, const char *user)
 {
     struct request_info request;
 
