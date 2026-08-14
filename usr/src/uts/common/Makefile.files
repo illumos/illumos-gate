@@ -66,6 +66,7 @@ COMMON_CORE_OBJS +=			\
 		kstat_fr.o		\
 		lgrp.o			\
 		lgrp_topo.o		\
+		memlist_new.o		\
 		mmapobj.o		\
 		mutex.o			\
 		page_lock.o		\

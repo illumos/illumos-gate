@@ -21,6 +21,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_SYS_MEMLIST_H
@@ -47,7 +48,11 @@ typedef struct memlist {
 	struct memlist	*ml_prev;	/* link to previous list element */
 } memlist_t;
 
+struct memlist_pool;
+typedef struct memlist_pool memlist_pool_t;
+
 extern int address_in_memlist(struct memlist *, uint64_t, size_t);
+extern size_t memlist_count(const struct memlist *);
 
 /*
  * phys_install is the pointer to the physical installed memory list

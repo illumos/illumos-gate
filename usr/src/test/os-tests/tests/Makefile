@@ -41,6 +41,7 @@ SUBDIRS =       \
 		libsocket \
 		libtopo \
 		mac \
+		memlist \
 		minttl \
 		oclo \
 		pf_key \

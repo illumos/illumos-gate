@@ -210,6 +210,9 @@ file path=opt/os-tests/tests/mac/mac_cksum mode=0555
 file path=opt/os-tests/tests/mac/mac_ktest mode=0555
 file path=opt/os-tests/tests/mac/mac_lso mode=0555
 file path=opt/os-tests/tests/mac/mac_parsing mode=0555
+dir  path=opt/os-tests/tests/memlist
+file path=opt/os-tests/tests/memlist/memlist_test.32 mode=0555
+file path=opt/os-tests/tests/memlist/memlist_test.64 mode=0555
 dir  path=opt/os-tests/tests/minttl
 file path=opt/os-tests/tests/minttl/minttl mode=0555
 file path=opt/os-tests/tests/minttl/minttl_err mode=0555

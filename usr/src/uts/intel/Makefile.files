@@ -24,7 +24,7 @@
 # Copyright 2019 Joyent, Inc.
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2019 Peter Tribble.
-# Copyright 2023 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 #
@@ -151,8 +151,7 @@ PCI_PCINEXUS_OBJS += pci_pci.o
 PCIEB_OBJS += pcieb_x86.o
 PIT_BEEP_OBJS += pit_beep.o
 POWER_OBJS += power.o
-PCI_AUTOCONFIG_OBJS += pci_autoconfig.o pci_boot.o pcie_nvidia.o \
-			pci_memlist.o
+PCI_AUTOCONFIG_OBJS += pci_autoconfig.o pci_boot.o pcie_nvidia.o
 RADEON_OBJS += r300_cmdbuf.o radeon_cp.o radeon_drv.o \
 			radeon_state.o radeon_irq.o radeon_mem.o
 SD_OBJS += sd.o sd_xbuf.o
