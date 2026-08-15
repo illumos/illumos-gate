@@ -11,7 +11,7 @@
 
 #
 # Copyright (c) 2018, Joyent, Inc.
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 include $(SRC)/Makefile.master
@@ -21,6 +21,7 @@ TESTDIR = $(ROOTOPTPKG)/tests/
 
 SRCS =	smbios.c \
 	smbios_test_addinfo.c \
+	smbios_test_boot.c \
 	smbios_test_chassis.c \
 	smbios_test_errors.c \
 	smbios_test_extmemdevice.c \

@@ -11,7 +11,7 @@
 
 /*
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -714,6 +714,38 @@ static const smbios_test_t smbios_tests[] = {
 	    .st_canopen = B_TRUE,
 	    .st_verify = smbios_test_mgmtcomp_verify,
 	    .st_desc = "management device component - basic"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_boot_mktable,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_boot_verify,
+	    .st_desc = "boot information - basic"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_boot_mktable_nodata,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_boot_verify_nodata,
+	    .st_desc = "boot information - no extended data"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_boot_mktable_short_base,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_boot_verify_short,
+	    .st_desc = "boot information - short (1)"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_boot_mktable_short_data,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_boot_verify_short,
+	    .st_desc = "boot information - short (2)"
 	}
 
 };

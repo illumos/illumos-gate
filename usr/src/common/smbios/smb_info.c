@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -1341,6 +1341,9 @@ smbios_info_boot(smbios_hdl_t *shp, smbios_boot_t *bp)
 
 	if (stp == NULL)
 		return (-1); /* errno is set for us */
+
+	if (stp->smbst_hdr->smbh_len < sizeof (smb_boot_t))
+		return (smb_set_errno(shp, ESMB_SHORT));
 
 	bzero(bp, sizeof (smbios_boot_t));
 

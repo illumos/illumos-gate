@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SMBIOS_TEST_H
@@ -193,6 +193,14 @@ extern boolean_t smbios_test_mgmtdev_mktable(smbios_test_table_t *);
 extern boolean_t smbios_test_mgmtcomp_mktable(smbios_test_table_t *);
 extern boolean_t smbios_test_mgmtdev_verify(smbios_hdl_t *);
 extern boolean_t smbios_test_mgmtcomp_verify(smbios_hdl_t *);
+
+extern boolean_t smbios_test_boot_mktable(smbios_test_table_t *);
+extern boolean_t smbios_test_boot_mktable_nodata(smbios_test_table_t *);
+extern boolean_t smbios_test_boot_mktable_short_base(smbios_test_table_t *);
+extern boolean_t smbios_test_boot_mktable_short_data(smbios_test_table_t *);
+extern boolean_t smbios_test_boot_verify(smbios_hdl_t *);
+extern boolean_t smbios_test_boot_verify_short(smbios_hdl_t *);
+extern boolean_t smbios_test_boot_verify_nodata(smbios_hdl_t *);
 
 #ifdef __cplusplus
 }
