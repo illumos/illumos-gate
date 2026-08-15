@@ -746,8 +746,39 @@ static const smbios_test_t smbios_tests[] = {
 	    .st_canopen = B_TRUE,
 	    .st_verify = smbios_test_boot_verify_short,
 	    .st_desc = "boot information - short (2)"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_bboard_mktable,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_bboard_verify_noents,
+	    .st_desc = "baseboard - no ents"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_bboard_mktable_ents,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_bboard_verify_ents,
+	    .st_desc = "baseboard - ents"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_bboard_mktable_short,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_bboard_verify_short,
+	    .st_desc = "baseboard - short table"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_bboard_mktable_short_ents,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_bboard_verify_short_ents,
+	    .st_desc = "baseboard - short ents"
 	}
-
 };
 
 static boolean_t

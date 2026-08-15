@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -112,7 +112,7 @@ typedef struct smb_bboard {
 	uint16_t smbbb_chassis;		/* chassis handle */
 	uint8_t smbbb_type;		/* board type */
 	uint8_t smbbb_cn;		/* number of contained handles */
-	uint16_t smbbb_cv[1];		/* array of contained handles */
+	uint16_t smbbb_cv[];		/* array of contained handles */
 } smb_bboard_t;
 
 /*

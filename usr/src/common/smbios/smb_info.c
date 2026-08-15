@@ -354,7 +354,7 @@ smbios_info_contains(smbios_hdl_t *shp, id_t id, uint_t idc, id_t *idv)
 {
 	const smb_struct_t *stp = smb_lookup_id(shp, id);
 	const struct smb_infospec *isp;
-	id_t *cp;
+	const void *cp;
 	uint_t size;
 	uint8_t cnt;
 	int i, n;
@@ -370,16 +370,27 @@ smbios_info_contains(smbios_hdl_t *shp, id_t id, uint_t idc, id_t *idv)
 	if (isp->is_type == SMB_TYPE_EOT)
 		return (smb_set_errno(shp, ESMB_TYPE));
 
+	/*
+	 * Not every info type has contained objects. Use the size field as a
+	 * proxy for this being actually present.
+	 */
 	size = isp->is_contsz;
-	cnt = *((uint8_t *)(uintptr_t)stp->smbst_hdr + isp->is_contc);
-	cp = (id_t *)((uintptr_t)stp->smbst_hdr + isp->is_contv);
+	if (size != SMB_CONT_WORD)
+		return (smb_set_errno(shp, ESMB_INVAL));
+
+	if (stp->smbst_hdr->smbh_len <= isp->is_contc)
+		return (smb_set_errno(shp, ESMB_SHORT));
+
+	cnt = *(uint8_t *)((uintptr_t)stp->smbst_hdr + isp->is_contc);
+
+	if (stp->smbst_hdr->smbh_len < isp->is_contv + size * cnt)
+		return (smb_set_errno(shp, ESMB_SHORT));
+
+	cp = (const void *)((uintptr_t)stp->smbst_hdr + isp->is_contv);
 
 	n = MIN(cnt, idc);
 	for (i = 0; i < n; i++) {
-		if (size == SMB_CONT_WORD)
-			idv[i] = *((uint16_t *)(uintptr_t)cp + (i * 2));
-		else
-			return (smb_set_errno(shp, ESMB_INVAL));
+		idv[i] = *((const uint16_t *)cp + i);
 	}
 
 	return (cnt);
@@ -512,6 +523,13 @@ smbios_info_bboard(smbios_hdl_t *shp, id_t id, smbios_bboard_t *bbp)
 
 	if (stp->smbst_hdr->smbh_type != SMB_TYPE_BASEBOARD)
 		return (smb_set_errno(shp, ESMB_TYPE));
+
+	/*
+	 * Minimum baseboard size is 0x8, e.g. one has everything ahead of the
+	 * asset tag.
+	 */
+	if (stp->smbst_hdr->smbh_len < offsetof(smb_bboard_t, smbbb_asset))
+		return (smb_set_errno(shp, ESMB_SHORT));
 
 	smb_info_bcopy(stp->smbst_hdr, &bb, sizeof (bb));
 	bzero(bbp, sizeof (smbios_bboard_t));

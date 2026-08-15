@@ -510,6 +510,10 @@ print_bboard(smbios_hdl_t *shp, id_t id, FILE *fp)
 
 		chdl = alloca(chdl_cnt * sizeof (id_t));
 		cnt = smbios_info_contains(shp, id, chdl_cnt, chdl);
+		if (cnt < 0) {
+			smbios_warn(shp, "failed to get contained handles");
+			return;
+		}
 		if (cnt > SMB_CONT_MAX)
 			return;
 		n = MIN(chdl_cnt, cnt);

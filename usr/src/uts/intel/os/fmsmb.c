@@ -274,7 +274,8 @@ smb_bb_contains(smbios_hdl_t *shp, smbs_cnt_t *stype)
 
 	for (cnt = 0; cnt < stype->count; cnt++) {
 		bb_id = stype->ids[cnt]->id;
-		(void) smbios_info_bboard(shp, stype->ids[cnt]->id, &smb_bb);
+		if (smbios_info_bboard(shp, stype->ids[cnt]->id, &smb_bb) == -1)
+			continue;
 		cont_count = (uint_t)smb_bb.smbb_contn;
 		if (cont_count == 0) {
 			continue;
@@ -287,7 +288,7 @@ smb_bb_contains(smbios_hdl_t *shp, smbs_cnt_t *stype)
 
 		rc = smbios_info_contains(shp, stype->ids[cnt]->id,
 		    cont_count, cont_hdl);
-		if (rc > SMB_CONT_MAX) {
+		if (rc > SMB_CONT_MAX || rc < 0) {
 			kmem_free(cont_hdl, cont_count * cont_len);
 			continue;
 		}
@@ -507,8 +508,8 @@ fm_smb_check(smbios_hdl_t *shp)
 		/* verify contained handles */
 		for (i = 0; i < bb_cnt; i++) {
 			bb_id = bb_stype->ids[i]->id;
-			(void) smbios_info_bboard(shp, bb_id, &bb);
-			if (bb.smbb_contn == 0) {
+			if (smbios_info_bboard(shp, bb_id, &bb) == -1 ||
+			    bb.smbb_contn == 0) {
 #ifdef	DEBUG
 				cmn_err(CE_NOTE, "!No contained hanldes (%d)",
 				    i);
@@ -645,7 +646,8 @@ find_matching_proc(smbios_hdl_t *shp, uint_t strand_apicid,
 	int rc;
 
 
-	(void) smbios_info_bboard(shp, bb_id, &bb);
+	if (smbios_info_bboard(shp, bb_id, &bb) == -1)
+		return (0);
 	cont_count = (uint_t)bb.smbb_contn;
 	if (cont_count == 0)
 		return (0);
@@ -656,7 +658,7 @@ find_matching_proc(smbios_hdl_t *shp, uint_t strand_apicid,
 		return (0);
 
 	rc = smbios_info_contains(shp, bb_id, cont_count, cont_hdl);
-	if (rc > SMB_CONT_MAX) {
+	if (rc > SMB_CONT_MAX || rc < 0) {
 		kmem_free(cont_hdl, cont_count * cont_len);
 		return (0);
 	}

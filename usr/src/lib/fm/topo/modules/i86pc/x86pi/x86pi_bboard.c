@@ -363,7 +363,7 @@ x86pi_bb_contains(topo_mod_t *mod)
 			    sizeof (id_t));
 			rv = smbios_info_contains(shp, smb_id, cont_cnt,
 			    cont_hdl);
-			if (rv > SMB_CONT_MAX) {
+			if (rv > SMB_CONT_MAX || rv < 0) {
 				topo_mod_free(mod, cont_hdl, cont_cnt *
 				    sizeof (id_t));
 				return (-1);

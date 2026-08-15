@@ -202,6 +202,16 @@ extern boolean_t smbios_test_boot_verify(smbios_hdl_t *);
 extern boolean_t smbios_test_boot_verify_short(smbios_hdl_t *);
 extern boolean_t smbios_test_boot_verify_nodata(smbios_hdl_t *);
 
+extern boolean_t smbios_test_bboard_mktable(smbios_test_table_t *);
+extern boolean_t smbios_test_bboard_mktable_noents(smbios_test_table_t *);
+extern boolean_t smbios_test_bboard_mktable_ents(smbios_test_table_t *);
+extern boolean_t smbios_test_bboard_mktable_short(smbios_test_table_t *);
+extern boolean_t smbios_test_bboard_mktable_short_ents(smbios_test_table_t *);
+extern boolean_t smbios_test_bboard_verify_noents(smbios_hdl_t *);
+extern boolean_t smbios_test_bboard_verify_ents(smbios_hdl_t *);
+extern boolean_t smbios_test_bboard_verify_short(smbios_hdl_t *);
+extern boolean_t smbios_test_bboard_verify_short_ents(smbios_hdl_t *);
+
 #ifdef __cplusplus
 }
 #endif

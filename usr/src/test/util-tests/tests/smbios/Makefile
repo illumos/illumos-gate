@@ -21,6 +21,7 @@ TESTDIR = $(ROOTOPTPKG)/tests/
 
 SRCS =	smbios.c \
 	smbios_test_addinfo.c \
+	smbios_test_bboard.c \
 	smbios_test_boot.c \
 	smbios_test_chassis.c \
 	smbios_test_errors.c \
