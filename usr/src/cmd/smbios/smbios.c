@@ -32,6 +32,7 @@
 #include <sys/bitext.h>
 #include <sys/hexdump.h>
 #include <sys/uuid.h>
+#include <sys/debug.h>
 
 #include <smbios.h>
 #include <alloca.h>
@@ -45,6 +46,8 @@
 #include <errno.h>
 #include <ctype.h>
 #include <libjedec.h>
+#include <priv.h>
+#include <err.h>
 
 #define	SMBIOS_SUCCESS	0
 #define	SMBIOS_ERROR	1
@@ -2352,6 +2355,50 @@ usage(FILE *fp)
 	return (SMBIOS_USAGE);
 }
 
+/*
+ * We only need a subset of privileges to actually run this command. To access
+ * libraries and the driver, we need PRIV_FILE_READ. We only need
+ * PRIV_FILE_WRITE if we're writing. If a user has the DAC variant of
+ * read/write/search they can keep it.
+ */
+static void
+priv_drop(boolean_t write)
+{
+	priv_set_t *min, *eff;
+
+	if ((min = priv_allocset()) == NULL ||
+	    (eff = priv_allocset()) == NULL) {
+		err(EXIT_FAILURE, "failed to allocate privilege sets");
+	}
+
+	priv_basicset(min);
+	VERIFY0(priv_delset(min, PRIV_FILE_LINK_ANY));
+	VERIFY0(priv_delset(min, PRIV_PROC_INFO));
+	VERIFY0(priv_delset(min, PRIV_PROC_SESSION));
+	VERIFY0(priv_delset(min, PRIV_PROC_FORK));
+	VERIFY0(priv_delset(min, PRIV_NET_ACCESS));
+	VERIFY0(priv_delset(min, PRIV_PROC_EXEC));
+	VERIFY0(priv_addset(min, PRIV_FILE_DAC_READ));
+	VERIFY0(priv_addset(min, PRIV_FILE_DAC_SEARCH));
+	if (!write) {
+		VERIFY0(priv_delset(min, PRIV_FILE_WRITE));
+	} else {
+		VERIFY0(priv_addset(min, PRIV_FILE_DAC_WRITE));
+	}
+
+	if (getppriv(PRIV_EFFECTIVE, eff) != 0) {
+		err(EXIT_FAILURE, "failed to get effective privileges");
+	}
+
+	priv_intersect(min, eff);
+	if (setppriv(PRIV_SET, PRIV_PERMITTED, eff) != 0) {
+		err(EXIT_FAILURE, "failed to set privileges");
+	}
+
+	priv_freeset(min);
+	priv_freeset(eff);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -2416,6 +2463,8 @@ main(int argc, char *argv[])
 			ifile = argv[optind++];
 		}
 	}
+
+	priv_drop(ofile != NULL);
 
 	if ((shp = smbios_open(ifile, SMB_VERSION, oflags, &err)) == NULL) {
 		(void) fprintf(stderr, "%s: failed to load SMBIOS: %s\n",
