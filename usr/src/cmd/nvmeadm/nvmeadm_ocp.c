@@ -302,24 +302,29 @@ static const nvmeadm_field_t ocp_vul_smart_fields[] = { {
 		[0] = "Other - unknown",
 		[1] = "PCIe: integrated",
 		[2] = "PCIe: Other - unknown",
+		/* 3 to 15 are reserved */
 		[16] = "PCIe: 2.5\" - unknown",
 		[17] = "PCIe: 2.5\" - U.2 15mm",
 		[18] = "PCIe: 2.5\" - U.2 7mm",
 		[19] = "PCIe: 2.5\" - U.3 15mm",
 		[20] = "PCIe: 2.5\" - U.3 7mm",
+		/* 21 to 31 are reserved */
 		[32] = "PCIe: CEM AIC - unknown",
 		[33] = "PCIe: CEM AIC - HHHL",
 		[34] = "PCIe: CEM AIC - FHHL",
 		[35] = "PCIe: CEM AIC - FHFL",
+		/* 36 to 47 are reserved */
 		[48] = "PCIe: M.2 - unknown",
 		[49] = "PCIe: M.2 - 2230",
 		[50] = "PCIe: M.2 - 2242",
 		[51] = "PCIe: M.2 - 2260",
 		[52] = "PCIe: M.2 - 2280",
 		[53] = "PCIe: M.2 - 22110",
+		/* 54 to 63 are reserved */
 		[64] = "PCIe: BGA - unknown",
 		[65] = "PCIe: BGA - 16x20mm (M.2 Type 1620)",
 		[66] = "PCIe: BGA - 11.5x13mm (M.2 Type 1113)",
+		/* 67 to 79 are reserved */
 		[80] = "PCIe: EDSFF - unknown",
 		[81] = "PCIe: E1.S - 5.9mm",
 		[82] = "PCIe: E1.S - 8mm",
@@ -332,6 +337,8 @@ static const nvmeadm_field_t ocp_vul_smart_fields[] = { {
 		[89] = "PCIe: E1.S - 9.5mm",
 		[90] = "PCIe: E1.S - 15mm",
 		[91] = "PCIe: E1.S - 25mm",
+		[92] = "PCIe: E2 - 9.5mm",
+		/* 93 to 95 are reserved */
 		[96] = "Ethernet: Other - unknown",
 		[97] = "Ethernet: 2.5\" NVMeoF 15mm",
 		[98] = "Ethernet: 2.5\" NVMeoF 7mm",

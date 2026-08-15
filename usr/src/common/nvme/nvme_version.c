@@ -28,6 +28,7 @@ const nvme_version_t nvme_vers_2v0 = { .v_major = 2, .v_minor = 0 };
 const nvme_version_t nvme_vers_2v1 = { .v_major = 2, .v_minor = 1 };
 const nvme_version_t nvme_vers_2v2 = { .v_major = 2, .v_minor = 2 };
 const nvme_version_t nvme_vers_2v3 = { .v_major = 2, .v_minor = 3 };
+const nvme_version_t nvme_vers_2v4 = { .v_major = 2, .v_minor = 4 };
 
 
 bool

@@ -951,14 +951,46 @@ typedef struct {
 /* NVMe Identify parameters (cdw10) */
 #define	NVME_IDENTIFY_NSID		0x0	/* Identify Namespace */
 #define	NVME_IDENTIFY_CTRL		0x1	/* Identify Controller */
+/* Added in NVMe 1.1 */
 #define	NVME_IDENTIFY_NSID_LIST		0x2	/* List Active Namespaces */
+/* Added in NVMe 1.3 */
 #define	NVME_IDENTIFY_NSID_DESC		0x3	/* Namespace ID Descriptors */
+/* Added in NVMe 1.4 */
+#define	NVME_IDENTIFY_SET_LIST		0x4	/* NVM Set List */
+/* Added in NVMe 2.0 */
+#define	NVME_IDENTIFY_IOCS_NSID		0x5	/* IOCS Identify Namespace */
+#define	NVME_IDENTIFY_IOCS_CTRL		0x6	/* IOCS Identify Controller */
+#define	NVME_IDENTIFY_IOCS_NSID_LIST	0x7	/* List IOCS Active NSIDs */
+#define	NVME_IDENTIFY_IOCI_NSID		0x8	/* IOCS Ind. Namespace */
+/* Added in NVMe 2.1 */
+#define	NVME_IDENTIFY_FMT_NSID		0x9	/* CSI/Format Id. Namespace */
+#define	NVME_IDENTIFY_FMT_IOCS_NSID	0xa	/* Format Ind. Namespace */
 
+/* Added in NVMe 1.2 */
 #define	NVME_IDENTIFY_NSID_ALLOC_LIST	0x10	/* List Allocated NSID */
 #define	NVME_IDENTIFY_NSID_ALLOC	0x11	/* Identify Allocated NSID */
 #define	NVME_IDENTIFY_NSID_CTRL_LIST	0x12	/* List Controllers on NSID */
 #define	NVME_IDENTIFY_CTRL_LIST		0x13	/* Controller List */
+/* Added in NVMe 1.3 */
 #define	NVME_IDENTIFY_PRIMARY_CAPS	0x14	/* Primary Controller Caps */
+#define	NVME_IDENTIFY_SEC_CTRL_LIST	0x15	/* Secondary Controller List */
+/* Added in NVMe 1.4 */
+#define	NVME_IDENTIFY_NS_GRAN_LIST	0x16	/* Namespace Granularity */
+#define	NVME_IDENTIFY_UUID_LIST		0x17	/* UUID List */
+/* Added in NVMe 2.0 */
+#define	NVME_IDENTIFY_DOMAIN_LIST	0x18	/* Domain List */
+#define	NVME_IDENTIFY_ENDGRP_LIST	0x19	/* Endurance Group List */
+#define	NVME_IDENTIFY_IOCS_ALLOC_LIST	0x1a	/* IOCS Allocated NSID List */
+#define	NVME_IDENTIFY_IOCS_ALLOC_NSID	0x1b	/* IOCS Allocated Id. NSID */
+#define	NVME_IDENTIFY_IOCS_DS		0x1c	/* IOCS data structure */
+/* Added in NVMe 2.1 */
+#define	NVME_IDENTIFY_UN_NSID_LIST	0x1d	/* Underlying Namespace List */
+#define	NVME_IDENTIFY_PORTS_LIST	0x1e	/* Ports List */
+#define	NVME_IDENTIFY_IOCI_ALLOC_NSID	0x1f	/* IOCS Ind. Alloc Namespace */
+#define	NVME_IDENTIFY_SUP_CTRL_ST_FMTS	0x20	/* Sup. Ctrl. State Formats */
+/* Added in NVMe 2.4 */
+#define	NVME_IDENTIFY_UN_CTRL_LIST	0x21	/* Underlying Controller List */
+#define	NVME_IDENTIFY_EXP_SUBSYS_LIST	0x22	/* Exported NVM Subsys List */
 
 
 /* NVMe Queue Entry Size bitfield */
@@ -1627,8 +1659,11 @@ typedef struct {
 #define	NVME_LOGPAGE_RECLAIM	0x21	/* Reclaim Unit Handle Usage (2.1) */
 #define	NVME_LOGPAGE_FDPSTAT	0x22	/* FDP Statistics (2.1) */
 #define	NVME_LOGPAGE_FDPEVENT	0x23	/* FDP Events (2.1) */
-/* 0x24 is not currently defined */
+#define	NVME_LOGPAGE_MFGDEFCFG	0x24	/* Mfg Default Config Status (2.4) */
 #define	NVME_LOGPAGE_POWER	0x25	/* Power Measurement (2.3) */
+/* 0x26 is reserved */
+#define	NVME_LOGPAGE_VOLT	0x27	/* Voltage Measurement (2.4) */
+#define	NVME_LOGPAGE_RATELIMIT	0x28	/* Rate Limiting (N1.3) */
 
 
 #define	NVME_LOGPAGE_VEND_MIN	0xc0
@@ -2173,7 +2208,6 @@ typedef union {
 #define	NVME_FEAT_SAN_CFG	0x17	/* Sanitize Config (1.4) */
 #define	NVME_FEAT_EGRP_EVENT	0x18	/* Endurance Group Event Config (1.4) */
 #define	NVME_FEAT_IO_CMD_SET	0x19	/* I/O Command Set Profile (2.0) */
-#define	NVME_FEAT_IO_CMD_SET	0x19	/* I/O Command Set Profile (2.0) */
 #define	NVME_FEAT_SPINUP	0x1a	/* Spinup Control (2.0) */
 #define	NVME_FEAT_PLS		0x1b	/* Power Loss Signaling (2.1) */
 #define	NVME_FEAT_PERF_CHAR	0x1c	/* Perf. Characteristics (N1.1) */
@@ -2185,6 +2219,9 @@ typedef union {
 #define	NVME_FEAT_POWER_LIMIT	0x23	/* Power Limit (2.3) */
 #define	NVME_FEAT_POWER_THRESH	0x24	/* Power Threshold (2.3) */
 #define	NVME_FEAT_POWER_MEASURE	0x25	/* Power Measurement (2.3) */
+#define	NVME_FEAT_VOLT_THRESH	0x26	/* Voltage Threshold (2.4) */
+#define	NVME_FEAT_VOLT_MEASURE	0x27	/* Voltage Measurement (2.4) */
+#define	NVME_FEAT_RATE_LIMIT	0x28	/* Rate Limiting (N1.3) */
 
 #define	NVME_FEAT_ENH_CTRL_META	0x7d	/* Enhanced Controller Metadata (2.0) */
 #define	NVME_FEAT_CTRL_META	0x7e	/* Controller Metadata (2.0) */
@@ -2534,6 +2571,9 @@ typedef union {
 /* Added in NVMe 2.3 */
 #define	NVME_CQE_SC_GEN_SAN_NS_FAIL	0x2b	/* Sanitize NS failed */
 #define	NVME_CQE_SC_GEN_SAN_NS_PROG	0x2c	/* Sanitize NS in progress */
+/* Added in NVMe 2.4 */
+#define	NVME_CQE_SC_GEN_RSTR_CFG_FAIL	0x2d	/* Failed to restore cfg. */
+/* 0x2e was allocated, but has no actual prose in the spec. */
 
 /* NVMe completion status code (generic NVM commands) */
 #define	NVME_CQE_SC_GEN_NVM_LBA_RANGE	0x80	/* LBA Out Of Range */
@@ -2620,6 +2660,10 @@ typedef union {
 #define	NVME_CQE_SC_SPC_XCTL_RST_PROG	0x3f	/* X-Ctrl Reset in Progress */
 #define	NVME_CQE_SC_SPC_XCTL_RST_LPF	0x40	/* X-Ctrl Log Page Full */
 #define	NVME_CQE_SC_SPC_XCTL_RST_LIM	0x41	/* X-Ctrl Reset Limit */
+/* Added in NVMe 2.4 */
+#define	NVME_CQE_SC_SPC_CTL_ACTIVE	0x42	/* Controller Active */
+#define	NVME_CQE_SC_SPC_INV_EXP_ASSOC	0x43	/* Invalid Exported Assoc. */
+#define	NVME_CQE_SC_SPC_INV_EXP_CFG	0x44	/* Inv. Exported Cfg. State */
 
 /* NVMe completion status code (I/O command specific) */
 #define	NVME_CQE_SC_SPC_NVM_CNFL_ATTR	0x80	/* Conflicting Attributes */

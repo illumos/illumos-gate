@@ -147,6 +147,8 @@ nvme_sctostr_gen_gen(uint32_t sct)
 		return ("sanitize namespace failed");
 	case NVME_CQE_SC_GEN_SAN_NS_PROG:
 		return ("sanitize namespace in progress");
+	case NVME_CQE_SC_GEN_RSTR_CFG_FAIL:
+		return ("failed to restore configuration");
 	default:
 		return ("unknown status code");
 	}
@@ -338,6 +340,12 @@ nvme_sctostr_cmd_gen(uint32_t sct)
 		return ("cross-controller reset log page full");
 	case NVME_CQE_SC_SPC_XCTL_RST_LIM:
 		return ("cross-controller reset limit exceeded");
+	case NVME_CQE_SC_SPC_CTL_ACTIVE:
+		return ("controller active");
+	case NVME_CQE_SC_SPC_INV_EXP_ASSOC:
+		return ("invalid exported association");
+	case NVME_CQE_SC_SPC_INV_EXP_CFG:
+		return ("invalid exported configuration state");
 	default:
 		return ("unknown generic command status code");
 	}
