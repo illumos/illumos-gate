@@ -1540,13 +1540,24 @@ smbios_info_extprocessor(smbios_hdl_t *shp, id_t id,
 	if (stp->smbst_hdr->smbh_type != SUN_OEM_EXT_PROCESSOR)
 		return (smb_set_errno(shp, ESMB_TYPE));
 
+	if (stp->smbst_hdr->smbh_len < sizeof (smb_processor_ext_t))
+		return (smb_set_errno(shp, ESMB_SHORT));
+
 	exp = (smb_processor_ext_t *)(uintptr_t)stp->smbst_hdr;
 	bzero(epp, sizeof (smbios_processor_ext_t));
 
 	epp->smbpe_processor = exp->smbpre_processor;
 	epp->smbpe_fru = exp->smbpre_fru;
 	epp->smbpe_n = exp->smbpre_n;
-	epp->smbpe_apicid = exp->smbpre_apicid;
+	if (epp->smbpe_n > 0) {
+		if (stp->smbst_hdr->smbh_len < sizeof (smb_processor_ext_t) +
+		    exp->smbpre_n * sizeof (uint16_t)) {
+			return (smb_set_errno(shp, ESMB_SHORT));
+		}
+		epp->smbpe_apicid = exp->smbpre_apicid;
+	} else {
+		epp->smbpe_apicid = NULL;
+	}
 
 	return (0);
 }
@@ -1562,6 +1573,9 @@ smbios_info_extport(smbios_hdl_t *shp, id_t id, smbios_port_ext_t *eportp)
 
 	if (stp->smbst_hdr->smbh_type != SUN_OEM_EXT_PORT)
 		return (smb_set_errno(shp, ESMB_TYPE));
+
+	if (stp->smbst_hdr->smbh_len < sizeof (smb_port_ext_t))
+		return (smb_set_errno(shp, ESMB_SHORT));
 
 	ep = (smb_port_ext_t *)(uintptr_t)stp->smbst_hdr;
 	bzero(eportp, sizeof (smbios_port_ext_t));

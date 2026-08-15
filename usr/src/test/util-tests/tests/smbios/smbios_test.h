@@ -61,6 +61,7 @@ extern void smbios_test_table_str_fini(smbios_test_table_t *);
 extern uint16_t smbios_test_table_append(smbios_test_table_t *, const void *,
     size_t);
 extern void smbios_test_table_append_eot(smbios_test_table_t *);
+extern void smbios_test_table_add_sunoem(smbios_test_table_t *);
 
 typedef boolean_t (*smbios_test_mktable_f)(smbios_test_table_t *);
 typedef boolean_t (*smbios_test_verify_f)(smbios_hdl_t *);
@@ -211,6 +212,19 @@ extern boolean_t smbios_test_bboard_verify_noents(smbios_hdl_t *);
 extern boolean_t smbios_test_bboard_verify_ents(smbios_hdl_t *);
 extern boolean_t smbios_test_bboard_verify_short(smbios_hdl_t *);
 extern boolean_t smbios_test_bboard_verify_short_ents(smbios_hdl_t *);
+
+extern boolean_t smbios_test_extproc_mktable_short(smbios_test_table_t *);
+extern boolean_t smbios_test_extproc_mktable_noapic(smbios_test_table_t *);
+extern boolean_t smbios_test_extproc_mktable_short_apic(smbios_test_table_t *);
+extern boolean_t smbios_test_extproc_mktable_apic(smbios_test_table_t *);
+extern boolean_t smbios_test_extproc_verify_noapic(smbios_hdl_t *);
+extern boolean_t smbios_test_extproc_verify_apic(smbios_hdl_t *);
+extern boolean_t smbios_test_extproc_verify_short(smbios_hdl_t *);
+
+extern boolean_t smbios_test_extport_mktable(smbios_test_table_t *);
+extern boolean_t smbios_test_extport_mktable_short(smbios_test_table_t *);
+extern boolean_t smbios_test_extport_verify(smbios_hdl_t *);
+extern boolean_t smbios_test_extport_verify_short(smbios_hdl_t *);
 
 #ifdef __cplusplus
 }

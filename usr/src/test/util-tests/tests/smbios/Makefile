@@ -26,6 +26,8 @@ SRCS =	smbios.c \
 	smbios_test_chassis.c \
 	smbios_test_errors.c \
 	smbios_test_extmemdevice.c \
+	smbios_test_extport.c \
+	smbios_test_extproc.c \
 	smbios_test_fwinfo.c \
 	smbios_test_memdevice.c \
 	smbios_test_mgmtdev.c \

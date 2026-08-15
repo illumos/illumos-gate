@@ -399,8 +399,8 @@ fm_smb_check(smbios_hdl_t *shp)
 	for (i = 0; i < pr_cnt; i++) {
 		pr_id = pr_stype->ids[i]->id;
 		expr_id = expr_stype->ids[i]->id;
-		(void) smbios_info_extprocessor(shp, expr_id, &exproc);
-		if (exproc.smbpe_processor != pr_id) {
+		if (smbios_info_extprocessor(shp, expr_id, &exproc) == -1 ||
+		    exproc.smbpe_processor != pr_id) {
 #ifdef	DEBUG
 			cmn_err(CE_NOTE, "!Processor struct linkage (%d)", i);
 #endif	/* DEBUG */
@@ -615,8 +615,8 @@ find_matching_apic(smbios_hdl_t *shp, uint16_t proc_id, uint_t strand_apicid)
 	smb_strcnt(shp, pstypes);
 	for (i = 0; i < pstypes->count; i++) {
 		ext_id = pstypes->ids[i]->id;
-		(void) smbios_info_extprocessor(shp, ext_id, &ep);
-		if (ep.smbpe_processor == proc_id) {
+		if (smbios_info_extprocessor(shp, ext_id, &ep) == 0 &&
+		    ep.smbpe_processor == proc_id) {
 			for (j = 0; j < ep.smbpe_n; j++) {
 				if (ep.smbpe_apicid[j] == strand_apicid) {
 					smb_free_strcnt(pstypes, strcnt);

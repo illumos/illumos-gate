@@ -160,7 +160,19 @@ smbios_test_table_append_eot(smbios_test_table_t *table)
 	    sizeof (endstring));
 	smbios_test_table_append_raw(table, &endstring,
 	    sizeof (endstring));
+}
 
+void
+smbios_test_table_add_sunoem(smbios_test_table_t *table)
+{
+	smb_strtab_t str;
+
+	str.smbtb_hdr.smbh_type = SMB_TYPE_OEMSTR;
+	str.smbtb_hdr.smbh_len = sizeof (str);
+	str.smbtb_count = 1;
+	(void) smbios_test_table_append(table, &str, sizeof (str));
+	smbios_test_table_append_string(table, "SUNW-PRMS-1");
+	smbios_test_table_str_fini(table);
 }
 
 static uint8_t
@@ -778,6 +790,54 @@ static const smbios_test_t smbios_tests[] = {
 	    .st_canopen = B_TRUE,
 	    .st_verify = smbios_test_bboard_verify_short_ents,
 	    .st_desc = "baseboard - short ents"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_extproc_mktable_noapic,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_extproc_verify_noapic,
+	    .st_desc = "Sun extended processor - no apic ids"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_extproc_mktable_apic,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_extproc_verify_apic,
+	    .st_desc = "Sun extended processor - apic ids"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_extproc_mktable_short,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_extproc_verify_short,
+	    .st_desc = "Sun extended processor - short table"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_extproc_mktable_short_apic,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_extproc_verify_short,
+	    .st_desc = "Sun extended processor - short apic"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_extport_mktable,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_extport_verify,
+	    .st_desc = "Sun extended port - base"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_extport_mktable_short,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_extport_verify_short,
+	    .st_desc = "Sun extended port - short"
 	}
 };
 

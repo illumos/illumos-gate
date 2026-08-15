@@ -775,7 +775,7 @@ typedef struct smb_processor_ext {
 	uint16_t smbpre_processor;	/* processor handle */
 	uint8_t smbpre_fru;		/* FRU indicator */
 	uint8_t smbpre_n;		/* number of APIC IDs */
-	uint16_t smbpre_apicid[1];	/* strand initial apic id */
+	uint16_t smbpre_apicid[];	/* strand initial apic id */
 } smb_processor_ext_t;
 
 /*
