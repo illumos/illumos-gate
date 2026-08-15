@@ -22,7 +22,7 @@
 /*
  * Copyright 2015 OmniTI Computer Consulting, Inc.  All rights reserved.
  * Copyright (c) 2018, Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -31,6 +31,7 @@
 #include <sys/param.h>
 #include <sys/bitext.h>
 #include <sys/hexdump.h>
+#include <sys/uuid.h>
 
 #include <smbios.h>
 #include <alloca.h>
@@ -454,27 +455,33 @@ print_system(smbios_hdl_t *shp, FILE *fp)
 	 * provide a corrected UUID.  The specification clarified this in
 	 * version 2.7, but this was first implemented prior to that.
 	 */
-	oprintf(fp, "  UUID: ");
-	oprintf(fp, "%02x%02x%02x%02x-%02x%02x-%02x%02x-",
-	    s.smbs_uuid[0], s.smbs_uuid[1], s.smbs_uuid[2], s.smbs_uuid[3],
-	    s.smbs_uuid[4], s.smbs_uuid[5], s.smbs_uuid[6], s.smbs_uuid[7]);
-	for (i = 8; i < s.smbs_uuidlen; i++) {
-		oprintf(fp, "%02x", s.smbs_uuid[i]);
-		if (i == 9)
-			oprintf(fp, "-");
-	}
-	oprintf(fp, "\n");
+	if (s.smbs_uuid != NULL && s.smbs_uuidlen >= UUID_LEN) {
+		oprintf(fp, "  UUID: ");
+		oprintf(fp, "%02x%02x%02x%02x-%02x%02x-%02x%02x-",
+		    s.smbs_uuid[0], s.smbs_uuid[1], s.smbs_uuid[2],
+		    s.smbs_uuid[3], s.smbs_uuid[4], s.smbs_uuid[5],
+		    s.smbs_uuid[6], s.smbs_uuid[7]);
+		for (i = 8; i < s.smbs_uuidlen; i++) {
+			oprintf(fp, "%02x", s.smbs_uuid[i]);
+			if (i == 9)
+				oprintf(fp, "-");
+		}
+		oprintf(fp, "\n");
 
-	oprintf(fp, "  UUID (Endian-corrected): ");
-	oprintf(fp, "%08x-%04hx-%04hx-", *((uint_t *)&s.smbs_uuid[0]),
-	    *((ushort_t *)&s.smbs_uuid[4]),
-	    *((ushort_t *)&s.smbs_uuid[6]));
-	for (i = 8; i < s.smbs_uuidlen; i++) {
-		oprintf(fp, "%02x", s.smbs_uuid[i]);
-		if (i == 9)
-			oprintf(fp, "-");
+		oprintf(fp, "  UUID (Endian-corrected): ");
+		oprintf(fp, "%08x-%04hx-%04hx-", *((uint_t *)&s.smbs_uuid[0]),
+		    *((ushort_t *)&s.smbs_uuid[4]),
+		    *((ushort_t *)&s.smbs_uuid[6]));
+		for (i = 8; i < s.smbs_uuidlen; i++) {
+			oprintf(fp, "%02x", s.smbs_uuid[i]);
+			if (i == 9)
+				oprintf(fp, "-");
+		}
+		oprintf(fp, "\n");
+	} else {
+		oprintf(fp, "  UUID unavailable (have %u bytes)\n",
+		    s.smbs_uuidlen);
 	}
-	oprintf(fp, "\n");
 
 	desc_printf(smbios_system_wakeup_desc(s.smbs_wakeup),
 	    fp, "  Wake-Up Event: 0x%x", s.smbs_wakeup);

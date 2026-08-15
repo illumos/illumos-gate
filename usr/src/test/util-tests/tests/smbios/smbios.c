@@ -838,6 +838,30 @@ static const smbios_test_t smbios_tests[] = {
 	    .st_canopen = B_TRUE,
 	    .st_verify = smbios_test_extport_verify_short,
 	    .st_desc = "Sun extended port - short"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_system_mktable,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_system_verify,
+	    .st_desc = "system - basic"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_system_mktable_2p3,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_system_verify_2p3,
+	    .st_desc = "system - basic (2.3)"
+	}, {
+	    .st_entry = SMBIOS_ENTRY_POINT_30,
+	    .st_tvers = SMB_VERSION,
+	    .st_libvers = SMB_VERSION,
+	    .st_mktable = smbios_test_system_mktable_2p0,
+	    .st_canopen = B_TRUE,
+	    .st_verify = smbios_test_system_verify_2p0,
+	    .st_desc = "system - basic (2.0)"
 	}
 };
 

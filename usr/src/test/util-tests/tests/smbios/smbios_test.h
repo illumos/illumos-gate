@@ -226,6 +226,13 @@ extern boolean_t smbios_test_extport_mktable_short(smbios_test_table_t *);
 extern boolean_t smbios_test_extport_verify(smbios_hdl_t *);
 extern boolean_t smbios_test_extport_verify_short(smbios_hdl_t *);
 
+extern boolean_t smbios_test_system_mktable(smbios_test_table_t *);
+extern boolean_t smbios_test_system_mktable_2p0(smbios_test_table_t *);
+extern boolean_t smbios_test_system_mktable_2p3(smbios_test_table_t *);
+extern boolean_t smbios_test_system_verify(smbios_hdl_t *);
+extern boolean_t smbios_test_system_verify_2p0(smbios_hdl_t *);
+extern boolean_t smbios_test_system_verify_2p3(smbios_hdl_t *);
+
 #ifdef __cplusplus
 }
 #endif

@@ -503,8 +503,24 @@ smbios_info_system(smbios_hdl_t *shp, smbios_system_t *sip)
 	smb_info_bcopy(stp->smbst_hdr, &si, sizeof (si));
 	bzero(sip, sizeof (smbios_system_t));
 
-	sip->smbs_uuid = ((smb_system_t *)stp->smbst_hdr)->smbsi_uuid;
-	sip->smbs_uuidlen = sizeof (si.smbsi_uuid);
+	/*
+	 * The UUID field was introduced in SMBIOS 2.1, it wasn't present in
+	 * SMBIOS 2.0. This library was first written against SMBIOS 2.4, which
+	 * required that and the family string. We only set the UUID field if we
+	 * have enough bytes for it.
+	 *
+	 * We really should check for the full spec's minimum lengths; however,
+	 * since this has never enforced this and the system relies on the
+	 * system information a fair bit, we basically instead only include the
+	 * UUID if we have enough bytes to cover it in its entirety.
+	 */
+	if (stp->smbst_hdr->smbh_len >= offsetof(smb_system_t, smbsi_wakeup)) {
+		sip->smbs_uuid = ((smb_system_t *)stp->smbst_hdr)->smbsi_uuid;
+		sip->smbs_uuidlen = sizeof (si.smbsi_uuid);
+	} else {
+		sip->smbs_uuid = NULL;
+		sip->smbs_uuidlen = 0;
+	}
 	sip->smbs_wakeup = si.smbsi_wakeup;
 	sip->smbs_sku = smb_strptr(stp, si.smbsi_sku);
 	sip->smbs_family = smb_strptr(stp, si.smbsi_family);

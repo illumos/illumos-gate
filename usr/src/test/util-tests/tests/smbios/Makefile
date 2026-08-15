@@ -36,6 +36,7 @@ SRCS =	smbios.c \
 	smbios_test_slot.c \
 	smbios_test_strings.c \
 	smbios_test_strprop.c \
+	smbios_test_system.c \
 	smbios_test_tpm.c
 PROGS = smbios
 
