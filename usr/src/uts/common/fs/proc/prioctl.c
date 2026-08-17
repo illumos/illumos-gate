@@ -83,8 +83,8 @@ static	ulong_t	prmaprunflags(long);
 static	long	prmapsetflags(long);
 static	void	prsetrun(kthread_t *, prrun_t *);
 static	int	propenm(prnode_t *, caddr_t, caddr_t, int *, cred_t *);
-extern	void	oprgetstatus(kthread_t *, prstatus_t *, zone_t *);
-extern	void	oprgetpsinfo(proc_t *, prpsinfo_t *, kthread_t *);
+static	void	oprgetstatus(kthread_t *, prstatus_t *, zone_t *);
+static	void	oprgetpsinfo(proc_t *, prpsinfo_t *, kthread_t *);
 static	int	oprgetmap(proc_t *, list_t *);
 
 static int
@@ -1444,7 +1444,7 @@ oprgetstatus32(kthread_t *t, prstatus32_t *sp, zone_t *zp)
 	mutex_enter(&p->p_lock);
 }
 
-void
+static void
 oprgetpsinfo32(proc_t *p, prpsinfo32_t *psp, kthread_t *tp)
 {
 	kthread_t *t;
@@ -3083,7 +3083,7 @@ propenm(prnode_t *pnp, caddr_t cmaddr, caddr_t va, int *rvalp, cred_t *cr)
  * Return old version of process/lwp status.
  * The u-block is mapped in by this routine and unmapped at the end.
  */
-void
+static void
 oprgetstatus(kthread_t *t, prstatus_t *sp, zone_t *zp)
 {
 	proc_t *p = ttoproc(t);
@@ -3232,7 +3232,7 @@ oprgetstatus(kthread_t *t, prstatus_t *sp, zone_t *zp)
 /*
  * Return old version of information used by ps(1).
  */
-void
+static void
 oprgetpsinfo(proc_t *p, prpsinfo_t *psp, kthread_t *tp)
 {
 	kthread_t *t;

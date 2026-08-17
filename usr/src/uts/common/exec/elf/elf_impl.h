@@ -95,8 +95,6 @@ typedef struct {
 #define	mapexec_brand		mapexec32_brand
 #define	setup_note_header	setup_note_header32
 #define	write_elfnotes		write_elfnotes32
-#define	setup_old_note_header	setup_old_note_header32
-#define	write_old_elfnotes	write_old_elfnotes32
 
 #if defined(__sparc)
 #define	gwindows_t	gwindows32_t
@@ -121,18 +119,12 @@ typedef struct {
 #endif
 #define	prfpregset_t	prfpregset32_t
 
-#define	oprgetstatus	oprgetstatus32
-#define	oprgetpsinfo	oprgetpsinfo32
 #define	prgetprfpregs	prgetprfpregs32
 
 #endif	/*	_ELF32_COMPAT	*/
 
 extern int elfnote(vnode_t *, offset_t *, int, int, void *, rlim64_t, cred_t *);
-extern void setup_old_note_header(Phdr *, proc_t *);
 extern void setup_note_header(Phdr *, proc_t *);
-
-extern int write_old_elfnotes(proc_t *, int, vnode_t *, offset_t,
-    rlim64_t, cred_t *);
 
 extern int write_elfnotes(proc_t *, int, vnode_t *, offset_t,
     rlim64_t, cred_t *, core_content_t);

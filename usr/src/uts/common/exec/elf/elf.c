@@ -28,6 +28,7 @@
 /*
  * Copyright 2019, Joyent, Inc.
  * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Carsten Grzemba
  */
 
 #include <sys/types.h>
@@ -2071,6 +2072,9 @@ done:
 	return (error);
 }
 
+
+#define	NOTES_SECTIONS 1
+
 int
 elfcore(vnode_t *vp, proc_t *p, cred_t *credp, rlim64_t rlimit, int sig,
     core_content_t content)
@@ -2109,7 +2113,8 @@ top:
 	prstop(0, 0);
 
 	AS_LOCK_ENTER(as, RW_WRITER);
-	nphdrs = prnsegs(as, 0) + 2;		/* two CORE note sections */
+
+	nphdrs = prnsegs(as, 0) + NOTES_SECTIONS;
 
 	/*
 	 * Count the number of section headers we're going to need.
@@ -2136,7 +2141,7 @@ top:
 	 * tasks sequentially, not simultaneously, so it does not need space
 	 * for all three data at once, only the largest one.
 	 */
-	VERIFY3U(nphdrs, >=, 2);
+	VERIFY3U(nphdrs, >=, NOTES_SECTIONS);
 	phdrsz = nphdrs * sizeof (Phdr);
 	shdrsz = nshdrs * sizeof (Shdr);
 	bigsize = MAX(sizeof (Ehdr), MAX(phdrsz, shdrsz));
@@ -2230,13 +2235,9 @@ top:
 	phdr = (Phdr *)bigwad;
 	bzero(phdr, phdrsz);
 
-	setup_old_note_header(&phdr[0], p);
+	setup_note_header(&phdr[0], p);
 	phdr[0].p_offset = doffset = roundup(doffset, sizeof (Word));
 	doffset += phdr[0].p_filesz;
-
-	setup_note_header(&phdr[1], p);
-	phdr[1].p_offset = doffset = roundup(doffset, sizeof (Word));
-	doffset += phdr[1].p_filesz;
 
 	mutex_enter(&p->p_lock);
 
@@ -2249,7 +2250,9 @@ top:
 	mutex_exit(&p->p_lock);
 
 	AS_LOCK_ENTER(as, RW_WRITER);
-	i = 2;
+
+	i = NOTES_SECTIONS;
+
 	for (seg = AS_SEGFIRST(as); seg != NULL; seg = AS_SEGNEXT(as, seg)) {
 		caddr_t eaddr = seg->s_base + pr_getsegsize(seg, 0);
 		caddr_t saddr, naddr;
@@ -2376,16 +2379,12 @@ exclude:
 		goto done;
 	}
 
-	if ((error = write_old_elfnotes(p, sig, vp, phdr[0].p_offset, rlimit,
-	    credp)) != 0) {
-		goto done;
-	}
-	if ((error = write_elfnotes(p, sig, vp, phdr[1].p_offset, rlimit,
+	if ((error = write_elfnotes(p, sig, vp, phdr[0].p_offset, rlimit,
 	    credp, content)) != 0) {
 		goto done;
 	}
 
-	for (i = 2; i < nphdrs; i++) {
+	for (i = NOTES_SECTIONS; i < nphdrs; i++) {
 		prkillinfo_t killinfo;
 		sigqueue_t *sq;
 		int sig, j;

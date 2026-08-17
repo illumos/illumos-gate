@@ -5,6 +5,7 @@
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright 2024 Oxide Computer Company
 .\" Copyright 2025 Hans Rosenfeld
+.\" Copyright 2026 Carsten Grzemba
 .\" Copyright 1989 AT&T
 .\"
 .\" The contents of this file are subject to the terms of the
@@ -22,7 +23,7 @@
 .\" fields enclosed by brackets "[]" replaced with your own identifying
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
-.Dd September 5, 2025
+.Dd August 19, 2026
 .Dt CORE 5
 .Os
 .Sh NAME
@@ -45,7 +46,7 @@ Whatever the cause, the core file itself provides invaluable information to the
 programmer or support engineer to aid in diagnosing the problem.
 The core file can be inspected using a debugger such as
 .Xr mdb 1 ,
-gdb, dbx, or by applying one of the
+gdb or by applying one of the
 .Xr proc 1
 tools.
 .Pp
@@ -178,27 +179,28 @@ field will have the
 .Dv PF_SUNW_KILLED
 flag set.
 .Pp
-The program headers of an ELF core file also contain entries for two
+In earlier versions of illumos the program header of an ELF core file could contain entries for two
 .Sy NOTE
 segments, each containing several note entries as described below.
 The note entry header and core file note type
 .Pq Fa n_type
 definitions are contained in
 .In sys/elf.h .
-The first
+The content of old
 .Sy NOTE
-segment exists for binary compatibility with old programs that deal with core
-files.
-It contains structures defined in
+segment is defined in
 .In sys/old_procfs.h .
-New programs should recognize and skip this
-.Sy NOTE
+Programs should recognize and skip this
 segment, advancing instead to the new
 .Sy NOTE
 segment.
-The old
-.Sy NOTE
-segment is deleted from core files in a future release.
+The old entries can be recognized by the name
+.Sy "CORE"
+and the note types
+.Sy NT_PRPSINFO
+and
+.Sy NT_PRSTATUS
+.
 .Pp
 The old
 .Sy NOTE

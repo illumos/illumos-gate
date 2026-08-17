@@ -500,15 +500,11 @@ fcnname##_info:							\
 	NO_UNLOAD_STUB(procfs, prgetlwpstatus,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, prgetpsinfo,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, prgetlwpsinfo,	nomod_zero);
-	NO_UNLOAD_STUB(procfs, oprgetstatus,	nomod_zero);
-	NO_UNLOAD_STUB(procfs, oprgetpsinfo,	nomod_zero);
 #ifdef _SYSCALL32_IMPL
 	NO_UNLOAD_STUB(procfs, prgetstatus32,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, prgetlwpstatus32, nomod_zero);
 	NO_UNLOAD_STUB(procfs, prgetpsinfo32,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, prgetlwpsinfo32,	nomod_zero);
-	NO_UNLOAD_STUB(procfs, oprgetstatus32,	nomod_zero);
-	NO_UNLOAD_STUB(procfs, oprgetpsinfo32,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, psinfo_kto32,	nomod_zero);
 	NO_UNLOAD_STUB(procfs, lwpsinfo_kto32,	nomod_zero);
 #endif	/* _SYSCALL32_IMPL */

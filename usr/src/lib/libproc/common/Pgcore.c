@@ -29,6 +29,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Carsten Grzemba
  */
 
 #define	_STRUCTURED_PROC	1
@@ -48,8 +49,6 @@
 #include <sys/proc.h>
 #include <sys/utsname.h>
 #include <core_shstrtab.h>
-
-#include <sys/old_procfs.h>
 
 #include "Pcontrol.h"
 #include "P32ton.h"
@@ -117,263 +116,6 @@ Pgcore(struct ps_prochandle *P, const char *fname, core_content_t content)
 	return (close(fd));
 }
 
-/*
- * Since we don't want to use the old-school procfs interfaces, we use the
- * new-style data structures we already have to construct the old-style
- * data structures. We include these data structures in core files for
- * backward compatability.
- */
-
-static void
-mkprstatus(struct ps_prochandle *P, const lwpstatus_t *lsp,
-    const lwpsinfo_t *lip, prstatus_t *psp)
-{
-	bzero(psp, sizeof (*psp));
-
-	if (lsp->pr_flags & PR_STOPPED)
-		psp->pr_flags = 0x0001;
-	if (lsp->pr_flags & PR_ISTOP)
-		psp->pr_flags = 0x0002;
-	if (lsp->pr_flags & PR_DSTOP)
-		psp->pr_flags = 0x0004;
-	if (lsp->pr_flags & PR_ASLEEP)
-		psp->pr_flags = 0x0008;
-	if (lsp->pr_flags & PR_FORK)
-		psp->pr_flags = 0x0010;
-	if (lsp->pr_flags & PR_RLC)
-		psp->pr_flags = 0x0020;
-	/*
-	 * Note that PR_PTRACE (0x0040) from <sys/old_procfs.h> is never set;
-	 * PR_PCOMPAT corresponds to PR_PTRACE in the newer <sys/procfs.h>.
-	 */
-	if (lsp->pr_flags & PR_PCINVAL)
-		psp->pr_flags = 0x0080;
-	if (lsp->pr_flags & PR_ISSYS)
-		psp->pr_flags = 0x0100;
-	if (lsp->pr_flags & PR_STEP)
-		psp->pr_flags = 0x0200;
-	if (lsp->pr_flags & PR_KLC)
-		psp->pr_flags = 0x0400;
-	if (lsp->pr_flags & PR_ASYNC)
-		psp->pr_flags = 0x0800;
-	if (lsp->pr_flags & PR_PTRACE)
-		psp->pr_flags = 0x1000;
-	if (lsp->pr_flags & PR_MSACCT)
-		psp->pr_flags = 0x2000;
-	if (lsp->pr_flags & PR_BPTADJ)
-		psp->pr_flags = 0x4000;
-	if (lsp->pr_flags & PR_ASLWP)
-		psp->pr_flags = 0x8000;
-
-	psp->pr_why = lsp->pr_why;
-	psp->pr_what = lsp->pr_what;
-	psp->pr_info = lsp->pr_info;
-	psp->pr_cursig = lsp->pr_cursig;
-	psp->pr_nlwp = P->status.pr_nlwp;
-	psp->pr_sigpend = P->status.pr_sigpend;
-	psp->pr_sighold = lsp->pr_lwphold;
-	psp->pr_altstack = lsp->pr_altstack;
-	psp->pr_action = lsp->pr_action;
-	psp->pr_pid = P->status.pr_pid;
-	psp->pr_ppid = P->status.pr_ppid;
-	psp->pr_pgrp = P->status.pr_pgid;
-	psp->pr_sid = P->status.pr_sid;
-	psp->pr_utime = P->status.pr_utime;
-	psp->pr_stime = P->status.pr_stime;
-	psp->pr_cutime = P->status.pr_cutime;
-	psp->pr_cstime = P->status.pr_cstime;
-	(void) strncpy(psp->pr_clname, lsp->pr_clname, sizeof (psp->pr_clname));
-	psp->pr_syscall = lsp->pr_syscall;
-	psp->pr_nsysarg = lsp->pr_nsysarg;
-	bcopy(lsp->pr_sysarg, psp->pr_sysarg, sizeof (psp->pr_sysarg));
-	psp->pr_who = lsp->pr_lwpid;
-	psp->pr_lwppend = lsp->pr_lwppend;
-	psp->pr_oldcontext = (ucontext_t *)lsp->pr_oldcontext;
-	psp->pr_brkbase = (caddr_t)P->status.pr_brkbase;
-	psp->pr_brksize = P->status.pr_brksize;
-	psp->pr_stkbase = (caddr_t)P->status.pr_stkbase;
-	psp->pr_stksize = P->status.pr_stksize;
-	psp->pr_processor = (short)lip->pr_onpro;
-	psp->pr_bind = (short)lip->pr_bindpro;
-	psp->pr_instr = lsp->pr_instr;
-	bcopy(lsp->pr_reg, psp->pr_reg, sizeof (psp->pr_sysarg));
-}
-
-static void
-mkprpsinfo(struct ps_prochandle *P, prpsinfo_t *psp)
-{
-	bzero(psp, sizeof (*psp));
-	psp->pr_state = P->psinfo.pr_lwp.pr_state;
-	psp->pr_sname = P->psinfo.pr_lwp.pr_sname;
-	psp->pr_zomb = (psp->pr_state == SZOMB);
-	psp->pr_nice = P->psinfo.pr_lwp.pr_nice;
-	psp->pr_flag = P->psinfo.pr_lwp.pr_flag;
-	psp->pr_uid = P->psinfo.pr_uid;
-	psp->pr_gid = P->psinfo.pr_gid;
-	psp->pr_pid = P->psinfo.pr_pid;
-	psp->pr_ppid = P->psinfo.pr_ppid;
-	psp->pr_pgrp = P->psinfo.pr_pgid;
-	psp->pr_sid = P->psinfo.pr_sid;
-	psp->pr_addr = (caddr_t)P->psinfo.pr_addr;
-	psp->pr_size = P->psinfo.pr_size;
-	psp->pr_rssize = P->psinfo.pr_rssize;
-	psp->pr_wchan = (caddr_t)P->psinfo.pr_lwp.pr_wchan;
-	psp->pr_start = P->psinfo.pr_start;
-	psp->pr_time = P->psinfo.pr_time;
-	psp->pr_pri = P->psinfo.pr_lwp.pr_pri;
-	psp->pr_oldpri = P->psinfo.pr_lwp.pr_oldpri;
-	psp->pr_cpu = P->psinfo.pr_lwp.pr_cpu;
-	psp->pr_ottydev = cmpdev(P->psinfo.pr_ttydev);
-	psp->pr_lttydev = P->psinfo.pr_ttydev;
-	(void) strncpy(psp->pr_clname, P->psinfo.pr_lwp.pr_clname,
-	    sizeof (psp->pr_clname));
-	(void) strncpy(psp->pr_fname, P->psinfo.pr_fname,
-	    sizeof (psp->pr_fname));
-	bcopy(&P->psinfo.pr_psargs, &psp->pr_psargs,
-	    sizeof (psp->pr_psargs));
-	psp->pr_syscall = P->psinfo.pr_lwp.pr_syscall;
-	psp->pr_ctime = P->psinfo.pr_ctime;
-	psp->pr_bysize = psp->pr_size * PAGESIZE;
-	psp->pr_byrssize = psp->pr_rssize * PAGESIZE;
-	psp->pr_argc = P->psinfo.pr_argc;
-	psp->pr_argv = (char **)P->psinfo.pr_argv;
-	psp->pr_envp = (char **)P->psinfo.pr_envp;
-	psp->pr_wstat = P->psinfo.pr_wstat;
-	psp->pr_pctcpu = P->psinfo.pr_pctcpu;
-	psp->pr_pctmem = P->psinfo.pr_pctmem;
-	psp->pr_euid = P->psinfo.pr_euid;
-	psp->pr_egid = P->psinfo.pr_egid;
-	psp->pr_aslwpid = 0;
-	psp->pr_dmodel = P->psinfo.pr_dmodel;
-}
-
-#ifdef _LP64
-
-static void
-mkprstatus32(struct ps_prochandle *P, const lwpstatus_t *lsp,
-    const lwpsinfo_t *lip, prstatus32_t *psp)
-{
-	bzero(psp, sizeof (*psp));
-
-	if (lsp->pr_flags & PR_STOPPED)
-		psp->pr_flags = 0x0001;
-	if (lsp->pr_flags & PR_ISTOP)
-		psp->pr_flags = 0x0002;
-	if (lsp->pr_flags & PR_DSTOP)
-		psp->pr_flags = 0x0004;
-	if (lsp->pr_flags & PR_ASLEEP)
-		psp->pr_flags = 0x0008;
-	if (lsp->pr_flags & PR_FORK)
-		psp->pr_flags = 0x0010;
-	if (lsp->pr_flags & PR_RLC)
-		psp->pr_flags = 0x0020;
-	/*
-	 * Note that PR_PTRACE (0x0040) from <sys/old_procfs.h> is never set;
-	 * PR_PCOMPAT corresponds to PR_PTRACE in the newer <sys/procfs.h>.
-	 */
-	if (lsp->pr_flags & PR_PCINVAL)
-		psp->pr_flags = 0x0080;
-	if (lsp->pr_flags & PR_ISSYS)
-		psp->pr_flags = 0x0100;
-	if (lsp->pr_flags & PR_STEP)
-		psp->pr_flags = 0x0200;
-	if (lsp->pr_flags & PR_KLC)
-		psp->pr_flags = 0x0400;
-	if (lsp->pr_flags & PR_ASYNC)
-		psp->pr_flags = 0x0800;
-	if (lsp->pr_flags & PR_PTRACE)
-		psp->pr_flags = 0x1000;
-	if (lsp->pr_flags & PR_MSACCT)
-		psp->pr_flags = 0x2000;
-	if (lsp->pr_flags & PR_BPTADJ)
-		psp->pr_flags = 0x4000;
-	if (lsp->pr_flags & PR_ASLWP)
-		psp->pr_flags = 0x8000;
-
-	psp->pr_why = lsp->pr_why;
-	psp->pr_what = lsp->pr_what;
-	siginfo_n_to_32(&lsp->pr_info, &psp->pr_info);
-	psp->pr_cursig = lsp->pr_cursig;
-	psp->pr_nlwp = P->status.pr_nlwp;
-	psp->pr_sigpend = P->status.pr_sigpend;
-	psp->pr_sighold = lsp->pr_lwphold;
-	stack_n_to_32(&lsp->pr_altstack, &psp->pr_altstack);
-	sigaction_n_to_32(&lsp->pr_action, &psp->pr_action);
-	psp->pr_pid = P->status.pr_pid;
-	psp->pr_ppid = P->status.pr_ppid;
-	psp->pr_pgrp = P->status.pr_pgid;
-	psp->pr_sid = P->status.pr_sid;
-	timestruc_n_to_32(&P->status.pr_utime, &psp->pr_utime);
-	timestruc_n_to_32(&P->status.pr_stime, &psp->pr_stime);
-	timestruc_n_to_32(&P->status.pr_cutime, &psp->pr_cutime);
-	timestruc_n_to_32(&P->status.pr_cstime, &psp->pr_cstime);
-	(void) strncpy(psp->pr_clname, lsp->pr_clname, sizeof (psp->pr_clname));
-	psp->pr_syscall = lsp->pr_syscall;
-	psp->pr_nsysarg = lsp->pr_nsysarg;
-	bcopy(lsp->pr_sysarg, psp->pr_sysarg, sizeof (psp->pr_sysarg));
-	psp->pr_who = lsp->pr_lwpid;
-	psp->pr_lwppend = lsp->pr_lwppend;
-	psp->pr_oldcontext = (caddr32_t)lsp->pr_oldcontext;
-	psp->pr_brkbase = (caddr32_t)P->status.pr_brkbase;
-	psp->pr_brksize = P->status.pr_brksize;
-	psp->pr_stkbase = (caddr32_t)P->status.pr_stkbase;
-	psp->pr_stksize = P->status.pr_stksize;
-	psp->pr_processor = (short)lip->pr_onpro;
-	psp->pr_bind = (short)lip->pr_bindpro;
-	psp->pr_instr = lsp->pr_instr;
-	bcopy(lsp->pr_reg, psp->pr_reg, sizeof (psp->pr_sysarg));
-}
-
-static void
-mkprpsinfo32(struct ps_prochandle *P, prpsinfo32_t *psp)
-{
-	bzero(psp, sizeof (*psp));
-	psp->pr_state = P->psinfo.pr_lwp.pr_state;
-	psp->pr_sname = P->psinfo.pr_lwp.pr_sname;
-	psp->pr_zomb = (psp->pr_state == SZOMB);
-	psp->pr_nice = P->psinfo.pr_lwp.pr_nice;
-	psp->pr_flag = P->psinfo.pr_lwp.pr_flag;
-	psp->pr_uid = P->psinfo.pr_uid;
-	psp->pr_gid = P->psinfo.pr_gid;
-	psp->pr_pid = P->psinfo.pr_pid;
-	psp->pr_ppid = P->psinfo.pr_ppid;
-	psp->pr_pgrp = P->psinfo.pr_pgid;
-	psp->pr_sid = P->psinfo.pr_sid;
-	psp->pr_addr = (caddr32_t)P->psinfo.pr_addr;
-	psp->pr_size = P->psinfo.pr_size;
-	psp->pr_rssize = P->psinfo.pr_rssize;
-	psp->pr_wchan = (caddr32_t)P->psinfo.pr_lwp.pr_wchan;
-	timestruc_n_to_32(&P->psinfo.pr_start, &psp->pr_start);
-	timestruc_n_to_32(&P->psinfo.pr_time, &psp->pr_time);
-	psp->pr_pri = P->psinfo.pr_lwp.pr_pri;
-	psp->pr_oldpri = P->psinfo.pr_lwp.pr_oldpri;
-	psp->pr_cpu = P->psinfo.pr_lwp.pr_cpu;
-	psp->pr_ottydev = cmpdev(P->psinfo.pr_ttydev);
-	psp->pr_lttydev = prcmpldev(P->psinfo.pr_ttydev);
-	(void) strncpy(psp->pr_clname, P->psinfo.pr_lwp.pr_clname,
-	    sizeof (psp->pr_clname));
-	(void) strncpy(psp->pr_fname, P->psinfo.pr_fname,
-	    sizeof (psp->pr_fname));
-	bcopy(&P->psinfo.pr_psargs, &psp->pr_psargs,
-	    sizeof (psp->pr_psargs));
-	psp->pr_syscall = P->psinfo.pr_lwp.pr_syscall;
-	timestruc_n_to_32(&P->psinfo.pr_ctime, &psp->pr_ctime);
-	psp->pr_bysize = psp->pr_size * PAGESIZE;
-	psp->pr_byrssize = psp->pr_rssize * PAGESIZE;
-	psp->pr_argc = P->psinfo.pr_argc;
-	psp->pr_argv = (caddr32_t)P->psinfo.pr_argv;
-	psp->pr_envp = (caddr32_t)P->psinfo.pr_envp;
-	psp->pr_wstat = P->psinfo.pr_wstat;
-	psp->pr_pctcpu = P->psinfo.pr_pctcpu;
-	psp->pr_pctmem = P->psinfo.pr_pctmem;
-	psp->pr_euid = P->psinfo.pr_euid;
-	psp->pr_egid = P->psinfo.pr_egid;
-	psp->pr_aslwpid = 0;
-	psp->pr_dmodel = P->psinfo.pr_dmodel;
-}
-
-#endif	/* _LP64 */
-
 static int
 write_note(int fd, uint_t type, const void *desc, size_t descsz, off64_t *offp)
 {
@@ -406,48 +148,7 @@ write_note(int fd, uint_t type, const void *desc, size_t descsz, off64_t *offp)
 }
 
 static int
-old_per_lwp(void *data, const lwpstatus_t *lsp, const lwpsinfo_t *lip)
-{
-	pgcore_t *pgc = data;
-	struct ps_prochandle *P = pgc->P;
-
-	/*
-	 * Legacy core files don't contain information about zombie LWPs.
-	 * We use Plwp_iter_all() so that we get the lwpsinfo_t structure
-	 * more cheaply.
-	 */
-	if (lsp == NULL)
-		return (0);
-
-	if (P->status.pr_dmodel == PR_MODEL_NATIVE) {
-		prstatus_t prstatus;
-		mkprstatus(P, lsp, lip, &prstatus);
-		if (write_note(pgc->pgc_fd, NT_PRSTATUS, &prstatus,
-		    sizeof (prstatus_t), pgc->pgc_doff) != 0)
-			return (0);
-		if (write_note(pgc->pgc_fd, NT_PRFPREG, &lsp->pr_fpreg,
-		    sizeof (prfpregset_t), pgc->pgc_doff) != 0)
-			return (1);
-#ifdef _LP64
-	} else {
-		prstatus32_t pr32;
-		prfpregset32_t pf32;
-		mkprstatus32(P, lsp, lip, &pr32);
-		if (write_note(pgc->pgc_fd, NT_PRSTATUS, &pr32,
-		    sizeof (prstatus32_t), pgc->pgc_doff) != 0)
-			return (1);
-		prfpregset_n_to_32(&lsp->pr_fpreg, &pf32);
-		if (write_note(pgc->pgc_fd, NT_PRFPREG, &pf32,
-		    sizeof (prfpregset32_t), pgc->pgc_doff) != 0)
-			return (1);
-#endif	/* _LP64 */
-	}
-
-	return (0);
-}
-
-static int
-new_per_lwp(void *data, const lwpstatus_t *lsp, const lwpsinfo_t *lip)
+per_lwp(void *data, const lwpstatus_t *lsp, const lwpsinfo_t *lip)
 {
 	pgcore_t *pgc = data;
 	struct ps_prochandle *P = pgc->P;
@@ -1088,6 +789,7 @@ write_shstrtab(struct ps_prochandle *P, pgcore_t *pgc)
 /*
  * Don't explicity stop the process; that's up to the consumer.
  */
+#define	NOTES_SECTIONS 1
 int
 Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 {
@@ -1129,10 +831,10 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 	}
 
 	/*
-	 * There are two PT_NOTE program headers for ancillary data, and
+	 * There are a PT_NOTE program header for ancillary data, and
 	 * one for each mapping.
 	 */
-	nphdrs = 2 + P->map_count;
+	nphdrs = NOTES_SECTIONS + P->map_count;
 	nshdrs = count_sections(&pgc);
 
 	(void) Pplatform(P, plat, sizeof (plat));
@@ -1279,87 +981,6 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 	    nshdrs - 1 >= SHN_LORESERVE ? nshdrs - 1 : 0,
 	    nphdrs >= PN_XNUM ? nphdrs : 0, 0, 0) != 0)
 		goto err;
-
-	/*
-	 * Construct the old-style note header and section.
-	 */
-
-	if (P->status.pr_dmodel == PR_MODEL_NATIVE) {
-		prpsinfo_t prpsinfo;
-
-		mkprpsinfo(P, &prpsinfo);
-		if (write_note(fd, NT_PRPSINFO, &prpsinfo, sizeof (prpsinfo_t),
-		    &doff) != 0) {
-			goto err;
-		}
-		if (write_note(fd, NT_AUXV, P->auxv,
-		    P->nauxv * sizeof (P->auxv[0]), &doff) != 0) {
-			goto err;
-		}
-#ifdef _LP64
-	} else {
-		prpsinfo32_t pi32;
-		auxv32_t *av32;
-		size_t size = sizeof (auxv32_t) * P->nauxv;
-		int i;
-
-		mkprpsinfo32(P, &pi32);
-		if (write_note(fd, NT_PRPSINFO, &pi32, sizeof (prpsinfo32_t),
-		    &doff) != 0) {
-			goto err;
-		}
-
-		if ((av32 = malloc(size)) == NULL)
-			goto err;
-
-		for (i = 0; i < P->nauxv; i++) {
-			auxv_n_to_32(&P->auxv[i], &av32[i]);
-		}
-
-		if (write_note(fd, NT_AUXV, av32, size, &doff) != 0) {
-			free(av32);
-			goto err;
-		}
-
-		free(av32);
-#endif	/* _LP64 */
-	}
-
-	if (write_note(fd, NT_PLATFORM, plat, platlen, &doff) != 0)
-		goto err;
-
-	if (Plwp_iter_all(P, old_per_lwp, &pgc) != 0)
-		goto err;
-
-	if (P->status.pr_dmodel == PR_MODEL_ILP32) {
-		Elf32_Phdr phdr;
-
-		bzero(&phdr, sizeof (phdr));
-		phdr.p_type = PT_NOTE;
-		phdr.p_flags = PF_R;
-		phdr.p_offset = (Elf32_Off)boff;
-		phdr.p_filesz = doff - boff;
-		boff = doff;
-
-		if (gc_pwrite64(fd, &phdr, sizeof (phdr), poff) != 0)
-			goto err;
-		poff += sizeof (phdr);
-#ifdef _LP64
-	} else {
-		Elf64_Phdr phdr;
-
-		bzero(&phdr, sizeof (phdr));
-		phdr.p_type = PT_NOTE;
-		phdr.p_flags = PF_R;
-		phdr.p_offset = boff;
-		phdr.p_filesz = doff - boff;
-		boff = doff;
-
-		if (gc_pwrite64(fd, &phdr, sizeof (phdr), poff) != 0)
-			goto err;
-		poff += sizeof (phdr);
-#endif	/* _LP64 */
-	}
 
 	/*
 	 * Construct the new-style note header and section.
@@ -1531,7 +1152,7 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 	}
 #endif	/* __i386 || __amd64 */
 
-	if (Plwp_iter_all(P, new_per_lwp, &pgc) != 0)
+	if (Plwp_iter_all(P, per_lwp, &pgc) != 0)
 		goto err;
 
 	if (P->status.pr_dmodel == PR_MODEL_ILP32) {
