@@ -291,6 +291,8 @@ file path=opt/os-tests/tests/sockfs/so_protocol mode=0555
 file path=opt/os-tests/tests/sockfs/sockpair mode=0555
 file path=opt/os-tests/tests/sockfs/timeouts.32 mode=0555
 file path=opt/os-tests/tests/sockfs/timeouts.64 mode=0555
+dir  path=opt/os-tests/tests/sockopt
+file path=opt/os-tests/tests/sockopt/v4mapped mode=0555
 dir  path=opt/os-tests/tests/spawn
 file path=opt/os-tests/tests/spawn/spawn-syscall.32 mode=0555
 file path=opt/os-tests/tests/spawn/spawn-syscall.64 mode=0555

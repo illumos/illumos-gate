@@ -1,10 +1,10 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved
-.\" Copyright 2024 Oxide Computer Company
+.\" Copyright 2026 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IP6 4P "April 17, 2024"
+.TH IP6 4P "August 12, 2026"
 .SH NAME
 ip6 \- Internet Protocol Version 6
 .SH SYNOPSIS
@@ -68,6 +68,17 @@ Sticky options, however, are supported.
 Since \fBsendmsg\fR(3SOCKET) is supported for \fBSOCK_DGRAM\fR upper level
 protocols, both ancillary data and sticky options are supported for \fBUDP\fR,
 \fBICMP6\fR, and raw \fBIPv6\fR sockets.
+.sp
+.LP
+An \fBAF_INET6\fR socket may represent a connection that uses IPv4 on the
+wire, such as one accepted from an IPv4 peer through an IPv4-mapped IPv6
+address. On such a connection, the \fBIPV6_UNICAST_HOPS\fR, \fBIPV6_TCLASS\fR,
+and \fBIPV6_MINHOPCOUNT\fR options remain available and are applied to the
+corresponding fields of the IPv4 header. Other options at the \fBIPv6\fR
+level are not available on such a \fBTCP\fR connection, but remain available
+on \fBUDP\fR, \fBICMP6\fR, and raw \fBIPv6\fR sockets, which may later be
+used to communicate over IPv6. The options at the IP level, described in
+\fBip\fR(4P), may also be used on such a connection.
 .sp
 .LP
 The socket options supported at the \fBIPv6\fR level are:

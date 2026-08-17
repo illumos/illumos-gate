@@ -24,7 +24,7 @@
  * Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2018, Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
@@ -1631,9 +1631,11 @@ udp_opt_get(conn_t *connp, t_scalar_t level, t_scalar_t name,
 	switch (level) {
 	case IPPROTO_IP:
 		/*
-		 * Only allow IPv4 option processing on IPv4 sockets.
+		 * Only allow IPv4 option processing when the socket uses
+		 * IPv4 on the wire. This includes AF_INET6 sockets which
+		 * are connected to IPv4-mapped IPv6 addresses.
 		 */
-		if (connp->conn_family != AF_INET)
+		if (connp->conn_ipversion != IPV4_VERSION)
 			return (-1);
 
 		switch (name) {

@@ -24,7 +24,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -480,7 +480,14 @@ tcp_opt_get(conn_t *connp, int level, int name, uchar_t *ptr)
 		}
 		break;
 	case IPPROTO_IP:
-		if (connp->conn_family != AF_INET)
+		/*
+		 * IPPROTO_IP options are supported whenever the connection
+		 * uses IPv4 on the wire. This includes AF_INET6 sockets
+		 * whose peers are IPv4-mapped IPv6 addresses, as with a
+		 * connection accepted from an IPv4 peer by a dual-stack
+		 * listener.
+		 */
+		if (connp->conn_ipversion != IPV4_VERSION)
 			return (-1);
 		switch (name) {
 		case IP_OPTIONS:
@@ -494,11 +501,22 @@ tcp_opt_get(conn_t *connp, int level, int name, uchar_t *ptr)
 
 	case IPPROTO_IPV6:
 		/*
-		 * IPPROTO_IPV6 options are only supported for sockets
-		 * that are using IPv6 on the wire.
+		 * Most IPPROTO_IPV6 options are only supported for sockets
+		 * that are using IPv6 on the wire. Options which control
+		 * fields that are also present in the IPv4 header remain
+		 * available when an AF_INET6 socket's connection uses IPv4,
+		 * as with a connection accepted from an IPv4 peer by a
+		 * dual-stack listener.
 		 */
 		if (connp->conn_ipversion != IPV6_VERSION) {
-			return (-1);
+			switch (name) {
+			case IPV6_UNICAST_HOPS:
+			case IPV6_TCLASS:
+			case IPV6_MINHOPCOUNT:
+				break;
+			default:
+				return (-1);
+			}
 		}
 		switch (name) {
 		case IPV6_PATHMTU:
@@ -1046,7 +1064,14 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 		}
 		break;
 	case IPPROTO_IP:
-		if (connp->conn_family != AF_INET) {
+		/*
+		 * IPPROTO_IP options are supported whenever the connection
+		 * uses IPv4 on the wire. This includes AF_INET6 sockets
+		 * whose peers are IPv4-mapped IPv6 addresses, as with a
+		 * connection accepted from an IPv4 peer by a dual-stack
+		 * listener.
+		 */
+		if (connp->conn_ipversion != IPV4_VERSION) {
 			*outlenp = 0;
 			return (EINVAL);
 		}
@@ -1074,12 +1099,23 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 		break;
 	case IPPROTO_IPV6:
 		/*
-		 * IPPROTO_IPV6 options are only supported for sockets
-		 * that are using IPv6 on the wire.
+		 * Most IPPROTO_IPV6 options are only supported for sockets
+		 * that are using IPv6 on the wire. Options which control
+		 * fields that are also present in the IPv4 header remain
+		 * available when an AF_INET6 socket's connection uses IPv4,
+		 * as with a connection accepted from an IPv4 peer by a
+		 * dual-stack listener.
 		 */
 		if (connp->conn_ipversion != IPV6_VERSION) {
-			*outlenp = 0;
-			return (EINVAL);
+			switch (name) {
+			case IPV6_UNICAST_HOPS:
+			case IPV6_TCLASS:
+			case IPV6_MINHOPCOUNT:
+				break;
+			default:
+				*outlenp = 0;
+				return (EINVAL);
+			}
 		}
 
 		switch (name) {

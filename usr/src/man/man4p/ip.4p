@@ -1,12 +1,12 @@
 '\" te
 .\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
-.\" Copyright 2024 Oxide Computer Company
+.\" Copyright 2026 Oxide Computer Company
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2008 AT&T
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IP 4P "April 17, 2024"
+.TH IP 4P "August 12, 2026"
 .SH NAME
 ip, IP \- Internet Protocol
 .SH SYNOPSIS
@@ -70,6 +70,12 @@ has a broadcast destination address. Since an application cannot send down
 fragments (as IP assigns the IP ID), Fragment Offset is always 0. The IP
 Checksum field is computed by IP. None of the data beyond the IP header are
 changed, including the application-provided transport header.
+.sp
+.LP
+The socket options at the IP level are available on \fBAF_INET\fR sockets,
+and on \fBAF_INET6\fR sockets whose underlying connection uses IPv4, such as
+a connection accepted from an IPv4 peer through an IPv4-mapped IPv6 address.
+See \fBip6\fR(4P).
 .sp
 .LP
 The socket options supported at the IP level are:
