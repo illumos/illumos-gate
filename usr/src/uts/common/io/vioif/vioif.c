@@ -996,7 +996,10 @@ vioif_m_getprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 
 		if (pr_valsize < sizeof (uint64_t))
 			return (EOVERFLOW);
-		speed = (uint64_t)vif->vif_speed * 1000000ULL;
+		if (vif->vif_speed == VIRTIO_NET_CONFIG_SPEED_UNKNOWN)
+			speed = 1000000000ULL;	/* 1Gb/s */
+		else
+			speed = (uint64_t)vif->vif_speed * 1000000ULL;
 		bcopy(&speed, pr_val, sizeof (uint64_t));
 		break;
 	}
