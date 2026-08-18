@@ -517,21 +517,11 @@ virtio_unmap_cap(virtio_t *vio, virtio_pci_cap_t *cap)
 static boolean_t
 virtio_map_cap(virtio_t *vio, virtio_pci_cap_t *cap)
 {
-	static uint8_t baridx = UINT8_MAX;
-	static int rnumber = -1;
+	int rnumber;
 
 	VERIFY(cap->vpc_type);
 
-	/*
-	 * With most hypervisors all of the capabilities point to the same BAR
-	 * so we can cache and re-use the corresponding register number.
-	 * This function is only called serially from `virtio_init` during
-	 * driver attach so it is safe to use static locals.
-	 */
-	if (baridx != cap->vpc_baridx) {
-		baridx = cap->vpc_baridx;
-		rnumber = virtio_bar_to_rnumber(vio, baridx);
-	}
+	rnumber = virtio_bar_to_rnumber(vio, cap->vpc_baridx);
 
 	if (rnumber == -1 || ddi_regs_map_setup(vio->vio_dip, rnumber,
 	    (caddr_t *)&cap->vpc_bar, cap->vpc_offset, cap->vpc_size,
