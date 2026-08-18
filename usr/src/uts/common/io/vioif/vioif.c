@@ -1537,6 +1537,24 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (!virtio_features_present(vio, VIRTIO_NET_F_CTRL_VQ))
 		features &= ~VIRTIO_NET_F_MQ;
 
+	/*
+	 * Similarly, the transmit offload features depend on
+	 * VIRTIO_NET_F_CSUM, and VIRTIO_NET_F_HOST_ECN additionally on at
+	 * least one of the TSO features being accepted alongside it.
+	 */
+	if (!virtio_features_present(vio, VIRTIO_NET_F_CSUM)) {
+		features &= ~(VIRTIO_NET_F_GSO | VIRTIO_NET_F_HOST_TSO4 |
+		    VIRTIO_NET_F_HOST_TSO6);
+	}
+	if (!virtio_features_present(vio, VIRTIO_NET_F_HOST_TSO4))
+		features &= ~VIRTIO_NET_F_HOST_TSO4;
+	if (!virtio_features_present(vio, VIRTIO_NET_F_HOST_TSO6))
+		features &= ~VIRTIO_NET_F_HOST_TSO6;
+	if ((features &
+	    (VIRTIO_NET_F_HOST_TSO4 | VIRTIO_NET_F_HOST_TSO6)) == 0) {
+		features &= ~VIRTIO_NET_F_HOST_ECN;
+	}
+
 	if (!virtio_init_features(vio, features, B_TRUE)) {
 		virtio_fini(vio, B_TRUE);
 		return (DDI_FAILURE);
