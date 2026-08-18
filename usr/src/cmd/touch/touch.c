@@ -25,10 +25,10 @@
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	All Rights Reserved	*/
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
-/*	  All Rights Reserved	*/
+/*	All Rights Reserved	*/
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -183,17 +183,11 @@ main(int argc, char *argv[])
 	for (c = 0; c < argc; c++) {
 		if (stat(argv[c], &stbuf)) {
 			/*
-			 * If stat failed for reasons other than EOVERFLOW or
-			 * ENOENT, the file should not be created, since this
-			 * can clobber the contents of an existing file.
+			 * If stat failed for reason other than ENOENT, the file
+			 * should not be created, since this can clobber
+			 * the contents of an existing file.
 			 */
-			if (errno == EOVERFLOW) {
-				/*
-				 * Since we have EOVERFLOW,
-				 * we know the file exists.
-				 */
-				/* EMPTY */;
-			} else if (errno != ENOENT) {
+			if (errno != ENOENT) {
 				(void) fprintf(stderr,
 				    gettext("%s: cannot stat %s: %s\n"),
 				    myname, argv[c], strerror(errno));

@@ -19,20 +19,20 @@
 #
 # CDDL HEADER END
 #
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 PROG= touch
 
+OBJS= $(PROG).o
+
 include ../Makefile.cmd
+include ../Makefile.cmd.64
+include ../Makefile.ctf
 
 CFLAGS += $(CCVERBOSE)
 XGETFLAGS += -a -x touch.xcl
-CPPFLAGS += -D_FILE_OFFSET_BITS=64
 
 .KEEP_STATE:
 
@@ -42,8 +42,11 @@ install: all $(ROOTPROG)
 	-$(RM) $(ROOTBIN)/settime
 	$(LN) -f $(ROOTPROG) $(ROOTBIN)/settime
 
-clean:
+$(PROG): $(OBJS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
 
-lint:	lint_PROG
+clean:
+	$(RM) $(OBJS)
 
 include ../Makefile.targ
