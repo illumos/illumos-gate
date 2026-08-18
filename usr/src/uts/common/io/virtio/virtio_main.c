@@ -851,6 +851,7 @@ virtio_queue_alloc(virtio_t *vio, uint16_t qidx, const char *name,
 			    "for notify region of size 0x%" PRIx64,
 			    name, (uint_t)qidx,
 			    noff, vio->vio_cap_notify.vpc_size);
+			mutex_exit(&vio->vio_mutex);
 			return (NULL);
 		}
 	}
