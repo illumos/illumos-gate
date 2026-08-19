@@ -23,6 +23,7 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2025 MNX Cloud, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "lint.h"
@@ -970,54 +971,30 @@ _aio_create_worker(aio_req_t *reqp, int mode)
  *	- lock the queue -> remove the request -> unlock the queue
  *	- this function/thread does not detect this cancellation process
  * b) request is in progress (AIO_REQ_INPROGRESS) :
- *	- this function first allow the cancellation of the running
- *	  request with the flag "work_cancel_flg=1"
- *		see _aio_req_get() -> _aio_cancel_on()
- *	  During this phase, it is allowed to interrupt the worker
- *	  thread running the request (this thread) using the SIGAIOCANCEL
- *	  signal.
- *	  Once this thread returns from the kernel (because the request
- *	  is just done), then it must disable a possible cancellation
- *	  and proceed to finish the request.  To disable the cancellation
- *	  this thread must use _aio_cancel_off() to set "work_cancel_flg=0".
+ *	- _aio_cancel_req() sets the result to -1/ECANCELED and sends
+ *	  SIGAIOCANCEL to the worker thread running the request
+ *	- this thread runs the operation with SIGAIOCANCEL deliverable;
+ *	  everywhere else the signal is deferred with sigoff()
  * c) request is already done (AIO_REQ_DONE || AIO_REQ_DONEQ):
  *	  same procedure as in a)
  *
  * To b)
  *	This thread uses sigsetjmp() to define the position in the code, where
- *	it wish to continue working in the case that a SIGAIOCANCEL signal
+ *	it wishes to continue working in the case that a SIGAIOCANCEL signal
  *	is detected.
  *	Normally this thread should get the cancellation signal during the
  *	kernel phase (reading or writing).  In that case the signal handler
  *	aiosigcancelhndlr() is activated using the worker thread context,
  *	which again will use the siglongjmp() function to break the standard
- *	code flow and jump to the "sigsetjmp" position, provided that
- *	"work_cancel_flg" is set to "1".
- *	Because the "work_cancel_flg" is only manipulated by this worker
- *	thread and it can only run on one CPU at a given time, it is not
- *	necessary to protect that flag with the queue lock.
- *	Returning from the kernel (read or write system call) we must
- *	first disable the use of the SIGAIOCANCEL signal and accordingly
- *	the use of the siglongjmp() function to prevent a possible deadlock:
- *	- It can happens that this worker thread returns from the kernel and
- *	  blocks in "work_qlock1",
- *	- then a second thread cancels the apparently "in progress" request
- *	  and sends the SIGAIOCANCEL signal to the worker thread,
- *	- the worker thread gets assigned the "work_qlock1" and will returns
- *	  from the kernel,
- *	- the kernel detects the pending signal and activates the signal
- *	  handler instead,
- *	- if the "work_cancel_flg" is still set then the signal handler
- *	  should use siglongjmp() to cancel the "in progress" request and
- *	  it would try to acquire the same work_qlock1 in _aio_req_get()
- *	  for a second time => deadlock.
- *	To avoid that situation we disable the cancellation of the request
- *	in progress BEFORE we try to acquire the work_qlock1.
- *	In that case the signal handler will not call siglongjmp() and the
- *	worker thread will continue running the standard code flow.
- *	Then this thread must check the AIO_REQ_CANCELED flag to emulate
- *	an eventually required siglongjmp() freeing the work_qlock1 and
- *	avoiding a deadlock.
+ *	code flow and jump to the "sigsetjmp" position, provided that the
+ *	signal is not deferred.
+ *	sigoff() defers the signal before work_qlock1 is acquired.  A
+ *	siglongjmp() out from under that lock would re-enter _aio_req_get()
+ *	and acquire it a second time.  A deferred signal is consumed at the
+ *	sigon()/sigoff() pair at the top of the request loop.
+ *	A cancellation that arrives too late to jump is handled in
+ *	_aio_finish_request(), which completes an AIO_REQ_CANCELED request
+ *	with -1/ECANCELED.
  */
 void *
 _aio_do_request(void *arglist)
@@ -1039,8 +1016,11 @@ _aio_do_request(void *arglist)
 	 * We resume here when an operation is cancelled.
 	 * On first entry, aiowp->work_req == NULL, so all
 	 * we do is block SIGAIOCANCEL.
+	 *
+	 * savemask is non-zero so that the siglongjmp() out of the handler
+	 * restores the mask and leaves SIGAIOCANCEL unblocked.
 	 */
-	(void) sigsetjmp(aiowp->work_jmp_buf, 0);
+	(void) sigsetjmp(aiowp->work_jmp_buf, 1);
 	ASSERT(self->ul_sigdefer == 0);
 
 	sigoff(self);	/* block SIGAIOCANCEL */
