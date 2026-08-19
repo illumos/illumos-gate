@@ -37,7 +37,7 @@
 #
 <include global_zone_only_component>
 set name=pkg.fmri \
-    value=pkg:/system/microcode/intel@20260512,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/microcode/intel@20260812,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.summary value="Microcode for Intel CPUs"
 set name=pkg.description value="Microcode for Intel CPUs"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -670,9 +670,11 @@ file path=platform/i86pc/ucode/GenuineIntel/000B0650-80 group=sys mode=0444 \
     reboot-needed=true
 file path=platform/i86pc/ucode/GenuineIntel/000B0671-02 group=sys mode=0444 \
     reboot-needed=true
+hardlink path=platform/i86pc/ucode/GenuineIntel/000B0671-04 target=000B0671-02
 hardlink path=platform/i86pc/ucode/GenuineIntel/000B0671-10 target=000B0671-02
 hardlink path=platform/i86pc/ucode/GenuineIntel/000B0671-20 target=000B0671-02
 hardlink path=platform/i86pc/ucode/GenuineIntel/000B0674-02 target=000B0671-02
+hardlink path=platform/i86pc/ucode/GenuineIntel/000B0674-04 target=000B0671-02
 hardlink path=platform/i86pc/ucode/GenuineIntel/000B0674-10 target=000B0671-02
 hardlink path=platform/i86pc/ucode/GenuineIntel/000B0674-20 target=000B0671-02
 file path=platform/i86pc/ucode/GenuineIntel/000B06A2-20 group=sys mode=0444 \
@@ -712,13 +714,16 @@ hardlink path=platform/i86pc/ucode/GenuineIntel/000C0664-02 target=000C0652-02
 hardlink path=platform/i86pc/ucode/GenuineIntel/000C0664-80 target=000C0652-02
 hardlink path=platform/i86pc/ucode/GenuineIntel/000C06A2-02 target=000C0652-02
 hardlink path=platform/i86pc/ucode/GenuineIntel/000C06A2-80 target=000C0652-02
-file path=platform/i86pc/ucode/GenuineIntel/000C06C1-10 group=sys mode=0444 \
+file path=platform/i86pc/ucode/GenuineIntel/000C06C1-04 group=sys mode=0444 \
     reboot-needed=true
-hardlink path=platform/i86pc/ucode/GenuineIntel/000C06C1-80 target=000C06C1-10
-hardlink path=platform/i86pc/ucode/GenuineIntel/000C06C2-10 target=000C06C1-10
-hardlink path=platform/i86pc/ucode/GenuineIntel/000C06C2-80 target=000C06C1-10
-hardlink path=platform/i86pc/ucode/GenuineIntel/000C06C3-10 target=000C06C1-10
-hardlink path=platform/i86pc/ucode/GenuineIntel/000C06C3-80 target=000C06C1-10
+hardlink path=platform/i86pc/ucode/GenuineIntel/000C06C1-10 target=000C06C1-04
+hardlink path=platform/i86pc/ucode/GenuineIntel/000C06C1-80 target=000C06C1-04
+hardlink path=platform/i86pc/ucode/GenuineIntel/000C06C2-04 target=000C06C1-04
+hardlink path=platform/i86pc/ucode/GenuineIntel/000C06C2-10 target=000C06C1-04
+hardlink path=platform/i86pc/ucode/GenuineIntel/000C06C2-80 target=000C06C1-04
+hardlink path=platform/i86pc/ucode/GenuineIntel/000C06C3-04 target=000C06C1-04
+hardlink path=platform/i86pc/ucode/GenuineIntel/000C06C3-10 target=000C06C1-04
+hardlink path=platform/i86pc/ucode/GenuineIntel/000C06C3-80 target=000C06C1-04
 file path=platform/i86pc/ucode/GenuineIntel/000C06F1-01 group=sys mode=0444 \
     reboot-needed=true
 hardlink path=platform/i86pc/ucode/GenuineIntel/000C06F1-02 target=000C06F1-01
@@ -728,6 +733,18 @@ hardlink path=platform/i86pc/ucode/GenuineIntel/000C06F2-01 target=000C06F1-01
 hardlink path=platform/i86pc/ucode/GenuineIntel/000C06F2-02 target=000C06F1-01
 hardlink path=platform/i86pc/ucode/GenuineIntel/000C06F2-04 target=000C06F1-01
 hardlink path=platform/i86pc/ucode/GenuineIntel/000C06F2-80 target=000C06F1-01
+file path=platform/i86pc/ucode/GenuineIntel/000D0650-40 group=sys mode=0444 \
+    reboot-needed=true
+hardlink path=platform/i86pc/ucode/GenuineIntel/000D0650-80 target=000D0650-40
+hardlink path=platform/i86pc/ucode/GenuineIntel/000D0651-40 target=000D0650-40
+hardlink path=platform/i86pc/ucode/GenuineIntel/000D0651-80 target=000D0650-40
+hardlink path=platform/i86pc/ucode/GenuineIntel/000D0670-02 target=000B0671-02
+hardlink path=platform/i86pc/ucode/GenuineIntel/000D0670-04 target=000B0671-02
+hardlink path=platform/i86pc/ucode/GenuineIntel/000D0670-10 target=000B0671-02
+hardlink path=platform/i86pc/ucode/GenuineIntel/000D0670-20 target=000B0671-02
+hardlink path=platform/i86pc/ucode/GenuineIntel/000E0652-04 target=000C06C1-04
+hardlink path=platform/i86pc/ucode/GenuineIntel/000E0652-10 target=000C06C1-04
+hardlink path=platform/i86pc/ucode/GenuineIntel/000E0652-80 target=000C06C1-04
 license lic_CDDL license=lic_CDDL
 license usr/src/data/ucode/intel/THIRDPARTYLICENSE \
     license=usr/src/data/ucode/intel/THIRDPARTYLICENSE
