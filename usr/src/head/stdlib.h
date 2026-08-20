@@ -29,7 +29,7 @@
 /*
  * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -331,6 +331,10 @@ extern void *recallocarray(void *, size_t, size_t, size_t);
 extern long long strtonum(const char *, long long, long long, const char **);
 extern long long strtonumx(const char *, long long, long long, const char **,
     int);
+extern unsigned long long strtounum(const char *, unsigned long long,
+    unsigned long long, const char **);
+extern unsigned long long strtounumx(const char *, unsigned long long,
+    unsigned long long, const char **, int);
 extern void *reallocf(void *, size_t);
 
 /* these three are also in xlocale.h */

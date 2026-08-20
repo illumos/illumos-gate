@@ -1,6 +1,6 @@
 .\"
 .\" Copyright (c) 2004 Ted Unangst
-.\" Copyright 2023 Oxide Computer Company
+.\" Copyright 2026 Oxide Computer Company
 .\"
 .\" Permission to use, copy, modify, and distribute this software for any
 .\" purpose with or without fee is hereby granted, provided that the above
@@ -14,12 +14,14 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd August 19, 2023
+.Dd August 20, 2026
 .Dt STRTONUM 3C
 .Os
 .Sh NAME
 .Nm strtonum ,
-.Nm strtonumx
+.Nm strtonumx ,
+.Nm strtounum ,
+.Nm strtounumx
 .Nd reliably convert string value to an integer
 .Sh LIBRARY
 .Lb libc
@@ -40,6 +42,21 @@
 .Fa "const char **errstr"
 .Fa "int base"
 .Fc
+.Ft "unsigned long long"
+.Fo strtounum
+.Fa "const char *nptr"
+.Fa "unsigned long long minval"
+.Fa "unsigned long long maxval"
+.Fa "const char **errstr"
+.Fc
+.Ft "unsigned long long"
+.Fo strtounumx
+.Fa "const char *nptr"
+.Fa "unsigned long long minval"
+.Fa "unsigned long long maxval"
+.Fa "const char **errstr"
+.Fa "int base"
+.Fc
 .Sh DESCRIPTION
 The
 .Fn strtonum
@@ -49,6 +66,12 @@ functions convert the string in
 .Fa nptr
 to a
 .Li long long
+value, while the
+.Fn strtounum
+and
+.Fn strtounumx
+functions convert it to an
+.Li unsigned long long
 value.
 These functions were designed to facilitate safe, robust programming and
 overcome the shortcomings of the
@@ -64,13 +87,27 @@ followed by a single optional
 or
 .Ql -
 sign.
+For
+.Fn strtounum
+and
+.Fn strtounumx ,
+a
+.Ql -
+sign is rejected with the error
+.Qq too small ;
+unlike
+.Xr strtoull 3C ,
+these functions never convert a negative string to its unsigned
+complement.
 .Pp
 The remainder of the string is converted to a
 .Li long long
+or
+.Li unsigned long long
 value according to base 10
-.Pq for Fn strtonum
+.Pq for Fn strtonum No and Fn strtounum
 or the provided base
-.Pq for Fn strtonumx .
+.Pq for Fn strtonumx No and Fn strtounumx .
 .Pp
 The value obtained is then checked against the provided
 .Fa minval
@@ -79,16 +116,14 @@ and
 bounds.
 If
 .Fa errstr
-is non-null,
-.Fn strtonum
-and
-.Fn strtonumx
-store an error string in
+is non-null, these functions store an error string in
 .Fa errstr
 indicating the failure.
 .Pp
 For
 .Fn strtonumx
+and
+.Fn strtounumx
 the value of
 .Ar base
 is interpreted in the same way as described in
@@ -98,11 +133,16 @@ In particular, if the value of
 is 0, then the expected form of
 .Ar nptr
 is that of a decimal constant, octal constant or hexadecimal constant, any of
-which may be preceded by a + or - sign.
+which may be preceded by a
+.Ql +
+or
+.Ql -
+sign, although, as described above, a
+.Ql -
+sign is rejected by
+.Fn strtounumx .
 .Sh RETURN VALUES
-The
-.Fn strtonum
-function returns the result of the conversion,
+These functions return the result of the conversion,
 unless the value would exceed the provided bounds or is invalid.
 On error, 0 is returned,
 .Va errno
@@ -131,11 +171,7 @@ The above example will guarantee that the value of iterations is between
 1 and 64
 .Pq inclusive .
 .Sh ERRORS
-The
-.Fn strtonum
-and
-.Fn strtonumx
-functions will fail if:
+These functions will fail if:
 .Bl -tag -width Er
 .It Er ERANGE
 The value to be returned falls outside of the specified range.
@@ -147,7 +183,9 @@ was larger than
 .Pp
 The
 .Fn strtonum
-function will fail if:
+and
+.Fn strtounum
+functions will fail if:
 .Bl -tag -width Er
 .It Er EINVAL
 The given string did not consist solely of digit characters.
@@ -155,11 +193,23 @@ The given string did not consist solely of digit characters.
 .Pp
 The
 .Fn strtonumx
-function will fail if:
+and
+.Fn strtounumx
+functions will fail if:
 .Bl -tag -width Er
 .It Er EINVAL
 The specified base was invalid, or the given string did not consist solely of
 characters which are valid in that base.
+.El
+.Pp
+The
+.Fn strtounum
+and
+.Fn strtounumx
+functions will fail if:
+.Bl -tag -width Er
+.It Er ERANGE
+The given string represented a negative number.
 .El
 .Pp
 If an error occurs,
@@ -170,7 +220,11 @@ will be set to one of the following strings:
 .It Qq too large
 The result was larger than the provided maximum value.
 .It Qq too small
-The result was smaller than the provided minimum value.
+The result was smaller than the provided minimum value, or a negative
+number was given to
+.Fn strtounum
+or
+.Fn strtounumx .
 .It Qq invalid
 The string did not consist solely of characters valid in the specified base
 .Pq or base 10 for Fn strtonum .
@@ -202,5 +256,8 @@ and
 .Xr strtol 3C ,
 are either impossible or difficult to use safely.
 .Pp
-.Fn strtonumx
-is an illumos extension.
+.Fn strtonumx ,
+.Fn strtounum ,
+and
+.Fn strtounumx
+are illumos extensions.

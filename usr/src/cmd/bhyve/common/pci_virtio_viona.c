@@ -784,13 +784,15 @@ pci_viona_parse_opts(struct pci_viona_softc *sc, nvlist_t *nvl)
 
 	value = get_config_value_node(nvl, "feature_mask");
 	if (value != NULL) {
-		num = strtonumx(value, 0, UINT64_MAX, &errstr, 0);
+		unsigned long long mask;
+
+		mask = strtounumx(value, 0, UINT64_MAX, &errstr, 0);
 		if (errstr != NULL) {
 			EPRINTLN("viona: invalid feature_mask '%s': %s",
 			    value, errstr);
 			err = -1;
 		} else {
-			sc->vsc_feature_mask = num;
+			sc->vsc_feature_mask = mask;
 		}
 	}
 

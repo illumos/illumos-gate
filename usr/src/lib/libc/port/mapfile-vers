@@ -80,6 +80,12 @@ $if _x86 && _ELF64
 $add amd64
 $endif
 
+SYMBOL_VERSION ILLUMOS_0.59 {
+    protected:
+	strtounum;
+	strtounumx;
+} ILLUMOS_0.58;
+
 SYMBOL_VERSION ILLUMOS_0.58 {
     protected:
 	c8rtomb;
