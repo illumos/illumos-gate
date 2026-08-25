@@ -55,7 +55,7 @@ extern "C" {
 #ifndef	_SIGSET_T
 #define	_SIGSET_T
 typedef	struct {	/* signal set type */
-	unsigned long	__sigbits[4];
+	unsigned int	__sigbits[4];
 } sigset_t;
 #endif /* _SIGSET_T */
 
