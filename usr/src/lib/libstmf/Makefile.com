@@ -23,6 +23,7 @@
 # Use is subject to license terms.
 #
 # Copyright (c) 2018, Joyent, Inc.
+# Copyright 2026 EFit Partners
 
 LIBRARY= libstmf.a
 VERS= .1
@@ -38,7 +39,7 @@ SRCDIR =	../common
 INCS += -I$(SRCDIR)
 
 CSTD=	$(CSTD_GNU99)
-LDLIBS +=	-lc -lnvpair -lscf -lm
+LDLIBS +=	-lc -lnvpair -lscf -lm -lsysevent
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
 # not linted

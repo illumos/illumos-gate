@@ -20,6 +20,7 @@
  */
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 EFit Partners
  */
 
 #ifndef	_LIBSTMF_H
@@ -128,6 +129,26 @@ extern "C" {
 #define	STMF_ACCESS_ACTIVE_TO_STANDBY   "1"
 #define	STMF_ACCESS_STANDBY		"2"
 #define	STMF_ACCESS_STANDBY_TO_ACTIVE	"3"
+
+/*
+ * EC_STMF sysevent attributes (name/value pairs), posted by libstmf upon
+ * successful completion of administrative operations.  Subclass
+ * definitions are found in sys/sysevent/eventdefs.h.  All events carry
+ * STMF_EV_TIMESTAMP; the remaining attributes identify the object the
+ * subclass applies to.
+ */
+#define	STMF_EV_TIMESTAMP	"when"		/* DATA_TYPE_UINT64 */
+#define	STMF_EV_LU_GUID		"lu_guid"	/* DATA_TYPE_STRING */
+#define	STMF_EV_DATA_FILE	"data_file"	/* DATA_TYPE_STRING */
+#define	STMF_EV_VE_INDEX	"ve_index"	/* DATA_TYPE_UINT32 */
+#define	STMF_EV_HOST_GROUP	"host_group"	/* DATA_TYPE_STRING */
+#define	STMF_EV_TARGET_GROUP	"target_group"	/* DATA_TYPE_STRING */
+#define	STMF_EV_LUN_NBR		"lun_nbr"	/* DATA_TYPE_UINT32 */
+#define	STMF_EV_GROUP_TYPE	"group_type"	/* DATA_TYPE_STRING */
+#define	STMF_EV_GROUP_NAME	"group_name"	/* DATA_TYPE_STRING */
+#define	STMF_EV_MEMBER		"member"	/* DATA_TYPE_STRING */
+#define	STMF_EV_TARGET_NAME	"target_name"	/* DATA_TYPE_STRING */
+#define	STMF_EV_NEW_STATE	"new_state"	/* DATA_TYPE_STRING */
 
 /*
  * LU Disk Properties

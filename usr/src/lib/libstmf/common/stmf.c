@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2026 EFit Partners
  */
 
 #include <stdlib.h>
@@ -39,6 +40,9 @@
 #include <pthread.h>
 #include <syslog.h>
 #include <libstmf.h>
+#include <libsysevent.h>
+#include <sys/sysevent/eventdefs.h>
+#include <time.h>
 #include <netinet/in.h>
 #include <inttypes.h>
 #include <store.h>
@@ -118,6 +122,12 @@ static int setProviderData(int fd, char *, nvlist_t *, int, uint64_t *);
 static int createDiskResource(luResourceImpl *);
 static int createDiskLu(diskResource *, stmfGuid *);
 static int deleteDiskLu(stmfGuid *luGuid);
+static void luGuidToAscii(stmfGuid *, char *);
+static void postStmfEvent(char *, nvlist_t *);
+static void postStmfLuEvent(char *, stmfGuid *, const char *, char *);
+static void postStmfViewEvent(char *, stmfGuid *, uint32_t, stmfViewEntry *);
+static void postStmfGroupEvent(char *, char *, stmfGroupName *, stmfDevid *);
+static void postStmfTargetEvent(char *, stmfDevid *, char *);
 static int getDiskProp(luResourceImpl *, uint32_t, char *, size_t *);
 static int getDiskAllProps(stmfGuid *luGuid, luResource *hdl);
 static int loadDiskPropsFromDriver(luResourceImpl *, sbd_lu_props_t *);
@@ -282,6 +292,154 @@ initializeConfig()
 	return (ret);
 }
 
+/*
+ * EC_STMF sysevent emission.  Best effort only: a consumer tracking the
+ * STMF configuration is expected to periodically reconcile against the
+ * actual configuration, so a failed post is never reported to the caller.
+ * Events are posted once both the framework update and, when persistence
+ * is enabled, the persistent store update have succeeded.  nvl is
+ * consumed and freed here.
+ */
+static void
+postStmfEvent(char *subclass, nvlist_t *nvl)
+{
+	sysevent_id_t eid;
+
+	if (nvl == NULL)
+		return;
+
+	if (nvlist_add_uint64(nvl, STMF_EV_TIMESTAMP,
+	    (uint64_t)time(NULL)) == 0) {
+		(void) sysevent_post_event(EC_STMF, subclass, ILLUMOS_VENDOR,
+		    "libstmf", nvl, &eid);
+	}
+	nvlist_free(nvl);
+}
+
+/* buf must hold LU_ASCII_GUID_SIZE + 1 bytes */
+static void
+luGuidToAscii(stmfGuid *guid, char *buf)
+{
+	int i;
+
+	for (i = 0; i < LU_GUID_SIZE; i++)
+		(void) snprintf(buf + (i * 2), 3, "%02x", guid->guid[i]);
+}
+
+static void
+postStmfLuEvent(char *subclass, stmfGuid *luGuid, const char *dataFile,
+    char *newState)
+{
+	nvlist_t *nvl;
+	char guidAscii[LU_ASCII_GUID_SIZE + 1];
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+		return;
+
+	if (luGuid != NULL) {
+		luGuidToAscii(luGuid, guidAscii);
+		if (nvlist_add_string(nvl, STMF_EV_LU_GUID, guidAscii) != 0)
+			goto fail;
+	}
+	if (dataFile != NULL &&
+	    nvlist_add_string(nvl, STMF_EV_DATA_FILE, dataFile) != 0)
+		goto fail;
+	if (newState != NULL &&
+	    nvlist_add_string(nvl, STMF_EV_NEW_STATE, newState) != 0)
+		goto fail;
+
+	postStmfEvent(subclass, nvl);
+	return;
+fail:
+	nvlist_free(nvl);
+}
+
+static void
+postStmfViewEvent(char *subclass, stmfGuid *luGuid, uint32_t veIndex,
+    stmfViewEntry *ve)
+{
+	nvlist_t *nvl;
+	char guidAscii[LU_ASCII_GUID_SIZE + 1];
+	uint32_t luNbr;
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+		return;
+
+	luGuidToAscii(luGuid, guidAscii);
+	if (nvlist_add_string(nvl, STMF_EV_LU_GUID, guidAscii) != 0 ||
+	    nvlist_add_uint32(nvl, STMF_EV_VE_INDEX, veIndex) != 0)
+		goto fail;
+
+	if (ve != NULL) {
+		if (nvlist_add_string(nvl, STMF_EV_HOST_GROUP,
+		    ve->allHosts ? "All" : (char *)ve->hostGroup) != 0 ||
+		    nvlist_add_string(nvl, STMF_EV_TARGET_GROUP,
+		    ve->allTargets ? "All" : (char *)ve->targetGroup) != 0)
+			goto fail;
+		if (ve->luNbrValid) {
+			/* same flat space addressing decode as stmfadm(8) */
+			luNbr = ((ve->luNbr[0] & 0x3F) << 8) | ve->luNbr[1];
+			if (nvlist_add_uint32(nvl, STMF_EV_LUN_NBR,
+			    luNbr) != 0)
+				goto fail;
+		}
+	}
+
+	postStmfEvent(subclass, nvl);
+	return;
+fail:
+	nvlist_free(nvl);
+}
+
+static void
+postStmfGroupEvent(char *subclass, char *groupType, stmfGroupName *groupName,
+    stmfDevid *member)
+{
+	nvlist_t *nvl;
+	char memberName[STMF_IDENT_LENGTH + 1];
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+		return;
+
+	if (nvlist_add_string(nvl, STMF_EV_GROUP_TYPE, groupType) != 0 ||
+	    nvlist_add_string(nvl, STMF_EV_GROUP_NAME,
+	    (char *)groupName) != 0)
+		goto fail;
+
+	if (member != NULL) {
+		bcopy(member->ident, memberName, member->identLength);
+		memberName[member->identLength] = '\0';
+		if (nvlist_add_string(nvl, STMF_EV_MEMBER, memberName) != 0)
+			goto fail;
+	}
+
+	postStmfEvent(subclass, nvl);
+	return;
+fail:
+	nvlist_free(nvl);
+}
+
+static void
+postStmfTargetEvent(char *subclass, stmfDevid *target, char *newState)
+{
+	nvlist_t *nvl;
+	char targetName[STMF_IDENT_LENGTH + 1];
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+		return;
+
+	bcopy(target->ident, targetName, target->identLength);
+	targetName[target->identLength] = '\0';
+
+	if (nvlist_add_string(nvl, STMF_EV_TARGET_NAME, targetName) != 0 ||
+	    nvlist_add_string(nvl, STMF_EV_NEW_STATE, newState) != 0)
+		goto fail;
+
+	postStmfEvent(subclass, nvl);
+	return;
+fail:
+	nvlist_free(nvl);
+}
 
 /*
  * groupIoctl
@@ -537,6 +695,10 @@ stmfAddToHostGroup(stmfGroupName *hostGroupName, stmfDevid *hostName)
 
 done:
 	(void) close(fd);
+	if (ret == STMF_STATUS_SUCCESS) {
+		postStmfGroupEvent(ESC_STMF_GROUP_MEMBER_ADD, "host",
+		    hostGroupName, hostName);
+	}
 	return (ret);
 }
 
@@ -612,6 +774,10 @@ stmfAddToTargetGroup(stmfGroupName *targetGroupName, stmfDevid *targetName)
 
 done:
 	(void) close(fd);
+	if (ret == STMF_STATUS_SUCCESS) {
+		postStmfGroupEvent(ESC_STMF_GROUP_MEMBER_ADD, "target",
+		    targetGroupName, targetName);
+	}
 	return (ret);
 }
 
@@ -845,6 +1011,8 @@ done:
 		viewEntry->luNbrValid = B_TRUE;
 		bcopy(iViewEntry.luNbr, viewEntry->luNbr,
 		    sizeof (iViewEntry.luNbr));
+		postStmfViewEvent(ESC_STMF_VIEW_ADD, lu, iViewEntry.veIndex,
+		    &iViewEntry);
 	}
 	return (ret);
 }
@@ -1038,6 +1206,10 @@ stmfCreateHostGroup(stmfGroupName *hostGroupName)
 
 done:
 	(void) close(fd);
+	if (ret == STMF_STATUS_SUCCESS) {
+		postStmfGroupEvent(ESC_STMF_GROUP_CREATE, "host",
+		    hostGroupName, NULL);
+	}
 	return (ret);
 }
 
@@ -1316,6 +1488,11 @@ createDiskLu(diskResource *disk, stmfGuid *createdGuid)
 	} else {
 		ret = addGuidToDiskStore(&guid, disk->luDataFileName);
 	}
+	if (ret == STMF_STATUS_SUCCESS) {
+		postStmfLuEvent(ESC_STMF_LU_CREATE, &guid,
+		    disk->luDataFileNameValid ? disk->luDataFileName : NULL,
+		    NULL);
+	}
 done:
 	free(sbdLu);
 	(void) close(fd);
@@ -1458,6 +1635,10 @@ importDiskLu(char *fname, stmfGuid *createdGuid)
 		bcopy(sbdLu->ilu_ret_guid, iGuid.guid,
 		    sizeof (sbdLu->ilu_ret_guid));
 		ret = addGuidToDiskStore(&iGuid, fname);
+	}
+	if (ret == STMF_STATUS_SUCCESS) {
+		postStmfLuEvent(ESC_STMF_LU_CREATE,
+		    (createdGuid != NULL) ? createdGuid : &iGuid, fname, NULL);
 	}
 done:
 	free(sbdLu);
@@ -1630,6 +1811,8 @@ deleteDiskLu(stmfGuid *luGuid)
 
 done:
 	(void) close(fd);
+	if (ret == STMF_STATUS_SUCCESS)
+		postStmfLuEvent(ESC_STMF_LU_DELETE, luGuid, NULL, NULL);
 	return (ret);
 }
 
@@ -1809,6 +1992,8 @@ modifyDiskLuProp(stmfGuid *luGuid, const char *fname, uint32_t prop,
 	luPropsHdl = hdl;
 	ret = modifyDiskLu((diskResource *)luPropsHdl->resource, luGuid, fname);
 	(void) stmfFreeLuResource(hdl);
+	if (ret == STMF_STATUS_SUCCESS)
+		postStmfLuEvent(ESC_STMF_LU_MODIFY, luGuid, fname, NULL);
 	return (ret);
 }
 
@@ -3237,6 +3422,10 @@ stmfCreateTargetGroup(stmfGroupName *targetGroupName)
 
 done:
 	(void) close(fd);
+	if (ret == STMF_STATUS_SUCCESS) {
+		postStmfGroupEvent(ESC_STMF_GROUP_CREATE, "target",
+		    targetGroupName, NULL);
+	}
 	return (ret);
 }
 
@@ -3317,6 +3506,10 @@ stmfDeleteHostGroup(stmfGroupName *hostGroupName)
 
 done:
 	(void) close(fd);
+	if (ret == STMF_STATUS_SUCCESS) {
+		postStmfGroupEvent(ESC_STMF_GROUP_DELETE, "host",
+		    hostGroupName, NULL);
+	}
 	return (ret);
 }
 
@@ -3397,6 +3590,10 @@ stmfDeleteTargetGroup(stmfGroupName *targetGroupName)
 
 done:
 	(void) close(fd);
+	if (ret == STMF_STATUS_SUCCESS) {
+		postStmfGroupEvent(ESC_STMF_GROUP_DELETE, "target",
+		    targetGroupName, NULL);
+	}
 	return (ret);
 }
 
@@ -5847,6 +6044,10 @@ stmfOfflineTarget(stmfDevid *devid)
 		return (ret);
 	ret = setStmfState(fd, &targetState, TARGET_TYPE);
 	(void) close(fd);
+	if (ret == STMF_STATUS_SUCCESS) {
+		postStmfTargetEvent(ESC_STMF_TARGET_STATE_CHANGE, devid,
+		    "offline");
+	}
 	return (ret);
 }
 
@@ -5880,6 +6081,10 @@ stmfOfflineLogicalUnit(stmfGuid *lu)
 		return (ret);
 	ret = setStmfState(fd, &luState, LOGICAL_UNIT_TYPE);
 	(void) close(fd);
+	if (ret == STMF_STATUS_SUCCESS) {
+		postStmfLuEvent(ESC_STMF_LU_STATE_CHANGE, lu, NULL,
+		    "offline");
+	}
 	return (ret);
 }
 
@@ -5914,6 +6119,10 @@ stmfOnlineTarget(stmfDevid *devid)
 		return (ret);
 	ret = setStmfState(fd, &targetState, TARGET_TYPE);
 	(void) close(fd);
+	if (ret == STMF_STATUS_SUCCESS) {
+		postStmfTargetEvent(ESC_STMF_TARGET_STATE_CHANGE, devid,
+		    "online");
+	}
 	return (ret);
 }
 
@@ -5947,6 +6156,10 @@ stmfOnlineLogicalUnit(stmfGuid *lu)
 		return (ret);
 	ret = setStmfState(fd, &luState, LOGICAL_UNIT_TYPE);
 	(void) close(fd);
+	if (ret == STMF_STATUS_SUCCESS) {
+		postStmfLuEvent(ESC_STMF_LU_STATE_CHANGE, lu, NULL,
+		    "online");
+	}
 	return (ret);
 }
 
@@ -6022,6 +6235,10 @@ stmfRemoveFromHostGroup(stmfGroupName *hostGroupName, stmfDevid *hostName)
 
 done:
 	(void) close(fd);
+	if (ret == STMF_STATUS_SUCCESS) {
+		postStmfGroupEvent(ESC_STMF_GROUP_MEMBER_REMOVE, "host",
+		    hostGroupName, hostName);
+	}
 	return (ret);
 }
 
@@ -6097,6 +6314,10 @@ stmfRemoveFromTargetGroup(stmfGroupName *targetGroupName, stmfDevid *targetName)
 
 done:
 	(void) close(fd);
+	if (ret == STMF_STATUS_SUCCESS) {
+		postStmfGroupEvent(ESC_STMF_GROUP_MEMBER_REMOVE, "target",
+		    targetGroupName, targetName);
+	}
 	return (ret);
 }
 
@@ -6210,6 +6431,10 @@ stmfRemoveViewEntry(stmfGuid *lu, uint32_t viewEntryIndex)
 
 done:
 	(void) close(fd);
+	if (ret == STMF_STATUS_SUCCESS) {
+		postStmfViewEvent(ESC_STMF_VIEW_REMOVE, lu, viewEntryIndex,
+		    NULL);
+	}
 	return (ret);
 }
 

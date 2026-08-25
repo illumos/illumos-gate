@@ -58,6 +58,7 @@ extern "C" {
 #define	EC_VRRP		"EC_vrrp"	/* VRRP event */
 #define	EC_PCIE		"EC_pcie"	/* PCIe event */
 #define	EC_ZONE		"EC_zone"	/* zone event */
+#define	EC_STMF		"EC_stmf"	/* STMF (COMSTAR) config event */
 
 /*
  * The following event class is reserved for exclusive use
@@ -256,6 +257,34 @@ extern "C" {
  * A zone configuration has been deleted via zonecfg(8).
  */
 #define	ESC_ZONE_CONFIG_DELETE		"ESC_zone_config_delete"
+
+/*
+ * EC_STMF subclass definitions.  Posted by libstmf(3LIB) upon successful
+ * completion of an administrative operation (stmfadm(8), sbdadm(8),
+ * itadm(8) or any other libstmf consumer), after both the framework
+ * ioctl and the SMF persistence have succeeded.  State-change subclasses
+ * reflect administrative requests only, not fault-driven transitions.
+ * Supporting attributes (name/value pairs) are found in libstmf.h.
+ */
+
+/* A logical unit has been created, modified or deleted */
+#define	ESC_STMF_LU_CREATE		"ESC_stmf_lu_create"
+#define	ESC_STMF_LU_MODIFY		"ESC_stmf_lu_modify"
+#define	ESC_STMF_LU_DELETE		"ESC_stmf_lu_delete"
+
+/* A view entry has been added to or removed from a logical unit */
+#define	ESC_STMF_VIEW_ADD		"ESC_stmf_view_add"
+#define	ESC_STMF_VIEW_REMOVE		"ESC_stmf_view_remove"
+
+/* A host group or target group has been created, deleted or modified */
+#define	ESC_STMF_GROUP_CREATE		"ESC_stmf_group_create"
+#define	ESC_STMF_GROUP_DELETE		"ESC_stmf_group_delete"
+#define	ESC_STMF_GROUP_MEMBER_ADD	"ESC_stmf_group_member_add"
+#define	ESC_STMF_GROUP_MEMBER_REMOVE	"ESC_stmf_group_member_remove"
+
+/* A logical unit or target port was brought online/offline by an admin */
+#define	ESC_STMF_LU_STATE_CHANGE	"ESC_stmf_lu_state_change"
+#define	ESC_STMF_TARGET_STATE_CHANGE	"ESC_stmf_target_state_change"
 
 #ifdef	__cplusplus
 }
