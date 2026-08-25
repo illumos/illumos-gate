@@ -24,6 +24,7 @@
  * Copyright 2016 Nexenta Systems, Inc.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 Garrett D'Amore
+ * Copyright 2026 EFit Partners
  */
 
 #ifndef	_SYS_SYSEVENT_EVENTDEFS_H
@@ -56,6 +57,7 @@ extern "C" {
 #define	EC_DATALINK	"EC_datalink"	/* datalink event */
 #define	EC_VRRP		"EC_vrrp"	/* VRRP event */
 #define	EC_PCIE		"EC_pcie"	/* PCIe event */
+#define	EC_ZONE		"EC_zone"	/* zone event */
 
 /*
  * The following event class is reserved for exclusive use
@@ -222,6 +224,38 @@ extern "C" {
  * sys/sysevent/pcie.h.
  */
 #define	ESC_PCIE_LINK_STATE	"ESC_pcie_link_state"
+
+/*
+ * EC_ZONE subclass definitions - supporting attributes (name/value pairs)
+ * are found in sys/zone.h
+ */
+
+/*
+ * Zone lifecycle state has changed (e.g. configured -> incomplete ->
+ * installed -> ready -> running -> shutting_down -> down -> installed,
+ * up to and including uninstalled/deleted).  This covers the full
+ * administrative lifecycle tracked by zoneadm(8)/zoneadmd(8), not only
+ * the subset of runtime states visible to the kernel zone_status_t.
+ */
+#define	ESC_ZONE_STATE_CHANGE		"ESC_zone_state_change"
+
+/*
+ * A new zone configuration has been created via zonecfg(8).
+ */
+#define	ESC_ZONE_CONFIG_CREATE		"ESC_zone_config_create"
+
+/*
+ * An existing zone configuration has been modified via zonecfg(8)
+ * (resources, properties, attributes added/removed/changed).  Mirrors
+ * the intent of ESC_ZFS_CONFIG_SYNC: consumers should re-read the
+ * zone's configuration.
+ */
+#define	ESC_ZONE_CONFIG_SYNC		"ESC_zone_config_sync"
+
+/*
+ * A zone configuration has been deleted via zonecfg(8).
+ */
+#define	ESC_ZONE_CONFIG_DELETE		"ESC_zone_config_delete"
 
 #ifdef	__cplusplus
 }

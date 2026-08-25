@@ -23,6 +23,7 @@
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2025 Edgecast Cloud LLC.
+# Copyright 2026 EFit Partners
 #
 
 PROG= zoneadmd
@@ -44,7 +45,7 @@ CFLAGS += $(CCVERBOSE)
 
 LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair \
 	-lgen -lbsm -lcontract -lzfs -luuid -lbrand -ldladm -ltsnet -ltsol \
-	-linetutil -lscf
+	-linetutil -lscf -lsysevent
 XGETFLAGS += -a -x zoneadmd.xcl
 
 .KEEP_STATE:

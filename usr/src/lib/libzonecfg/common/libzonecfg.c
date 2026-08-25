@@ -25,9 +25,11 @@
  * Copyright (c) 2018, Joyent, Inc.
  * Copyright 2015 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 EFit Partners
  */
 
 #include <libsysevent.h>
+#include <sys/sysevent/eventdefs.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -39,6 +41,7 @@
 #include <libintl.h>
 #include <alloca.h>
 #include <ctype.h>
+#include <time.h>
 #include <sys/acl.h>
 #include <sys/stat.h>
 #include <sys/brand.h>
@@ -334,6 +337,30 @@ zonecfg_fini_handle(zone_dochandle_t handle)
 		free(handle);
 }
 
+/*
+ * Post an EC_ZONE configuration-change event (create/sync/delete).  Best
+ * effort only: a consumer that cares about zone configuration is expected
+ * to periodically reconcile against the on-disk state, so a missed or
+ * failed event here is not treated as an error by any caller.
+ */
+static void
+post_zone_config_event(const char *zonename, char *subclass)
+{
+	nvlist_t *nvl;
+	sysevent_id_t eid;
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+		return;
+
+	if (nvlist_add_string(nvl, ZONE_CB_NAME, zonename) == 0 &&
+	    nvlist_add_uint64(nvl, ZONE_CB_TIMESTAMP,
+	    (uint64_t)time(NULL)) == 0) {
+		(void) sysevent_post_event(EC_ZONE, subclass, ILLUMOS_VENDOR,
+		    "libzonecfg", nvl, &eid);
+	}
+	nvlist_free(nvl);
+}
+
 static int
 zonecfg_destroy_impl(char *filename)
 {
@@ -402,8 +429,10 @@ zonecfg_destroy(const char *zonename, boolean_t force)
 	 * Treat failure to find the XML file silently, since, well, it's
 	 * gone, and with the index file cleaned up, we're done.
 	 */
-	if (err == Z_OK || err == Z_NO_ZONE)
+	if (err == Z_OK || err == Z_NO_ZONE) {
+		post_zone_config_event(zonename, ESC_ZONE_CONFIG_DELETE);
 		return (Z_OK);
+	}
 	return (err);
 }
 
@@ -1339,6 +1368,9 @@ zonecfg_save(zone_dochandle_t handle)
 
 	if (err != Z_OK)
 		return (err);
+
+	post_zone_config_event(zname, is_new(handle) ?
+	    ESC_ZONE_CONFIG_CREATE : ESC_ZONE_CONFIG_SYNC);
 
 	handle->zone_dh_newzone = B_FALSE;
 
@@ -5810,16 +5842,43 @@ int
 zone_set_state(char *zone, zone_state_t state)
 {
 	struct zoneent ze;
+	zone_state_t old_state;
+	boolean_t have_old_state;
+	int err;
+	nvlist_t *nvl;
+	sysevent_id_t eid;
 
 	if (state != ZONE_STATE_CONFIGURED && state != ZONE_STATE_INSTALLED &&
 	    state != ZONE_STATE_INCOMPLETE)
 		return (Z_INVAL);
 
+	have_old_state = (zone_get_state(zone, &old_state) == Z_OK);
+
 	bzero(&ze, sizeof (ze));
 	(void) strlcpy(ze.zone_name, zone, sizeof (ze.zone_name));
 	ze.zone_state = state;
 	(void) strlcpy(ze.zone_path, "", sizeof (ze.zone_path));
-	return (putzoneent(&ze, PZE_MODIFY));
+	if ((err = putzoneent(&ze, PZE_MODIFY)) != Z_OK)
+		return (err);
+
+	/*
+	 * Best effort only: see the comment on post_zone_config_event().
+	 */
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
+		return (Z_OK);
+
+	if (nvlist_add_string(nvl, ZONE_CB_NAME, zone) == 0 &&
+	    nvlist_add_string(nvl, ZONE_CB_NEWSTATE,
+	    zone_state_str(state)) == 0 &&
+	    (!have_old_state || nvlist_add_string(nvl,
+	    ZONE_CB_OLDSTATE, zone_state_str(old_state)) == 0) &&
+	    nvlist_add_uint64(nvl, ZONE_CB_TIMESTAMP,
+	    (uint64_t)time(NULL)) == 0) {
+		(void) sysevent_post_event(EC_ZONE, ESC_ZONE_STATE_CHANGE,
+		    ILLUMOS_VENDOR, "libzonecfg", nvl, &eid);
+	}
+	nvlist_free(nvl);
+	return (Z_OK);
 }
 
 /*

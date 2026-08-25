@@ -24,6 +24,7 @@
  * Copyright 2014 Igor Kozhukhov <ikozhukhov@gmail.com>.
  * Copyright 2019 Nexenta Systems, Inc. All rights reserved.
  * Copyright 2020 Joyent, Inc.
+ * Copyright 2026 EFit Partners
  */
 
 #ifndef _SYS_ZONE_H
@@ -134,6 +135,25 @@ extern "C" {
 #define	ZONE_EVENT_READY		"ready"
 #define	ZONE_EVENT_RUNNING		"running"
 #define	ZONE_EVENT_SHUTTING_DOWN	"shutting_down"
+
+/*
+ * Administrative lifecycle states, as tracked by zoneadm(8)/zoneadmd(8),
+ * for use with ESC_ZONE_STATE_CHANGE.  These extend the runtime-only
+ * states above (which are all that the kernel zone_status_t can express)
+ * with the install/uninstall states that only ever exist on-disk and in
+ * zoneadmd's own state machine.
+ */
+#define	ZONE_EVENT_CONFIGURED		"configured"
+#define	ZONE_EVENT_INCOMPLETE		"incomplete"
+#define	ZONE_EVENT_INSTALLED		"installed"
+
+/*
+ * zoneadmd(8) reaches this state once the zone's virtual platform has
+ * been fully torn down after a halt.  Distinct from ZONE_EVENT_INSTALLED
+ * only in that it is emitted by zoneadmd at the moment of teardown,
+ * rather than by zoneadm/libzonecfg when the persisted state is set.
+ */
+#define	ZONE_EVENT_DOWN			"down"
 
 #define	ZONE_CB_NAME		"zonename"
 #define	ZONE_CB_NEWSTATE	"newstate"
