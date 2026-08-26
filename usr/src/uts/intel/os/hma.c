@@ -97,6 +97,13 @@ typedef struct hma_svm_cpu {
 /*
  * Combined per-CPU state data
  *
+ * This is indexed by CPU ID, and not by CPU sequence ID. Although the two
+ * are usually the same, they diverge if a CPU fails to start during boot.
+ * In that case, the failed CPU's sequence ID is released for re-use by the
+ * next CPU to start, but its CPU ID is not. The CPU ID is also the
+ * convention for identifying target CPUs in a cross-call, and is the ID
+ * which is passed to registered CPU setup functions.
+ *
  * The bulk of HMA state (VMX & SVM) is protected by cpu_lock, rather than a
  * mutex specific to the module.  It (cpu_lock) is already required for the
  * state needed to perform setup on all CPUs, so it was a natural fit to
@@ -340,7 +347,7 @@ hma_vmx_cpu_vmxon(xc_arg_t arg1 __unused, xc_arg_t arg2 __unused,
     xc_arg_t arg3 __unused)
 {
 	uint64_t fctrl;
-	const processorid_t id = CPU->cpu_seqid;
+	const processorid_t id = CPU->cpu_id;
 	hma_vmx_cpu_t *vmx_cpu = hma_vmx_cpu(id);
 
 	VERIFY(vmx_cpu->hvc_vmxon_page != NULL);
@@ -546,7 +553,7 @@ hma_vmx_init(void)
 	/* Perform VMX configuration for already-online CPUs. */
 	cp = cpu_active;
 	do {
-		err = hma_vmx_cpu_setup(CPU_ON, cp->cpu_seqid, NULL);
+		err = hma_vmx_cpu_setup(CPU_ON, cp->cpu_id, NULL);
 		if (err != 0) {
 			msg = "failure during VMXON setup";
 			mutex_exit(&cpu_lock);
@@ -612,7 +619,7 @@ hma_svm_asid_update(hma_svm_asid_t *vcp, boolean_t flush_by_asid,
 		vcp->hsa_gen = 0;
 	}
 
-	hma_svm_asid_t *hcp = &(hma_svm_cpu(CPU->cpu_seqid)->hsc_asid);
+	hma_svm_asid_t *hcp = &(hma_svm_cpu(CPU->cpu_id)->hsc_asid);
 	if (vcp->hsa_gen != hcp->hsa_gen) {
 		hcp->hsa_asid++;
 
@@ -656,7 +663,7 @@ hma_svm_gif_disable(void)
 	 */
 	__asm__ __volatile__("clgi");
 
-	hma_svm_cpu_t *svm_cpu = hma_svm_cpu(CPU->cpu_seqid);
+	hma_svm_cpu_t *svm_cpu = hma_svm_cpu(CPU->cpu_id);
 	const uint_t old_gif = atomic_swap_uint(&svm_cpu->hsc_gif_disabled, 1);
 
 	if (old_gif != 0) {
@@ -667,7 +674,7 @@ hma_svm_gif_disable(void)
 void
 hma_svm_gif_enable(void)
 {
-	hma_svm_cpu_t *svm_cpu = hma_svm_cpu(CPU->cpu_seqid);
+	hma_svm_cpu_t *svm_cpu = hma_svm_cpu(CPU->cpu_id);
 	const uint_t old_gif = atomic_swap_uint(&svm_cpu->hsc_gif_disabled, 0);
 
 	if (old_gif == 0) {
@@ -684,7 +691,7 @@ hma_svm_gif_enable(void)
 boolean_t
 hma_svm_gif_is_disabled(void)
 {
-	hma_svm_cpu_t *svm_cpu = hma_svm_cpu(CPU->cpu_seqid);
+	hma_svm_cpu_t *svm_cpu = hma_svm_cpu(CPU->cpu_id);
 
 	/*
 	 * At the time of this writing, there exists no mechanism by which the
@@ -714,7 +721,7 @@ hma_svm_gif_is_disabled(void)
 hma_svm_cpc_res_t
 hma_svm_cpc_enter(struct hma_svm_cpc_state *cpc_state)
 {
-	hma_svm_cpu_t *svm_cpu = hma_svm_cpu(CPU->cpu_seqid);
+	hma_svm_cpu_t *svm_cpu = hma_svm_cpu(CPU->cpu_id);
 
 	ASSERT(!interrupts_enabled());
 
@@ -767,13 +774,13 @@ hma_svm_cpc_enter(struct hma_svm_cpc_state *cpc_state)
 			 * the guest, so just leave everything in place.
 			 */
 			DTRACE_PROBE2(hma_svm__guest_deferred,
-			    processorid_t, CPU->cpu_seqid,
+			    processorid_t, CPU->cpu_id,
 			    uint_t, guest_active);
 			return (HSCR_EMPTY);
 		}
 
 		DTRACE_PROBE2(hma_svm__host_deferred,
-		    processorid_t, CPU->cpu_seqid, uint_t, host_active);
+		    processorid_t, CPU->cpu_id, uint_t, host_active);
 
 		/*
 		 * Disable any active host counters, trying to do so in as
@@ -825,7 +832,7 @@ hma_svm_cpc_exit(struct hma_svm_cpc_state *cpc_state)
 {
 	ASSERT(!interrupts_enabled());
 
-	hma_svm_cpu_t *svm_cpu = hma_svm_cpu(CPU->cpu_seqid);
+	hma_svm_cpu_t *svm_cpu = hma_svm_cpu(CPU->cpu_id);
 
 	const hma_cpc_flags_t saved_flags = svm_cpu->hsc_cpc_saved_flags;
 	if (saved_flags == HCF_DISABLED) {
@@ -872,7 +879,7 @@ static int
 hma_svm_cpu_activate(xc_arg_t arg1 __unused, xc_arg_t arg2 __unused,
     xc_arg_t arg3 __unused)
 {
-	const processorid_t id = CPU->cpu_seqid;
+	const processorid_t id = CPU->cpu_id;
 	const uintptr_t hsave_pa = hma_svm_cpu(id)->hsc_hsave_pa;
 	uint64_t efer;
 
@@ -941,7 +948,7 @@ hma_svm_cpu_setup(cpu_setup_t what, int id, void *arg __unused)
 	}
 
 	kpreempt_disable();
-	if (CPU->cpu_seqid == id) {
+	if (CPU->cpu_id == id) {
 		/* Perform svm setup directly if this CPU is the target */
 		(void) hma_svm_cpu_activate(0, 0, 0);
 		kpreempt_enable();
@@ -1002,7 +1009,7 @@ hma_svm_init(void)
 	/* Perform SVM configuration for already-online CPUs. */
 	cp = cpu_active;
 	do {
-		int err = hma_svm_cpu_setup(CPU_ON, cp->cpu_seqid, NULL);
+		int err = hma_svm_cpu_setup(CPU_ON, cp->cpu_id, NULL);
 		if (err != 0) {
 			msg = "failure during SVM setup";
 			mutex_exit(&cpu_lock);
