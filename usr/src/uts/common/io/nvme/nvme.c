@@ -2911,6 +2911,15 @@ nvme_async_event_task(void *arg)
 	nvme_async_event_t event;
 
 	/*
+	 * If the device was removed, there's nothing more to do but free
+	 * the command and return.
+	 */
+	if (nvme_ctrl_is_gone(nvme)) {
+		nvme_free_cmd(cmd);
+		return;
+	}
+
+	/*
 	 * Check for errors associated with the async request itself. The only
 	 * command-specific error is "async event limit exceeded", which
 	 * indicates a programming error in the driver and causes a panic in
