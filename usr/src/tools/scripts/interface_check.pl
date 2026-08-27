@@ -25,6 +25,10 @@
 #
 
 #
+# Copyright 2026 Oxide Computer Company
+#
+
+#
 # Check versioning information.
 #
 # This script descends a directory hierarchy inspecting ELF shared objects for
@@ -46,8 +50,8 @@
 
 
 # Define all global variables (required for strict)
-use vars  qw($Prog $Intfdir);
-use vars  qw(%opt @SaveArgv $ErrFH $ObjCnt);
+use vars  qw($Prog $Tmpdir);
+use vars  qw(%opt @SaveArgv $ErrFH $ObjCnt $Jobs);
 
 
 # An exception file is used to specify regular expressions to match
@@ -96,6 +100,7 @@ use strict;
 use POSIX qw(getenv);
 use Getopt::Std;
 use File::Basename;
+use IO::Handle;
 
 
 
@@ -142,7 +147,7 @@ sub ProcFile {
 	# If there are no versions in the file we're done.
 	if ($Verdef eq 'NOVERDEF') {
 	        # Report the lack of versioning, unless the object is
-	    	# a known plugin, or is explicitly exempt.
+		# a known plugin, or is explicitly exempt.
 		if ($NotPlugin &&
 		    (!defined($EXRE_noverdef) || ($RelPath !~ $EXRE_noverdef))) {
 			onbld_elfmod::OutMsg($ErrFH, \$Ttl, $RelPath,
@@ -179,8 +184,8 @@ sub ProcFile {
 	my %TopNumberedVers = ();
 	foreach my $Line (split(/\n/, `pvs -dos $FullPath 2>&1`)) {
 		my($Ver) = $Line;
-		
-		$Ver =~ s/^.*-\t(.*): .*/$1/; 		# isolate version
+
+		$Ver =~ s/^.*-\t(.*): .*/$1/;		# isolate version
 
 		# See if we've already caught this version name. We only look
 		# at each version once.
@@ -276,7 +281,7 @@ sub ProcFile {
 			my $InheritVers = ($Line =~ /(\{.*\});$/) ? "\t$1" : '';
 
 			# Extract the version name
-			$Line =~ s/^\s*([^;: ]*).*/$1/; 
+			$Line =~ s/^\s*([^;: ]*).*/$1/;
 
 			# Skip version if it is in the SONAME or PRIVATE
 			# categories.
@@ -373,7 +378,13 @@ sub ProcFindElf {
 	# Process the remainder of the file.
 	while ($line = onbld_elfmod::GetLine(\*FIND_ELF, \$LineNum)) {
 		if ($line =~ /^OBJECT\s/i) {
-			push @ObjList, $line;
+			my ($item, $class, $type, $verdef, $obj) =
+			    split(/\s+/, $line, 5);
+
+			# We are only interested in sharable objects. We may
+			# see other file types if processing a list of
+			# objects supplied via the -f option.
+			push @ObjList, $line if $type eq 'DYN';
 			next;
 		}
 
@@ -389,21 +400,130 @@ sub ProcFindElf {
 		}
 	}
 
-	foreach $line (@ObjList) {
+	close FIND_ELF;
+
+	if ($Jobs > 1) {
+		ProcObjListParallel($prefix, \@ObjList, \%ObjToAlias);
+	} else {
+		ProcObjList($prefix, \@ObjList, \%ObjToAlias, 0,
+		    scalar(@ObjList));
+	}
+}
+
+sub ProcObjList {
+	my ($prefix, $objs, $alias, $lo, $hi) = @_;
+
+	for (my $i = $lo; $i < $hi; $i++) {
 		my ($item, $class, $type, $verdef, $obj) =
-		    split(/\s+/, $line, 5);
+		    split(/\s+/, $objs->[$i], 5);
+		my $a = defined($alias->{$obj}) ? $alias->{$obj} : '';
 
-		my $alias = defined($ObjToAlias{$obj}) ? $ObjToAlias{$obj} : '';
+		ProcFile($prefix, $obj, $class, $type, $verdef, $a);
+	}
+}
 
-		# We are only interested in sharable objects. We may see
-		# other file types if processing a list of objects
-		# supplied via the -f option.
-		next if ($type ne 'DYN');
+sub AppendFile {
+	my ($file, $fh) = @_;
+	my $line;
 
-		ProcFile($prefix, $obj, $class, $type, $verdef, $alias);
+	open(APPEND, $file) || return;
+	print $fh $line while ($line = <APPEND>);
+	close APPEND;
+}
+
+sub ProcObjListParallel {
+	my ($prefix, $objs, $alias) = @_;
+	my $cnt = scalar(@$objs);
+	my $jobs = ($Jobs > $cnt) ? $cnt : $Jobs;
+	my (@Pids, @Errs, @Ints);
+	my $failed = 0;
+
+	my $workdir = "$Tmpdir/$Prog.$$";
+	mkdir($workdir, 0700) || die "$Prog: mkdir failed: $workdir: $!";
+
+	$ErrFH->flush();
+	(\*INTFILE)->flush() if $opt{i};
+	(\*STDOUT)->flush();
+
+	# The child reaping below relies on the default disposition of
+	# SIGCHLD.
+	local $SIG{CHLD} = 'DEFAULT';
+
+	# Each child is given a contiguous slice of the object list. A slice
+	# starts where the previous one ended, and since $jobs has been
+	# clamped to the number of objects no slice is empty.
+	my ($lo, $hi) = (0, 0);
+	for (my $i = 0; $i < $jobs; $lo = $hi, $i++) {
+		$hi = int(($cnt * ($i + 1)) / $jobs);
+
+		my $efile = "$workdir/err.$i";
+		my $ifile = "$workdir/intf.$i";
+		my $pid = fork();
+
+		if (!defined($pid)) {
+			# Fall through so that the children despatched so
+			# far are still reaped and their output collected
+			# before the failure is reported.
+			warn "$Prog: fork failed: $!\n";
+			$failed = 1;
+			last;
+		}
+
+		if ($pid == 0) {
+			# Child - redirect the error output, and any
+			# interface description output, to temporary files
+			# and process our slice of the object array.
+			open(CHLDERR, ">$efile") ||
+			    die "$Prog: open failed: $efile: $!";
+			$ErrFH = \*CHLDERR;
+			if ($opt{i}) {
+				open(INTFILE, ">$ifile") ||
+				    die "$Prog: open failed: $ifile: $!";
+				$ObjCnt = 0;
+			}
+
+			ProcObjList($prefix, $objs, $alias, $lo, $hi);
+
+			close(CHLDERR) ||
+			    die "$Prog: close failed: $efile: $!";
+			if ($opt{i}) {
+				close(INTFILE) ||
+				    die "$Prog: close failed: $ifile: $!";
+			}
+			exit 0;
+		}
+
+		push @Pids, $pid;
+		push @Errs, $efile;
+		push @Ints, $ifile;
 	}
 
-	close FIND_ELF;
+	for (my $i = 0; $i <= $#Pids; $i++) {
+		next if waitpid($Pids[$i], 0) != -1 && $? == 0;
+
+		warn "$Prog: child " . ($i + 1) . "/" . scalar(@Pids) .
+		    " failed: status $?\n";
+		$failed = 1;
+	}
+
+	for (my $i = 0; $i <= $#Errs; $i++) {
+		AppendFile($Errs[$i], $ErrFH);
+		unlink $Errs[$i];
+
+		next if !$opt{i};
+
+		if (-s $Ints[$i]) {
+			print INTFILE "\n" if !$opt{h} && ($ObjCnt != 0);
+			AppendFile($Ints[$i], \*INTFILE);
+			$ObjCnt++;
+		}
+		unlink $Ints[$i];
+	}
+
+	rmdir $workdir;
+
+	die "$Prog: parallel object processing failed\n" if $failed;
+	die "$Prog: only $hi of $cnt objects were processed\n" if $hi != $cnt;
 }
 
 
@@ -414,9 +534,11 @@ chomp($Prog = `basename $0`);
 
 # Check that we have arguments.
 @SaveArgv = @ARGV;
-if ((getopts('c:E:e:f:hIi:ow:', \%opt) == 0) || (!$opt{f} && ($#ARGV == -1))) {
+if ((getopts('c:E:e:f:hIi:j:ow:', \%opt) == 0) ||
+    (!$opt{f} && ($#ARGV == -1))) {
 	print "usage: $Prog [-hIo] [-c vtype_mod] [-E errfile] [-e exfile]\n";
-	print "\t\t[-f listfile] [-i intffile] [-w outdir] file | dir, ...\n";
+	print "\t\t[-f listfile] [-i intffile] [-j jobs] [-w outdir]\n";
+	print "\t\tfile | dir, ...\n";
 	print "\n";
 	print "\t[-c vtype_mod]\tsupply alternative version category module\n";
 	print "\t[-E errfile]\tdirect error output to file\n";
@@ -425,10 +547,20 @@ if ((getopts('c:E:e:f:hIi:ow:', \%opt) == 0) || (!$opt{f} && ($#ARGV == -1))) {
 	print "\t[-h]\t\tdo not produce a CDDL/Copyright header comment\n";
 	print "\t[-I]\t\tExpand inheritance in -i output (debugging)\n";
 	print "\t[-i intffile]\tcreate interface description output file\n";
+	print "\t[-j jobs]\tprocess objects in parallel with this many jobs\n";
 	print "\t[-o]\t\tproduce one-liner output (prefixed with pathname)\n";
 	print "\t[-w outdir]\tinterpret all files relative to given directory\n";
 	exit 1;
 }
+
+$Jobs = 1;
+if (defined($opt{j})) {
+	die "$Prog: -j requires a positive integer\n"
+	    if $opt{j} !~ /^\d+$/ || $opt{j} == 0;
+	$Jobs = $opt{j};
+}
+
+$Tmpdir = "/tmp" if (!($Tmpdir = $ENV{TMPDIR}) || (! -d $Tmpdir));
 
 # We depend on the onbld_elfmod and onbld_elfmod_vertype perl modules.
 # Both modules are maintained in the same directory as this script,

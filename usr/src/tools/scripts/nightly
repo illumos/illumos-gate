@@ -28,7 +28,7 @@
 # Copyright (c) 2017 by Delphix. All rights reserved.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2019 Peter Trible.
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 # Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2025 Bill Sommerfeld <sommerfeld@hamachi.org>
 #
@@ -1931,8 +1931,9 @@ if [[ ($build_ok == y) && (($A_FLAG == y) || ($r_FLAG == y)) ]]; then
 		    tee -a $LOGFILE >> $mail_msg_file
 
 		# Produce interface description for the proto. Report errors.
-		interface_check -o -w $elf_ddir -f object_list \
-			-i interface -E interface.err
+		interface_check -o -j $DMAKE_MAX_JOBS -w $elf_ddir \
+			-f object_list -i interface -E interface.err
+		(( $? == 0 )) || build_extras_ok=n
 		if [[ -s $elf_ddir/interface.err ]]; then
 			tee -a $LOGFILE < $elf_ddir/interface.err \
 			    >> $mail_msg_file
@@ -1980,9 +1981,9 @@ if [[ ($build_ok == y) && (($A_FLAG == y) || ($r_FLAG == y)) ]]; then
 		else
 			rtime_sflag="-s"
 		fi
-		check_rtime -i -m -v $rtime_sflag -o -w $elf_ddir \
-			-D object_list  -f object_list -E runtime.err \
-			-I runtime.attr.raw
+		check_rtime -i -m -v $rtime_sflag -o -j $DMAKE_MAX_JOBS \
+			-w $elf_ddir -D object_list -f object_list \
+			-E runtime.err -I runtime.attr.raw
 		if (( $? != 0 )); then
 			build_extras_ok=n
 		fi
@@ -2044,6 +2045,8 @@ fi
 # "make check" begins
 
 if [ "$i_CMD_LINE_FLAG" = "n" -a "$C_FLAG" = "y" ]; then
+	echo "\n==== Make check at `date` ====\n" >> $LOGFILE
+
 	# remove old check.out
 	rm -f $SRC/check.out
 

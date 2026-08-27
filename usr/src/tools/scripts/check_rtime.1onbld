@@ -1,4 +1,5 @@
 .\" Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
+.\" Copyright 2026 Oxide Computer Company
 .\"
 .\" CDDL HEADER START
 .\"
@@ -19,7 +20,7 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.Dd December 3, 2021
+.Dd August 27, 2026
 .Dt CHECK_RTIME 1ONBLD
 .Os
 .Sh NAME
@@ -33,6 +34,7 @@
 .Op Fl e Ar exfile
 .Op Fl f Ar listfile
 .Op Fl I Ar infofile
+.Op Fl j Ar jobs
 .Op Fl w Ar outdir
 .Ar file | dir ...
 .Sh DESCRIPTION
@@ -150,7 +152,7 @@ Dependency lists (typically defined via
 that have been copy and pasted
 between
 .Pa Makefiles
-without verifying their need, are a typicalreason why unused dependencies
+without verifying their need, are a typical reason why unused dependencies
 exist.
 Unused dependencies are displayed as:
 .Pp
@@ -199,8 +201,8 @@ of relocating the shared object.
 In past releases, the link-edit of a dynamic object with the
 .Fl z Ar combreloc
 option was required to generate a combined relocation section.
-However, with the integration of 6642769, this section combination is a default behavior of
-the link-editor.
+However, with the integration of 6642769, this section combination is a
+default behavior of the link-editor.
 .Pp
 In past releases, not inheriting
 .Dv $(DYNFLAGS)
@@ -372,7 +374,7 @@ Presently the information listed is:
 .Bl -bullet
 .It
 Runpaths are printed for any dynamic object.
-This is a historic sanity check to insure compiler supplied runpaths
+This is a historic check to ensure compiler supplied runpaths
 (typically from
 .Nm CC )
 are not recorded in any objects.
@@ -493,6 +495,12 @@ instead of stdout.
 .It Fl i
 Provide dynamic entry information.
 Presently only dependencies and runpaths are printed.
+.It Fl j Ar jobs
+Process objects in parallel, using up to
+.Ar jobs
+child processes.
+The output produced by a successful run is identical to that of a serial
+run.
 .It Fl m
 Enable
 .Xr mcs 1

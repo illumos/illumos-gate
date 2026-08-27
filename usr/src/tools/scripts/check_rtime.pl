@@ -22,7 +22,7 @@
 
 #
 # Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
-# Copyright 2020 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 #
@@ -59,6 +59,7 @@ use vars  qw($Prog $Env $Ena64 $Tmpdir);
 use vars  qw($LddNoU $Conf32 $Conf64);
 use vars  qw(%opt);
 use vars  qw($ErrFH $ErrTtl $InfoFH $InfoTtl $OutCnt1 $OutCnt2);
+use vars  qw($Jobs $SameOut $ParentPid);
 
 # An exception file is used to specify regular expressions to match
 # objects. These directives specify special attributes of the object.
@@ -157,6 +158,7 @@ use vars  qw($EXRE_unused_rpath $EXRE_no_comment $EXRE_not_kmod);
 use strict;
 use Getopt::Std;
 use File::Basename;
+use IO::Handle;
 
 
 # Reliably compare two OS revisions.  Arguments are <ver1> <op> <ver2>.
@@ -888,19 +890,133 @@ sub ProcFindElf {
 	my $file = $_[0];
 	my $line;
 	my $LineNum;
+	my @Objects = ();
 
 	my $prefix = OpenFindElf($file, \*FIND_ELF, \$LineNum);
 
 	while ($line = onbld_elfmod::GetLine(\*FIND_ELF, \$LineNum)) {
 		next if !($line =~ /^OBJECT\s/i);
 
-		my ($item, $class, $type, $verdef, $obj) =
-		    split(/\s+/, $line, 5);
-
-		ProcFile("$prefix/$obj", $obj, $class, $type, $verdef);
+		push @Objects, $line;
 	}
 
 	close FIND_ELF;
+
+	if ($Jobs > 1) {
+		ProcObjectsParallel($prefix, \@Objects);
+	} else {
+		ProcObjects($prefix, \@Objects, 0, scalar(@Objects));
+	}
+}
+
+sub ProcObjects {
+	my ($prefix, $objs, $lo, $hi) = @_;
+
+	for (my $i = $lo; $i < $hi; $i++) {
+		my ($item, $class, $type, $verdef, $obj) =
+		    split(/\s+/, $objs->[$i], 5);
+
+		ProcFile("$prefix/$obj", $obj, $class, $type, $verdef);
+	}
+}
+
+sub AppendFile {
+	my ($file, $fh) = @_;
+	my $line;
+
+	open(APPEND, $file) || return;
+	print $fh $line while ($line = <APPEND>);
+	close APPEND;
+}
+
+sub ProcObjectsParallel {
+	my ($prefix, $objs) = @_;
+	my $cnt = scalar(@$objs);
+	my $jobs = ($Jobs > $cnt) ? $cnt : $Jobs;
+	my (@Pids, @Errs, @Infos);
+	my $failed = 0;
+
+	my $workdir = "$Tmpdir/$Prog.$$";
+	mkdir($workdir, 0700) || die "$Prog: mkdir failed: $workdir: $!";
+
+	$ErrFH->flush();
+	$InfoFH->flush();
+	(\*STDOUT)->flush();
+
+	# The child reaping below relies on the default disposition of
+	# SIGCHLD.
+	local $SIG{CHLD} = 'DEFAULT';
+
+	# Each child is given a contiguous slice of the object list. A slice
+	# starts where the previous one ended, and since $jobs has been
+	# clamped to the number of objects no slice is empty.
+	my ($lo, $hi) = (0, 0);
+	for (my $i = 0; $i < $jobs; $lo = $hi, $i++) {
+		$hi = int(($cnt * ($i + 1)) / $jobs);
+
+		my $efile = "$workdir/err.$i";
+		my $ifile = $SameOut ? $efile : "$workdir/info.$i";
+		my $pid = fork();
+
+		if (!defined($pid)) {
+			warn "$Prog: fork failed: $!\n";
+			$failed = 1;
+			last;
+		}
+
+		if ($pid == 0) {
+			open(CHLDERR, ">$efile") ||
+			    die "$Prog: open failed: $efile: $!";
+			$ErrFH = \*CHLDERR;
+			if ($SameOut) {
+				$InfoFH = $ErrFH;
+			} else {
+				open(CHLDINFO, ">$ifile") ||
+				    die "$Prog: open failed: $ifile: $!";
+				$InfoFH = \*CHLDINFO;
+			}
+
+			$Tmpdir = "$workdir/obj.$i";
+			mkdir($Tmpdir, 0700) ||
+			    die "$Prog: mkdir failed: $Tmpdir: $!";
+
+			ProcObjects($prefix, $objs, $lo, $hi);
+
+			rmdir $Tmpdir;
+
+			close(CHLDERR) ||
+			    die "$Prog: close failed: $efile: $!";
+			if (!$SameOut) {
+				close(CHLDINFO) ||
+				    die "$Prog: close failed: $ifile: $!";
+			}
+			exit 0;
+		}
+
+		push @Pids, $pid;
+		push @Errs, $efile;
+		push @Infos, $ifile;
+	}
+
+	for (my $i = 0; $i <= $#Pids; $i++) {
+		next if waitpid($Pids[$i], 0) != -1 && $? == 0;
+
+		warn "$Prog: child " . ($i + 1) . "/" . scalar(@Pids) .
+		    " failed: status $?\n";
+		$failed = 1;
+	}
+
+	for (my $i = 0; $i <= $#Errs; $i++) {
+		AppendFile($Errs[$i], $ErrFH);
+		AppendFile($Infos[$i], $InfoFH) if !$SameOut;
+		unlink $Errs[$i];
+		unlink $Infos[$i] if !$SameOut;
+	}
+
+	rmdir $workdir;
+
+	die "$Prog: parallel object processing failed\n" if $failed;
+	die "$Prog: only $hi of $cnt objects were processed\n" if $hi != $cnt;
 }
 
 
@@ -934,7 +1050,7 @@ sub AltObjectConfig {
 	my $obj_active = 0;
 	my $obj_class;
 
-	my $prefix = OpenFindElf($file, \*FIND_ELF);
+	my $prefix = OpenFindElf($file, \*FIND_ELF, \$LineNum);
 
 LINE:
 	while ($line = onbld_elfmod::GetLine(\*FIND_ELF, \$LineNum)) {
@@ -1059,6 +1175,9 @@ delete($ENV{LD_PRELOAD_64});
 # Establish a program name for any error diagnostics.
 chomp($Prog = `basename $0`);
 
+# Remember which process is the parent, for use in the END block below.
+$ParentPid = $$;
+
 # The onbld_elfmod package is maintained in the same directory as this
 # script, and is installed in ../lib/perl. Use the local one if present,
 # and the installed one otherwise.
@@ -1084,11 +1203,11 @@ if ($Mach =~ /sparc/) {
 $Env = '';
 
 # Check that we have arguments.
-if ((getopts('D:d:E:e:f:I:imosvw:', \%opt) == 0) ||
+if ((getopts('D:d:E:e:f:I:ij:mosvw:', \%opt) == 0) ||
     (!$opt{f} && ($#ARGV == -1))) {
 	print "usage: $Prog [-imosv] [-D depfile | -d depdir] [-E errfile]\n";
-	print "\t\t[-e exfile] [-f listfile] [-I infofile] [-w outdir]\n";
-	print "\t\t[file | dir]...\n";
+	print "\t\t[-e exfile] [-f listfile] [-I infofile] [-j jobs]\n";
+	print "\t\t[-w outdir] [file | dir]...\n";
 	print "\n";
 	print "\t[-D depfile]\testablish dependencies from 'find_elf -r' file list\n";
 	print "\t[-d depdir]\testablish dependencies from under directory\n";
@@ -1097,6 +1216,7 @@ if ((getopts('D:d:E:e:f:I:imosvw:', \%opt) == 0) ||
 	print "\t[-f listfile]\tuse file list produced by find_elf -r\n";
 	print "\t[-I infofile]\tdirect informational output (-i, -v) to file\n";
 	print "\t[-i]\t\tproduce dynamic table entry information\n";
+	print "\t[-j jobs]\tprocess objects in parallel with this many jobs\n";
 	print "\t[-m]\t\tprocess mcs(1) comments\n";
 	print "\t[-o]\t\tproduce one-liner output (prefixed with pathname)\n";
 	print "\t[-s]\t\tprocess .stab and .symtab entries\n";
@@ -1106,6 +1226,13 @@ if ((getopts('D:d:E:e:f:I:imosvw:', \%opt) == 0) ||
 }
 
 die "$Prog: -D and -d options are mutually exclusive\n" if ($opt{D} && $opt{d});
+
+$Jobs = 1;
+if (defined($opt{j})) {
+	die "$Prog: -j requires a positive integer\n"
+	    if $opt{j} !~ /^\d+$/ || $opt{j} == 0;
+	$Jobs = $opt{j};
+}
 
 $Tmpdir = "/tmp" if (!($Tmpdir = $ENV{TMPDIR}) || (! -d $Tmpdir));
 
@@ -1140,7 +1267,7 @@ if ($opt{d}) {
 if ($opt{D} || $Proto) {
 	if (system('ldd -e /usr/lib/lddstub 2> /dev/null')) {
 		print "ldd: does not support -e, unable to ";
-		print "create alternative dependency mappingings.\n";
+		print "create alternative dependency mappings.\n";
 		print "ldd: option added under 4390308 (s81_30).\n\n";
 	} else {
 		# If -D was specified, it supplies a list of files in
@@ -1198,9 +1325,9 @@ if ($opt{I}) {
 }
 my ($err_dev, $err_ino) = stat($ErrFH);
 my ($info_dev, $info_ino) = stat($InfoFH);
+$SameOut = (($err_dev == $info_dev) && ($err_ino == $info_ino)) ? 1 : 0;
 $ErrTtl = \$OutCnt1;
-$InfoTtl = (($err_dev == $info_dev) && ($err_ino == $info_ino)) ?
-    \$OutCnt1 : \$OutCnt2;
+$InfoTtl = $SameOut ? \$OutCnt1 : \$OutCnt2;
 
 
 # If we were given a list of objects in 'find_elf -r' format, then
@@ -1214,9 +1341,17 @@ foreach my $Arg (@ARGV) {
 }
 
 # Cleanup output files
-unlink $Conf64 if $Conf64;
-unlink $Conf32 if $Conf32;
 close ERROR if $opt{E};
 close INFO if $opt{I};
+
+# Remove the crle(1) configuration files on any exit path, including
+# die(). Only the parent may do this - the children inherit this block,
+# and the configuration files are shared.
+END {
+	if (defined($ParentPid) && $$ == $ParentPid) {
+		unlink $Conf64 if $Conf64;
+		unlink $Conf32 if $Conf32;
+	}
+}
 
 exit 0;

@@ -1,4 +1,5 @@
 .\" Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
+.\" Copyright 2026 Oxide Computer Company
 .\"
 .\" CDDL HEADER START
 .\"
@@ -19,11 +20,12 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH INTERFACE_CHECK 1ONBLD "Mar 25, 2010"
+.TH INTERFACE_CHECK 1ONBLD "August 27, 2026"
 .SH NAME
 interface_check \- check shared object interfaces
 .SH SYNOPSIS
-\fBinterface_check [-hIo] [-c vertype_module] [-E errfile] [-e exfile] [-f listfile] [-i intffile] [-w outdir] file | dir, ...\fP
+\fBinterface_check [-hIo] [-c vertype_module] [-E errfile] [-e exfile]
+[-f listfile] [-i intffile] [-j jobs] [-w outdir] file | dir, ...\fP
 .SH DESCRIPTION
 The
 .I interface_check
@@ -49,7 +51,7 @@ can also be run standalone against any set of dynamic objects.
 .I interface_check
 uses \fBelfdump(1)\fP and \fBpvs(1)\fP to
 check file naming standardization, and versioning consistency. These
-check are carried out for the following reasons:
+checks are carried out for the following reasons:
 .TP 4
 \(bu
 A shared object should exist with a versioned filename.
@@ -118,7 +120,6 @@ detected by inspecting this database with
 .I interface_cmp.
 .sp
 .SH OPTIONS
-.LP
 The following options are supported:
 .TP 4
 .B \-c vertype_module
@@ -171,6 +172,11 @@ the objects analyzed. This file can be used with
 to audit versioning between gates, or prior to integration within
 a single gate. See INTERFACE DESCRIPTION FILE FORMAT.
 .TP 4
+.B \-j jobs
+Process objects in parallel, using up to \fIjobs\fP child processes.
+The output produced by a successful run is identical to that of a serial
+run.
+.TP 4
 .B \-o
 Produce one-liner output, with each line of diagnostic output
 prefixed with the object pathname.
@@ -180,7 +186,7 @@ Interpret the paths of all input and output files relative to \fIoutdir\fP.
 .SH EXCEPTION FILE FORMAT
 Exceptions to the rules enforced by
 .I interface_check
-are be specified using an exception file. The \fB-e\fP option is used to
+are specified using an exception file. The \fB-e\fP option is used to
 specify an explicit exception file. Otherwise, if used in an activated
 workspace, the default exception file is
 $CODEMGR_WS/exception_list/interface_check
@@ -357,14 +363,13 @@ to generate an interface database for a workspace:
 .RS
 .nf
 % mkdir $SRC/ELF-data.$MACH
-% interface_check -w $SRC/ELF-data.$MACH -E interface.err \ 
+% interface_check -w $SRC/ELF-data.$MACH -E interface.err \
         -i interface $ROOT
 % ls -1R $SRC/ELF
 interface
 interface.err
 .br
 .SH FILES
-.LP
 .RS 5
 $CODEMGR_WS/exception_list/interface_check
 /opt/onbld/etc/exception_list/interface_check
