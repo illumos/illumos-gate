@@ -531,17 +531,26 @@ get_key_material(libzfs_handle_t *hdl, boolean_t do_verify, boolean_t newkey,
 			goto error;
 		break;
 	case ZFS_KEYLOCATION_URI:
+		ret = ENOTSUP;
+
 		for (handler = uri_handlers; handler->zuh_scheme != NULL;
 		    handler++) {
 			if (strcmp(handler->zuh_scheme, scheme) != 0)
 				continue;
+
 			if ((ret = handler->zuh_handler(hdl, keylocation,
 			    fsname, keyformat, newkey, &km, &kmlen)) != 0)
 				goto error;
+
+			break;
 		}
-		ret = ENOTSUP;
-		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-		    "URI scheme is not supported"));
+
+		if (ret == ENOTSUP) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "URI scheme is not supported"));
+			goto error;
+		}
+
 		break;
 	default:
 		ret = EINVAL;

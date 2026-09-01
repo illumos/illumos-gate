@@ -728,6 +728,9 @@ file \
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zfs_create/zfs_create_crypt_combos \
     mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zfs_create/zfs_create_crypt_keyfile_error \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zfs_create/zfs_create_dryrun \
     mode=0555
 file \
