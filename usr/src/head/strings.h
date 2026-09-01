@@ -76,6 +76,11 @@ extern int strcasecmp_l(const char *, const char *, locale_t);
 extern int strncasecmp_l(const char *, const char *, size_t, locale_t);
 #endif	/* !_STRICT_POSIX || _XPG7 */
 
+#if !defined(_STRICT_POSIX) || defined(_XPG8)
+extern int ffsl(long);
+extern int ffsll(long long);
+#endif	/* !_STRICT_POSIX || _XPG8 */
+
 #ifdef	__cplusplus
 }
 #endif
