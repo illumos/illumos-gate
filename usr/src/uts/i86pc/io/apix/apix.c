@@ -26,6 +26,7 @@
  * Copyright (c) 2010, Intel Corporation.
  * All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -336,6 +337,8 @@ apix_get_intr_handler(int cpu, short vec)
 		return (0);
 
 	apix_vector = apixs[cpu]->x_vectbl[vec];
+	if (apix_vector == NULL)
+		return (0);
 
 	return ((uintptr_t)(apix_vector->v_autovect));
 }
