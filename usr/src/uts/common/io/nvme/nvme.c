@@ -3446,7 +3446,7 @@ nvme_get_logpage_int(nvme_t *nvme, boolean_t user, void **buf, size_t *bufsize,
 }
 
 static boolean_t
-nvme_identify(nvme_t *nvme, boolean_t user, nvme_ioctl_identify_t *ioc,
+nvme_identify(nvme_t *nvme, boolean_t dontpanic, nvme_ioctl_identify_t *ioc,
     void **buf)
 {
 	nvme_cmd_t *cmd = nvme_alloc_admin_cmd(nvme, KM_SLEEP);
@@ -3493,7 +3493,7 @@ nvme_identify(nvme_t *nvme, boolean_t user, nvme_ioctl_identify_t *ioc,
 		    cmd->nc_dma->nd_cookie.dmac_laddress;
 	}
 
-	if (user)
+	if (dontpanic)
 		cmd->nc_flags |= NVME_CMD_F_DONTPANIC;
 
 	nvme_admin_cmd(cmd, nvme_admin_cmd_timeout);
@@ -4485,6 +4485,7 @@ nvme_enable_host_behavior(nvme_t *nvme)
 static int
 nvme_init(nvme_t *nvme)
 {
+	nvme_ioctl_identify_t id = { 0 };
 	nvme_reg_cc_t cc = { 0 };
 	nvme_reg_aqa_t aqa = { 0 };
 	nvme_reg_asq_t asq = { 0 };
@@ -4808,11 +4809,29 @@ nvme_init(nvme_t *nvme)
 		nsid = 1;
 	}
 
-	if (!nvme_identify_int(nvme, nsid, NVME_IDENTIFY_NSID,
-	    (void **)&nvme->n_idcomns)) {
-		dev_err(nvme->n_dip, CE_WARN, "!failed to identify common "
-		    "namespace information");
-		goto fail;
+	/*
+	 * Some controllers may advertise namespace management support but still
+	 * reject an Identify Namespace command with the broadcast nsid.  Rather
+	 * than panic or fail we'll try to fall back to the data for nsid 1.
+	 */
+	id.nid_common.nioc_nsid = nsid;
+	id.nid_cns = NVME_IDENTIFY_NSID;
+	if (!nvme_identify(nvme, B_TRUE, &id, (void **)&nvme->n_idcomns)) {
+		if (nsid != NVME_NSID_BCAST) {
+			dev_err(nvme->n_dip, CE_WARN, "!failed to identify "
+			    "common namespace information");
+			goto fail;
+		}
+
+		dev_err(nvme->n_dip, CE_NOTE, "!failed to identify common with "
+		    "broadcast nsid, falling back to nsid 1");
+
+		if (!nvme_identify_int(nvme, 1, NVME_IDENTIFY_NSID,
+		    (void **)&nvme->n_idcomns)) {
+			dev_err(nvme->n_dip, CE_WARN, "!failed to identify "
+			    "common namespace information");
+			goto fail;
+		}
 	}
 
 	if (nvme_get_current_nqueues(nvme, &nq)) {
