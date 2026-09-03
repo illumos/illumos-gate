@@ -27,6 +27,7 @@
 /*
  * Copyright (c) 2011 by Delphix. All rights reserved.
  * Copyright 2026 Oxide Computer Company
+ * Copyright 2026 RackTop Systems, Inc.
  */
 
 #include "lint.h"
@@ -586,8 +587,13 @@ posix_spawn_file_actions_addfchdir_np(
 int
 posix_spawnattr_init(posix_spawnattr_t *attr)
 {
-	if ((attr->__spawn_attrp = lmalloc(sizeof (posix_spawnattr_t))) == NULL)
+	spawn_attr_t *sap;
+
+	if ((sap = lmalloc(sizeof (*sap))) == NULL)
 		return (ENOMEM);
+
+	attr->__spawn_attrp = sap;
+
 	/*
 	 * Add default stuff here?
 	 */
