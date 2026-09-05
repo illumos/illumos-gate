@@ -484,7 +484,10 @@ void	error(format, args)
 
 void usage()
 {
-	fprintf(stderr, "usage: dos2unix [ -ascii ] [ -iso ] [ -7 ] [ originalfile [ convertedfile ] ]\n");
+	fprintf(stderr,
+	    "usage: dos2unix [ -ascii ] [ -iso ] [ -7 ]\n"
+	    "\t[ -437 | -850 | -860 | -863 | -865 ] [ originalfile "
+	    "[ convertedfile ] ]\n");
 	exit(1);
 }
 
