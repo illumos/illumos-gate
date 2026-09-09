@@ -1,367 +1,355 @@
-'\" te
-.\" Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
-.\"  Copyright (C) 2008 Sun Microsystems, Inc. All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH USER_ATTR 5 "Oct 1, 2020"
-.SH NAME
-user_attr \- extended user attributes database
-.SH SYNOPSIS
-.nf
-\fB/etc/user_attr\fR
-.fi
-
-.SH DESCRIPTION
-\fB/etc/user_attr\fR is a local source of extended attributes associated with
-users and roles. \fBuser_attr\fR can be used with other user attribute sources,
-including the LDAP people container and the \fBuser_attr\fR \fBNIS\fR map.
-Programs use the \fBgetuserattr\fR(3SECDB)
+.\" The contents of this file are subject to the terms of the Common
+.\" Development and Distribution License (the "License").  You may not use
+.\" this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or
+.\" http://www.opensolaris.org/os/licensing.  See the License for the
+.\" specific language governing permissions and limitations under the
+.\" License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each file
+.\" and include the License file at usr/src/OPENSOLARIS.LICENSE.  If
+.\" applicable, add the following below this CDDL HEADER, with the fields
+.\" enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
+.\" Copyright (C) 2008 Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd August 8, 2026
+.Dt USER_ATTR 5
+.Os
+.Sh NAME
+.Nm user_attr
+.Nd extended user attributes database
+.Sh SYNOPSIS
+.Nm /etc/user_attr
+.Sh DESCRIPTION
+.Nm
+is a local source of extended attributes associated with users and roles.
+.Nm
+can be used with other user attribute sources, including the LDAP people
+container and the
+.Nm
+NIS map.
+Programs use the
+.Xr getuserattr 3SECDB
 routines to gain access to this information.
-.sp
-.LP
-The search order for multiple \fBuser_attr\fR sources is specified in the
-\fB/etc/nsswitch.conf\fR file, as described in the \fBnsswitch.conf\fR(5) man
-page. The search order follows that for \fBpasswd\fR(5).
-.sp
-.LP
-Each entry in the \fBuser_attr\fR databases consists of a single line with five
-fields separated by colons (\fB:\fR). Line continuations using the backslash
-(\fB\e\fR) character are permitted. Each entry has the form:
-.sp
-.in +2
-.nf
-\fIuser\fR:\fIqualifier\fR:\fIres1\fR:\fIres2\fR:\fIattr\fR
-.fi
-.in -2
-
-.sp
-.ne 2
-.na
-\fB\fIuser\fR\fR
-.ad
-.sp .6
-.RS 4n
-The name of the user as specified in the \fBpasswd\fR(5) database.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIqualifier\fR\fR
-.ad
-.sp .6
-.RS 4n
+.Pp
+The search order for multiple
+.Nm
+sources is specified via
+.Xr nsswitch.conf 5 .
+The search order follows that for
+.Xr passwd 5 .
+.Pp
+Each entry in the
+.Nm
+database consists of a single line with five fields separated by colons
+.Pq \&: .
+Line continuations using the backslash
+.Pq \e
+character are permitted.
+Each entry has the form:
+.Pp
+.Sm off
+.D1 Ar user : qualifier : res1 : res2 : attr
+.Sm on
+.Bl -tag -width qualifier
+.It Ar user
+The name of the user as specified in the
+.Xr passwd 5
+database.
+.It Ar qualifier
 Reserved for future use.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIres1\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Ar res1
 Reserved for future use.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIres2\fR\fR
-.ad
-.sp .6
-.RS 4n
+.It Ar res2
 Reserved for future use.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fIattr\fR\fR
-.ad
-.sp .6
-.RS 4n
-An optional list of semicolon-separated (\fB;\fR) key-value pairs that describe
-the security attributes to apply to the object upon execution. Zero or more
-keys may be specified. The following keys are currently interpreted by the
-system:
-.sp
-.ne 2
-.na
-\fBauths\fR
-.ad
-.sp .6
-.RS 4n
+.It Ar attr
+An optional list of semicolon-separated
+.Pq \&;
+key-value pairs that describe the security attributes to apply to the object
+upon execution.
+Zero or more keys may be specified.
+The following keys are currently interpreted by the system:
+.Bl -tag -width Ds
+.It Sy auths
 Specifies a comma-separated list of authorization names chosen from those names
-defined in the \fBauth_attr\fR(5) database. Authorization names may be
-specified using the asterisk (\fB*\fR) character as a wildcard. For example,
-\fBsolaris.printer.*\fR means all of Sun's printer authorizations.
-.RE
-
-.sp
-.ne 2
-.na
-\fBprofiles\fR
-.ad
-.sp .6
-.RS 4n
+defined in the
+.Xr auth_attr 5
+database.
+Authorization names may be specified using the asterisk
+.Pq \&*
+character as a wildcard.
+For example,
+.Sq solaris.printer.*
+means all printer authorizations.
+.It Sy profiles
 Contains an ordered, comma-separated list of profile names chosen from
-\fBprof_attr\fR(5). Profiles are enforced by the profile shells, \fBpfcsh\fR,
-\fBpfksh\fR, and \fBpfsh\fR. See \fBpfsh\fR(1). A default profile is assigned
-in \fB/etc/security/policy.conf\fR (see \fBpolicy.conf\fR(5)). If no profiles
-are assigned, the profile shells do not allow the user to execute any commands.
-.RE
-
-.sp
-.ne 2
-.na
-\fBroleauth\fR
-.ad
-.sp .6
-.RS 4n
+.Xr prof_attr 5 .
+Any exec attributes applied by one of these profiles is automatically applied
+via
+.Xr exec 2
+if the
+.Dv PRIV_PFEXEC
+process flag is set.
+See
+.Xr pfexec 1 .
+The profile shells such as
+.Xr pfksh 1
+and
+.Xr pfcsh 1
+have this flag set by default.
+A default profile is assigned in
+.Xr policy.conf 5 .
+If no profiles are assigned, the profile shells do not allow the user to
+execute any commands.
+.It Sy roleauth
 Specifies whether a user assuming a role is required to use the role password
 or their own password.
-If the \fBroleauth\fR key value is not specified, the role password is required
-for users assuming the role.
-.RE
-
-.sp
-.ne 2
-.na
-\fBroles\fR
-.ad
-.sp .6
-.RS 4n
+If the
+.Sy roleauth
+key value is not specified, the role password is required for users assuming
+the role.
+.It Sy roles
 Can be assigned a comma-separated list of role names from the set of user
-accounts in this database whose \fBtype\fR field indicates the account is a
-role. If the \fBroles\fR key value is not specified, the user is not permitted
-to assume any role.
-.RE
-
-.sp
-.ne 2
-.na
-\fBtype\fR
-.ad
-.sp .6
-.RS 4n
-Can be assigned one of these strings: \fBnormal\fR, indicating that this
-account is for a normal user, one who logs in; or \fBrole\fR, indicating that
-this account is for a role. Roles can only be assumed by a normal user after
-the user has logged in.
-.RE
-
-.sp
-.ne 2
-.na
-\fBproject\fR
-.ad
-.sp .6
-.RS 4n
-Can be assigned a name of one project from the \fBproject\fR(5) database to be
-used as a default project to place the user in at login time. For more
-information, see \fBgetdefaultproj\fR(3PROJECT).
-.RE
-
-.sp
-.ne 2
-.na
-\fBdefaultpriv\fR
-.ad
-.sp .6
-.RS 4n
+accounts in this database whose
+.Sy type
+field indicates the account is a role.
+If the
+.Sy roles
+key value is not specified, the user is not permitted to assume any role.
+.It Sy type
+Can be assigned one of these strings:
+.Sy normal ,
+indicating that this account is for a normal user, one who logs in; or
+.Sy role ,
+indicating that this account is for a role.
+Roles can only be assumed by a normal user after the user has logged in.
+.It Sy project
+Can be assigned a name of one project from the
+.Xr project 5
+database to be used as a default project to place the user in at login time.
+For more information, see
+.Xr getdefaultproj 3PROJECT .
+.It Sy defaultpriv
 The default set of privileges assigned to a user's inheritable set upon login.
-See "Privileges Keywords," below.
-.RE
-
-.sp
-.ne 2
-.na
-\fBlimitpriv\fR
-.ad
-.sp .6
-.RS 4n
+See
+.Sx Privileges Keywords ,
+below.
+.It Sy limitpriv
 The maximum set of privileges a user or any process started by the user,
-whether through \fBsu\fR(8) or any other means, can obtain. The system
-administrator must take extreme care when removing privileges from the limit
-set. Removing any basic privilege has the ability of crippling all
-applications; removing any other privilege can cause many or all applications
-requiring privileges to malfunction. See "Privileges Keywords," below.
-.RE
-
-.sp
-.ne 2
-.na
-\fBlock_after_retries\fR
-.ad
-.sp .6
-.RS 4n
+whether through
+.Xr su 8
+or any other means, can obtain.
+The system administrator must take extreme care when removing privileges from
+the limit set.
+Removing any basic privilege has the ability of crippling all applications;
+removing any other privilege can cause many or all applications requiring
+privileges to malfunction.
+See
+.Sx Privileges Keywords ,
+below.
+.It Sy lock_after_retries
 Specifies whether an account is locked after the count of failed logins for a
 user equals or exceeds the allowed number of retries as defined by
-\fBRETRIES\fR in \fB/etc/default/login\fR. Possible values are \fByes\fR or
-\fBno\fR. The default is \fBno\fR. Account locking is applicable only to local
-accounts.
-.RE
-
+.Sy RETRIES
+in
+.Pa /etc/default/login .
+Possible values are
+.Sy yes
+or
+.Sy no .
+The default is
+.Sy no .
+Account locking is applicable only to local accounts.
+.El
+.Pp
 The following keys are available only if the system is configured with the
 Trusted Extensions feature:
-.sp
-.ne 2
-.na
-\fBclearance\fR
-.ad
-.sp .6
-.RS 4n
-Contains the maximum label at which the user can operate. If unspecified, in
-the Defense Intelligence Agency (\fBDIA\fR) encodings scheme, the default is
-specified in \fBlabel_encodings\fR(5) (see \fBlabel_encodings\fR(5) and
-\fBlabels\fR(7) in the \fISolaris Trusted Extensions Reference Manual\fR).
-.RE
-
-.sp
-.ne 2
-.na
-\fBmin_label\fR
-.ad
-.sp .6
-.RS 4n
-Contains the minimum label at which the user can log in. If unspecified, in the
-\fBDIA\fR encodings scheme, the default is specified in
-\fBlabel_encodings\fR(5) (see \fBlabel_encodings\fR(5) and \fBlabels\fR(7) in
-the \fISolaris Trusted Extensions Reference Manual\fR).
-.RE
-
-.RE
-
-.sp
-.LP
-Except for the \fBtype\fR key, the \fB\fIkey\fR=\fIvalue\fR\fR fields in
-\fB/etc/user_attr\fR can be added using \fBroleadd\fR(8) and
-\fBuseradd\fR(8). You can use \fBrolemod\fR(8) and \fBusermod\fR(8) to
-modify \fB\fIkey\fR=\fIvalue\fR\fR fields in \fB/etc/user_attr\fR. Modification
-of the \fBtype\fR key is restricted as described in \fBrolemod\fR and
-\fBusermod\fR.
-.SS "Privileges Keywords"
-The \fBdefaultpriv\fR and \fBlimitpriv\fR are the privileges-related keywords
-and are described above.
-.sp
-.LP
-See \fBprivileges\fR(7) for a description of privileges. The command
-\fBppriv\fR \fB-l\fR (see \fBppriv\fR(1)) produces a list of all supported
-privileges. Note that you specify privileges as they are displayed by
-\fBppriv\fR. In \fBprivileges\fR(7), privileges are listed in the form
-\fBPRIV_\fR\fI<privilege_name>\fR\&. For example, the privilege
-\fBfile_chown\fR, as you would specify it in \fBuser_attr\fR, is listed in
-\fBprivileges\fR(7) as \fBPRIV_FILE_CHOWN\fR.
-.sp
-.LP
-See \fBusermod\fR(8) for examples of commands that
-modify privileges and their subsequent effect on \fBuser_attr\fR.
-.SH EXAMPLES
-\fBExample 1 \fRAssigning a Profile to Root
-.sp
-.LP
-The following example entry assigns to root the \fBAll\fR profile, which allows
-root to use all commands in the system, and also assigns two authorizations:
-
-.sp
-.in +2
-.nf
-root::::auths=solaris.*,solaris.grant;profiles=All;type=normal
-.fi
-.in -2
-
-.sp
-.LP
-The \fBsolaris.*\fR wildcard authorization shown above gives root all the
-\fBsolaris\fR authorizations; and the \fBsolaris.grant\fR authorization gives
-root the right to grant to others any \fBsolaris\fR authorizations that root
-has. The combination of authorizations enables root to grant to others all the
-\fBsolaris\fR authorizations. See \fBauth_attr\fR(5) for more about
-authorizations.
-
-.SH FILES
-.ne 2
-.na
-\fB/etc/nsswitch.conf\fR
-.ad
-.sp .6
-.RS 4n
-See \fBnsswitch.conf\fR(5).
-.RE
-
-.sp
-.ne 2
-.na
-\fB/etc/user_attr\fR
-.ad
-.sp .6
-.RS 4n
+.Bl -tag -width Ds
+.It Sy clearance
+Contains the maximum label at which the user can operate.
+If unspecified, in the Defense Intelligence Agency
+.Pq DIA
+encodings scheme, the default is specified in
+.Xr label_encodings 5
+.Po
+see
+.Xr label_encodings 5
+and
+.Xr labels 7
+in the
+.%T Solaris Trusted Extensions Reference Manual
+.Pc .
+.It Sy min_label
+Contains the minimum label at which the user can log in.
+If unspecified, in the DIA encodings scheme, the default is specified in
+.Xr label_encodings 5
+.Po
+see
+.Xr label_encodings 5
+and
+.Xr labels 7
+in the
+.%T Solaris Trusted Extensions Reference Manual
+.Pc .
+.El
+.El
+.Pp
+Except for the
+.Sy type
+key, the
+.Ar key Ns = Ns Ar value
+fields in
+.Pa /etc/user_attr
+can be added using
+.Xr roleadd 8
+and
+.Xr useradd 8 .
+You can use
+.Xr rolemod 8
+and
+.Xr usermod 8
+to modify
+.Ar key Ns = Ns Ar value
+fields in
+.Pa /etc/user_attr .
+Modification of the
+.Sy type
+key is restricted as described in
+.Xr rolemod 8
+and
+.Xr usermod 8 .
+.Ss Privileges Keywords
+The
+.Sy defaultpriv
+and
+.Sy limitpriv
+are the privileges-related keywords and are described above.
+.Pp
+See
+.Xr privileges 7
+for a description of privileges.
+The command
+.Sy ppriv Fl l
+.Po
+see
+.Xr ppriv 1
+.Pc
+produces a list of all supported privileges.
+Note that you specify privileges as they are displayed by
+.Sy ppriv .
+In
+.Xr privileges 7 ,
+privileges are listed in the form
+.Dv PRIV_ Ns Aq Ar privilege_name .
+For example, the privilege
+.Sy file_chown ,
+as you would specify it in
+.Nm ,
+is listed in
+.Xr privileges 7
+as
+.Dv PRIV_FILE_CHOWN .
+.Pp
+See
+.Xr usermod 8
+for examples of commands that modify privileges and their subsequent effect on
+.Nm .
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa /etc/nsswitch.conf
+See
+.Xr nsswitch.conf 5 .
+.It Pa /etc/user_attr
 Described here.
-.RE
-
-.SH ATTRIBUTES
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Availibility	SUNWcsr
-_
-Interface Stability	See below
-.TE
-
-.sp
-.LP
-The command-line syntax is Committed. The output is Uncommitted.
-.SH SEE ALSO
-.BR auths (1),
-.BR pfcsh (1),
-.BR pfksh (1),
-.BR pfsh (1),
-.BR ppriv (1),
-.BR profiles (1),
-.BR roles (1),
-.BR getdefaultproj (3PROJECT),
-.BR getuserattr (3SECDB),
-.BR auth_attr (5),
-.BR exec_attr (5),
-.BR nsswitch.conf (5),
-.BR passwd (5),
-.BR policy.conf (5),
-.BR prof_attr (5),
-.BR project (5),
-.BR attributes (7),
-.BR privileges (7),
-.BR roleadd (8),
-.BR rolemod (8),
-.BR useradd (8),
-.BR usermod (8)
-.sp
-.LP
-\fISystem Administration Guide: Security Services\fR
-.SH NOTES
+.El
+.Sh EXAMPLES
+.Sy Example 1 No Assigning a Profile to Root
+.Pp
+The following example entry assigns to root the
+.Sy All
+profile, which allows root to use all commands in the system, and also assigns
+two authorizations:
+.Bd -literal -offset 4n
+root::::auths=solaris.*,solaris.grant;profiles=All;type=normal
+.Ed
+.Pp
+The
+.Sy solaris.*
+wildcard authorization shown above gives root all the solaris authorizations;
+and the
+.Sy solaris.grant
+authorization gives root the right to grant to others any solaris
+authorizations that root has.
+The combination of authorizations enables root to grant to others all the
+solaris authorizations.
+See
+.Xr auth_attr 5
+for more about authorizations.
+.Sh INTERFACE STABILITY
+The interfaces of the command line utilities are
+.Sy Committed .
+The output of those utilities is
+.Sy Not-An-Interface
+and may change at any time.
+.Sh SEE ALSO
+.Xr auths 1 ,
+.Xr pfcsh 1 ,
+.Xr pfksh 1 ,
+.Xr pfsh 1 ,
+.Xr ppriv 1 ,
+.Xr profiles 1 ,
+.Xr roles 1 ,
+.Xr getdefaultproj 3PROJECT ,
+.Xr getuserattr 3SECDB ,
+.Xr auth_attr 5 ,
+.Xr exec_attr 5 ,
+.Xr nsswitch.conf 5 ,
+.Xr passwd 5 ,
+.Xr policy.conf 5 ,
+.Xr prof_attr 5 ,
+.Xr project 5 ,
+.Xr attributes 7 ,
+.Xr privileges 7 ,
+.Xr roleadd 8 ,
+.Xr rolemod 8 ,
+.Xr useradd 8 ,
+.Xr usermod 8
+.Rs
+.%B System Administration Guide: Security Services
+.Re
+.Sh NOTES
 The root user is usually defined in local databases for a number of reasons,
 including the fact that root needs to be able to log in and do system
 maintenance in single-user mode, before the network name service databases are
-available. For this reason, an entry should exist for root in the local
-\fBuser_attr\fR file, and the precedence shown in the example
-\fBnsswitch.conf\fR(5) file entry under EXAMPLES is highly recommended.
-.sp
-.LP
+available.
+For this reason, an entry should exist for root in the local
+.Nm
+file, and the local files source should be listed first for
+.Nm
+in
+.Xr nsswitch.conf 5 .
+.Pp
 Because the list of legal keys is likely to expand, any code that parses this
-database must be written to ignore unknown key-value pairs without error. When
-any new keywords are created, the names should be prefixed with a unique
+database must be written to ignore unknown key-value pairs without error.
+When any new keywords are created, the names should be prefixed with a unique
 string, such as the company's stock symbol, to avoid potential naming
 conflicts.
-.sp
-.LP
-In the \fBattr\fR field, escape the following symbols with a backslash
-(\fB\e\fR) if you use them in any value: colon (\fB:\fR), semicolon (\fB;\fR),
-carriage return (\fB\en\fR), equals (\fB=\fR), or backslash (\fB\e\fR).
+.Pp
+In the
+.Ar attr
+field, escape the following symbols with a backslash
+.Pq \e
+if you use them in any value: colon
+.Pq \&: ,
+semicolon
+.Pq \&; ,
+newline
+.Pq \en ,
+equals
+.Pq \&= ,
+or backslash
+.Pq \e .
