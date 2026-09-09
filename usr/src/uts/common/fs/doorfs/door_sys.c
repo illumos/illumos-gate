@@ -23,6 +23,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -3107,6 +3108,7 @@ door_upcall(vnode_t *vp, door_arg_t *param, struct cred *cred,
 	door_client_t	*ct;		/* curthread door_data */
 	door_server_t	*st;		/* server thread door_data */
 	int		gotresults = 0;
+	int		needcleanup = 0;
 	int		cancel_pending;
 
 	if (vp->v_type != VDOOR) {
@@ -3207,6 +3209,7 @@ door_upcall(vnode_t *vp, door_arg_t *param, struct cred *cred,
 	dp->door_active++;
 
 	ct->d_error = DOOR_WAIT;
+	ct->d_args_done = 0;
 	st->d_caller = curthread;
 	st->d_active = dp;
 
@@ -3289,11 +3292,21 @@ shuttle_return:
 			cv_wait(&ct->d_cv, &door_knob);
 
 		/*
+		 * If the server has not processed our message, free the
+		 * descriptors.
+		 */
+		if (!ct->d_args_done) {
+			needcleanup = 1;
+			ct->d_args_done = 1;
+		}
+
+		/*
 		 * Find out if results were successfully copied.
 		 */
 		if (ct->d_error == 0)
 			gotresults = 1;
 	}
+	ASSERT(ct->d_args_done);
 	if (lwp) {
 		lwp->lwp_asleep = 0;		/* /proc */
 		lwp->lwp_sysabort = 0;		/* /proc */
@@ -3301,6 +3314,9 @@ shuttle_return:
 	if (--dp->door_active == 0 && (dp->door_flags & DOOR_DELAY))
 		door_deliver_unref(dp);
 	mutex_exit(&door_knob);
+
+	if (needcleanup)
+		door_fp_close(ct->d_fpp, ct->d_args.desc_num);
 
 	/*
 	 * Translate returned doors (if any)
