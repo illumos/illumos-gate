@@ -21,7 +21,7 @@
 
 /*
  * Copyright (c) 2001, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2017 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  * Copyright 2014 Nexenta Systems, Inc.  All rights reserved.
  */
 
@@ -320,28 +320,25 @@ adt_get_unique_id(au_id_t uid)
  */
 
 /*
- * adt_cpy_tid() -- if lib is 64 bit, just copy it (dev_t and port are
- * both 64 bits).  If lib is 32 bits, squeeze the two-int port into
- * a 32 bit dev_t.  A port fits in the "minor" part of au_port_t,
- * so it isn't broken up into pieces.  (When it goes to the kernel
- * and back, however, it will have been split into major/minor
- * pieces.)
+ * adt_cpy_tid() -- the kernel and ucred supply the port as separate
+ * 32 bit major and minor numbers.  Rebuild a dev_t from them using the
+ * major/minor layout of this data model, 32 and 32 bits for a 64 bit
+ * process or 14 and 18 bits for a 32 bit one.  A port fits in the
+ * "minor" part of au_port_t, so it isn't broken up into pieces.  (When
+ * it goes to the kernel and back, however, it will have been split into
+ * major/minor pieces.)
  */
 
 static void
 adt_cpy_tid(au_tid_addr_t *dest, const au_tid64_addr_t *src)
 {
-#ifdef _LP64
-	(void) memcpy(dest, src, sizeof (au_tid_addr_t));
-#else	/* _LP64 */
 	dest->at_type = src->at_type;
 
-	dest->at_port  = src->at_port.at_minor & MAXMIN32;
-	dest->at_port |= (src->at_port.at_major & MAXMAJ32) <<
-	    NBITSMINOR32;
+	dest->at_port  = src->at_port.at_minor & MAXMIN;
+	dest->at_port |= ((dev_t)src->at_port.at_major & MAXMAJ) <<
+	    NBITSMINOR;
 
 	(void) memcpy(dest->at_addr, src->at_addr, 4 * sizeof (uint32_t));
-#endif	/* _LP64 */
 }
 
 /*
