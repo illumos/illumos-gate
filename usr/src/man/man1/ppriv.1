@@ -26,12 +26,14 @@
 .Fl e
 .Op Fl D | N
 .Op Fl M
+.Op Fl f Bro +- Brc Ns Brq DMPX
 .Op Fl s Ar spec
 .Ar command
 .Op Ar arg Ns ...
 .Nm
 .Op Fl vS
 .Op Fl D | N
+.Op Fl f Bro +- Brc Ns Brq DMPX
 .Op Fl s Ar spec
 .Brq pid | core
 .No ...
@@ -57,9 +59,34 @@ The following options are supported:
 .Bl -tag -width Ds
 .It Fl D
 Turns on privilege debugging for the processes or command supplied.
+Equivalent to
+.Fl f Cm +D .
 .It Fl e
 Interprets the remainder of the arguments as a command line and runs the
 command line with specified privilege attributes and sets.
+.It Fl f Bro +- Brc Ns Brq DMPX
+Set or unset process flags.
+With
+.Cm \&+
+the listed flags are set, and with
+.Cm \&-
+the flags are unset.
+Available flags are:
+.Bl -tag -width 4n -offset 4n
+.It Cm D
+.Dv PRIV_DEBUG
+.It Cm M
+.Dv NET_MAC_AWARE ,
+.Dv NET_MAC_AWARE_INHERIT
+.It Cm P
+.Dv PRIV_PFEXEC
+.It Cm X
+.Dv PRIV_XPOLICY
+.El
+.Pp
+See
+.Xr setpflags 2
+for more information on these flags.
 .It Fl l
 Lists all currently defined privileges on
 .Dv stdout .
@@ -69,12 +96,19 @@ When a system is configured with Trusted Extensions, this option turns on the
 and
 .Sy NET_MAC_AWARE_INHERIT
 process attributes.
+Equivalent to
+.Fl f Cm +M .
 .Pp
 A process with these attributes and the
 .Sy net_mac_aware
 privilege can communicate with lower-level remote peers.
 .It Fl N
 Turns off privilege debugging for the processes or command supplied.
+Equivalent to
+.Fl f Cm -D .
+.It Fl P
+Equivalent to
+.Fl f Cm +P .
 .It Fl s Ar spec
 Modifies a process's privilege sets according to
 .Ar spec ,
@@ -123,6 +157,9 @@ See
 .It Fl v
 Verbose.
 Reports privilege sets using privilege names.
+.It Fl x
+Equivalent to
+.Fl f Cm +X .
 .El
 .Sh USAGE
 The

@@ -24,6 +24,7 @@
 /*
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2015, Joyent, Inc.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 /*
  * Program to examine or set process privileges.
@@ -41,6 +42,7 @@
 #include <priv.h>
 #include <errno.h>
 #include <ctype.h>
+#include <sys/sysmacros.h>
 
 #include <locale.h>
 #include <langinfo.h>
@@ -50,6 +52,7 @@ static void	perr(char *);
 static void	usage(void);
 static void	loadprivinfo(void);
 static int	parsespec(const char *);
+static int	parseflags(const char *);
 static void	privupdate(prpriv_t *, const char *);
 static void	privupdate_self(void);
 static int	dumppriv(char **);
@@ -60,13 +63,25 @@ static char		*procname;
 static boolean_t	verb = B_FALSE;
 static boolean_t	set = B_FALSE;
 static boolean_t	exec = B_FALSE;
-static boolean_t	Don = B_FALSE;
-static boolean_t	Doff = B_FALSE;
 static boolean_t	list = B_FALSE;
-static boolean_t	mac_aware = B_FALSE;
-static boolean_t	pfexec = B_FALSE;
-static boolean_t	xpol = B_FALSE;
 static int		mode = PRIV_STR_PORT;
+static uint_t		setflags;
+static uint_t		clearflags;
+
+static struct {
+	int flag;
+	char opt;
+	char *name;
+} flags[] = {
+	{ PRIV_DEBUG,			'D',	"PRIV_DEBUG" },
+	{ PRIV_AWARE,			'\0',	"PRIV_AWARE" },
+	{ PRIV_AWARE_INHERIT,		'\0',	"PRIV_AWARE_INHERIT" },
+	{ PRIV_AWARE_RESET,		'\0',	"PRIV_AWARE_RESET" },
+	{ PRIV_XPOLICY,			'X',	"PRIV_XPOLICY" },
+	{ PRIV_PFEXEC,			'P',	"PRIV_PFEXEC" },
+	{ NET_MAC_AWARE,		'M',	"NET_MAC_AWARE" },
+	{ NET_MAC_AWARE_INHERIT,	'M',	"NET_MAC_AWARE_INHERIT" },
+};
 
 int
 main(int argc, char **argv)
@@ -74,6 +89,7 @@ main(int argc, char **argv)
 	int rc = 0;
 	int opt;
 	struct rlimit rlim;
+	boolean_t mac_aware = B_FALSE;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -83,25 +99,36 @@ main(int argc, char **argv)
 	else
 		command = argv[0];
 
-	while ((opt = getopt(argc, argv, "lDMNPevs:xS")) != EOF) {
+	while ((opt = getopt(argc, argv, "f:lDMNPevs:xS")) != EOF) {
 		switch (opt) {
+		case 'f':
+			set = B_TRUE;
+			if ((rc = parseflags(optarg)) != 0)
+				return (rc);
+			break;
 		case 'l':
 			list = B_TRUE;
 			break;
 		case 'D':
 			set = B_TRUE;
-			Don = B_TRUE;
+			setflags |= PRIV_DEBUG;
+			clearflags &= ~PRIV_DEBUG;
 			break;
 		case 'M':
+			set = B_TRUE;
 			mac_aware = B_TRUE;
+			setflags |= NET_MAC_AWARE | NET_MAC_AWARE_INHERIT;
+			clearflags &= ~(NET_MAC_AWARE | NET_MAC_AWARE_INHERIT);
 			break;
 		case 'N':
 			set = B_TRUE;
-			Doff = B_TRUE;
+			clearflags |= PRIV_DEBUG;
+			setflags &= ~PRIV_DEBUG;
 			break;
 		case 'P':
 			set = B_TRUE;
-			pfexec = B_TRUE;
+			setflags |= PRIV_PFEXEC;
+			clearflags &= ~PRIV_PFEXEC;
 			break;
 		case 'e':
 			exec = B_TRUE;
@@ -120,20 +147,21 @@ main(int argc, char **argv)
 			break;
 		case 'x':
 			set = B_TRUE;
-			xpol = B_TRUE;
+			setflags |= PRIV_XPOLICY;
+			clearflags &= ~PRIV_XPOLICY;
 			break;
 		default:
 			usage();
-			/*NOTREACHED*/
 		}
 	}
 
 	argc -= optind;
 	argv += optind;
 
-	if ((argc < 1 && !list) || Doff && Don || list && (set || exec) ||
-	    (mac_aware && !exec))
+	if ((argc < 1 && !list) || (list && (set || exec)) ||
+	    (mac_aware && !exec)) {
 		usage();
+	}
 
 	/*
 	 * Make sure we'll have enough file descriptors to handle a target
@@ -318,13 +346,13 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "usage:\t%s [-v] [-S] [-D|-N] [-s spec] { pid | core } ...\n"
-	    "\t%s -e [-D|-N] [-M] [-s spec] cmd [args ...]\n"
+	    "usage:\t%s [-vS] [-D|-N] [-f {+-}{DMPX}] [-s spec] "
+	    "{ pid | core } ...\n"
+	    "\t%s -e [-D|-N] [-M] [-f {+-}{DMPX}] [-s spec] cmd [args ...]\n"
 	    "\t%s -l [-v] [privilege ...]\n"
 	    "  (report, set or list process privileges)\n", command,
 	    command, command);
 	exit(2);
-	/*NOTREACHED*/
 }
 
 /*
@@ -356,7 +384,6 @@ badspec(const char *spec)
 	(void) fprintf(stderr, "%s: bad privilege specification: \"%s\"\n",
 	    command, spec);
 	exit(3);
-	/*NOTREACHED*/
 }
 
 /*
@@ -489,18 +516,16 @@ privupdate(prpriv_t *pr, const char *arg)
 		}
 	}
 
-	if (Doff || Don || pfexec || xpol) {
+	if (setflags != 0 || clearflags != 0) {
 		priv_info_uint_t *pii;
 		int sz = PRIV_PRPRIV_SIZE(pr);
 		char *x = (char *)pr + PRIV_PRPRIV_INFO_OFFSET(pr);
 		uint32_t fl = 0;
 
 		while (x < (char *)pr + sz) {
-			/* LINTED: alignment */
 			priv_info_t *pi = (priv_info_t *)x;
 
 			if (pi->priv_info_type == PRIV_INFO_FLAGS) {
-				/* LINTED: alignment */
 				pii = (priv_info_uint_t *)x;
 				fl = pii->val;
 				goto done;
@@ -518,18 +543,15 @@ privupdate(prpriv_t *pr, const char *arg)
 done:
 
 		pr->pr_infosize = sizeof (priv_info_uint_t);
-		/* LINTED: alignment */
 		pii = (priv_info_uint_t *)
 		    ((char *)pr + PRIV_PRPRIV_INFO_OFFSET(pr));
 
-		if (Don)
-			fl |= PRIV_DEBUG;
-		if (Doff)
-			fl &= ~PRIV_DEBUG;
-		if (pfexec)
-			fl |= PRIV_PFEXEC;
-		if (xpol)
-			fl |= PRIV_XPOLICY;
+		for (i = 0; i < ARRAY_SIZE(flags); i++) {
+			if (setflags & flags[i].flag)
+				fl |= flags[i].flag;
+			else if (clearflags & flags[i].flag)
+				fl &= ~flags[i].flag;
+		}
 
 		pii->info.priv_info_size = sizeof (*pii);
 		pii->info.priv_info_type = PRIV_INFO_FLAGS;
@@ -542,17 +564,31 @@ done:
 static void
 privupdate_self(void)
 {
+	uint_t i;
 	int set;
 
-	if (mac_aware) {
-		if (setpflags(NET_MAC_AWARE, 1) != 0)
-			fatal("setpflags(NET_MAC_AWARE)");
-		if (setpflags(NET_MAC_AWARE_INHERIT, 1) != 0)
-			fatal("setpflags(NET_MAC_AWARE_INHERIT)");
-	}
-	if (pfexec) {
-		if (setpflags(PRIV_PFEXEC, 1) != 0)
-			fatal("setpflags(PRIV_PFEXEC)");
+	for (i = 0; i < ARRAY_SIZE(flags); i++) {
+		uint_t val;
+
+		if (setflags & flags[i].flag)
+			val = 1;
+		else if (clearflags & flags[i].flag)
+			val = 0;
+		else
+			continue;
+
+		if (setpflags(flags[i].flag, val) != 0) {
+			int serrno = errno;
+			char *msg;
+
+			if (asprintf(&msg, "setpflags(%s, %u)",
+			    flags[i].name, val) == -1) {
+				msg = "setpflags";
+			}
+			errno = serrno;
+			fatal(msg);
+			/* NOTREACHED */
+		}
 	}
 
 	if (sets != NULL) {
@@ -589,13 +625,6 @@ privupdate_self(void)
 		}
 		priv_freeset(target);
 	}
-
-	if (Doff || Don)
-		(void) setpflags(PRIV_DEBUG, Don ? 1 : 0);
-	if (xpol)
-		(void) setpflags(PRIV_XPOLICY, 1);
-	if (pfexec)
-		(void) setpflags(PRIV_PFEXEC, 1);
 }
 
 static int
@@ -644,20 +673,6 @@ dumppriv(char **argv)
 	return (rc);
 }
 
-static struct {
-	int flag;
-	char *name;
-} flags[] = {
-	{ PRIV_DEBUG, "PRIV_DEBUG" },
-	{ PRIV_AWARE, "PRIV_AWARE" },
-	{ PRIV_AWARE_INHERIT, "PRIV_AWARE_INHERIT" },
-	{ PRIV_AWARE_RESET, "PRIV_AWARE_RESET" },
-	{ PRIV_XPOLICY, "PRIV_XPOLICY" },
-	{ PRIV_PFEXEC, "PRIV_PFEXEC" },
-	{ NET_MAC_AWARE, "NET_MAC_AWARE" },
-	{ NET_MAC_AWARE_INHERIT, "NET_MAC_AWARE_INHERIT" },
-};
-
 /*
  * Print flags preceeded by a space.
  */
@@ -671,7 +686,7 @@ flags2str(uint_t pflags)
 		(void) fputs(" <none>", stdout);
 		return;
 	}
-	for (i = 0; i < sizeof (flags)/sizeof (flags[0]) && pflags != 0; i++) {
+	for (i = 0; i < ARRAY_SIZE(flags) && pflags != 0; i++) {
 		if ((pflags & flags[i].flag) != 0) {
 			(void) printf("%c%s", c, flags[i].name);
 			pflags &= ~flags[i].flag;
@@ -680,4 +695,48 @@ flags2str(uint_t pflags)
 	}
 	if (pflags != 0)
 		(void) printf("%c<0x%x>", c, pflags);
+}
+
+static int
+parseflags(const char *flagstr)
+{
+	boolean_t add = B_FALSE;
+	uint_t i, lim, flag = 0;
+
+	if (*flagstr == '+')
+		add = B_TRUE;
+	else if (*flagstr != '-')
+		usage();
+
+	flagstr++;
+
+	lim = ARRAY_SIZE(flags);
+	for (; *flagstr != '\0'; flagstr++) {
+		uint_t nmatched = 0;
+
+		/*
+		 * A letter can map to more than one flag; 'M' covers both
+		 * of the MAC awareness flags.
+		 */
+		for (i = 0; i < lim; i++) {
+			if (flags[i].opt == *flagstr) {
+				flag |= flags[i].flag;
+				nmatched++;
+			}
+		}
+		if (nmatched == 0) {
+			(void) fprintf(stderr, "Unknown flag %c\n", *flagstr);
+			return (1);
+		}
+	}
+
+	if (add) {
+		setflags |= flag;
+		clearflags &= ~flag;
+	} else {
+		clearflags |= flag;
+		setflags &= ~flag;
+	}
+
+	return (0);
 }
