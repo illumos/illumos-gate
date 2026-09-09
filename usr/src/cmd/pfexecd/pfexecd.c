@@ -44,6 +44,7 @@
 #include <regex.h>
 #include <secdb.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -219,14 +220,28 @@ get_uid(const char *v, boolean_t *ok, char *path)
 	return ((uid_t)-1);
 }
 
-static uid_t
+static gid_t
 get_gid(const char *v, boolean_t *ok, char *path)
 {
 	struct group *grp, grpm;
-	char buf[1024];
+	char *buf;
+	long bufsz;
 
-	if (getgrnam_r(v, &grpm, buf, sizeof (buf), &grp) == 0 && grp != NULL)
-		return (grp->gr_gid);
+	/*
+	 * The group entry, including the member pointer array which is
+	 * constructed inside the caller's buffer, can be large, so size the
+	 * buffer using the maximum reported by sysconf(3C).
+	 */
+	if ((bufsz = sysconf(_SC_GETGR_R_SIZE_MAX)) > 0 &&
+	    (buf = malloc(bufsz)) != NULL) {
+		bool found;
+
+		found = getgrnam_r(v, &grpm, buf, bufsz, &grp) == 0 &&
+		    grp != NULL;
+		free(buf);
+		if (found)
+			return (grpm.gr_gid);
+	}
 
 	if (alldigits(v))
 		return (atoi(v));
