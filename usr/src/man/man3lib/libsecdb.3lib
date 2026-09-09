@@ -1,92 +1,63 @@
-'\" te
+.\" The contents of this file are subject to the terms of the Common
+.\" Development and Distribution License (the "License").  You may not use
+.\" this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or
+.\" http://www.opensolaris.org/os/licensing.  See the License for the
+.\" specific language governing permissions and limitations under the
+.\" License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each file
+.\" and include the License file at usr/src/OPENSOLARIS.LICENSE.  If
+.\" applicable, add the following below this CDDL HEADER, with the fields
+.\" enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
 .\" Copyright (c) 2004, Sun Microsystems, Inc.  All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH LIBSECDB 3LIB "Mar 24, 2004"
-.SH NAME
-libsecdb \- security attributes database library
-.SH SYNOPSIS
-.LP
-.nf
-cc [ \fIflag\fR... ] \fIfile\fR... \fB-lsecdb\fR [ \fIlibrary\fR... ]
-#include <\fBsecdb.h\fR>
-#include <\fBuser_attr.h\fR>
-#include <\fBprof_attr.h\fR>
-#include <\fBexec_attr.h\fR>
-#include <\fBauth_attr.h\fR>
-.fi
-
-.SH DESCRIPTION
-.sp
-.LP
+.\" Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd August 8, 2026
+.Dt LIBSECDB 3LIB
+.Os
+.Sh NAME
+.Nm libsecdb
+.Nd security attributes database library
+.Sh LIBRARY
+.Lb libsecdb
+.Sh SYNOPSIS
+.In secdb.h
+.In user_attr.h
+.In prof_attr.h
+.In exec_attr.h
+.In auth_attr.h
+.Sh DESCRIPTION
 Functions in this library provide routines for manipulation of security
 attribute databases.
-.SH INTERFACES
-.sp
-.LP
-The shared object \fBlibsecdb.so.1\fR provides the public interfaces defined
-below. See \fBIntro\fR(3) for additional information on shared object
-interfaces.
-.sp
-
-.sp
-.TS
-l l
-l l .
-\fBchkauthattr\fR	\fBendauthattr\fR
-\fBendexecattr\fR	\fBendprofattr\fR
-\fBenduserattr\fR	\fBfgetuserattr\fR
-\fBfree_authattr\fR	\fBfree_execattr\fR
-\fBfree_profattr\fR	\fBfree_proflist\fR
-\fBfree_userattr\fR	\fBgetauthattr\fR
-\fBgetauthnam\fR	\fBgetexecattr\fR
-\fBgetexecprof\fR	\fBgetexecuser\fR
-\fBgetprofattr\fR	\fBgetproflist\fR
-\fBgetprofnam\fR	\fBgetuserattr\fR
-\fBgetusernam\fR	\fBgetuseruid\fR
-\fBkva_match\fR	\fBmatch_execattr\fR
-\fBsetauthattr\fR	\fBsetexecattr\fR
-\fBsetprofattr\fR	\fBsetuserattr\fR
-.TE
-
-.SH FILES
-.sp
-.ne 2
-.na
-\fB\fB/lib/libsecdb.so.1\fR\fR
-.ad
-.RS 25n
+.Sh INTERFACES
+The shared object
+.Pa libsecdb.so.1
+provides the public interfaces defined below.
+See
+.Xr Intro 3
+for additional information on shared object interfaces.
+.Bl -column -offset 4n match_execattr match_execattr match_execattr match_execattr
+.It chkauthattr Ta endauthattr Ta endexecattr Ta endprofattr
+.It enduserattr Ta fgetuserattr Ta free_authattr Ta free_execattr
+.It free_profattr Ta free_proflist Ta free_userattr Ta getauthattr
+.It getauthnam Ta getexecattr Ta getexecprof Ta getexecuser
+.It getprofattr Ta getproflist Ta getprofnam Ta getuserattr
+.It getusernam Ta getuseruid Ta kva_match Ta match_execattr
+.It setauthattr Ta setexecattr Ta setprofattr Ta setuserattr
+.El
+.Sh FILES
+.Bl -tag -width /lib/64/libsecdb.so.1
+.It Pa /lib/libsecdb.so.1
 shared object
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB/lib/64/libsecdb.so.1\fR\fR
-.ad
-.RS 25n
+.It Pa /lib/64/libsecdb.so.1
 64-bit shared object
-.RE
-
-.SH ATTRIBUTES
-.sp
-.LP
-See \fBattributes\fR(7) for description of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-MT-Level	MT-Safe
-.TE
-
-.SH SEE ALSO
-.sp
-.LP
-.BR Intro (3),
-.BR attributes (7)
+.El
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr Intro 3 ,
+.Xr attributes 7
