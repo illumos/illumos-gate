@@ -2480,7 +2480,6 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 		*perr = G_FORMAT;
 		goto err;
 	}
-	core_info->core_osabi = core.e_hdr.e_ident[EI_OSABI];
 
 	/*
 	 * Because the core file may be a large file, we can't use libelf to
@@ -2542,13 +2541,9 @@ Pfgrab_core(int core_fd, const char *aout_path, int *perr)
 
 	/*
 	 * If we couldn't find anything of type PT_NOTE, abort.  The core file
-	 * is corrupt.  Core files from older releases carried two PT_NOTE
-	 * segments, the first holding the pre-2.6 /proc structures, so a core
-	 * file marked ELFOSABI_SOLARIS with only one PT_NOTE is rejected as
-	 * too old.
+	 * is corrupt.
 	 */
-	if (notes == 0 || (notes == 1 && core_info->core_osabi ==
-	    ELFOSABI_SOLARIS)) {
+	if (notes == 0) {
 		*perr = G_NOTE;
 		goto err;
 	}

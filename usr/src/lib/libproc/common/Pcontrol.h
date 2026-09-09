@@ -27,7 +27,7 @@
  * Copyright (c) 2013 by Delphix. All rights reserved.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_PCONTROL_H
@@ -158,7 +158,6 @@ typedef struct fd_info {
 
 typedef struct core_info {	/* information specific to core files */
 	char core_dmodel;	/* data model for core file */
-	char core_osabi;	/* ELF OS ABI */
 	int core_errno;		/* error during initialization if != 0 */
 	list_t core_lwp_head;	/* head of list of lwp info */
 	lwp_info_t *core_lwp;	/* current lwp information */
