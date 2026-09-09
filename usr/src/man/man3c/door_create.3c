@@ -15,8 +15,9 @@
 .\"
 .\" Copyright (c) 2008, Sun Microsystems, Inc.  All Rights Reserved.
 .\" Copyright 2026 Oxide Computer Company
+.\" Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd August 6, 2026
+.Dd September 26, 2026
 .Dt DOOR_CREATE 3C
 .Os
 .Sh NAME
@@ -139,6 +140,18 @@ on this door will not cause the cancellation of the server thread handling the
 request.
 See
 .Xr cancellation 7 .
+.It Dv DOOR_KERNEL_ONLY
+Only the kernel may invoke this door.
+Any attempt by a process to call
+.Fn door_call
+on it fails with
+.Er EACCES .
+Unreferenced invocations always originate in the kernel and so are still
+delivered to a door which also has
+.Dv DOOR_UNREF
+or
+.Dv DOOR_UNREF_MULTI
+set.
 .El
 .Pp
 The descriptor returned from

@@ -1,14 +1,15 @@
 '\" te
 .\" Copyright (c) 2008, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH UCRED 3C "Nov 6, 2014"
+.TH UCRED 3C "Oct 17, 2026"
 .SH NAME
 ucred, ucred_get, ucred_free, ucred_geteuid, ucred_getruid, ucred_getsuid,
 ucred_getegid, ucred_getrgid, ucred_getsgid, ucred_getgroups, ucred_getprivset,
 ucred_getpid, ucred_getprojid, ucred_getzoneid, ucred_getpflags,
-ucred_getlabel, ucred_size \- user credential functions
+ucred_getlabel, ucred_iskernel, ucred_size \- user credential functions
 .SH SYNOPSIS
 .LP
 .nf
@@ -66,6 +67,11 @@ ucred_getlabel, ucred_size \- user credential functions
 .LP
 .nf
 \fBpid_t\fR \fBucred_getpid\fR(\fBconst ucred_t *\fR\fIuc\fR);
+.fi
+
+.LP
+.nf
+\fBboolean_t\fR \fBucred_iskernel\fR(\fBconst ucred_t *\fR\fIuc\fR);
 .fi
 
 .LP
@@ -130,6 +136,15 @@ cases, the process in question might have handed of the file descriptor, the
 process might have exited or executed another program, or the process ID might
 have been reused by a completely unrelated process after the original program
 exited.
+.sp
+.LP
+The \fBucred_iskernel()\fR function returns \fBB_TRUE\fR if the user
+credential describes a request made from within the kernel, such as a door
+invocation made by the kernel on behalf of a process, and \fBB_FALSE\fR
+otherwise. This is the only supported way to determine that a credential
+belongs to the kernel. If the system cannot determine whether the user
+credential comes from the kernel because the necessary information is not
+available, \fBucred_iskernel()\fR returns \fBB_FALSE\fR.
 .sp
 .LP
 The \fBucred_getprojid()\fR function returns the project ID of the process or

@@ -479,6 +479,14 @@ door_check_limits(door_node_t *dp, door_arg_t *da, int upcall)
 {
 	ASSERT(MUTEX_HELD(&door_knob));
 
+	/*
+	 * A door created with DOOR_KERNEL_ONLY may only be invoked by the
+	 * kernel. Unreferenced invocations are upcalls too, so they are
+	 * unaffected.
+	 */
+	if (upcall == 0 && (dp->door_flags & DOOR_KERNEL_ONLY) != 0)
+		return (EACCES);
+
 	/* we allow unref upcalls through, despite any minimum */
 	if (da->data_size < dp->door_data_min &&
 	    !(upcall && da->data_ptr == DOOR_UNREF_DATA))

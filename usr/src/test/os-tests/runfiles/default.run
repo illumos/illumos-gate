@@ -12,7 +12,7 @@
 #
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2020 Joyent, Inc.
-# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2026 Oxide Computer Company
 # Copyright 2022 MNX Cloud, Inc.
@@ -143,6 +143,9 @@ tests = ['ldt', 'badseg']
 
 [/opt/os-tests/tests/writev.32]
 [/opt/os-tests/tests/writev.64]
+
+[/opt/os-tests/tests/door_kernel_only.32]
+[/opt/os-tests/tests/door_kernel_only.64]
 
 [/opt/os-tests/tests/imc_test]
 arch = i86pc

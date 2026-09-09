@@ -16,7 +16,7 @@
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Jason King
 # Copyright 2020 Joyent, Inc.
-# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2025 Hans Rosenfeld
 #
 
@@ -1563,6 +1563,7 @@ link path=usr/share/man/man3c/ucred_getruid.3c target=ucred.3c
 link path=usr/share/man/man3c/ucred_getsgid.3c target=ucred.3c
 link path=usr/share/man/man3c/ucred_getsuid.3c target=ucred.3c
 link path=usr/share/man/man3c/ucred_getzoneid.3c target=ucred.3c
+link path=usr/share/man/man3c/ucred_iskernel.3c target=ucred.3c
 link path=usr/share/man/man3c/ucred_size.3c target=ucred.3c
 link path=usr/share/man/man3c/ulckpwdf.3c target=lckpwdf.3c
 link path=usr/share/man/man3c/ulltostr.3c target=strtol.3c

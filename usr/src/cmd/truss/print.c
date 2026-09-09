@@ -29,7 +29,10 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
-/* Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved. */
+/*
+ * Copyright (c) 2013, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
 
 #define	_SYSCALL32	/* make 32-bit compat headers visible */
 
@@ -2822,6 +2825,7 @@ door_flags(private_t *pri, long val)
 	PROCESS_FLAG(DOOR_PRIVATE);
 	PROCESS_FLAG(DOOR_REFUSE_DESC);
 	PROCESS_FLAG(DOOR_NO_CANCEL);
+	PROCESS_FLAG(DOOR_KERNEL_ONLY);
 	PROCESS_FLAG(DOOR_LOCAL);
 	PROCESS_FLAG(DOOR_REVOKED);
 	PROCESS_FLAG(DOOR_IS_UNREF);

@@ -1,10 +1,11 @@
 '\" te
 .\" Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
+.\" Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 .\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DOOR_CALL 3C "Feb 7, 2015"
+.TH DOOR_CALL 3C "September 26, 2026"
 .SH NAME
 door_call \- invoke the function associated with a door descriptor
 .SH SYNOPSIS
@@ -191,6 +192,16 @@ The \fBdoor_call()\fR function will fail if:
 .ad
 .RS 13n
 Arguments were too big for server thread stack.
+.RE
+
+.sp
+.ne 2
+.na
+\fBEACCES\fR
+.ad
+.RS 13n
+The door was created with the \fBDOOR_KERNEL_ONLY\fR attribute and may only be
+invoked by the kernel.
 .RE
 
 .sp

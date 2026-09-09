@@ -23,6 +23,7 @@
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2022 RackTop Systems, Inc.
  * Copyright 2026 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -163,12 +164,11 @@ have_priv_sys_smb(void)
 	}
 
 	/*
-	 * in-kernel callers have pid==0
-	 * If we have pid zero, that's sufficient.
+	 * An in-kernel caller is sufficient.
 	 * If not, allow with sys_smb priv (below)
 	 */
 	pid = ucred_getpid(uc);
-	if (pid == 0) {
+	if (ucred_iskernel(uc)) {
 		ret = B_TRUE;
 		goto out;
 	}

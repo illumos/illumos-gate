@@ -23,6 +23,7 @@
  * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2022 RackTop Systems, Inc.
  * Copyright 2026 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <sys/list.h>
@@ -248,16 +249,13 @@ have_req_privs(uint32_t opcode, int opflags)
 	}
 
 	/*
-	 * in-kernel callers have pid==0
-	 * If we have pid zero, that's sufficient.
+	 * An in-kernel caller is sufficient for operations that allow it.
 	 * If not, allow with sys_smb priv (below)
 	 */
 	pid = ucred_getpid(uc);
-	if ((opflags & DOF_K) != 0) {
-		if (pid == 0) {
-			ret = B_TRUE;
-			goto out;
-		}
+	if ((opflags & DOF_K) != 0 && ucred_iskernel(uc)) {
+		ret = B_TRUE;
+		goto out;
 	}
 	uid = ucred_geteuid(uc);
 	if ((opflags & DOF_D) != 0) {

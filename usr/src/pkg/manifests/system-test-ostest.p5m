@@ -13,7 +13,7 @@
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2020 Joyent, Inc.
-# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2021 Tintri by DDN, Inc. All rights reserved.
 # Copyright 2026 Oxide Computer Company
 # Copyright 2022 MNX Cloud, Inc.
@@ -64,6 +64,8 @@ file path=opt/os-tests/tests/definit/definit_test.32 mode=0555
 file path=opt/os-tests/tests/definit/definit_test.64 mode=0555
 file path=opt/os-tests/tests/definit/init.data mode=0444
 file path=opt/os-tests/tests/definit/init.expected mode=0444
+file path=opt/os-tests/tests/door_kernel_only.32 mode=0555
+file path=opt/os-tests/tests/door_kernel_only.64 mode=0555
 file path=opt/os-tests/tests/epoll_test mode=0555
 file path=opt/os-tests/tests/eventfd.32 mode=0555
 file path=opt/os-tests/tests/eventfd.64 mode=0555

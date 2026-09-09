@@ -25,6 +25,7 @@
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2026 Oxide Computer Company
  * Copyright 2026 EFit Partners
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 /*
@@ -1311,7 +1312,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		goto out;
 	}
 
-	kernelcall = ucred_getpid(uc) == 0;
+	kernelcall = ucred_iskernel(uc);
 
 	/*
 	 * This is safe because we only use a zlog_t throughout the

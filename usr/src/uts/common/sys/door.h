@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  * Use is subject to license terms.
  */
 
@@ -45,6 +46,7 @@ extern "C" {
 #define	DOOR_REFUSE_DESC 0x40	/* Do not accept descriptors from callers */
 #define	DOOR_NO_CANCEL	0x80	/* No server thread cancel on client abort */
 #define	DOOR_NO_DEPLETION_CB 0x100 /* No thread create callbacks on depletion */
+#define	DOOR_KERNEL_ONLY 0x800	/* Only the kernel may invoke the door */
 
 /* Attributes (additional) returned with door_info and door_desc_t data */
 #define	DOOR_LOCAL	0x04	/* Descriptor is local to current process */
@@ -82,7 +84,7 @@ typedef struct __door_handle *door_handle_t;	/* opaque kernel door handle */
 /* Masks of applicable flags */
 #define	DOOR_CREATE_MASK	(DOOR_UNREF | DOOR_PRIVATE | \
 	    DOOR_UNREF_MULTI | DOOR_REFUSE_DESC | DOOR_NO_CANCEL | \
-	    DOOR_NO_DEPLETION_CB | DOOR_PRIVCREATE)
+	    DOOR_NO_DEPLETION_CB | DOOR_PRIVCREATE | DOOR_KERNEL_ONLY)
 #define	DOOR_KI_CREATE_MASK	(DOOR_UNREF | DOOR_UNREF_MULTI)
 
 /* Mask of above attributes */
@@ -254,7 +256,7 @@ typedef struct door_return_desc32 {
  */
 typedef struct door_node {
 	vnode_t		*door_vnode;
-	struct proc 	*door_target;	/* Proc handling this doors invoc's. */
+	struct proc	*door_target;	/* Proc handling this doors invoc's. */
 	struct door_node *door_list;	/* List of active doors in proc */
 	struct door_node *door_ulist;	/* Unref list */
 	void		(*door_pc)();	/* Door server entry point */

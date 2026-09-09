@@ -21,6 +21,7 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2015, Joyent, Inc.
  * Copyright 2026 Oxide Computer Company
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #define	_POSIX_PTHREAD_SEMANTICS 1
@@ -590,8 +591,8 @@ main(void)
 	}
 
 	doorfd = door_xcreate(callback, NULL,
-	    DOOR_REFUSE_DESC | DOOR_NO_DEPLETION_CB, create_door_thread,
-	    NULL, NULL, DOOR_THREADS);
+	    DOOR_REFUSE_DESC | DOOR_NO_DEPLETION_CB | DOOR_KERNEL_ONLY,
+	    create_door_thread, NULL, NULL, DOOR_THREADS);
 
 	if (doorfd == -1 || register_pfexec(doorfd) != 0) {
 		perror("doorfd");

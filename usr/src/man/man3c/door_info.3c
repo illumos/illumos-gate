@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (c) 2005, Sun Microsystems, Inc.  All Rights Reserved.
+.\" Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DOOR_INFO 3C "Mar 22, 2005"
+.TH DOOR_INFO 3C "September 26, 2026"
 .SH NAME
 door_info \- return information associated with a door descriptor
 .SH SYNOPSIS
@@ -99,6 +100,16 @@ descriptors.
 .RS 20n
 Clients who abort a \fBdoor_call\fR(3C) call on this door will not cause the
 \fBcancellation\fR(7) of the server thread handling the request.
+.RE
+
+.sp
+.ne 2
+.na
+\fBDOOR_KERNEL_ONLY\fR
+.ad
+.RS 20n
+Only the kernel may invoke the door. Any attempt to \fBdoor_call\fR(3C) it
+from a process fails with \fBEACCES\fR.
 .RE
 
 .sp
