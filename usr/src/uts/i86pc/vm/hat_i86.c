@@ -30,6 +30,7 @@
  * Copyright 2018 Joyent, Inc.  All rights reserved.
  * Copyright (c) 2014, 2015 by Delphix. All rights reserved.
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -2521,14 +2522,11 @@ void
 hat_tlb_inval_range(hat_t *hat, tlb_range_t *in_range)
 {
 	extern int	flushes_require_xcalls;	/* from mp_startup.c */
-	cpuset_t	justme;
+	const ulong_t	*bv;
 	cpuset_t	cpus_to_shootdown;
 	tlb_range_t	range = *in_range;
-#ifndef __xpv
-	cpuset_t	check_cpus;
-	cpu_t		*cpup;
+	uint_t		ntargets = 0;
 	int		c;
-#endif
 
 	/*
 	 * If the hat is being destroyed, there are no more users, so
@@ -2572,25 +2570,25 @@ hat_tlb_inval_range(hat_t *hat, tlb_range_t *in_range)
 	 * Otherwise it's just CPUs currently executing in this hat.
 	 */
 	kpreempt_disable();
-	CPUSET_ONLY(justme, CPU->cpu_id);
 	if (hat == kas.a_hat)
-		cpus_to_shootdown = khat_cpuset;
+		bv = CPUSET2BV(khat_cpuset);
 	else
-		cpus_to_shootdown = hat->hat_cpus;
+		bv = CPUSET2BV(hat->hat_cpus);
 
-#ifndef __xpv
 	/*
-	 * If any CPUs in the set are idle, just request a delayed flush
-	 * and avoid waking them up.
+	 * Build the set of CPUs to cross-call by walking the source set a
+	 * word at a time, so that the cost is proportional to the number of
+	 * CPUs in it rather than to the number of possible CPU ids. A CPU
+	 * that is idle is instead asked to flush its TLB when it next wakes,
+	 * which avoids waking it now.
 	 */
-	check_cpus = cpus_to_shootdown;
-	for (c = 0; c < NCPU && !CPUSET_ISNULL(check_cpus); ++c) {
+	CPUSET_ZERO(cpus_to_shootdown);
+	c = -1;
+	while ((c = bt_getlowbit(bv, c + 1, max_ncpus - 1)) != -1) {
+#ifndef __xpv
+		cpu_t *cpup = cpu[c];
 		ulong_t tlb_info;
 
-		if (!CPU_IN_SET(check_cpus, c))
-			continue;
-		CPUSET_DEL(check_cpus, c);
-		cpup = cpu[c];
 		if (cpup == NULL)
 			continue;
 
@@ -2603,13 +2601,19 @@ hat_tlb_inval_range(hat_t *hat, tlb_range_t *in_range)
 		}
 		if (tlb_info == (TLBIDLE_CPU_HALTED | TLBIDLE_INVAL_ALL)) {
 			HATSTAT_INC(hs_tlb_inval_delayed);
-			CPUSET_DEL(cpus_to_shootdown, c);
+			continue;
 		}
-	}
 #endif
+		CPUSET_ADD(cpus_to_shootdown, c);
+		ntargets++;
+	}
 
-	if (CPUSET_ISNULL(cpus_to_shootdown) ||
-	    CPUSET_ISEQUAL(cpus_to_shootdown, justme)) {
+	/*
+	 * If there is nothing to cross-call, or the only target is this CPU,
+	 * do the work locally.
+	 */
+	if (ntargets == 0 ||
+	    (ntargets == 1 && CPU_IN_SET(cpus_to_shootdown, CPU->cpu_id))) {
 
 #ifdef __xpv
 		if (range.tr_va == DEMAP_ALL_ADDR) {
