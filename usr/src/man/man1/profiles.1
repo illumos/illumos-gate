@@ -1,138 +1,147 @@
-'\" te
+.\" The contents of this file are subject to the terms of the Common
+.\" Development and Distribution License (the "License").  You may not use
+.\" this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or
+.\" http://www.opensolaris.org/os/licensing.  See the License for the
+.\" specific language governing permissions and limitations under the
+.\" License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each file
+.\" and include the License file at usr/src/OPENSOLARIS.LICENSE.  If
+.\" applicable, add the following below this CDDL HEADER, with the fields
+.\" enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
 .\" Copyright (c) 2000, Sun Microsystems, Inc.  All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PROFILES 1 "Jan 7, 2018"
-.SH NAME
-profiles \- print execution profiles for a user
-.SH SYNOPSIS
-.LP
-.nf
-\fBprofiles\fR [\fB-l\fR] [ \fIuser\fR ]...
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBprofiles\fR command prints on standard output the names of the execution
-profiles that have been assigned to you or to the optionally-specified user or
-role name. Profiles are a bundling mechanism used to enumerate the commands and
-authorizations needed to perform a specific function. Along with each listed
-executable are the process attributes, such as the effective user and group
-\fBID\fRs, with which the process runs when started by a privileged command
-interpreter. The profile shells are \fBpfcsh\fR, \fBpfksh\fR, and \fBpfexec\fR.
-See the \fBpfexec\fR(1) man page. Profiles can contain other profiles defined
-in \fBprof_attr\fR(5).
-.sp
-.LP
+.\" Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd August 8, 2026
+.Dt PROFILES 1
+.Os
+.Sh NAME
+.Nm profiles
+.Nd print execution profiles for a user
+.Sh SYNOPSIS
+.Nm
+.Op Fl l
+.Op Ar user Ns ...
+.Sh DESCRIPTION
+The
+.Nm
+command prints on standard output the names of the execution profiles that have
+been assigned to you or to the optionally-specified user or role name.
+Profiles are a bundling mechanism used to enumerate the commands and
+authorizations needed to perform a specific function.
+Along with each listed executable are the process attributes, such as the
+effective user and group IDs, with which the process runs when started by a
+privileged command interpreter.
+The profile shells are
+.Sy pfcsh ,
+.Sy pfksh ,
+and
+.Sy pfexec .
+See the
+.Xr pfexec 1
+man page.
+Profiles can contain other profiles defined in
+.Xr prof_attr 5 .
+.Pp
 Multiple profiles can be combined to construct the appropriate access control.
 When profiles are assigned, the authorizations are added to the existing set.
 If the same command appears in multiple profiles, the first occurrence, as
 determined by the ordering of the profiles, is used for process-attribute
-settings. For convenience, a wild card can be specified to match all commands.
-.sp
-.LP
+settings.
+For convenience, a wild card can be specified to match all commands.
+.Pp
 When profiles are interpreted, the profile list is loaded from
-\fBuser_attr\fR(5). If any default profile is defined in
-\fB/etc/security/policy.conf\fR (see \fBpolicy.conf\fR(5)), the list of default
-profiles are added to the list loaded from \fBuser_attr\fR(5). Matching entries
-in \fBprof_attr\fR(5) provide the authorizations list, and matching entries in
-\fBexec_attr\fR(5) provide the commands list.
-.SH OPTIONS
-.LP
+.Xr user_attr 5 .
+If any default profile is defined in
+.Pa /etc/security/policy.conf
+.Pq see Xr policy.conf 5 ,
+the list of default profiles are added to the list loaded from
+.Xr user_attr 5 .
+Matching entries in
+.Xr prof_attr 5
+provide the authorizations list, and matching entries in
+.Xr exec_attr 5
+provide the commands list.
+.Sh OPTIONS
 The following options are supported:
-.sp
-.ne 2
-.na
-\fB\fB-l\fR\fR
-.ad
-.RS 6n
+.Bl -tag -width Ds
+.It Fl l
 Lists the commands in each profile followed by the special process attributes
-such as user and group \fBID\fRs.
-.RE
-
-.SH EXAMPLES
-.LP
-\fBExample 1\fR Sample Output
-.sp
-.LP
-The output of the \fBprofiles\fR command has the following form:
-
-.sp
-.in +2
-.nf
-example% \fBprofiles tester01 tester02\fR
-tester01 : Audit Management, All Commands
-tester02 : Device Management, All Commands
-example%
-.fi
-.in -2
-.sp
-
-.LP
-\fBExample 2\fR Using the \fBlist\fR Option
-.sp
-.in +2
-.nf
-example% \fBprofiles -l tester01 tester02\fR
-tester01 :
-    Audit Management:
-      /usr/sbin/audit          euid=root
-      /usr/sbin/auditconfig    euid=root    egid=sys
-    All Commands:
-      *
-tester02 :
-    Device Management:
-      /usr/bin/allocate:       euid=root
-      /usr/bin/deallocate:     euid=root
-    All Commands
-      *
-example%
-.fi
-.in -2
-.sp
-
-.SH EXIT STATUS
-.LP
+such as user and group IDs.
+.El
+.Sh FILES
+.Bl -item
+.It
+.Pa /etc/security/exec_attr
+.It
+.Pa /etc/security/prof_attr
+.It
+.Pa /etc/user_attr
+.It
+.Pa /etc/security/policy.conf
+.El
+.Sh EXIT STATUS
 The following exit values are returned:
-.sp
-.ne 2
-.na
-\fB\fB0\fR \fR
-.ad
-.RS 6n
+.Bl -tag -width Ds
+.It 0
 Successful completion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB1\fR \fR
-.ad
-.RS 6n
+.It 1
 An error occurred.
-.RE
+.El
+.Sh EXAMPLES
+.Sy Example 1 No Sample Output
+.Pp
+The output of the
+.Nm
+command has the following form:
+.Bd -literal -offset 4n
+% profiles tester01 tester02
+tester01:
+          Primary Administrator
+          Basic Solaris User
+          All
 
-.SH FILES
-.LP
-\fB/etc/security/exec_attr\fR
-.sp
-.LP
-\fB/etc/security/prof_attr\fR
-.sp
-.LP
-\fB/etc/user_attr\fR
-.sp
-.LP
-\fB/etc/security/policy.conf\fR
-.SH SEE ALSO
-.LP
-.BR auths (1),
-.BR pfexec (1),
-.BR roles (1),
-.BR getprofattr (3SECDB),
-.BR exec_attr (5),
-.BR policy.conf (5),
-.BR prof_attr (5),
-.BR user_attr (5),
-.BR attributes (7)
+tester02:
+          Software Installation
+          Basic Solaris User
+          All
+.Ed
+.Pp
+.Sy Example 2 No Using Fl l No to show more detail
+.Bd -literal -offset 4n
+% profiles -l tester01 tester02
+tester01:
+      Primary Administrator
+          *                          uid=0
+                                     gid=0
+      Basic Solaris User
+          /usr/lib/fs/smbfs/mount    privs=sys_mount
+          /usr/lib/fs/smbfs/umount   privs=sys_mount
+      All
+          *
+
+tester02:
+      Software Installation
+          /usr/bin/pkg               uid=0
+          /sbin/beadm                uid=0
+                                     gid=bin
+      Basic Solaris User
+          /usr/lib/fs/smbfs/mount    privs=sys_mount
+          /usr/lib/fs/smbfs/umount   privs=sys_mount
+      All
+          *
+.Ed
+.Sh SEE ALSO
+.Xr auths 1 ,
+.Xr pfexec 1 ,
+.Xr roles 1 ,
+.Xr getprofattr 3SECDB ,
+.Xr exec_attr 5 ,
+.Xr policy.conf 5 ,
+.Xr prof_attr 5 ,
+.Xr user_attr 5 ,
+.Xr attributes 7
