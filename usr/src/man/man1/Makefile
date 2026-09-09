@@ -13,7 +13,7 @@
 # Copyright 2011, Richard Lowe
 # Copyright 2018 Nexenta Systems, Inc.
 # Copyright 2022 Garrett D'Amore
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2020 Joyent, Inc.
 #
 
@@ -389,6 +389,7 @@ MANFILES=	acctcom.1			\
 		units.1				\
 		unix2dos.1			\
 		uptime.1			\
+		userattr.1			\
 		uuidgen.1			\
 		vacation.1			\
 		vgrind.1			\

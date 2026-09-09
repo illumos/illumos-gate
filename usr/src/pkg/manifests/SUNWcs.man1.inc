@@ -12,7 +12,7 @@
 #
 # Copyright 2011, Richard Lowe
 # Copyright 2018 Nexenta Systems, Inc.
-# Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 #
 
 file path=usr/share/man/man1/Intro.1
@@ -268,6 +268,7 @@ link path=usr/share/man/man1/unset.1 target=set.1
 link path=usr/share/man/man1/unsetenv.1 target=set.1
 link path=usr/share/man/man1/until.1 target=shell_builtins.1
 file path=usr/share/man/man1/uptime.1
+file path=usr/share/man/man1/userattr.1
 file path=usr/share/man/man1/uuidgen.1
 link path=usr/share/man/man1/valdate.1 target=ckdate.1
 link path=usr/share/man/man1/valgid.1 target=ckgid.1

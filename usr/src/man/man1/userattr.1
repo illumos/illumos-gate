@@ -1,0 +1,117 @@
+.\"
+.\" This file and its contents are supplied under the terms of the
+.\" Common Development and Distribution License ("CDDL"), version 1.0.
+.\" You may only use this file in accordance with the terms of version
+.\" 1.0 of the CDDL.
+.\"
+.\" A full copy of the text of the CDDL should have accompanied this
+.\" source.  A copy of the CDDL is also available via the Internet at
+.\" http://www.illumos.org/license/CDDL.
+.\"
+.\" Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd August 8, 2026
+.Dt USERATTR 1
+.Os
+.Sh NAME
+.Nm userattr
+.Nd display extended user attributes
+.Sh SYNOPSIS
+.Nm
+.Op Fl v
+.Ar attr_name
+.Op Ar user
+.Sh DESCRIPTION
+The
+.Nm
+command prints on standard output the first matching value found for
+.Ar attr_name
+in the
+.Xr user_attr 5 ,
+.Xr prof_attr 5
+and
+.Xr policy.conf 5
+databases
+.Pq searched in that order
+for
+.Ar user .
+If
+.Ar user
+is omitted, then the real UID of the invoking user is used.
+.Sh OPTIONS
+The following options are supported:
+.Bl -tag -width Ds
+.It Fl v
+Include the source of the reported value in the output.
+This will be
+.Sq user_attr
+for values found in the
+.Xr user_attr 5
+database or set directly by a keyword in
+.Xr policy.conf 5 ,
+otherwise the name of the profile, from
+.Xr prof_attr 5 ,
+through which the value was assigned.
+.El
+.Sh OPERANDS
+The following operands are supported:
+.Bl -tag -width attr_name
+.It Ar attr_name
+The attribute to be searched for.
+.It Ar user
+The user for which attributes should be retrieved.
+.El
+.Sh FILES
+.Bl -item
+.It
+.Pa /etc/security/prof_attr
+.It
+.Pa /etc/user_attr
+.It
+.Pa /etc/security/policy.conf
+.El
+.Sh EXIT STATUS
+.Bl -tag -width Ds
+.It 0
+Successful completion.
+.It 1
+The requested attribute was not found, or an error occurred.
+.El
+.Sh EXAMPLES
+.Sy Example 1
+Retrieving the
+.Em audit_flags
+attribute for user
+.Em student1 :
+.Bd -literal -offset 4n
+% userattr audit_flags student1
+ex,pc:lo
+.Ed
+.Pp
+.Sy Example 2
+Retrieving the
+.Em auths
+attribute for user
+.Em student1
+with the verbose option:
+.Bd -literal -offset 4n
+% userattr -v auths student1
+Basic Solaris User : solaris.profmgr.read,solaris.mail.mailq
+.Ed
+.Sh INTERFACE STABILITY
+The command line interface of
+.Nm
+is
+.Sy Committed .
+The output of
+.Nm
+is
+.Sy Not-An-Interface
+and may change at any time.
+.Sh SEE ALSO
+.Xr auths 1 ,
+.Xr profiles 1 ,
+.Xr policy.conf 5 ,
+.Xr prof_attr 5 ,
+.Xr user_attr 5 ,
+.Xr rbac 7
