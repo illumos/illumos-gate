@@ -1,108 +1,113 @@
-'\" te
+.\" The contents of this file are subject to the terms of the Common
+.\" Development and Distribution License (the "License").  You may not use
+.\" this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or
+.\" http://www.opensolaris.org/os/licensing.  See the License for the
+.\" specific language governing permissions and limitations under the
+.\" License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each file
+.\" and include the License file at usr/src/OPENSOLARIS.LICENSE.  If
+.\" applicable, add the following below this CDDL HEADER, with the fields
+.\" enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
 .\" Copyright (c) 2005, Sun Microsystems, Inc. All Rights Reserved.
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH DOOR_UCRED 3C "Mar 22, 2005"
-.SH NAME
-door_ucred \- return credential information associated with the client
-.SH SYNOPSIS
-.LP
-.nf
-\fBcc\fR \fB-mt\fR [ \fIflag\fR... ] \fIfile\fR... [ \fIlibrary\fR... ]
-#include <door.h>
-
-\fBint\fR \fBdoor_ucred\fR(\fBucred_t **\fR\fIinfo\fR);
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBdoor_ucred()\fR function returns credential information associated with
-the client, if any, of the current door invocation.
-.sp
-.LP
-When successful, \fBdoor_ucred()\fR writes a pointer to a user credential to
-the location pointed to by \fIinfo\fR if that location was previously
-\fINULL\fR. If that location was non-null, \fBdoor_ucred()\fR assumes that
-\fIinfo\fR points to a previously allocated \fBucred_t\fR which is then reused.
-The location pointed to by \fIinfo\fR can be used multiple times before being
-freed. The value returned in \fIinfo\fR must be freed using
-\fBucred_free\fR(3C).
-.sp
-.LP
-The resulting user credential includes information about the effective user and
-group ID, the real user and group ID, all privilege sets and the calling PID.
-.sp
-.LP
-The credential information associated with the client refers to the information
-from the immediate caller, not necessarily from the first thread in a chain of
-door calls.
-.SH RETURN VALUES
-.LP
-Upon successful completion, \fBdoor_ucred()\fR returns 0. Otherwise, -1 is
-returned and \fBerrno\fR is set to indicate the error, in which case the memory
-location pointed to by the \fIinfo\fR argument is unchanged.
-.SH ERRORS
-.LP
-The \fBdoor_ucred()\fR function will fail if:
-.sp
-.ne 2
-.na
-\fB\fBEAGAIN\fR\fR
-.ad
-.RS 10n
-The location pointed to by \fIinfo\fR was \fINULL\fR and allocating memory
-sufficient to hold a ucred failed.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEFAULT\fR\fR
-.ad
-.RS 10n
-The address of the \fIinfo\fR argument is invalid.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBEINVAL\fR\fR
-.ad
-.RS 10n
+.\" Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd August 8, 2026
+.Dt DOOR_UCRED 3C
+.Os
+.Sh NAME
+.Nm door_ucred
+.Nd return credential information associated with the client
+.Sh LIBRARY
+.Lb libc
+.Sh SYNOPSIS
+.In door.h
+.Ft int
+.Fo door_ucred
+.Fa "ucred_t **info"
+.Fc
+.Sh DESCRIPTION
+The
+.Fn door_ucred
+function returns credential information associated with the client of the
+current door invocation.
+If the calling thread is not servicing a door invocation, the function fails
+with EINVAL.
+.Pp
+When successful,
+.Fn door_ucred
+writes a pointer to a user credential to the location pointed to by
+.Fa info
+if that location was previously
+.Dv NULL .
+If that location was non-null,
+.Fn door_ucred
+assumes that
+.Fa info
+points to a previously allocated
+.Vt ucred_t
+which is then reused.
+The location pointed to by
+.Fa info
+can be used multiple times before being freed.
+The value returned in
+.Fa info
+must be freed using
+.Xr ucred_free 3C .
+.Pp
+The resulting user credential includes information about the effective user
+and group ID, the real user and group ID, all privilege sets and the calling
+PID.
+.Pp
+The credential information associated with the client refers to the
+information from the immediate caller, not necessarily from the first thread
+in a chain of door calls.
+.Sh RETURN VALUES
+Upon successful completion,
+.Fn door_ucred
+returns 0.
+Otherwise, -1 is returned and
+.Va errno
+is set to indicate the error, in which case the memory location pointed to by
+the
+.Fa info
+argument is unchanged.
+.Sh ERRORS
+The
+.Fn door_ucred
+function will fail if:
+.Bl -tag -width Er
+.It Er EAGAIN
+The location pointed to by
+.Fa info
+was
+.Dv NULL
+and there is not enough memory available to allocate a ucred.
+The application can try again later.
+.It Er EFAULT
+The address of the
+.Fa info
+argument is invalid.
+.It Er EINVAL
 There is no associated door client.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fBENOMEM\fR\fR
-.ad
-.RS 10n
-The location pointed to by \fIinfo\fR was \fINULL\fR and allocating memory
-sufficient to hold a ucred failed.
-.RE
-
-.SH ATTRIBUTES
-.LP
-See \fBattributes\fR(7) for descriptions of the following attributes:
-.sp
-
-.sp
-.TS
-box;
-c | c
-l | l .
-ATTRIBUTE TYPE	ATTRIBUTE VALUE
-_
-Interface Stability	Stable
-_
-MT-Level	Safe
-.TE
-
-.SH SEE ALSO
-.LP
-.BR door_call (3C),
-.BR door_create (3C),
-.BR ucred_get (3C),
-.BR attributes (7)
+.It Er ENOMEM
+The location pointed to by
+.Fa info
+was
+.Dv NULL
+and the physical limits of the system are exceeded by the memory
+allocation needed to hold a ucred.
+.El
+.Sh INTERFACE STABILITY
+.Sy Committed
+.Sh MT-LEVEL
+.Sy MT-Safe
+.Sh SEE ALSO
+.Xr door_call 3C ,
+.Xr door_create 3C ,
+.Xr ucred_get 3C ,
+.Xr attributes 7
