@@ -1,115 +1,127 @@
-'\" te
+.\" The contents of this file are subject to the terms of the Common
+.\" Development and Distribution License (the "License").  You may not use
+.\" this file except in compliance with the License.
+.\"
+.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or
+.\" http://www.opensolaris.org/os/licensing.  See the License for the
+.\" specific language governing permissions and limitations under the
+.\" License.
+.\"
+.\" When distributing Covered Code, include this CDDL HEADER in each file
+.\" and include the License file at usr/src/OPENSOLARIS.LICENSE.  If
+.\" applicable, add the following below this CDDL HEADER, with the fields
+.\" enclosed by brackets "[]" replaced with your own identifying
+.\" information: Portions Copyright [yyyy] [name of copyright owner]
+.\"
 .\" Copyright (c) 2003, Sun Microsystems, Inc.  All Rights Reserved
-.\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
-.\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
-.\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH PFEXEC 1 "Jul 8, 2016"
-.SH NAME
-pfexec, pfsh, pfcsh, pfksh \- execute a command in a profile
-.SH SYNOPSIS
-.LP
-.nf
-\fB/usr/bin/pfexec\fR \fIcommand\fR
-.fi
-
-.LP
-.nf
-\fB/usr/bin/pfexec\fR \fB-P\fR \fIprivspec\fR \fIcommand\fR [ \fIarg\fR ]...
-.fi
-
-.LP
-.nf
-\fB/usr/bin/pfsh\fR [ \fIoptions\fR ] [ \fIargument\fR ]...
-.fi
-
-.LP
-.nf
-\fB/usr/bin/pfcsh\fR [ \fIoptions\fR ] [ \fIargument\fR ]...
-.fi
-
-.LP
-.nf
-\fB/usr/bin/pfksh\fR [ \fIoptions\fR ] [ \fIargument\fR ]...
-.fi
-
-.SH DESCRIPTION
-.LP
-The \fBpfexec\fR program is used to execute commands with the attributes
-specified by the user's profiles in the \fBexec_attr\fR(5) database. It is
-invoked by the profile shells, \fBpfsh\fR, \fBpfcsh\fR, and \fBpfksh\fR which
-are linked to the Bourne shell, C shell, and Korn shell, respectively.
-.sp
-.LP
+.\" Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+.\"
+.Dd August 8, 2026
+.Dt PFEXEC 1
+.Os
+.Sh NAME
+.Nm pfexec ,
+.Nm pfsh ,
+.Nm pfcsh ,
+.Nm pfksh
+.Nd execute a command in a profile
+.Sh SYNOPSIS
+.Nm pfexec
+.Ar command
+.Nm pfexec
+.Fl P Ar privspec
+.Ar command
+.Op Ar arg Ns ...
+.Nm pfsh
+.Op Ar options
+.Op Ar argument Ns ...
+.Nm pfcsh
+.Op Ar options
+.Op Ar argument Ns ...
+.Nm pfksh
+.Op Ar options
+.Op Ar argument Ns ...
+.Sh DESCRIPTION
+The
+.Nm pfexec
+program is used to execute commands with the attributes specified by the
+user's profiles in the
+.Xr exec_attr 5
+database.
+It is invoked by the profile shells,
+.Nm pfsh ,
+.Nm pfcsh ,
+and
+.Nm pfksh
+which are linked to the Bourne shell, C shell, and Korn shell, respectively.
+.Pp
 Profiles are searched in the order specified in the user's entry in the
-\fBuser_attr\fR(5) database. If the same command appears in more than one
-profile, the profile shell uses the first matching entry.
-.sp
-.LP
-The second form, \fBpfexec\fR \fB-P\fR \fIprivspec\fR, allows a user to obtain
-the additional privileges awarded to the user's profiles in \fBprof_attr\fR(5).
-The privileges specification on the commands line is parsed using
-\fBpriv_str_to_set\fR(3C). The resulting privileges are intersected with the
-union of the privileges specified using the "\fBprivs\fR" keyword in
-\fBprof_attr\fR(5) for all the user's profiles and added to the inheritable set
-before executing the command.
-.sp
-.LP
-For \fBpfexec\fR to function correctly, the \fBpfexecd\fR daemon must be running
-in the current zone. This is normally managed by the
-"\fBsvc:/system/pfexec:default\fR" SMF service (see \fBsmf\fR(7)).
-.SH USAGE
-.LP
-\fBpfexec\fR is used to execute commands with predefined process attributes,
-such as specific user or group \fBID\fRs.
-.sp
-.LP
-Refer to the \fBsh\fR(1), \fBcsh\fR(1), and \fBksh\fR(1) man pages for complete
-usage descriptions of the profile shells.
-.SH EXAMPLES
-.LP
-\fBExample 1 \fRObtaining additional user privileges
-.sp
-.in +2
-.nf
-example% \fBpfexec -P all chown user file\fR
-.fi
-.in -2
-.sp
-
-.sp
-.LP
-This command runs \fBchown user file\fR with all privileges assigned to the
-current user, not necessarily all privileges.
-
-.SH EXIT STATUS
-.LP
+.Xr user_attr 5
+database.
+If the same command appears in more than one profile, the profile shell uses
+the first matching entry.
+.Pp
+The second form,
+.Nm pfexec Fl P Ar privspec ,
+allows a user to obtain the additional privileges awarded to the user's
+profiles in
+.Xr prof_attr 5 .
+The privileges specification on the command line is parsed using
+.Xr priv_str_to_set 3C .
+The resulting privileges are intersected with the union of the privileges
+specified using the
+.Sy privs
+keyword in
+.Xr prof_attr 5
+for all the user's profiles and added to the inheritable set before executing
+the command.
+.Pp
+For
+.Nm pfexec
+to function correctly, the
+.Sy pfexecd
+daemon must be running in the current zone.
+This is normally managed by the
+.Sy svc:/system/pfexec:default
+SMF service
+.Pq see Xr smf 7 .
+.Sh USAGE
+.Nm pfexec
+is used to execute commands with predefined process attributes, such as
+specific user or group IDs.
+.Pp
+Refer to the
+.Xr sh 1 ,
+.Xr csh 1 ,
+and
+.Xr ksh 1
+man pages for complete usage descriptions of the profile shells.
+.Sh EXIT STATUS
 The following exit values are returned:
-.sp
-.ne 2
-.na
-\fB\fB0\fR \fR
-.ad
-.RS 6n
+.Bl -tag -width Ds
+.It 0
 Successful completion.
-.RE
-
-.sp
-.ne 2
-.na
-\fB\fB1\fR \fR
-.ad
-.RS 6n
+.It 1
 An error occurred.
-.RE
-
-.SH SEE ALSO
-.LP
-.BR csh (1),
-.BR ksh (1),
-.BR profiles (1),
-.BR sh (1),
-.BR exec_attr (5),
-.BR prof_attr (5),
-.BR user_attr (5),
-.BR attributes (7),
-.BR smf (7)
+.El
+.Sh EXAMPLES
+.Sy Example 1 No Obtaining additional user privileges
+.Bd -literal -offset 4n
+% pfexec -P all chown user file
+.Ed
+.Pp
+This command runs
+.Ql chown user file
+with all privileges assigned to the current user, not necessarily all
+privileges.
+.Sh SEE ALSO
+.Xr csh 1 ,
+.Xr ksh 1 ,
+.Xr profiles 1 ,
+.Xr sh 1 ,
+.Xr priv_str_to_set 3C ,
+.Xr exec_attr 5 ,
+.Xr prof_attr 5 ,
+.Xr user_attr 5 ,
+.Xr attributes 7 ,
+.Xr smf 7
