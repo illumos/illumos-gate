@@ -18,7 +18,7 @@
 #
 
 set name=pkg.fmri \
-    value=pkg:/system/data/zoneinfo@2026.3,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
+    value=pkg:/system/data/zoneinfo@2026.4,$(PKGVERS_BUILTON)-$(PKGVERS_BRANCH)
 set name=pkg.summary value="Timezone Information"
 set name=pkg.description value="timezone information"
 set name=info.classification value=org.opensolaris.category.2008:System/Core
@@ -425,7 +425,7 @@ hardlink path=usr/share/lib/zoneinfo/Brazil/DeNoronha target=../America/Noronha
 hardlink path=usr/share/lib/zoneinfo/Brazil/East target=../America/Sao_Paulo
 hardlink path=usr/share/lib/zoneinfo/Brazil/West target=../America/Manaus
 hardlink path=usr/share/lib/zoneinfo/CET target=Europe/Brussels
-hardlink path=usr/share/lib/zoneinfo/CST6CDT target=America/Chicago
+file path=usr/share/lib/zoneinfo/CST6CDT
 dir  path=usr/share/lib/zoneinfo/Canada
 hardlink path=usr/share/lib/zoneinfo/Canada/Atlantic target=../America/Halifax
 hardlink path=usr/share/lib/zoneinfo/Canada/Central target=../America/Winnipeg
@@ -444,7 +444,7 @@ hardlink path=usr/share/lib/zoneinfo/Chile/EasterIsland target=../Pacific/Easter
 hardlink path=usr/share/lib/zoneinfo/Cuba target=America/Havana
 hardlink path=usr/share/lib/zoneinfo/EET target=Europe/Athens
 hardlink path=usr/share/lib/zoneinfo/EST target=America/Panama
-hardlink path=usr/share/lib/zoneinfo/EST5EDT target=America/New_York
+file path=usr/share/lib/zoneinfo/EST5EDT
 hardlink path=usr/share/lib/zoneinfo/Egypt target=Africa/Cairo
 hardlink path=usr/share/lib/zoneinfo/Eire target=Europe/Dublin
 dir  path=usr/share/lib/zoneinfo/Etc
@@ -580,7 +580,7 @@ hardlink path=usr/share/lib/zoneinfo/Kwajalein target=Pacific/Kwajalein
 hardlink path=usr/share/lib/zoneinfo/Libya target=Africa/Tripoli
 hardlink path=usr/share/lib/zoneinfo/MET target=Europe/Brussels
 hardlink path=usr/share/lib/zoneinfo/MST target=America/Phoenix
-hardlink path=usr/share/lib/zoneinfo/MST7MDT target=America/Denver
+file path=usr/share/lib/zoneinfo/MST7MDT
 dir  path=usr/share/lib/zoneinfo/Mexico
 hardlink path=usr/share/lib/zoneinfo/Mexico/BajaNorte target=../America/Tijuana
 hardlink path=usr/share/lib/zoneinfo/Mexico/BajaSur target=../America/Mazatlan
@@ -590,7 +590,7 @@ hardlink path=usr/share/lib/zoneinfo/NZ target=Pacific/Auckland
 hardlink path=usr/share/lib/zoneinfo/NZ-CHAT target=Pacific/Chatham
 hardlink path=usr/share/lib/zoneinfo/Navajo target=America/Denver
 hardlink path=usr/share/lib/zoneinfo/PRC target=Asia/Shanghai
-hardlink path=usr/share/lib/zoneinfo/PST8PDT target=America/Los_Angeles
+file path=usr/share/lib/zoneinfo/PST8PDT
 dir  path=usr/share/lib/zoneinfo/Pacific
 file path=usr/share/lib/zoneinfo/Pacific/Apia
 file path=usr/share/lib/zoneinfo/Pacific/Auckland
