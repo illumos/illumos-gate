@@ -67,8 +67,8 @@ smbios_open(const char *file, int version, int flags, int *errp)
 	smbios_entry_t *ep;
 	caddr_t stbuf, bios, p, q;
 	caddr_t smb2, smb3;
-	uint64_t startaddr, startoff = 0;
-	size_t bioslen;
+	uint64_t startaddr, epaddr;
+	size_t bioslen, eplen;
 	uint_t smbe_stlen;
 	smbios_entry_point_t ep_type;
 	uint8_t smbe_major, smbe_minor;
@@ -83,28 +83,24 @@ smbios_open(const char *file, int version, int flags, int *errp)
 		bioslen = SMB_RANGE_LIMIT - SMB_RANGE_START + 1;
 	} else {
 		/*
-		 * We have smbios address from boot loader, map a page or two.
+		 * We have smbios address from boot loader. Map only
+		 * the entry point.
 		 */
-		bioslen = MMU_PAGESIZE;
-		startoff = startaddr & MMU_PAGEOFFSET;
-		startaddr &= MMU_PAGEMASK;
-		if (bioslen - startoff <= startoff)
-			bioslen += MMU_PAGESIZE;
+		bioslen = sizeof (smbios_entry_t);
 	}
 
-	bios = psm_map_phys(startaddr, bioslen, PSM_PROT_READ);
+	bios = psm_map_phys_new(startaddr, bioslen, PSM_PROT_READ);
 
 	if (bios == NULL)
 		return (smb_open_error(shp, errp, ESMB_MAPDEV));
 
 	/*
-	 * In case we did map one page, make sure we will not cross
-	 * the end of the page.
+	 * Entry point structure must fit into the mapped range.
 	 */
-	p = bios + startoff;
-	q = bios + bioslen - startoff;
+	p = bios;
+	q = bios + bioslen - sizeof (smbios_entry_t);
 	smb2 = smb3 = NULL;
-	while (p < q) {
+	while (p <= q) {
 		if (smb2 != NULL && smb3 != NULL)
 			break;
 
@@ -158,15 +154,27 @@ smbios_open(const char *file, int version, int flags, int *errp)
 		p = smb2;
 	}
 	bcopy(p, ep, sizeof (smbios_entry_t));
-	if (ep_type == SMBIOS_ENTRY_POINT_21) {
-		ep->ep21.smbe_elen = MIN(ep->ep21.smbe_elen, SMB_ENTRY_MAXLEN);
-		bcopy(p, ep, ep->ep21.smbe_elen);
-	} else if (ep_type == SMBIOS_ENTRY_POINT_30) {
-		ep->ep30.smbe_elen = MIN(ep->ep30.smbe_elen, SMB_ENTRY_MAXLEN);
-		bcopy(p, ep, ep->ep30.smbe_elen);
+	if (ep_type == SMBIOS_ENTRY_POINT_21)
+		eplen = ep->ep21.smbe_elen;
+	else
+		eplen = ep->ep30.smbe_elen;
+	eplen = MIN(eplen, SMB_ENTRY_MAXLEN);
+	epaddr = startaddr + (p - bios);
+	psm_unmap_phys(bios, bioslen);
+
+	/*
+	 * If entry point is larger than our structure, remap it.
+	 */
+	if (eplen > sizeof (smbios_entry_t)) {
+		bios = psm_map_phys_new(epaddr, eplen, PSM_PROT_READ);
+		if (bios == NULL) {
+			smb_free(ep, SMB_ENTRY_MAXLEN);
+			return (smb_open_error(shp, errp, ESMB_MAPDEV));
+		}
+		bcopy(bios, ep, eplen);
+		psm_unmap_phys(bios, eplen);
 	}
 
-	psm_unmap_phys(bios, bioslen);
 	switch (ep_type) {
 	case SMBIOS_ENTRY_POINT_21:
 		smbe_major = ep->ep21.smbe_major;
@@ -216,16 +224,15 @@ smbios_open(const char *file, int version, int flags, int *errp)
 	return (shp);
 }
 
-/*ARGSUSED*/
 smbios_hdl_t *
-smbios_fdopen(int fd, int version, int flags, int *errp)
+smbios_fdopen(int fd __unused, int version __unused, int flags __unused,
+    int *errp)
 {
 	return (smb_open_error(NULL, errp, ENOTSUP));
 }
 
-/*ARGSUSED*/
 int
-smbios_write(smbios_hdl_t *shp, int fd)
+smbios_write(smbios_hdl_t *shp, int fd __unused)
 {
 	return (smb_set_errno(shp, ENOTSUP));
 }
