@@ -694,8 +694,19 @@ blockif_open(nvlist_t *nvl, const char *ident)
 	psectsz = sbuf.st_blksize;
 	if (S_ISCHR(sbuf.st_mode)) {
 		struct dk_minfo_ext dkmext;
+		struct dk_cinfo dkcinfo;
 		int wce_val;
 
+		/*
+		 * The geom flag is used to check whether we need a bounce
+		 * buffer for misaligned I/O. Set it by default for all devices
+		 * except ZVOLs, which can handle this just fine.
+		 */
+		geom = 1;
+		if (ioctl(fd, DKIOCINFO, &dkcinfo) == 0) {
+			if (strncmp(dkcinfo.dki_cname, "zvol", DK_DEVLEN) == 0)
+				geom = 0;
+		}
 		/* Look for a more accurate physical block/media size */
 		if (ioctl(fd, DKIOCGMEDIAINFOEXT, &dkmext) == 0) {
 			psectsz = dkmext.dki_pbsize;
