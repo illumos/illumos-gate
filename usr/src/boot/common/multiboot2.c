@@ -782,8 +782,11 @@ mbi_size(struct preloaded_file *fp, char *cmdline)
 #if !defined(EFI)
 	if (gfx_fb.framebuffer_common.framebuffer_type ==
 	    MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED) {
+		uint16_t nc;
+		nc = gfx_fb.u.fb1.framebuffer_palette_num_colors;
 		size += sizeof (struct multiboot_tag_framebuffer_common);
-		size += CMAP_SIZE * sizeof (multiboot_color_t);
+		size += sizeof (uint16_t);
+		size += nc * sizeof (multiboot_color_t);
 	} else {
 		size += sizeof (multiboot_tag_framebuffer_t);
 	}
@@ -1153,17 +1156,8 @@ multiboot2_exec(struct preloaded_file *fp)
 
 	if (have_framebuffer == true) {
 		multiboot_tag_framebuffer_t *tag;
-		extern multiboot_tag_framebuffer_t gfx_fb;
-#if defined(EFI)
-
-		tag = (multiboot_tag_framebuffer_t *)mb_malloc(sizeof (*tag));
-		memcpy(tag, &gfx_fb, sizeof (*tag));
-		tag->framebuffer_common.mb_type =
-		    MULTIBOOT_TAG_TYPE_FRAMEBUFFER;
-		tag->framebuffer_common.mb_size = sizeof (*tag);
-#else
-		extern multiboot_color_t *cmap;
 		uint32_t size;
+		extern multiboot_tag_framebuffer_t gfx_fb;
 
 		if (gfx_fb.framebuffer_common.framebuffer_type ==
 		    MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED) {
@@ -1173,24 +1167,26 @@ multiboot2_exec(struct preloaded_file *fp)
 			    + sizeof (nc)
 			    + nc * sizeof (multiboot_color_t);
 		} else {
-			size = sizeof (gfx_fb);
+			size = sizeof (*tag);
 		}
 
 		tag = (multiboot_tag_framebuffer_t *)mb_malloc(size);
 		memcpy(tag, &gfx_fb, sizeof (*tag));
-
 		tag->framebuffer_common.mb_type =
 		    MULTIBOOT_TAG_TYPE_FRAMEBUFFER;
 		tag->framebuffer_common.mb_size = size;
 
+#if !defined(EFI)
+		extern multiboot_color_t *cmap;
+
 		if (gfx_fb.framebuffer_common.framebuffer_type ==
 		    MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED) {
-			gfx_fb.u.fb1.framebuffer_palette_num_colors = CMAP_SIZE;
-
+			uint16_t nc;
+			nc = gfx_fb.u.fb1.framebuffer_palette_num_colors;
 			memcpy(tag->u.fb1.framebuffer_palette, cmap,
-			    sizeof (multiboot_color_t) * CMAP_SIZE);
+			    sizeof (multiboot_color_t) * nc);
 		}
-#endif /* EFI */
+#endif /* !EFI */
 	}
 
 #if defined(EFI)

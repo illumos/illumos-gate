@@ -463,6 +463,7 @@ vbe_set_mode(int modenum)
 	case 0x4:
 		gfx_fb.framebuffer_common.framebuffer_type =
 		    MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED;
+		gfx_fb.u.fb1.framebuffer_palette_num_colors = CMAP_SIZE;
 		break;
 	case 0x6:
 		gfx_fb.framebuffer_common.framebuffer_type =
