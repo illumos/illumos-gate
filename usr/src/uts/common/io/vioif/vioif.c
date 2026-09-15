@@ -2044,6 +2044,26 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		}
 	}
 
+	/*
+	 * A device may start out with any receive filtering policy so
+	 * explicitly select our desired mode. This is best effort, so a
+	 * failure is not fatal.
+	 */
+	if (vif->vif_has_ctrlq_rx) {
+		int e;
+
+		e = vioif_m_setpromisc(vif, B_FALSE);
+		if (e == 0) {
+			mutex_enter(&vif->vif_mactab_mutex);
+			e = vioif_set_allmulti(vif, false);
+			mutex_exit(&vif->vif_mactab_mutex);
+		}
+		if (e != 0) {
+			dev_err(dip, CE_WARN,
+			    "!failed to reset the receive filtering mode");
+		}
+	}
+
 	if (virtio_interrupts_enable(vio) != DDI_SUCCESS) {
 		dev_err(dip, CE_WARN, "failed to enable interrupts");
 		goto fail;
