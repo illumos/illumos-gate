@@ -53,23 +53,28 @@ extern char *rindex(const char *, int);
  * do not permit the visibility of anything other than what is
  * specifically defined for each of these headers.  As a result,
  * inclusion of <string.h> would result in declarations not allowed
- * in <strings.h>, and making the following prototypes visible for
- * anything other than X/Open UNIX Extension would result in
- * conflicts with what is now in <string.h>.
+ * in <strings.h>.
+ *
+ * <strings.h> is not defined by ISO C.  In a strict ISO C environment,
+ * explicitly including this header is treated as a request for the
+ * interfaces it provides.  _STRICT_POSIX distinguishes that case from
+ * strict POSIX and XPG environments, where the requested edition
+ * determines which interfaces are visible.
  */
-#if defined(_XPG4_2) && !defined(__EXTENSIONS__)
+#if !defined(_STRICT_POSIX) || defined(_XPG4_2)
 extern int ffs(int);
 extern int strcasecmp(const char *, const char *);
 extern int strncasecmp(const char *, const char *, size_t);
-#if defined(_XPG7)
+#endif /* !_STRICT_POSIX || _XPG4_2 */
+
+#if !defined(_STRICT_POSIX) || defined(_XPG7)
 #ifndef	_LOCALE_T
 #define	_LOCALE_T
 typedef struct _locale *locale_t;
 #endif
 extern int strcasecmp_l(const char *, const char *, locale_t);
 extern int strncasecmp_l(const char *, const char *, size_t, locale_t);
-#endif	/* defined(_XPG7) */
-#endif	/* defined(_XPG4_2) && !defined(__EXTENSIONS__) */
+#endif	/* !_STRICT_POSIX || _XPG7 */
 
 #ifdef	__cplusplus
 }
