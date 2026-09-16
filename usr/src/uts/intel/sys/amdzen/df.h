@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SYS_AMDZEN_DF_H
@@ -255,6 +255,7 @@ typedef enum {
 #define	DF_FBIINFO3_V3_GET_BLOCKID(r)	bitx32(r, 13, 8)
 #define	DF_FBIINFO3_V3P5_GET_BLOCKID(r)	bitx32(r, 11, 8)
 #define	DF_FBIINFO3_V4_GET_BLOCKID(r)	bitx32(r, 19, 8)
+#define	DF_FBIINFO3_V4D2_GET_BLOCKID(r)	bitx32(r, 15, 8)
 #define	DF_FBIINFO3_GET_INSTID(r)	bitx32(r, 7, 0)
 
 /*
@@ -906,6 +907,7 @@ typedef enum {
 				.drd_func = 4, \
 				.drd_reg = 0x180 }
 #define	DF_SYSCFG_V4_GET_NODE_ID(r)	bitx32(r, 27, 16)
+#define	DF_SYSCFG_V4D2_GET_NODE_ID(r)	bitx32(r, 23, 16)
 #define	DF_SYSCFG_V4_GET_OTHER_SOCK(r)	bitx32(r, 8, 8)
 #define	DF_SYSCFG_V4_GET_NODE_MAP(r)	bitx32(r, 4, 4)
 #define	DF_SYSCFG_V4_GET_OTHER_TYPE(r)	bitx32(r, 3, 2)

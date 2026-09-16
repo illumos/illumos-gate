@@ -1120,7 +1120,9 @@ amdzen_determine_fabric_decomp(amdzen_t *azn, amdzen_df_t *df)
 		    DF_FIDMASK0_V3P5_GET_COMP_MASK(df->adf_mask0);
 		decomp->dfd_comp_shift = 0;
 
-		df->adf_nodeid = DF_SYSCFG_V4_GET_NODE_ID(df->adf_syscfg);
+		df->adf_nodeid = (df->adf_rev == DF_REV_4) ?
+		    DF_SYSCFG_V4_GET_NODE_ID(df->adf_syscfg) :
+		    DF_SYSCFG_V4D2_GET_NODE_ID(df->adf_syscfg);
 		break;
 	default:
 		panic("encountered suspicious, previously rejected DF "
@@ -1318,9 +1320,12 @@ amdzen_setup_df(amdzen_t *azn, amdzen_df_t *df)
 			    DF_FBIINFO3_V3P5_GET_BLOCKID(dfe->adfe_info3);
 			break;
 		case DF_REV_4:
-		case DF_REV_4D2:
 			dfe->adfe_fabric_id =
 			    DF_FBIINFO3_V4_GET_BLOCKID(dfe->adfe_info3);
+			break;
+		case DF_REV_4D2:
+			dfe->adfe_fabric_id =
+			    DF_FBIINFO3_V4D2_GET_BLOCKID(dfe->adfe_info3);
 			break;
 		default:
 			panic("encountered suspicious, previously rejected DF "
