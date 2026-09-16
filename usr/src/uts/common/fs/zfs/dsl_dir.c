@@ -1494,7 +1494,22 @@ dsl_dir_willuse_space(dsl_dir_t *dd, int64_t space, dmu_tx_t *tx)
 		dsl_dir_willuse_space(dd->dd_parent, parent_space, tx);
 }
 
-/* call from syncing context when we actually write/free space for this dd */
+/*
+ * Called from syncing context when space is actually allocated or freed.
+ *
+ * A dsl_dir uses MAX(dd_used_bytes, dd_reserved) of its parent's space
+ * (see parent_delta()), so how a change is split between the parent's
+ * DD_USED_CHILD and DD_USED_CHILD_RSRV depends on dd_used_bytes at the
+ * time of the change.  The child's dd_lock is dropped before the parent
+ * is updated, so if callers ran concurrently, the parent could see their
+ * changes in a different order than the child did, and DD_USED_CHILD_RSRV
+ * could underflow in between.  The same goes for DD_USED_REFRSRV, which
+ * is split according to ds_unique_bytes.  Therefore callers must not run
+ * concurrently, so dsl_dataset_block_born() and dsl_dataset_block_kill()
+ * only accumulate deltas, which dsl_dataset_apply_deltas() applies from
+ * the sync thread, and the other callers are sync tasks or run in the
+ * sync thread too.
+ */
 void
 dsl_dir_diduse_space(dsl_dir_t *dd, dd_used_t type,
     int64_t used, int64_t compressed, int64_t uncompressed, dmu_tx_t *tx)
