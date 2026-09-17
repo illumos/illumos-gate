@@ -11,6 +11,7 @@
 
 #
 # Copyright 2025 Oxide Computer Company
+# Copyright 2026 Dave Eddy
 #
 
 PROGS = \
@@ -30,7 +31,7 @@ CSTD = $(CSTD_GNU17)
 CTF_MODE = link
 CPPFLAGS += -D_XOPEN_SOURCE=800 -D__EXTENSIONS__
 
-oclo		:=	LDLIBS += -lsocket
+oclo		:=	LDLIBS += -lsocket -lcontract
 oclo_errors	:=	LDLIBS += -lsocket
 
 .KEEP_STATE:

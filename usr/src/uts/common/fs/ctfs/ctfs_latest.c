@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2026 Dave Eddy
  * Use is subject to license terms.
  */
 
@@ -124,7 +125,7 @@ ctfs_latest_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 {
 	vnode_t *nvp;
 
-	if (flag != (FREAD | FOFFMAX))
+	if ((flag & ~CTFS_FD_FLAGS) != (FREAD | FOFFMAX))
 		return (EINVAL);
 
 	if (nvp = ctfs_latest_nested_open(*vpp, cr)) {

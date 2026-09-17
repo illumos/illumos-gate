@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2026 Dave Eddy
  * Use is subject to license terms.
  */
 
@@ -76,7 +77,7 @@ ctfs_create_tmplnode(vnode_t *pvp)
 static int
 ctfs_tmpl_open(vnode_t **vpp, int flag, cred_t *cr, caller_context_t *ct)
 {
-	if (flag != (FREAD | FWRITE | FOFFMAX))
+	if ((flag & ~CTFS_FD_FLAGS) != (FREAD | FWRITE | FOFFMAX))
 		return (EINVAL);
 
 	return (0);

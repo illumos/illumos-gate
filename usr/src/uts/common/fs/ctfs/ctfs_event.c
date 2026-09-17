@@ -20,6 +20,7 @@
  */
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2026 Dave Eddy
  * Use is subject to license terms.
  */
 
@@ -57,7 +58,7 @@
 static int
 ctfs_endpoint_open(ctfs_endpoint_t *endpt, ct_equeue_t *q, int flag)
 {
-	if ((flag & ~FNONBLOCK) != (FREAD | FOFFMAX))
+	if ((flag & ~(FNONBLOCK | CTFS_FD_FLAGS)) != (FREAD | FOFFMAX))
 		return (EINVAL);
 
 	mutex_enter(&endpt->ctfs_endpt_lock);

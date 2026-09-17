@@ -21,6 +21,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Dave Eddy
  */
 
 #ifndef	_SYS_CTFS_IMPL_H
@@ -89,6 +90,12 @@ extern "C" {
  * Other constants
  */
 #define	CTFS_NAME_MAX		32
+
+/*
+ * Flags to ignore when validating CTFS open and pass directly through to
+ * the generic open call.
+ */
+#define	CTFS_FD_FLAGS		(FCLOEXEC | FCLOFORK)
 
 /*
  * Possible values for ctfs_endpt_flags, below.

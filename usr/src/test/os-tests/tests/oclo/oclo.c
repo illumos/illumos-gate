@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Dave Eddy
  */
 
 /*
@@ -59,7 +60,11 @@
 #include <string.h>
 #include <limits.h>
 #include <libgen.h>
+#include <libcontract.h>
 #include <sys/socket.h>
+#include <sys/contract.h>
+#include <sys/contract/process.h>
+#include <sys/ctfs.h>
 
 /*
  * Verification program name.
@@ -210,6 +215,151 @@ static void
 oclo_open(const clo_create_t *c)
 {
 	oclo_record(c, oclo_file(c), c->clo_flags, NULL);
+}
+
+static void
+oclo_ctfs(const clo_create_t *c)
+{
+	char ctl[PATH_MAX];
+	char events[PATH_MAX];
+	ct_stathdl_t status;
+	ctid_t ctid;
+	pid_t pid;
+	int error, fd, flags = 0, wstatus;
+
+	/*
+	 * Files to check with their respective flags to open(2).  "ctl" and
+	 * "events" will be updated below after the template is configured and
+	 * a child process is forked.
+	 */
+	struct {
+		const char *oc_name;
+		int oc_mode;
+	} files[] = { {
+		.oc_name = CTFS_ROOT "/process/bundle",
+		.oc_mode = O_RDONLY
+	}, {
+		.oc_name = CTFS_ROOT "/process/pbundle",
+		.oc_mode = O_RDONLY
+	}, {
+		.oc_name = CTFS_ROOT "/process/template",
+		.oc_mode = O_RDWR
+	}, {
+		.oc_name = CTFS_ROOT "/process/latest",
+		.oc_mode = O_RDONLY
+	}, {
+		.oc_name = ctl,
+		.oc_mode = O_WRONLY
+	}, {
+		.oc_name = events,
+		.oc_mode = O_RDONLY
+	} };
+
+	if ((c->clo_flags & FD_CLOEXEC) != 0) {
+		flags |= O_CLOEXEC;
+	}
+	if ((c->clo_flags & FD_CLOFORK) != 0) {
+		flags |= O_CLOFORK;
+	}
+
+	/*
+	 * Create a process contract so we have "ctl" and "events" files to
+	 * open below.
+	 */
+	fd = open(CTFS_ROOT "/process/template", O_RDWR);
+	if (fd < 0) {
+		err(EXIT_FAILURE, "TEST FAILED: %s: failed to open contract "
+		    "process template", c->clo_desc);
+	}
+
+	if ((error = ct_tmpl_set_critical(fd, 0)) != 0 ||
+	    (error = ct_tmpl_set_informative(fd, 0)) != 0 ||
+	    (error = ct_tmpl_activate(fd)) != 0) {
+		errc(EXIT_FAILURE, error, "TEST FAILED: %s: failed to "
+		    "configure contract process template", c->clo_desc);
+	}
+
+	/*
+	 * Fork to create a process contract for the calling LWP - this makes
+	 * <CTFS_ROOT>/process/latest available for opening and inspecting.  The
+	 * child doesn't need to do anything so we just exit immediately.
+	 */
+	pid = fork();
+	if (pid < 0) {
+		err(EXIT_FAILURE, "TEST FAILED: %s: failed to fork child "
+		    "process", c->clo_desc);
+	}
+	if (pid == 0) {
+		_exit(EXIT_SUCCESS);
+	}
+
+	if ((error = ct_tmpl_clear(fd)) != 0) {
+		errc(EXIT_FAILURE, error, "TEST FAILED: %s: failed to clear "
+		    "contract process template", c->clo_desc);
+	}
+	(void) close(fd);
+
+	fd = open(CTFS_ROOT "/process/latest", O_RDONLY);
+	if (fd < 0) {
+		err(EXIT_FAILURE, "TEST FAILED: %s: failed to open latest "
+		    "contract", c->clo_desc);
+	}
+	if ((error = ct_status_read(fd, CTD_COMMON, &status)) != 0) {
+		errc(EXIT_FAILURE, error, "TEST FAILED: %s: failed to read "
+		    "contract status", c->clo_desc);
+	}
+	ctid = ct_status_get_id(status);
+	ct_status_free(status);
+	(void) close(fd);
+
+	/*
+	 * The new contract has been created - update the "ctl" and "event"
+	 * file names and open the fds.
+	 */
+	if (snprintf(ctl, sizeof (ctl), CTFS_ROOT "/process/%" _PRIdID "/ctl",
+	    ctid) >= sizeof (ctl)) {
+		errx(EXIT_FAILURE, "TEST FAILED: contract ctl path is too "
+		    "long");
+	}
+	if (snprintf(events, sizeof (events), CTFS_ROOT "/process/%" _PRIdID
+	    "/events", ctid) >= sizeof (events)) {
+		errx(EXIT_FAILURE, "TEST FAILED: contract events path is too "
+		    "long");
+	}
+
+	for (size_t i = 0; i < ARRAY_SIZE(files); i++) {
+		fd = open(files[i].oc_name, files[i].oc_mode | flags);
+		if (fd < 0) {
+			err(EXIT_FAILURE, "TEST FAILED: %s: failed to open %s",
+			    c->clo_desc, files[i].oc_name);
+		}
+		oclo_record(c, fd, c->clo_flags, files[i].oc_name);
+	}
+
+	/*
+	 * At this point all fds have been opened.  We open the "ctl" file here
+	 * to abandon the contract - this will not affect the already-open fds
+	 * above which also include a "ctl" file.
+	 */
+	fd = open(ctl, O_WRONLY);
+	if (fd < 0) {
+		err(EXIT_FAILURE, "TEST FAILED: %s: failed to open %s",
+		    c->clo_desc, ctl);
+	}
+	if ((error = ct_ctl_abandon(fd)) != 0) {
+		errc(EXIT_FAILURE, error, "TEST FAILED: %s: failed to abandon "
+		    "process contract", c->clo_desc);
+	}
+	(void) close(fd);
+
+	if (waitpid(pid, &wstatus, 0) != pid) {
+		err(EXIT_FAILURE, "TEST FAILED: %s: failed to wait for "
+		    "contract child process", c->clo_desc);
+	}
+	if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus) != EXIT_SUCCESS) {
+		errx(EXIT_FAILURE, "TEST FAILED: %s: contract child process "
+		    "exited incorrectly", c->clo_desc);
+	}
 }
 
 static void
@@ -666,6 +816,22 @@ static const clo_create_t oclo_create[] = { {
 	.clo_desc = "open(2), O_CLOEXEC|O_CLOFORK",
 	.clo_flags = FD_CLOEXEC | FD_CLOFORK,
 	.clo_func = oclo_open
+}, {
+	.clo_desc = "CTFS open(2), no flags",
+	.clo_flags = 0,
+	.clo_func = oclo_ctfs
+}, {
+	.clo_desc = "CTFS open(2), O_CLOEXEC",
+	.clo_flags = FD_CLOEXEC,
+	.clo_func = oclo_ctfs
+}, {
+	.clo_desc = "CTFS open(2), O_CLOFORK",
+	.clo_flags = FD_CLOFORK,
+	.clo_func = oclo_ctfs
+}, {
+	.clo_desc = "CTFS open(2), O_CLOEXEC|O_CLOFORK",
+	.clo_flags = FD_CLOEXEC | FD_CLOFORK,
+	.clo_func = oclo_ctfs
 }, {
 	.clo_desc = "fcntl(F_SETFD) no flags->no flags",
 	.clo_flags = 0,
