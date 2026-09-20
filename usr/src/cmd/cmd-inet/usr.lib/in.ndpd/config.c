@@ -21,10 +21,14 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "defs.h"
 #include "tables.h"
+
+#include <values.h>
 
 /*
  * Parse the config file which consists of entries of the form:
@@ -567,7 +571,7 @@ parse_var_value(config_type_t type, struct configinfo *list, char *varstr,
 			confvar[I_MinRtrAdvInterval].cf_value = val / 3;
 		if (cip->ci_index == I_MaxRtrAdvInterval &&
 		    !confvar[I_AdvDefaultLifetime].cf_notdefault)
-		    confvar[I_AdvDefaultLifetime].cf_value = 3 * val;
+			confvar[I_AdvDefaultLifetime].cf_value = 3 * val;
 	}
 }
 
@@ -902,7 +906,6 @@ parse_addrprefix(char *strin, struct in6_addr *in6)
  * If the date has passed return zero.
  *
  * Returns true if ok (and *resp updated) and false if failed.
- * XXX Due to getdate limitations can not exceed year 2038.
  */
 static boolean_t
 parse_date(char *str, uint_t *resp)
@@ -937,9 +940,14 @@ parse_date(char *str, uint_t *resp)
 		    buf, ntime - time);
 	}
 	if (ntime < time) {
-		conferr("Date in the past <%s>\n", str);
+		conferr("Date in the past <%s> using no lifetime\n", str);
 		*resp = 0;
 		return (_B_TRUE);
+	}
+	/* Rest of this program deals with ints, prevent self-kneecapping. */
+	if (ntime - time > (time_t)MAXINT) {
+		conferr("Date too far in the future <%s>, rejecting\n", str);
+		return (_B_FALSE);
 	}
 	*resp = (ntime - time);
 	return (_B_TRUE);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  *
  * Copyright (c) 1999, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "defs.h"
@@ -109,19 +109,13 @@ static	int	ndpd_delete_addrs(const char *);
 static	int	phyint_check_ipadm_intfid(struct phyint *);
 
 /*
- * Return the current time in milliseconds truncated to
+ * Return the current (monotonic) time in milliseconds truncated to
  * fit in an integer.
  */
 uint_t
 getcurrenttime(void)
 {
-	struct timeval tp;
-
-	if (gettimeofday(&tp, NULL) < 0) {
-		logperror("getcurrenttime: gettimeofday failed");
-		exit(1);
-	}
-	return (tp.tv_sec * 1000 + tp.tv_usec / 1000);
+	return (NSEC2MSEC(gethrtime()));
 }
 
 /*
@@ -1916,7 +1910,7 @@ loopback_ra_enqueue(struct phyint *pi, struct nd_router_advert *ra, int len)
 	if (debug & D_PKTOUT)
 		logmsg(LOG_DEBUG, "loopback_ra_enqueue for %s\n", pi->pi_name);
 
-	raq = calloc(sizeof (struct raq), 1);
+	raq = calloc(1, sizeof (struct raq));
 	if (raq == NULL) {
 		logmsg(LOG_ERR, "loopback_ra_enqueue: out of memory\n");
 		return;

@@ -22,7 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "defs.h"
@@ -98,7 +98,7 @@ phyint_create(char *name)
 	if (debug & D_PHYINT)
 		logmsg(LOG_DEBUG, "phyint_create(%s)\n", name);
 
-	pi = (struct phyint *)calloc(sizeof (struct phyint), 1);
+	pi = (struct phyint *)calloc(1, sizeof (struct phyint));
 	if (pi == NULL) {
 		logmsg(LOG_ERR, "phyint_create: out of memory\n");
 		return (NULL);
@@ -1134,7 +1134,7 @@ prefix_create(struct phyint *pi, struct in6_addr prefix, int prefixlen,
 		    pi->pi_name, inet_ntop(AF_INET6, (void *)&prefix,
 		    abuf, sizeof (abuf)), prefixlen, flags);
 	}
-	pr = (struct prefix *)calloc(sizeof (struct prefix), 1);
+	pr = (struct prefix *)calloc(1, sizeof (struct prefix));
 	if (pr == NULL) {
 		logmsg(LOG_ERR, "prefix_create: out of memory\n");
 		return (NULL);
@@ -1167,7 +1167,7 @@ prefix_create_name(struct phyint *pi, char *name)
 		logmsg(LOG_DEBUG, "prefix_create_name(%s, %s)\n",
 		    pi->pi_name, name);
 	}
-	pr = (struct prefix *)calloc(sizeof (struct prefix), 1);
+	pr = (struct prefix *)calloc(1, sizeof (struct prefix));
 	if (pr == NULL) {
 		logmsg(LOG_ERR, "prefix_create_name: out of memory\n");
 		return (NULL);
@@ -1953,7 +1953,7 @@ adv_prefix_create(struct phyint *pi, struct in6_addr prefix, int prefixlen)
 		    pi->pi_name, inet_ntop(AF_INET6, (void *)&prefix,
 		    abuf, sizeof (abuf)), prefixlen);
 	}
-	adv_pr = (struct adv_prefix *)calloc(sizeof (struct adv_prefix), 1);
+	adv_pr = (struct adv_prefix *)calloc(1, sizeof (struct adv_prefix));
 	if (adv_pr == NULL) {
 		logmsg(LOG_ERR, "adv_prefix_create: calloc\n");
 		return (NULL);
@@ -2092,7 +2092,7 @@ router_create(struct phyint *pi, struct in6_addr addr, uint_t lifetime)
 		    abuf, sizeof (abuf)), lifetime);
 	}
 
-	dr = (struct router *)calloc(sizeof (struct router), 1);
+	dr = (struct router *)calloc(1, sizeof (struct router));
 	if (dr == NULL) {
 		logmsg(LOG_ERR, "router_create: out of memory\n");
 		return (NULL);
