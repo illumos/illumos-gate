@@ -57,6 +57,8 @@ EFI_GUID gEfiUgaDrawProtocolGuid = EFI_UGA_DRAW_PROTOCOL_GUID;
 EFI_GUID gEfiUgaIoProtocolGuid = EFI_UGA_IO_PROTOCOL_GUID;
 EFI_GUID gEfiEdidActiveProtocolGuid = EFI_EDID_ACTIVE_PROTOCOL_GUID;
 EFI_GUID gEfiEdidDiscoveredProtocolGuid = EFI_EDID_DISCOVERED_PROTOCOL_GUID;
+
+bool has_framebuffer = false;
 static EFI_HANDLE gop_handle;
 
 /* Saved initial GOP mode. */
@@ -559,6 +561,7 @@ efi_find_framebuffer(struct efi_fb *efifb)
 	free(hlist);
 
 	if (gop != NULL) {
+		has_framebuffer = true;
 		/* Save default mode. */
 		if (default_mode == UINT32_MAX) {
 			default_mode = gop->Mode->Mode;
@@ -574,9 +577,12 @@ efi_find_framebuffer(struct efi_fb *efifb)
 
 	status = BS->LocateProtocol(&gEfiUgaDrawProtocolGuid, NULL,
 	    (void **)&uga);
-	if (status == EFI_SUCCESS)
+	if (status == EFI_SUCCESS) {
+		has_framebuffer = true;
 		return (efifb_from_uga(efifb, uga));
+	}
 
+	has_framebuffer = false;
 	return (1);
 }
 

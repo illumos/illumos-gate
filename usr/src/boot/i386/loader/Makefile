@@ -104,7 +104,7 @@ CPPFLAGS +=	-I../btx/lib
 include ../Makefile.inc
 
 conf.o := CPPFLAGS += -I../../sys/cddl/boot/zfs
-multiboot2.o := CPPFLAGS += -I../../sys/cddl/boot/zfs
+multiboot2.o := CPPFLAGS += -I../../sys/cddl/boot/zfs -I$(PNGLITE)
 main.o := CPPFLAGS += -I../../sys/cddl/boot/zfs -I$(SRC)/uts/common/fs/zfs
 zfs_cmd.o := CPPFLAGS += -I../../sys/cddl/boot/zfs
 

@@ -43,6 +43,8 @@
 #define	SUPPORT_DHCP
 #include <bootp.h>
 
+#include <gfx_fb.h>
+
 #if !defined(EFI)
 #include "../i386/btx/lib/btxv86.h"
 #include "libi386.h"
@@ -73,10 +75,8 @@ static int multiboot2_exec(struct preloaded_file *);
 
 struct file_format multiboot2 = { multiboot2_loadfile, multiboot2_exec };
 static bool keep_bs = false;
-static bool have_framebuffer = false;
 static vm_offset_t load_addr;
 static vm_offset_t entry_addr;
-bool has_boot_services = true;
 
 /*
  * Validate tags in info request. This function is provided just to
@@ -200,7 +200,6 @@ multiboot2_loadfile(char *filename, uint64_t dest,
 	if (header == NULL)
 		goto out;
 
-	have_framebuffer = false;
 	for (tag = header->mb2_tags; tag->mbh_type != MULTIBOOT_TAG_TYPE_END;
 	    tag = (multiboot_header_tag_t *)((uintptr_t)tag +
 	    roundup2(tag->mbh_size, MULTIBOOT_TAG_ALIGN))) {
@@ -219,7 +218,6 @@ multiboot2_loadfile(char *filename, uint64_t dest,
 		case MULTIBOOT_HEADER_TAG_CONSOLE_FLAGS:
 			break;
 		case MULTIBOOT_HEADER_TAG_FRAMEBUFFER:
-			have_framebuffer = true;
 			break;
 		case MULTIBOOT_HEADER_TAG_MODULE_ALIGN:
 			/* we always align modules */
@@ -749,9 +747,6 @@ static size_t
 mbi_size(struct preloaded_file *fp, char *cmdline)
 {
 	size_t size;
-#if !defined(EFI)
-	extern multiboot_tag_framebuffer_t gfx_fb;
-#endif
 
 	size = sizeof (uint32_t) * 2; /* first 2 fields from MBI header */
 	size += sizeof (multiboot_tag_string_t) + strlen(cmdline) + 1;
@@ -769,32 +764,25 @@ mbi_size(struct preloaded_file *fp, char *cmdline)
 	size = roundup2(size, MULTIBOOT_TAG_ALIGN);
 	size += efimemmap_size();
 	size = roundup2(size, MULTIBOOT_TAG_ALIGN);
-
-	if (have_framebuffer == true) {
-		size += sizeof (multiboot_tag_framebuffer_t);
-		size = roundup2(size, MULTIBOOT_TAG_ALIGN);
-	}
 #endif
 
 	size += biossmap_size(fp);
 	size = roundup2(size, MULTIBOOT_TAG_ALIGN);
 
-#if !defined(EFI)
-	if (gfx_fb.framebuffer_common.framebuffer_type ==
-	    MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED) {
-		uint16_t nc;
-		nc = gfx_fb.u.fb1.framebuffer_palette_num_colors;
-		size += sizeof (struct multiboot_tag_framebuffer_common);
-		size += sizeof (uint16_t);
-		size += nc * sizeof (multiboot_color_t);
-	} else {
-		size += sizeof (multiboot_tag_framebuffer_t);
+	if (has_framebuffer) {
+		if (gfx_fb.framebuffer_common.framebuffer_type ==
+		    MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED) {
+			uint16_t nc;
+			nc = gfx_fb.u.fb1.framebuffer_palette_num_colors;
+			size +=
+			    sizeof (struct multiboot_tag_framebuffer_common);
+			size += sizeof (uint16_t);
+			size += nc * sizeof (multiboot_color_t);
+		} else {
+			size += sizeof (multiboot_tag_framebuffer_t);
+		}
+		size = roundup2(size, MULTIBOOT_TAG_ALIGN);
 	}
-	size = roundup2(size, MULTIBOOT_TAG_ALIGN);
-
-	size += sizeof (multiboot_tag_vbe_t);
-	size = roundup2(size, MULTIBOOT_TAG_ALIGN);
-#endif
 
 	if (bootp_response != NULL) {
 		size += sizeof (multiboot_tag_network_t) + bootp_response_size;
@@ -875,11 +863,6 @@ multiboot2_exec(struct preloaded_file *fp)
 
 #else
 	i386_getdev((void **)(&rootdev), NULL, NULL);
-
-	if (have_framebuffer == false) {
-		/* make sure we have text mode */
-		bios_set_text_mode(VGA_TEXT_MODE);
-	}
 #endif
 
 	error = EINVAL;
@@ -1098,18 +1081,6 @@ multiboot2_exec(struct preloaded_file *fp)
 		memcpy(tag->mb_dhcpack, bootp_response, bootp_response_size);
 	}
 
-#if !defined(EFI)
-	multiboot_tag_vbe_t *tag;
-	extern multiboot_tag_vbe_t vbestate;
-
-	if (VBE_VALID_MODE(vbestate.vbe_mode)) {
-		tag = (multiboot_tag_vbe_t *)mb_malloc(sizeof (*tag));
-		memcpy(tag, &vbestate, sizeof (*tag));
-		tag->mb_type = MULTIBOOT_TAG_TYPE_VBE;
-		tag->mb_size = sizeof (*tag);
-	}
-#endif
-
 	if (rsdp != NULL) {
 		multiboot_tag_new_acpi_t *ntag;
 		multiboot_tag_old_acpi_t *otag;
@@ -1154,10 +1125,9 @@ multiboot2_exec(struct preloaded_file *fp)
 #endif /* __LP64__ */
 #endif /* EFI */
 
-	if (have_framebuffer == true) {
+	if (has_framebuffer) {
 		multiboot_tag_framebuffer_t *tag;
 		uint32_t size;
-		extern multiboot_tag_framebuffer_t gfx_fb;
 
 		if (gfx_fb.framebuffer_common.framebuffer_type ==
 		    MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED) {

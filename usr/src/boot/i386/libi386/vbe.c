@@ -43,6 +43,9 @@
 #include <sys/vgareg.h>
 #include <sys/vgasubr.h>
 
+/* This code always fills gfx_fb. */
+bool has_framebuffer = true;
+
 multiboot_tag_vbe_t vbestate;
 static struct vbeinfoblock *vbe =
 	(struct vbeinfoblock *)&vbestate.vbe_control_info;

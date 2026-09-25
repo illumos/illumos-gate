@@ -31,6 +31,7 @@
 #include <Protocol/LoadedImage.h>
 #include <bootstrap.h>
 
+bool has_boot_services = true;
 static EFI_PHYSICAL_ADDRESS heap;
 static UINTN heapsize;
 

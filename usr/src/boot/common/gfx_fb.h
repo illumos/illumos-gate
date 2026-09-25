@@ -134,6 +134,7 @@ struct resolution {
 typedef TAILQ_HEAD(edid_resolution, resolution) edid_res_list_t;
 
 extern multiboot_tag_framebuffer_t gfx_fb;
+extern bool has_framebuffer;
 
 typedef enum {
 	GfxFbBltVideoFill,
