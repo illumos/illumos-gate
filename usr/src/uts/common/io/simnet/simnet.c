@@ -1416,7 +1416,7 @@ simnet_m_setprop(void *arg, const char *name, mac_prop_id_t num,
 	switch (num) {
 	case MAC_PROP_MTU:
 		(void) memcpy(&mtu, val, sizeof (mtu));
-		if (mtu > ETHERMIN && mtu < SIMNET_MAX_MTU)
+		if (mtu >= ETHERMIN && mtu <= SIMNET_MAX_MTU)
 			return (mac_maxsdu_update(sdev->sd_mh, mtu));
 		else
 			return (EINVAL);
@@ -1688,6 +1688,12 @@ simnet_m_propinfo(void *arg, const char *name, const mac_prop_id_t num,
     const mac_prop_info_handle_t prh)
 {
 	simnet_dev_t *sdev = arg;
+
+	if (num == MAC_PROP_MTU) {
+		/* Match the bounds accepted by simnet_m_setprop(). */
+		mac_prop_info_set_range_uint32(prh, ETHERMIN, SIMNET_MAX_MTU);
+		return;
+	}
 
 	switch (sdev->sd_type) {
 	case DL_ETHER:

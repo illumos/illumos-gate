@@ -57,5 +57,7 @@ file path=opt/net-tests/tests/ipv6/link-local mode=0555
 file path=opt/net-tests/tests/ipv6/scope-test-v4 mode=0555
 file path=opt/net-tests/tests/ipv6/scope-test-v6 mode=0555
 file path=opt/net-tests/tests/net_common mode=0555
+dir  path=opt/net-tests/tests/simnet
+file path=opt/net-tests/tests/simnet/mtu mode=0555
 license lic_CDDL license=lic_CDDL
 depend type=require fmri=system/test/testrunner

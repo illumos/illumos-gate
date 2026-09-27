@@ -51,3 +51,7 @@ tests = [
       'scope-test-v6',
       ]
 user = root
+
+[/opt/net-tests/tests/simnet]
+tests = ['mtu']
+user = root

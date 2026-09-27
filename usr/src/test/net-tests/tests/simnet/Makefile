@@ -10,19 +10,18 @@
 #
 
 #
-# Copyright 2019 Joyent, Inc.
-# Copyright 2024 Oxide Computer Company
+# Copyright 2026 Michal Skalski
 #
+
 include $(SRC)/Makefile.master
 include $(SRC)/cmd/Makefile.cmd
 
-SUBDIRS = forwarding ipv6 simnet
-SCRIPTS = net_common
 ROOTOPTPKG = $(ROOT)/opt/net-tests
-TESTDIR = $(ROOTOPTPKG)/tests
-CMDS = $(SCRIPTS:%=$(TESTDIR)/%)
-FILEMODE=0444
-$(CMDS) := FILEMODE = 0555
+TESTDIR = $(ROOTOPTPKG)/tests/simnet
+
+PROG = mtu
+CMDS = $(PROG:%=$(TESTDIR)/%)
+FILEMODE = 0555
 
 include $(SRC)/test/Makefile.com
 
@@ -35,9 +34,6 @@ $(CMDS): $(TESTDIR)
 
 $(TESTDIR):
 	$(INS.dir)
-
-$(TESTDIR)/%: %
-	$(INS.file)
 
 $(TESTDIR)/%: %.ksh
 	$(INS.rename)
