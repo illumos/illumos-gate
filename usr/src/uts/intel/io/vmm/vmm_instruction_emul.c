@@ -611,10 +611,33 @@ vie_update_register(struct vm *vm, int vcpuid, enum vm_reg_name reg,
 	return (error);
 }
 
+/*
+ * Check if this instruction needs to repeat and set the emulation's status
+ * appropriately.
+ */
 static int
-vie_repeat(struct vie *vie)
+vie_needs_repeat(uint64_t rcx, struct vie *vie)
 {
+	/*
+	 * The count register may be %rcx, %ecx, or %cx depending on the address
+	 * size of the instruction.
+	 */
+	if ((rcx & vie_size2mask(vie->addrsize)) == 0) {
+		vie->status &= ~VIES_REPEAT;
+		return (false);
+	}
+
 	vie->status |= VIES_REPEAT;
+
+	return (true);
+}
+
+static int
+vie_repeat(uint64_t rcx, struct vie *vie)
+{
+	if (!vie_needs_repeat(rcx, vie)) {
+		return (0);
+	}
 
 	/*
 	 * Clear out any cached operation values so the repeated instruction can
@@ -1168,11 +1191,7 @@ vie_emulate_movs(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 		error = vm_get_register(vm, vcpuid, VM_REG_GUEST_RCX, &rcx);
 		KASSERT(!error, ("%s: error %d getting rcx", __func__, error));
 
-		/*
-		 * The count register is %rcx, %ecx or %cx depending on the
-		 * address size of the instruction.
-		 */
-		if ((rcx & vie_size2mask(vie->addrsize)) == 0) {
+		if (!vie_needs_repeat(rcx, vie)) {
 			error = 0;
 			goto done;
 		}
@@ -1318,11 +1337,7 @@ vie_emulate_movs(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 		    rcx, vie->addrsize);
 		KASSERT(!error, ("%s: error %d updating rcx", __func__, error));
 
-		/*
-		 * Repeat the instruction if the count register is not zero.
-		 */
-		if ((rcx & vie_size2mask(vie->addrsize)) != 0)
-			return (vie_repeat(vie));
+		return (vie_repeat(rcx, vie));
 	}
 done:
 	return (error);
@@ -1342,12 +1357,9 @@ vie_emulate_stos(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 		error = vm_get_register(vm, vcpuid, VM_REG_GUEST_RCX, &rcx);
 		KASSERT(!error, ("%s: error %d getting rcx", __func__, error));
 
-		/*
-		 * The count register is %rcx, %ecx or %cx depending on the
-		 * address size of the instruction.
-		 */
-		if ((rcx & vie_size2mask(vie->addrsize)) == 0)
+		if (!vie_needs_repeat(rcx, vie)) {
 			return (0);
+		}
 	}
 
 	error = vm_get_register(vm, vcpuid, VM_REG_GUEST_RAX, &val);
@@ -1378,11 +1390,7 @@ vie_emulate_stos(struct vie *vie, struct vm *vm, int vcpuid, uint64_t gpa)
 		    rcx, vie->addrsize);
 		KASSERT(!error, ("%s: error %d updating rcx", __func__, error));
 
-		/*
-		 * Repeat the instruction if the count register is not zero.
-		 */
-		if ((rcx & vie_size2mask(vie->addrsize)) != 0)
-			return (vie_repeat(vie));
+		return (vie_repeat(rcx, vie));
 	}
 
 	return (0);
@@ -2463,7 +2471,7 @@ static int
 vie_emulate_inout_str(struct vie *vie, struct vm *vm, int vcpuid)
 {
 	uint8_t bytes, addrsize;
-	uint64_t index, count = 0, gla, rflags;
+	uint64_t index, rcx = 0, gla, rflags;
 	int prot, err, fault;
 	bool in, repeat;
 	enum vm_reg_name seg_reg, idx_reg;
@@ -2471,7 +2479,7 @@ vie_emulate_inout_str(struct vie *vie, struct vm *vm, int vcpuid)
 
 	in = (vie->inout.flags & INOUT_IN) != 0;
 	bytes = vie->inout.bytes;
-	addrsize = vie->inout.addrsize;
+	addrsize = vie->addrsize;
 	prot = in ? PROT_WRITE : PROT_READ;
 
 	ASSERT(bytes == 1 || bytes == 2 || bytes == 4);
@@ -2487,18 +2495,11 @@ vie_emulate_inout_str(struct vie *vie, struct vm *vm, int vcpuid)
 
 	/* Count register */
 	if (repeat) {
-		err = vm_get_register(vm, vcpuid, VM_REG_GUEST_RCX, &count);
-		count &= vie_size2mask(addrsize);
+		err = vm_get_register(vm, vcpuid, VM_REG_GUEST_RCX, &rcx);
 
-		if (count == 0) {
-			/*
-			 * If we were asked to emulate a REP INS/OUTS when the
-			 * count register is zero, no further work is required.
-			 */
+		if (!vie_needs_repeat(rcx, vie)) {
 			return (0);
 		}
-	} else {
-		count = 1;
 	}
 
 	gla = 0;
@@ -2557,15 +2558,13 @@ vie_emulate_inout_str(struct vie *vie, struct vm *vm, int vcpuid)
 		 * Update count register only if the instruction had a repeat
 		 * prefix.
 		 */
-		if ((vie->inout.flags & INOUT_REP) != 0) {
-			count--;
+		if (repeat) {
+			rcx = rcx - 1;
 			err = vie_update_register(vm, vcpuid, VM_REG_GUEST_RCX,
-			    count, addrsize);
+			    rcx, addrsize);
 			ASSERT(err == 0);
 
-			if (count != 0) {
-				return (vie_repeat(vie));
-			}
+			return (vie_repeat(rcx, vie));
 		}
 	}
 
@@ -2601,7 +2600,6 @@ vie_emulate_inout(struct vie *vie, struct vm *vm, int vcpuid)
 			VERIFY0(err);
 		}
 	} else {
-		vie->status &= ~VIES_REPEAT;
 		err = vie_emulate_inout_str(vie, vm, vcpuid);
 
 	}
@@ -2960,6 +2958,11 @@ vie_init_inout(struct vie *vie, const struct vm_inout *inout, uint8_t inst_len,
 
 	vie->inout = *inout;
 	vie->paging = *paging;
+
+	/*
+	 * Replicate addrsize to vie for use in in-kernel emulation.
+	 */
+	vie->addrsize = inout->addrsize;
 
 	/*
 	 * Since VMX/SVM assists already decoded the nature of the in/out

@@ -9,7 +9,7 @@
 # http://www.illumos.org/license/CDDL.
 #
 
-# Copyright 2025 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 
 include $(SRC)/cmd/Makefile.cmd
 include $(SRC)/cmd/Makefile.cmd.64
@@ -20,7 +20,8 @@ PROG =	rdmsr \
 	imul \
 	cpuid \
 	cpuid_guest_state \
-	inout
+	inout \
+	rep_instrs
 
 # These should probably go in the `vmm` tests, but since they depend on
 # in-guest payloads, it is easier to build them here.

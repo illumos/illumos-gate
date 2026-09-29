@@ -66,6 +66,8 @@ tests = [
 	'imul',
 	'rdmsr',
 	'wrmsr',
+	'inout',
+	'rep_instrs',
 	'triple_fault',
 	'exit_paging',
 	'page_dirty',

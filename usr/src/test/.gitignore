@@ -45,11 +45,13 @@ bhyve-tests/tests/inst_emul/payload_imul
 bhyve-tests/tests/inst_emul/payload_inout
 bhyve-tests/tests/inst_emul/payload_page_dirty
 bhyve-tests/tests/inst_emul/payload_rdmsr
+bhyve-tests/tests/inst_emul/payload_rep_instrs
 bhyve-tests/tests/inst_emul/payload_suspend_info
 bhyve-tests/tests/inst_emul/payload_triple_fault
 bhyve-tests/tests/inst_emul/payload_vcpu_barrier
 bhyve-tests/tests/inst_emul/payload_wrmsr
 bhyve-tests/tests/inst_emul/rdmsr
+bhyve-tests/tests/inst_emul/rep_instrs
 bhyve-tests/tests/inst_emul/suspend_info
 bhyve-tests/tests/inst_emul/triple_fault
 bhyve-tests/tests/inst_emul/vcpu_barrier
