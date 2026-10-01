@@ -22,7 +22,7 @@
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -3590,31 +3590,51 @@ pcie_fabric_feature_set(dev_info_t *dip, void *arg)
 	pci_cfgacc_put16(rcdip, bus_p->bus_bdf, bus_p->bus_pcie_off +
 	    PCIE_DEVCTL, devctl);
 
-	if (bus_p->bus_pcie_vers == PCIE_PCIECAP_VER_2_0 &&
-	    (fab->pfd_tag_act & PCIE_TAG_10B_COMP) != 0) {
+	/*
+	 * A function may only issue requests with 10-bit or 14-bit tags when
+	 * every completer in the fabric supports them (PCIE_TAG_10B_COMP /
+	 * PCIE_TAG_14B_COMP). A function must also not advertise the requester
+	 * capability without the matching completer capability being present.
+	 * Although the latter will have caused the fabric-level flag to be
+	 * unset we check it explicitly here too. Otherwise we clear the enable
+	 * bit as hotplug may have added a completer without support since the
+	 * last scan.
+	 */
+	if (bus_p->bus_pcie_vers == PCIE_PCIECAP_VER_2_0) {
 		uint32_t devcap2 = pci_cfgacc_get32(rcdip, bus_p->bus_bdf,
 		    bus_p->bus_pcie_off + PCIE_DEVCAP2);
 
-		if ((devcap2 & PCIE_DEVCAP2_10B_TAG_REQ_SUP) == 0) {
+		if ((devcap2 & PCIE_DEVCAP2_10B_TAG_REQ_SUP) != 0) {
 			uint16_t devctl2 = pci_cfgacc_get16(rcdip,
 			    bus_p->bus_bdf, bus_p->bus_pcie_off + PCIE_DEVCTL2);
-			devctl2 |= PCIE_DEVCTL2_10B_TAG_REQ_EN;
+
+			if ((fab->pfd_tag_act & PCIE_TAG_10B_COMP) != 0 &&
+			    (devcap2 & PCIE_DEVCAP2_10B_TAG_COMP_SUP) != 0) {
+				devctl2 |= PCIE_DEVCTL2_10B_TAG_REQ_EN;
+			} else {
+				devctl2 &= ~PCIE_DEVCTL2_10B_TAG_REQ_EN;
+			}
 			pci_cfgacc_put16(rcdip, bus_p->bus_bdf,
 			    bus_p->bus_pcie_off + PCIE_DEVCTL2, devctl2);
 		}
 	}
 
-	if (bus_p->bus_dev3_off != 0 &&
-	    (fab->pfd_tag_act & PCIE_TAG_14B_COMP) != 0) {
+	if (bus_p->bus_dev3_off != 0) {
 		uint32_t devcap3 = pci_cfgacc_get32(rcdip, bus_p->bus_bdf,
 		    bus_p->bus_dev3_off + PCIE_DEVCAP3);
 
-		if ((devcap3 & PCIE_DEVCAP3_14B_TAG_REQ_SUP) == 0) {
+		if ((devcap3 & PCIE_DEVCAP3_14B_TAG_REQ_SUP) != 0) {
 			uint16_t devctl3 = pci_cfgacc_get16(rcdip,
 			    bus_p->bus_bdf, bus_p->bus_dev3_off + PCIE_DEVCTL3);
-			devctl3 |= PCIE_DEVCTL3_14B_TAG_REQ_EN;
+
+			if ((fab->pfd_tag_act & PCIE_TAG_14B_COMP) != 0 &&
+			    (devcap3 & PCIE_DEVCAP3_14B_TAG_COMP_SUP) != 0) {
+				devctl3 |= PCIE_DEVCTL3_14B_TAG_REQ_EN;
+			} else {
+				devctl3 &= ~PCIE_DEVCTL3_14B_TAG_REQ_EN;
+			}
 			pci_cfgacc_put16(rcdip, bus_p->bus_bdf,
-			    bus_p->bus_pcie_off + PCIE_DEVCTL2, devctl3);
+			    bus_p->bus_dev3_off + PCIE_DEVCTL3, devctl3);
 		}
 	}
 
