@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2023 Toomas Soome <tsoome@me.com>
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -23,6 +24,7 @@
 typedef uint64_t vm_paddr_t;
 typedef int64_t vm_ooffset_t;
 #include <sys/vmm_dev.h>
+#include <sys/viona_io.h>
 
 /* VMM ioctls */
 const struct ioc vmmctl_ioc[] = {
@@ -146,11 +148,59 @@ const struct ioc vmm_ioc[] = {
 	{ (uint_t)VM_DEVMEM_GETOFFSET,		"VM_DEVMEM_GETOFFSET", NULL }
 };
 
+/* viona ioctls */
+const struct ioc viona_ioc[] = {
+	{ (uint_t)VNA_IOC_CREATE,		"VNA_IOC_CREATE", NULL },
+	{ (uint_t)VNA_IOC_DELETE,		"VNA_IOC_DELETE", NULL },
+	{ (uint_t)VNA_IOC_VERSION,		"VNA_IOC_VERSION", NULL },
+	{ (uint_t)VNA_IOC_DEFAULT_PARAMS,	"VNA_IOC_DEFAULT_PARAMS",
+		NULL },
+
+	{ (uint_t)VNA_IOC_RING_INIT,		"VNA_IOC_RING_INIT", NULL },
+	{ (uint_t)VNA_IOC_RING_RESET,		"VNA_IOC_RING_RESET", NULL },
+	{ (uint_t)VNA_IOC_RING_KICK,		"VNA_IOC_RING_KICK", NULL },
+	{ (uint_t)VNA_IOC_RING_SET_MSI,		"VNA_IOC_RING_SET_MSI", NULL },
+	{ (uint_t)VNA_IOC_RING_INTR_CLR,	"VNA_IOC_RING_INTR_CLR", NULL },
+	{ (uint_t)VNA_IOC_RING_SET_STATE,	"VNA_IOC_RING_SET_STATE",
+		NULL },
+	{ (uint_t)VNA_IOC_RING_GET_STATE,	"VNA_IOC_RING_GET_STATE",
+		NULL },
+	{ (uint_t)VNA_IOC_RING_PAUSE,		"VNA_IOC_RING_PAUSE", NULL },
+	{ (uint_t)VNA_IOC_RING_INIT_MODERN,	"VNA_IOC_RING_INIT_MODERN",
+		NULL },
+
+	{ (uint_t)VNA_IOC_INTR_POLL,		"VNA_IOC_INTR_POLL", NULL },
+	{ (uint_t)VNA_IOC_SET_FEATURES,		"VNA_IOC_SET_FEATURES", NULL },
+	{ (uint_t)VNA_IOC_GET_FEATURES,		"VNA_IOC_GET_FEATURES", NULL },
+	{ (uint_t)VNA_IOC_SET_NOTIFY_IOP,	"VNA_IOC_SET_NOTIFY_IOP",
+		NULL },
+	{ (uint_t)VNA_IOC_SET_PROMISC,		"VNA_IOC_SET_PROMISC", NULL },
+	{ (uint_t)VNA_IOC_GET_PARAMS,		"VNA_IOC_GET_PARAMS", NULL },
+	{ (uint_t)VNA_IOC_SET_PARAMS,		"VNA_IOC_SET_PARAMS", NULL },
+	{ (uint_t)VNA_IOC_GET_MTU,		"VNA_IOC_GET_MTU", NULL },
+	{ (uint_t)VNA_IOC_SET_MTU,		"VNA_IOC_SET_MTU", NULL },
+	{ (uint_t)VNA_IOC_SET_NOTIFY_MMIO,	"VNA_IOC_SET_NOTIFY_MMIO",
+		NULL },
+	{ (uint_t)VNA_IOC_INTR_POLL_MQ,		"VNA_IOC_INTR_POLL_MQ", NULL },
+	{ (uint_t)VNA_IOC_SET_MAC_FILTERS,	"VNA_IOC_SET_MAC_FILTERS",
+		NULL },
+	{ (uint_t)VNA_IOC_GET_MAC_FILTERS,	"VNA_IOC_GET_MAC_FILTERS",
+		NULL },
+	{ (uint_t)VNA_IOC_SET_MAC_ADDR,		"VNA_IOC_SET_MAC_ADDR", NULL },
+	{ (uint_t)VNA_IOC_GET_MAC_ADDR,		"VNA_IOC_GET_MAC_ADDR", NULL },
+
+	{ (uint_t)VNA_IOC_GET_PAIRS,		"VNA_IOC_GET_PAIRS", NULL },
+	{ (uint_t)VNA_IOC_SET_PAIRS,		"VNA_IOC_SET_PAIRS", NULL },
+	{ (uint_t)VNA_IOC_GET_USEPAIRS,		"VNA_IOC_GET_USEPAIRS", NULL },
+	{ (uint_t)VNA_IOC_SET_USEPAIRS,		"VNA_IOC_SET_USEPAIRS", NULL }
+};
+
 const struct iocs vmm_iocs[] = {
 	{ .nitems = ARRAY_SIZE(vmmctl_ioc), .data = vmmctl_ioc },
 	{ .nitems = ARRAY_SIZE(vmm_cpu_ioc), .data = vmm_cpu_ioc },
 	{ .nitems = ARRAY_SIZE(vmm_lock_ioc), .data = vmm_lock_ioc },
 	{ .nitems = ARRAY_SIZE(vmm_ioc), .data = vmm_ioc },
+	{ .nitems = ARRAY_SIZE(viona_ioc), .data = viona_ioc },
 	{ .nitems = 0, .data = NULL }
 };
 #else
