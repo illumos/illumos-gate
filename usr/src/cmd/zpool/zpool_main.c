@@ -529,8 +529,9 @@ usage(boolean_t requested)
 
 /*
  * print a pool vdev config for dry runs
+ * Return B_TRUE if 'name' was printed.
  */
-static void
+static boolean_t
 print_vdev_tree(zpool_handle_t *zhp, const char *name, nvlist_t *nv, int indent,
     const char *match, int name_flags)
 {
@@ -541,9 +542,9 @@ print_vdev_tree(zpool_handle_t *zhp, const char *name, nvlist_t *nv, int indent,
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
 	    &child, &children) != 0) {
-		if (name != NULL)
+		if ((printed = (name != NULL)))
 			(void) printf("\t%*s%s\n", indent, "", name);
-		return;
+		return (printed);
 	}
 
 	for (c = 0; c < children; c++) {
@@ -564,10 +565,11 @@ print_vdev_tree(zpool_handle_t *zhp, const char *name, nvlist_t *nv, int indent,
 			printed = B_TRUE;
 		}
 		vname = zpool_vdev_name(g_zfs, zhp, child[c], name_flags);
-		print_vdev_tree(zhp, vname, child[c], indent + 2, "",
+		(void) print_vdev_tree(zhp, vname, child[c], indent + 2, "",
 		    name_flags);
 		free(vname);
 	}
+	return (printed);
 }
 
 static boolean_t
@@ -800,33 +802,33 @@ zpool_do_add(int argc, char **argv)
 
 	if (dryrun) {
 		nvlist_t *poolnvroot;
+		boolean_t printed;
 
 		verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
 		    &poolnvroot) == 0);
-
 		(void) printf(gettext("would update '%s' to the following "
 		    "configuration:\n"), zpool_get_name(zhp));
 
 		/* print original main pool and new tree */
-		print_vdev_tree(zhp, poolname, poolnvroot, 0, "",
+		(void) print_vdev_tree(zhp, poolname, poolnvroot, 0, "",
 		    name_flags | VDEV_NAME_TYPE_ID);
-		print_vdev_tree(zhp, NULL, nvroot, 0, "", name_flags);
+		(void) print_vdev_tree(zhp, NULL, nvroot, 0, "", name_flags);
 
 		/* print other classes: 'dedup', 'special', and 'log' */
-		print_vdev_tree(zhp, "dedup", poolnvroot, 0,
+		printed = print_vdev_tree(zhp, "dedup", poolnvroot, 0,
 		    VDEV_ALLOC_BIAS_DEDUP, name_flags);
-		print_vdev_tree(zhp, NULL, nvroot, 0, VDEV_ALLOC_BIAS_DEDUP,
-		    name_flags);
+		(void) print_vdev_tree(zhp, printed ? NULL : "dedup", nvroot, 0,
+		    VDEV_ALLOC_BIAS_DEDUP, name_flags);
 
-		print_vdev_tree(zhp, "special", poolnvroot, 0,
+		printed = print_vdev_tree(zhp, "special", poolnvroot, 0,
 		    VDEV_ALLOC_BIAS_SPECIAL, name_flags);
-		print_vdev_tree(zhp, NULL, nvroot, 0, VDEV_ALLOC_BIAS_SPECIAL,
-		    name_flags);
+		(void) print_vdev_tree(zhp, printed ? NULL : "special", nvroot,
+		    0, VDEV_ALLOC_BIAS_SPECIAL, name_flags);
 
-		print_vdev_tree(zhp, "logs", poolnvroot, 0, VDEV_ALLOC_BIAS_LOG,
-		    name_flags);
-		print_vdev_tree(zhp, NULL, nvroot, 0, VDEV_ALLOC_BIAS_LOG,
-		    name_flags);
+		printed = print_vdev_tree(zhp, "logs", poolnvroot, 0,
+		    VDEV_ALLOC_BIAS_LOG, name_flags);
+		(void) print_vdev_tree(zhp, printed ? NULL : "logs", nvroot, 0,
+		    VDEV_ALLOC_BIAS_LOG, name_flags);
 
 		ret = 0;
 	} else {
@@ -1427,12 +1429,12 @@ zpool_do_create(int argc, char **argv)
 		(void) printf(gettext("would create '%s' with the "
 		    "following layout:\n\n"), poolname);
 
-		print_vdev_tree(NULL, poolname, nvroot, 0, "", 0);
-		print_vdev_tree(NULL, "dedup", nvroot, 0,
+		(void) print_vdev_tree(NULL, poolname, nvroot, 0, "", 0);
+		(void) print_vdev_tree(NULL, "dedup", nvroot, 0,
 		    VDEV_ALLOC_BIAS_DEDUP, 0);
-		print_vdev_tree(NULL, "special", nvroot, 0,
+		(void) print_vdev_tree(NULL, "special", nvroot, 0,
 		    VDEV_ALLOC_BIAS_SPECIAL, 0);
-		print_vdev_tree(NULL, "logs", nvroot, 0,
+		(void) print_vdev_tree(NULL, "logs", nvroot, 0,
 		    VDEV_ALLOC_BIAS_LOG, 0);
 
 		ret = 0;
@@ -5935,7 +5937,7 @@ zpool_do_split(int argc, char **argv)
 		if (flags.dryrun) {
 			(void) printf(gettext("would create '%s' with the "
 			    "following layout:\n\n"), newpool);
-			print_vdev_tree(NULL, newpool, config, 0, "",
+			(void) print_vdev_tree(NULL, newpool, config, 0, "",
 			    flags.name_flags);
 		}
 		nvlist_free(config);
