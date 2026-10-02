@@ -22,6 +22,7 @@
 /*
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <assert.h>
@@ -215,11 +216,13 @@ nwam_backend_door_server(void *cookie, char *arg, size_t arg_size,
 	uid_t uid;
 	boolean_t write = B_TRUE;
 
-	/* Check arg size */
-	if (arg_size < sizeof (nwam_backend_door_arg_t)) {
-		req->nwbda_result = NWAM_INVALID_ARG;
-		(void) door_return((char *)req,
-		    sizeof (nwam_backend_door_arg_t), NULL, 0);
+	/*
+	 * The door is accessible to all users, so validate the request before
+	 * touching it. A zero-length request arrives with a NULL argument.
+	 */
+	if (req == NULL || arg_size < sizeof (nwam_backend_door_arg_t)) {
+		(void) door_return(NULL, 0, NULL, 0);
+		return;
 	}
 
 	if (door_ucred(&ucr) != 0) {

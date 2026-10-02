@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <auth_attr.h>
@@ -541,6 +542,15 @@ nwamd_door_switch(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 	struct passwd *pwd = NULL;
 	boolean_t found = B_FALSE;
 	int i;
+
+	/*
+	 * The door is accessible to all users, so validate the request before
+	 * touching it. A zero-length request arrives with a NULL argument.
+	 */
+	if (argp == NULL || arg_size < sizeof (nwamd_door_arg_t)) {
+		(void) door_return(NULL, 0, NULL, 0);
+		return;
+	}
 
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	req = (nwamd_door_arg_t *)argp;
