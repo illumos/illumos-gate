@@ -21,6 +21,8 @@
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_NSCD_SELFCRED_H
@@ -53,18 +55,17 @@ typedef struct nscd_fork {
 /*
  * prototypes
  */
-int _nscd_is_self_cred_on(int recheck, char **dblist);
-void _nscd_set_forker_pid(pid_t	pid);
-void _nscd_free_cslots();
-void _nscd_kill_forker();
-void _nscd_kill_all_children();
-void _nscd_proc_iamhere(void *buf, door_desc_t *dp,
-	uint_t n_desc, int iam);
-void _nscd_proc_pulse(void *buf, int iam);
-void _nscd_proc_fork(void *buf, int iam);
-void _nscd_proc_alt_get(void *buf, int *door);
-void _nscd_start_forker(char *path, int argc, char **argv);
-void _nscd_peruser_getadmin(void *buf, int buf_size);
+int _nscd_is_self_cred_on(int, char **);
+void _nscd_set_forker_pid(pid_t);
+void _nscd_free_cslots(void);
+void _nscd_kill_forker(void);
+void _nscd_kill_all_children(void);
+boolean_t _nscd_proc_iamhere(void *, door_desc_t *, uint_t, int);
+void _nscd_proc_pulse(void *, int);
+void _nscd_proc_fork(void *, int);
+void _nscd_proc_alt_get(void *, int *);
+void _nscd_start_forker(char *, int, char **);
+void _nscd_peruser_getadmin(void *, int);
 
 #ifdef	__cplusplus
 }

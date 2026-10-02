@@ -23,6 +23,7 @@
  * Copyright (c) 2006, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright 2018 Joyent Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -497,14 +498,15 @@ child_monitor(
 	return (NULL);
 }
 
-
-void
+/* Returns TRUE if we are keeping the file descriptor in door_desc_t. */
+boolean_t
 _nscd_proc_iamhere(
 	void		*buf,
 	door_desc_t	*dp,
 	uint_t		n_desc,
 	int		iam)
 {
+	boolean_t	retval = B_FALSE;
 	int		cslot;
 	child_t		*ch;
 	int		errnum;
@@ -525,7 +527,7 @@ _nscd_proc_iamhere(
 
 		NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, errnum,
 		    NSCD_DOOR_UCRED_ERROR);
-		return;
+		return (retval);
 	}
 	uid = ucred_geteuid(uc);
 
@@ -598,6 +600,7 @@ _nscd_proc_iamhere(
 				(void) close(forking_door);
 			forking_door = dp->d_data.d_desc.d_descriptor;
 			(void) mutex_unlock(&forking_lock);
+			retval = B_TRUE; /* Consuming dp. */
 
 			_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 			(me, "forking door is %d\n", forking_door);
@@ -666,6 +669,16 @@ _nscd_proc_iamhere(
 			break;
 		}
 
+		if (n_desc < 1) {
+			_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
+			(me, "BAD CHILD, NO DOOR!\n");
+
+
+			NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
+			    NSCD_SELF_CRED_NO_DOOR);
+			break;
+		}
+
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
 		(me, "d_descriptor = %d, d_id = %lld\n",
 		    dp->d_data.d_desc.d_descriptor, dp->d_data.d_desc.d_id);
@@ -677,6 +690,7 @@ _nscd_proc_iamhere(
 			if (ch->child_door != -1)
 				(void) close(ch->child_door);
 			ch->child_door = dp->d_data.d_desc.d_descriptor;
+			retval = B_TRUE; /* Consuming dp. */
 			ch->child_pid  = ucred_getpid(uc);
 			ch->child_state  = CHILD_STATE_PIDKNOWN;
 			_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_DEBUG)
@@ -703,6 +717,7 @@ _nscd_proc_iamhere(
 
 	ucred_free(uc);
 	uc = NULL;
+	return (retval);
 }
 
 void
