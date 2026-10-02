@@ -25,6 +25,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -47,6 +48,7 @@
 #include <string.h>
 #include <strings.h>
 #include <door.h>
+#include <ucred.h>
 #include <wait.h>
 #include <libintl.h>
 #include <locale.h>
@@ -217,16 +219,36 @@ reparsed_doorfunc(void *cookie, char *argp, size_t arg_size,
 	char *svc_type, *svc_data;
 	char *cp, *buf, *sbuf, res_buf[DOOR_RESULT_BUFSZ];
 	reparsed_door_res_t *resp;
+	ucred_t *uc = NULL;
+	pid_t pid;
+
+	/*
+	 * The only legitimate caller is the kernel, via reparse_kderef().
+	 * Kernel upcalls are reported with a pid of 0, which no user process
+	 * can have.
+	 */
+	if (door_ucred(&uc) != 0) {
+		reparsed_door_call_error(EPERM, 0);
+		/* NOTREACHED */
+	}
+	pid = ucred_getpid(uc);
+	ucred_free(uc);
+	if (pid != 0) {
+		reparsed_door_call_error(EPERM, 0);
+		/* NOTREACHED */
+	}
 
 	if ((argp == NULL) || (arg_size == 0)) {
 		reparsed_door_call_error(EINVAL, 0);
 		/* NOTREACHED */
 	}
 
-	if (verbose)
-		syslog(LOG_NOTICE, "reparsed_door: [%s, %d]", argp, arg_size);
+	if (verbose) {
+		syslog(LOG_NOTICE, "reparsed_door: [%.*s, %zu]",
+		    (int)arg_size, argp, arg_size);
+	}
 
-	if ((svc_type = strdup(argp)) == NULL) {
+	if ((svc_type = strndup(argp, arg_size)) == NULL) {
 		reparsed_door_call_error(ENOMEM, 0);
 		/* NOTREACHED */
 	}
@@ -329,7 +351,7 @@ start_reparsed_svcs()
 	 * Create a file system path for the door
 	 */
 	if ((dfd = open(REPARSED_DOOR, O_RDWR|O_CREAT|O_TRUNC,
-	    S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)) == -1) {
+	    S_IRUSR|S_IWUSR)) == -1) {
 		syslog(LOG_ERR, "unable to open %s", REPARSED_DOOR);
 		(void) close(doorfd);
 		return (1);

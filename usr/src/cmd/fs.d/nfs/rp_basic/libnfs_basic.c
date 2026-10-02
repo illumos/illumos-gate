@@ -22,6 +22,7 @@
 /*
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -103,6 +104,14 @@ get_fs_locations(char *buf)
 	char *p, *sp, *dp, buf2[SYMLINK_MAX];
 
 	if (buf == NULL)
+		return (NULL);
+
+	/*
+	 * Each host and path is copied into buf2 below so neither can be
+	 * longer than the input; reject any input that would not fit.
+	 * Data from a real reparse point is always shorter than this.
+	 */
+	if (strlen(buf) >= sizeof (buf2))
 		return (NULL);
 #ifdef DEBUG
 	printf("get_fs_locations: input %s\n", buf);
