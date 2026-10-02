@@ -38,7 +38,7 @@
 /* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -73,7 +73,7 @@ enum {
 CTASSERT(HOST_MSR_NUM == SVM_HOST_MSR_NUM);
 
 void
-svm_msr_guest_init(struct svm_softc *sc, int vcpu)
+svm_msr_guest_init(struct svm_vcpu *vcpu)
 {
 	/*
 	 * All the MSRs accessible to the guest are either saved/restored by
@@ -86,9 +86,10 @@ svm_msr_guest_init(struct svm_softc *sc, int vcpu)
 }
 
 void
-svm_msr_guest_enter(struct svm_softc *sc, int vcpu)
+svm_msr_guest_enter(struct svm_vcpu *vcpu)
 {
-	uint64_t *host_msrs = sc->host_msrs[vcpu];
+	struct svm_softc *sc = vcpu->sc;
+	uint64_t *host_msrs = sc->host_msrs[vcpu->vcpuid];
 
 	/*
 	 * Save host MSRs (if any) and restore guest MSRs (if any).
@@ -109,9 +110,10 @@ svm_msr_guest_enter(struct svm_softc *sc, int vcpu)
 }
 
 void
-svm_msr_guest_exit(struct svm_softc *sc, int vcpu)
+svm_msr_guest_exit(struct svm_vcpu *vcpu)
 {
-	uint64_t *host_msrs = sc->host_msrs[vcpu];
+	struct svm_softc *sc = vcpu->sc;
+	uint64_t *host_msrs = sc->host_msrs[vcpu->vcpuid];
 
 	/*
 	 * Save guest MSRs (if any) and restore host MSRs.
@@ -130,7 +132,7 @@ svm_msr_guest_exit(struct svm_softc *sc, int vcpu)
 }
 
 vm_msr_result_t
-svm_rdmsr(struct svm_softc *sc, int vcpu, uint32_t num, uint64_t *result)
+svm_rdmsr(struct svm_vcpu *vcpu, uint32_t num, uint64_t *result)
 {
 	switch (num) {
 	case MSR_SYSCFG:
@@ -157,7 +159,7 @@ svm_rdmsr(struct svm_softc *sc, int vcpu, uint32_t num, uint64_t *result)
 }
 
 vm_msr_result_t
-svm_wrmsr(struct svm_softc *sc, int vcpu, uint32_t num, uint64_t val)
+svm_wrmsr(struct svm_vcpu *vcpu, uint32_t num, uint64_t val)
 {
 	switch (num) {
 	case MSR_SYSCFG:

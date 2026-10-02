@@ -38,11 +38,13 @@
 /* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_VMM_INSTRUCTION_EMUL_H_
 #define	_VMM_INSTRUCTION_EMUL_H_
+
+struct vcpu;
 
 #include <sys/mman.h>
 #include <machine/vmm.h>
@@ -68,22 +70,22 @@ bool vie_pending(const struct vie *vie);
 uint64_t vie_mmio_gpa(const struct vie *vie);
 void vie_exitinfo(const struct vie *vie, struct vm_exit *vme);
 void vie_fallback_exitinfo(const struct vie *vie, struct vm_exit *vme);
-void vie_cs_info(const struct vie *vie, struct vm *vm, int vcpuid,
+void vie_cs_info(const struct vie *vie, struct vcpu *vcpu,
     uint64_t *cs_base, int *cs_d);
 
 void vie_reset(struct vie *vie);
 void vie_advance_pc(struct vie *vie, uint64_t *nextrip);
 
-int vie_emulate_mmio(struct vie *vie, struct vm *vm, int vcpuid);
-int vie_emulate_inout(struct vie *vie, struct vm *vm, int vcpuid);
-int vie_emulate_other(struct vie *vie, struct vm *vm, int vcpuid);
+int vie_emulate_mmio(struct vie *vie, struct vcpu *vcpu);
+int vie_emulate_inout(struct vie *vie, struct vcpu *vcpu);
+int vie_emulate_other(struct vie *vie, struct vcpu *vcpu);
 
 /*
  * APIs to fetch and decode the instruction from nested page fault handler.
  *
  * 'vie' must be initialized before calling 'vie_fetch_instruction()'
  */
-int vie_fetch_instruction(struct vie *vie, struct vm *vm, int cpuid,
+int vie_fetch_instruction(struct vie *vie, struct vcpu *vcpu,
     uint64_t rip, int *is_fault);
 
 /*
@@ -94,18 +96,18 @@ int vie_fetch_instruction(struct vie *vie, struct vm *vm, int cpuid,
  *   0		   1		An exception was injected into the guest
  * EFAULT	  N/A		An unrecoverable hypervisor error occurred
  */
-int vm_gla2gpa(struct vm *vm, int vcpuid, struct vm_guest_paging *paging,
+int vm_gla2gpa(struct vcpu *vcpu, struct vm_guest_paging *paging,
     uint64_t gla, int prot, uint64_t *gpa, int *is_fault);
 
 /*
  * Like vm_gla2gpa, but no exceptions are injected into the guest and
  * PTEs are not changed.
  */
-int vm_gla2gpa_nofault(struct vm *vm, int vcpuid,
+int vm_gla2gpa_nofault(struct vcpu *vcpu,
     struct vm_guest_paging *paging, uint64_t gla, int prot, uint64_t *gpa,
     int *is_fault);
 
-int vie_verify_gla(struct vie *vie, struct vm *vm, int cpuid, uint64_t gla);
+int vie_verify_gla(struct vie *vie, struct vcpu *vcpu, uint64_t gla);
 /*
  * Decode the instruction fetched into 'vie' so it can be emulated.
  *
@@ -118,6 +120,6 @@ int vie_verify_gla(struct vie *vie, struct vm *vm, int cpuid, uint64_t gla);
  * in VIE_INVALID_GLA instead.
  */
 #define	VIE_INVALID_GLA		(1UL << 63)	/* a non-canonical address */
-int vie_decode_instruction(struct vie *vie, struct vm *vm, int cpuid, int csd);
+int vie_decode_instruction(struct vie *vie, struct vcpu *vcpu, int csd);
 
 #endif	/* _VMM_INSTRUCTION_EMUL_H_ */

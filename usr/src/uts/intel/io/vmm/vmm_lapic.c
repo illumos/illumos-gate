@@ -39,7 +39,7 @@
 
 /*
  * Copyright 2014 Pluribus Networks Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -64,13 +64,10 @@
 #define	MSI_X86_ADDR_LOG	0x00000004	/* Destination Mode */
 
 int
-lapic_set_intr(struct vm *vm, int cpu, int vector, bool level)
+lapic_set_intr(struct vcpu *vcpu, int vector, bool level)
 {
 	struct vlapic *vlapic;
 	vcpu_notify_t notify;
-
-	if (cpu < 0 || cpu >= vm_get_maxcpus(vm))
-		return (EINVAL);
 
 	/*
 	 * According to section "Maskable Hardware Interrupts" in Intel SDM
@@ -79,31 +76,28 @@ lapic_set_intr(struct vm *vm, int cpu, int vector, bool level)
 	if (vector < 16 || vector > 255)
 		return (EINVAL);
 
-	vlapic = vm_lapic(vm, cpu);
+	vlapic = vm_lapic(vcpu);
 	notify = vlapic_set_intr_ready(vlapic, vector, level);
-	vcpu_notify_event_type(vm, cpu, notify);
+	vcpu_notify_event_type(vcpu, notify);
 	return (0);
 }
 
 int
-lapic_set_local_intr(struct vm *vm, int cpu, int vector)
+lapic_set_local_intr(struct vm *vm, struct vcpu *vcpu, int vector)
 {
 	struct vlapic *vlapic;
 	cpuset_t dmask;
-	int error;
+	int cpu, error;
 
-	if (cpu < -1 || cpu >= vm_get_maxcpus(vm))
-		return (EINVAL);
-
-	if (cpu == -1)
+	if (vcpu == NULL)
 		dmask = vm_active_cpus(vm);
 	else
-		CPU_SETOF(cpu, &dmask);
+		CPU_SETOF(vcpu_vcpuid(vcpu), &dmask);
 	error = 0;
 	while ((cpu = CPU_FFS(&dmask)) != 0) {
 		cpu--;
 		CPU_CLR(cpu, &dmask);
-		vlapic = vm_lapic(vm, cpu);
+		vlapic = vm_lapic(vm_vcpu(vm, cpu));
 		error = vlapic_trigger_lvt(vlapic, vector);
 		if (error)
 			break;

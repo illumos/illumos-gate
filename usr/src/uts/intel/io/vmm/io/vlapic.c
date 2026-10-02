@@ -41,7 +41,7 @@
 /*
  * Copyright 2014 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -500,13 +500,13 @@ vlapic_fire_lvt(struct vlapic *vlapic, uint_t lvt)
 			return (0);
 		}
 		notify = vlapic_set_intr_ready(vlapic, vec, false);
-		vcpu_notify_event_type(vlapic->vm, vlapic->vcpuid, notify);
+		vcpu_notify_event_type(vlapic->vcpu, notify);
 		break;
 	case APIC_LVT_DM_NMI:
-		(void) vm_inject_nmi(vlapic->vm, vlapic->vcpuid);
+		(void) vm_inject_nmi(vlapic->vcpu);
 		break;
 	case APIC_LVT_DM_EXTINT:
-		(void) vm_inject_extint(vlapic->vm, vlapic->vcpuid);
+		(void) vm_inject_extint(vlapic->vcpu);
 		break;
 	default:
 		// Other modes ignored
@@ -612,13 +612,12 @@ vlapic_process_eoi(struct vlapic *vlapic)
 			isrptr[idx] &= ~(1 << bitpos);
 			vlapic_update_ppr(vlapic);
 			if ((tmrptr[idx] & (1 << bitpos)) != 0) {
-				vioapic_process_eoi(vlapic->vm, vlapic->vcpuid,
-				    vector);
+				vioapic_process_eoi(vlapic->vm, vector);
 			}
 			return;
 		}
 	}
-	vmm_stat_incr(vlapic->vm, vlapic->vcpuid, VLAPIC_GRATUITOUS_EOI, 1);
+	vmm_stat_incr(vlapic->vcpu, VLAPIC_GRATUITOUS_EOI, 1);
 }
 
 static __inline int
@@ -654,7 +653,7 @@ vlapic_set_error(struct vlapic *vlapic, uint32_t mask, bool lvt_error)
 		return;
 
 	if (vlapic_fire_lvt(vlapic, APIC_LVT_ERROR)) {
-		vmm_stat_incr(vlapic->vm, vlapic->vcpuid, VLAPIC_INTR_ERROR, 1);
+		vmm_stat_incr(vlapic->vcpu, VLAPIC_INTR_ERROR, 1);
 	}
 }
 
@@ -666,7 +665,7 @@ vlapic_fire_timer(struct vlapic *vlapic)
 	ASSERT(VLAPIC_TIMER_LOCKED(vlapic));
 
 	if (vlapic_fire_lvt(vlapic, APIC_LVT_TIMER)) {
-		vmm_stat_incr(vlapic->vm, vlapic->vcpuid, VLAPIC_INTR_TIMER, 1);
+		vmm_stat_incr(vlapic->vcpu, VLAPIC_INTR_TIMER, 1);
 	}
 }
 
@@ -678,7 +677,7 @@ vlapic_fire_cmci(struct vlapic *vlapic)
 {
 
 	if (vlapic_fire_lvt(vlapic, APIC_LVT_CMCI)) {
-		vmm_stat_incr(vlapic->vm, vlapic->vcpuid, VLAPIC_INTR_CMC, 1);
+		vmm_stat_incr(vlapic->vcpu, VLAPIC_INTR_CMC, 1);
 	}
 }
 
@@ -696,12 +695,10 @@ vlapic_trigger_lvt(struct vlapic *vlapic, int vector)
 		 */
 		switch (vector) {
 			case APIC_LVT_LINT0:
-				(void) vm_inject_extint(vlapic->vm,
-				    vlapic->vcpuid);
+				(void) vm_inject_extint(vlapic->vcpu);
 				break;
 			case APIC_LVT_LINT1:
-				(void) vm_inject_nmi(vlapic->vm,
-				    vlapic->vcpuid);
+				(void) vm_inject_nmi(vlapic->vcpu);
 				break;
 			default:
 				break;
@@ -718,7 +715,7 @@ vlapic_trigger_lvt(struct vlapic *vlapic, int vector)
 	case APIC_LVT_THERMAL:
 	case APIC_LVT_CMCI:
 		if (vlapic_fire_lvt(vlapic, vector)) {
-			vmm_stat_array_incr(vlapic->vm, vlapic->vcpuid,
+			vmm_stat_array_incr(vlapic->vcpu,
 			    LVTS_TRIGGERRED, vector, 1);
 		}
 		break;
@@ -870,7 +867,7 @@ vlapic_calcdest(struct vm *vm, cpuset_t *dmask, uint32_t dest, bool phys,
 			vcpuid--;
 			CPU_CLR(vcpuid, &amask);
 
-			vlapic = vm_lapic(vm, vcpuid);
+			vlapic = vm_lapic(vm_vcpu(vm, vcpuid));
 			dfr = vlapic->apic_page->dfr;
 			ldr = vlapic->apic_page->ldr;
 
@@ -927,7 +924,7 @@ vlapic_set_cr8(struct vlapic *vlapic, uint64_t val)
 	uint8_t tpr;
 
 	if (val & ~0xf) {
-		vm_inject_gp(vlapic->vm, vlapic->vcpuid);
+		vm_inject_gp(vlapic->vcpu);
 		return;
 	}
 
@@ -1091,24 +1088,25 @@ vlapic_icrlo_write_handler(struct vlapic *vlapic)
 	}
 
 	while ((i = CPU_FFS(&dmask)) != 0) {
+		struct vcpu *dvcpu;
+
 		i--;
 		CPU_CLR(i, &dmask);
+		dvcpu = vm_vcpu(vlapic->vm, i);
 		switch (mode) {
 		case APIC_DELMODE_FIXED:
-			(void) lapic_intr_edge(vlapic->vm, i, vec);
-			vmm_stat_incr(vlapic->vm, vlapic->vcpuid,
-			    VLAPIC_IPI_SEND, 1);
-			vmm_stat_incr(vlapic->vm, i,
-			    VLAPIC_IPI_RECV, 1);
+			(void) lapic_intr_edge(dvcpu, vec);
+			vmm_stat_incr(vlapic->vcpu, VLAPIC_IPI_SEND, 1);
+			vmm_stat_incr(dvcpu, VLAPIC_IPI_RECV, 1);
 			break;
 		case APIC_DELMODE_NMI:
-			(void) vm_inject_nmi(vlapic->vm, i);
+			(void) vm_inject_nmi(dvcpu);
 			break;
 		case APIC_DELMODE_INIT:
-			(void) vm_inject_init(vlapic->vm, i);
+			(void) vm_inject_init(dvcpu);
 			break;
 		case APIC_DELMODE_STARTUP:
-			(void) vm_inject_sipi(vlapic->vm, i, vec);
+			(void) vm_inject_sipi(dvcpu, vec);
 			break;
 		case APIC_DELMODE_LOWPRIO:
 		case APIC_DELMODE_SMI:
@@ -1127,9 +1125,9 @@ vlapic_self_ipi_handler(struct vlapic *vlapic, uint32_t val)
 	/* self-IPI is only exposed via x2APIC */
 	ASSERT(vlapic_x2mode(vlapic));
 
-	(void) lapic_intr_edge(vlapic->vm, vlapic->vcpuid, vec);
-	vmm_stat_incr(vlapic->vm, vlapic->vcpuid, VLAPIC_IPI_SEND, 1);
-	vmm_stat_incr(vlapic->vm, vlapic->vcpuid, VLAPIC_IPI_RECV, 1);
+	(void) lapic_intr_edge(vlapic->vcpu, vec);
+	vmm_stat_incr(vlapic->vcpu, VLAPIC_IPI_SEND, 1);
+	vmm_stat_incr(vlapic->vcpu, VLAPIC_IPI_RECV, 1);
 }
 
 int
@@ -1708,12 +1706,12 @@ vlapic_wrmsr(struct vlapic *vlapic, uint32_t msr, uint64_t val)
 }
 
 void
-vlapic_set_x2apic_state(struct vm *vm, int vcpuid, enum x2apic_state state)
+vlapic_set_x2apic_state(struct vcpu *vcpu, enum x2apic_state state)
 {
 	struct vlapic *vlapic;
 	struct LAPIC *lapic;
 
-	vlapic = vm_lapic(vm, vcpuid);
+	vlapic = vm_lapic(vcpu);
 
 	if (state == X2APIC_DISABLED)
 		vlapic->msr_apicbase &= ~APICBASE_X2APIC;
@@ -1766,12 +1764,15 @@ vlapic_deliver_intr(struct vm *vm, bool level, uint32_t dest, bool phys,
 	vlapic_calcdest(vm, &dmask, dest, phys, lowprio, false);
 
 	while ((vcpuid = CPU_FFS(&dmask)) != 0) {
+		struct vcpu *vcpu;
+
 		vcpuid--;
 		CPU_CLR(vcpuid, &dmask);
+		vcpu = vm_vcpu(vm, vcpuid);
 		if (delmode == IOART_DELEXINT) {
-			(void) vm_inject_extint(vm, vcpuid);
+			(void) vm_inject_extint(vcpu);
 		} else {
-			(void) lapic_set_intr(vm, vcpuid, vec, level);
+			(void) lapic_set_intr(vcpu, vec, level);
 		}
 	}
 }
@@ -1826,7 +1827,7 @@ vlapic_data_read(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 	VERIFY3U(req->vdr_version, ==, 1);
 	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_lapic_v1));
 
-	struct vlapic *vlapic = vm_lapic(vm, vcpuid);
+	struct vlapic *vlapic = vm_lapic(vm_vcpu(vm, vcpuid));
 	struct vdi_lapic_v1 *out = req->vdr_data;
 
 	VLAPIC_TIMER_LOCK(vlapic);
@@ -1984,7 +1985,7 @@ vlapic_data_write(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 	VERIFY3U(req->vdr_version, ==, 1);
 	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_lapic_v1));
 
-	struct vlapic *vlapic = vm_lapic(vm, vcpuid);
+	struct vlapic *vlapic = vm_lapic(vm_vcpu(vm, vcpuid));
 	if (vlapic_data_validate(vlapic, req) != VVE_OK) {
 		return (EINVAL);
 	}

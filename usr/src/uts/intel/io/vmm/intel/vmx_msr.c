@@ -39,7 +39,7 @@
 
 /*
  * Copyright 2020 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -157,7 +157,7 @@ vmx_msr_bitmap_initialize(struct vmx *vmx)
 		VERIFY3U((uintptr_t)bitmap & PAGEOFFSET, ==, 0);
 		memset(bitmap, 0xff, PAGESIZE);
 
-		vmx->msr_bitmap[i] = bitmap;
+		vmx_get_vcpu(vmx, i)->msr_bitmap = bitmap;
 	}
 }
 
@@ -165,16 +165,18 @@ void
 vmx_msr_bitmap_destroy(struct vmx *vmx)
 {
 	for (uint_t i = 0; i < VM_MAXCPU; i++) {
-		VERIFY3P(vmx->msr_bitmap[i], !=, NULL);
-		kmem_free(vmx->msr_bitmap[i], PAGESIZE);
-		vmx->msr_bitmap[i] = NULL;
+		struct vmx_vcpu *vcpu = vmx_get_vcpu(vmx, i);
+
+		VERIFY3P(vcpu->msr_bitmap, !=, NULL);
+		kmem_free(vcpu->msr_bitmap, PAGESIZE);
+		vcpu->msr_bitmap = NULL;
 	}
 }
 
 void
-vmx_msr_bitmap_change_access(struct vmx *vmx, int vcpuid, uint_t msr, int acc)
+vmx_msr_bitmap_change_access(struct vmx_vcpu *vcpu, uint_t msr, int acc)
 {
-	uint8_t *bitmap = vmx->msr_bitmap[vcpuid];
+	uint8_t *bitmap = vcpu->msr_bitmap;
 	int byte, bit;
 
 	if (msr <= 0x00001FFF) {
@@ -333,9 +335,9 @@ vmx_msr_init(void)
 }
 
 void
-vmx_msr_guest_init(struct vmx *vmx, int vcpuid)
+vmx_msr_guest_init(struct vmx_vcpu *vcpu)
 {
-	uint64_t *guest_msrs = vmx->guest_msrs[vcpuid];
+	uint64_t *guest_msrs = vcpu->guest_msrs;
 
 	/*
 	 * It is safe to allow direct access to MSR_GSBASE and
@@ -358,23 +360,23 @@ vmx_msr_guest_init(struct vmx *vmx, int vcpuid)
 	 * difference between the host TSC and the guest TSC is written
 	 * into the TSC offset in the VMCS.
 	 */
-	guest_msr_rw(vmx, vcpuid, MSR_GSBASE);
-	guest_msr_rw(vmx, vcpuid, MSR_FSBASE);
-	guest_msr_rw(vmx, vcpuid, MSR_SYSENTER_CS_MSR);
-	guest_msr_rw(vmx, vcpuid, MSR_SYSENTER_ESP_MSR);
-	guest_msr_rw(vmx, vcpuid, MSR_SYSENTER_EIP_MSR);
-	guest_msr_rw(vmx, vcpuid, MSR_EFER);
-	guest_msr_ro(vmx, vcpuid, MSR_TSC);
+	guest_msr_rw(vcpu, MSR_GSBASE);
+	guest_msr_rw(vcpu, MSR_FSBASE);
+	guest_msr_rw(vcpu, MSR_SYSENTER_CS_MSR);
+	guest_msr_rw(vcpu, MSR_SYSENTER_ESP_MSR);
+	guest_msr_rw(vcpu, MSR_SYSENTER_EIP_MSR);
+	guest_msr_rw(vcpu, MSR_EFER);
+	guest_msr_ro(vcpu, MSR_TSC);
 
 	/*
 	 * The guest may have direct access to these MSRs as they are
 	 * saved/restored in vmx_msr_guest_enter() and vmx_msr_guest_exit().
 	 */
-	guest_msr_rw(vmx, vcpuid, MSR_LSTAR);
-	guest_msr_rw(vmx, vcpuid, MSR_CSTAR);
-	guest_msr_rw(vmx, vcpuid, MSR_STAR);
-	guest_msr_rw(vmx, vcpuid, MSR_SF_MASK);
-	guest_msr_rw(vmx, vcpuid, MSR_KGSBASE);
+	guest_msr_rw(vcpu, MSR_LSTAR);
+	guest_msr_rw(vcpu, MSR_CSTAR);
+	guest_msr_rw(vcpu, MSR_STAR);
+	guest_msr_rw(vcpu, MSR_SF_MASK);
+	guest_msr_rw(vcpu, MSR_KGSBASE);
 
 	/*
 	 * Initialize guest IA32_PAT MSR with default value after reset.
@@ -390,10 +392,10 @@ vmx_msr_guest_init(struct vmx *vmx, int vcpuid)
 }
 
 void
-vmx_msr_guest_enter(struct vmx *vmx, int vcpuid)
+vmx_msr_guest_enter(struct vmx_vcpu *vcpu)
 {
-	uint64_t *guest_msrs = vmx->guest_msrs[vcpuid];
-	uint64_t *host_msrs = vmx->host_msrs[vcpuid];
+	uint64_t *guest_msrs = vcpu->guest_msrs;
+	uint64_t *host_msrs = vcpu->host_msrs;
 
 	/* Save host MSRs */
 	host_msrs[IDX_MSR_LSTAR] = rdmsr(MSR_LSTAR);
@@ -410,10 +412,10 @@ vmx_msr_guest_enter(struct vmx *vmx, int vcpuid)
 }
 
 void
-vmx_msr_guest_exit(struct vmx *vmx, int vcpuid)
+vmx_msr_guest_exit(struct vmx_vcpu *vcpu)
 {
-	uint64_t *guest_msrs = vmx->guest_msrs[vcpuid];
-	uint64_t *host_msrs = vmx->host_msrs[vcpuid];
+	uint64_t *guest_msrs = vcpu->guest_msrs;
+	uint64_t *host_msrs = vcpu->host_msrs;
 
 	/* Save guest MSRs */
 	guest_msrs[IDX_MSR_LSTAR] = rdmsr(MSR_LSTAR);
@@ -432,9 +434,9 @@ vmx_msr_guest_exit(struct vmx *vmx, int vcpuid)
 }
 
 vm_msr_result_t
-vmx_rdmsr(struct vmx *vmx, int vcpuid, uint32_t num, uint64_t *val)
+vmx_rdmsr(struct vmx_vcpu *vcpu, uint32_t num, uint64_t *val)
 {
-	const uint64_t *guest_msrs = vmx->guest_msrs[vcpuid];
+	const uint64_t *guest_msrs = vcpu->guest_msrs;
 
 	switch (num) {
 	case MSR_IA32_FEATURE_CONTROL:
@@ -465,9 +467,9 @@ vmx_rdmsr(struct vmx *vmx, int vcpuid, uint32_t num, uint64_t *val)
 }
 
 vm_msr_result_t
-vmx_wrmsr(struct vmx *vmx, int vcpuid, uint32_t num, uint64_t val)
+vmx_wrmsr(struct vmx_vcpu *vcpu, uint32_t num, uint64_t val)
 {
-	uint64_t *guest_msrs = vmx->guest_msrs[vcpuid];
+	uint64_t *guest_msrs = vcpu->guest_msrs;
 	uint64_t changed;
 
 	switch (num) {

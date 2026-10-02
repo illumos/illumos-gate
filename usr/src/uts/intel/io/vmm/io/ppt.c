@@ -41,6 +41,7 @@
 /*
  * Copyright 2019 Joyent, Inc.
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -1289,8 +1290,7 @@ pptintr(caddr_t arg, caddr_t unused)
 }
 
 int
-ppt_setup_msi(struct vm *vm, int vcpu, int pptfd, uint64_t addr, uint64_t msg,
-    int numvec)
+ppt_setup_msi(struct vm *vm, int pptfd, uint64_t addr, uint64_t msg, int numvec)
 {
 	int i, msi_count, intr_type;
 	struct pptdev *ppt;
@@ -1393,7 +1393,7 @@ done:
 }
 
 int
-ppt_setup_msix(struct vm *vm, int vcpu, int pptfd, int idx, uint64_t addr,
+ppt_setup_msix(struct vm *vm, int pptfd, int idx, uint64_t addr,
     uint64_t msg, uint32_t vector_control)
 {
 	struct pptdev *ppt;

@@ -40,7 +40,7 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _VMX_H_
@@ -126,21 +126,34 @@ typedef enum {
 	VS_LOADED	= 0x2
 } vmcs_state_t;
 
+struct vmx;
+
+/* per-vCPU state */
+struct vmx_vcpu {
+	struct vmx	*vmx;		/* owning softc */
+	struct vcpu	*vcpu;		/* generic vcpu state */
+	int		vcpuid;		/* id within the vm */
+	struct vmcs	*vmcs;
+	uintptr_t	vmcs_pa;
+	vmcs_state_t	vmcs_state;
+	struct apic_page *apic_page;
+	uint8_t		*msr_bitmap;
+	struct pir_desc	*pir_desc;
+	uint64_t	guest_msrs[GUEST_MSR_NUM];
+	uint64_t	host_msrs[GUEST_MSR_NUM];
+	uint64_t	tsc_offset_active;
+	struct vmxctx	ctx;
+	struct vmxcap	cap;
+	struct vmxstate	state;
+};
+
 /* virtual machine softc */
 struct vmx {
 	struct vmcs	vmcs[VM_MAXCPU];	/* one vmcs per virtual cpu */
 	struct apic_page apic_page[VM_MAXCPU];	/* one apic page per vcpu */
-	uint8_t		*msr_bitmap[VM_MAXCPU];	/* one MSR bitmap per vCPU */
 	struct pir_desc	pir_desc[VM_MAXCPU];
-	uint64_t	guest_msrs[VM_MAXCPU][GUEST_MSR_NUM];
-	uint64_t	host_msrs[VM_MAXCPU][GUEST_MSR_NUM];
-	uint64_t	tsc_offset_active[VM_MAXCPU];
-	vmcs_state_t	vmcs_state[VM_MAXCPU];
-	uintptr_t	vmcs_pa[VM_MAXCPU];
 	void		*apic_access_page;
-	struct vmxctx	ctx[VM_MAXCPU];
-	struct vmxcap	cap[VM_MAXCPU];
-	struct vmxstate	state[VM_MAXCPU];
+	struct vmx_vcpu	vcpus[VM_MAXCPU];
 	uint64_t	eptp;
 	enum vmx_caps	vmx_caps;
 	struct vm	*vm;
@@ -153,8 +166,13 @@ struct vmx {
 	uint64_t	eptgen[MAXCPU];
 };
 CTASSERT((offsetof(struct vmx, vmcs) & PAGE_MASK) == 0);
-CTASSERT((offsetof(struct vmx, msr_bitmap) & PAGE_MASK) == 0);
 CTASSERT((offsetof(struct vmx, pir_desc[0]) & 63) == 0);
+
+static __inline struct vmx_vcpu *
+vmx_get_vcpu(struct vmx *vmx, int vcpuid)
+{
+	return (&vmx->vcpus[vcpuid]);
+}
 
 static __inline bool
 vmx_cap_en(const struct vmx *vmx, enum vmx_caps cap)

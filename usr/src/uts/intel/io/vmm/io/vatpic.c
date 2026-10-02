@@ -38,7 +38,7 @@
 /* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -262,7 +262,7 @@ vatpic_notify_intr(struct vatpic *vatpic)
 		 * interrupt.
 		 */
 		atpic->intr_raised = true;
-		(void) lapic_set_local_intr(vatpic->vm, -1, APIC_LVT_LINT0);
+		(void) lapic_set_local_intr(vatpic->vm, NULL, APIC_LVT_LINT0);
 		(void) vioapic_pulse_irq(vatpic->vm, 0);
 		vatpic->stats.as_interrupts++;
 	} else {

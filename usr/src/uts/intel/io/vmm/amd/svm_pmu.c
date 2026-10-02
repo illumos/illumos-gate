@@ -11,7 +11,7 @@
 /* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/kernel.h>
@@ -25,6 +25,7 @@
 #include "svm.h"
 #include "svm_softc.h"
 #include "svm_pmu.h"
+#include "vmm_util.h"
 
 /*
  * Allow guests to use perf counter resources.
@@ -69,7 +70,8 @@ svm_pmu_init(struct svm_softc *svm_sc)
 	/* Turn on base and extended CPCs for all vCPUs */
 	const uint_t maxcpu = vm_get_maxcpus(svm_sc->vm);
 	for (uint_t i = 0; i < maxcpu; i++) {
-		struct svm_pmu_vcpu *pmu_vcpu = svm_get_pmu(svm_sc, i);
+		struct svm_pmu_vcpu *pmu_vcpu =
+		    svm_get_pmu(svm_get_vcpu(svm_sc, i));
 
 		pmu_vcpu->spv_hma_state.hscs_flags = HCF_EN_BASE | HCF_EN_EXTD;
 	}
@@ -225,11 +227,11 @@ svm_pmu_evtsel_allowed(uint64_t evtsel, svm_pmu_flavor_t flavor)
 }
 
 vm_msr_result_t
-svm_pmu_rdmsr(struct svm_softc *svm_sc, int vcpu, uint32_t msr, uint64_t *valp)
+svm_pmu_rdmsr(struct svm_vcpu *vcpu, uint32_t msr, uint64_t *valp)
 {
 	ASSERT(svm_pmu_owned_msr(msr));
 
-	struct svm_pmu_vcpu *pmu = svm_get_pmu(svm_sc, vcpu);
+	struct svm_pmu_vcpu *pmu = svm_get_pmu(vcpu);
 
 	if (!svm_pmu_is_active(pmu)) {
 		return (VMR_UNHANLDED);
@@ -252,12 +254,12 @@ svm_pmu_rdmsr(struct svm_softc *svm_sc, int vcpu, uint32_t msr, uint64_t *valp)
 }
 
 vm_msr_result_t
-svm_pmu_wrmsr(struct svm_softc *svm_sc, int vcpu, uint32_t msr, uint64_t val)
+svm_pmu_wrmsr(struct svm_vcpu *vcpu, uint32_t msr, uint64_t val)
 {
 	ASSERT(svm_pmu_owned_msr(msr));
 
-	struct svm_pmu_vcpu *pmu = svm_get_pmu(svm_sc, vcpu);
-	const svm_pmu_flavor_t flavor = svm_sc->pmu_flavor;
+	struct svm_pmu_vcpu *pmu = svm_get_pmu(vcpu);
+	const svm_pmu_flavor_t flavor = vcpu->sc->pmu_flavor;
 
 	if (!svm_pmu_is_active(pmu)) {
 		return (VMR_UNHANLDED);
@@ -295,9 +297,9 @@ svm_pmu_wrmsr(struct svm_softc *svm_sc, int vcpu, uint32_t msr, uint64_t val)
 }
 
 bool
-svm_pmu_rdpmc(struct svm_softc *svm_sc, int vcpu, uint32_t ecx, uint64_t *valp)
+svm_pmu_rdpmc(struct svm_vcpu *vcpu, uint32_t ecx, uint64_t *valp)
 {
-	struct svm_pmu_vcpu *pmu = svm_get_pmu(svm_sc, vcpu);
+	struct svm_pmu_vcpu *pmu = svm_get_pmu(vcpu);
 
 	if (!svm_pmu_is_active(pmu)) {
 		return (false);
@@ -318,9 +320,9 @@ svm_pmu_rdpmc(struct svm_softc *svm_sc, int vcpu, uint32_t ecx, uint64_t *valp)
  * and thus demands a call to svm_apply_dirty() prior to VM entry.
  */
 void
-svm_pmu_enter(struct svm_softc *svm_sc, int vcpu)
+svm_pmu_enter(struct svm_vcpu *vcpu)
 {
-	struct svm_pmu_vcpu *pmu = svm_get_pmu(svm_sc, vcpu);
+	struct svm_pmu_vcpu *pmu = svm_get_pmu(vcpu);
 
 	if (!svm_pmu_is_active(pmu)) {
 		return;
@@ -337,10 +339,10 @@ svm_pmu_enter(struct svm_softc *svm_sc, int vcpu)
 	if (entry != pmu->spv_last_entry) {
 		/* Update intercepts to match what is allowed per HMA.  */
 		if (entry & HSCR_ACCESS_RDPMC && svm_pmu_force_exit == 0) {
-			svm_disable_intercept(svm_sc, vcpu, VMCB_CTRL1_INTCPT,
+			svm_disable_intercept(vcpu, VMCB_CTRL1_INTCPT,
 			    VMCB_INTCPT_RDPMC);
 		} else {
-			svm_enable_intercept(svm_sc, vcpu, VMCB_CTRL1_INTCPT,
+			svm_enable_intercept(vcpu, VMCB_CTRL1_INTCPT,
 			    VMCB_INTCPT_RDPMC);
 		}
 	}
@@ -351,9 +353,9 @@ svm_pmu_enter(struct svm_softc *svm_sc, int vcpu)
  * If guest PMU state is active, save it, and restore the host state.
  */
 void
-svm_pmu_exit(struct svm_softc *svm_sc, int vcpu)
+svm_pmu_exit(struct svm_vcpu *vcpu)
 {
-	struct svm_pmu_vcpu *pmu = svm_get_pmu(svm_sc, vcpu);
+	struct svm_pmu_vcpu *pmu = svm_get_pmu(vcpu);
 
 	if (!svm_pmu_is_active(pmu)) {
 		return;
@@ -369,12 +371,16 @@ svm_pmu_data_read(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 	VERIFY3U(req->vdr_version, ==, 1);
 	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_pmu_amd_v1));
 
+	/* This class is registered on every host but only SVM has the state */
+	if (!vmm_is_svm())
+		return (EINVAL);
+
 	struct svm_softc *svm_sc = vm_get_cookie(vm);
-	struct svm_pmu_vcpu *pmu = svm_get_pmu(svm_sc, vcpuid);
+	struct svm_pmu_vcpu *pmu = svm_get_pmu(svm_get_vcpu(svm_sc, vcpuid));
 	struct vdi_pmu_amd_v1 *out = req->vdr_data;
 
 	if (!svm_pmu_is_active(pmu)) {
-		bzero(out, sizeof (out));
+		bzero(out, sizeof (*out));
 		return (0);
 	}
 
@@ -392,8 +398,12 @@ svm_pmu_data_write(struct vm *vm, int vcpuid, const vmm_data_req_t *req)
 	VERIFY3U(req->vdr_version, ==, 1);
 	VERIFY3U(req->vdr_len, >=, sizeof (struct vdi_pmu_amd_v1));
 
+	/* This class is registered on every host but only SVM has the state */
+	if (!vmm_is_svm())
+		return (EINVAL);
+
 	struct svm_softc *svm_sc = vm_get_cookie(vm);
-	struct svm_pmu_vcpu *pmu = svm_get_pmu(svm_sc, vcpuid);
+	struct svm_pmu_vcpu *pmu = svm_get_pmu(svm_get_vcpu(svm_sc, vcpuid));
 	const struct vdi_pmu_amd_v1 *src = req->vdr_data;
 
 	if (!svm_pmu_is_active(pmu)) {

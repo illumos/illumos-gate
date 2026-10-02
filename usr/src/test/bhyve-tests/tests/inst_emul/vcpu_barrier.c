@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -84,26 +84,14 @@ configure_timeout(void)
 	(void) alarm(1);
 }
 
-int
-main(int argc, char *argv[])
+/*
+ * Run vcpu0 in the kernel and push it out with a barrier, aimed either at it
+ * alone or at every active vCPU.
+ */
+static void
+run_barrier(struct vmctx *ctx, struct vcpu *vcpu, bool all)
 {
-	const char *suite_name = basename(argv[0]);
-	struct vmctx *ctx;
-	struct vcpu *vcpu;
 	int err;
-
-	ctx = test_initialize(suite_name);
-	assert(ctx != NULL);
-
-	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
-		test_fail_errno(errno, "Could not open vcpu0");
-	}
-
-	/* Activate vcpu0 as if it were running */
-	err = vm_activate_cpu(vcpu);
-	if (err != 0) {
-		test_fail_errno(err, "could not activate vcpu0");
-	}
 
 	/*
 	 * Set unorthodox run-state for vcpu0: wait-for-SIPI
@@ -125,9 +113,17 @@ main(int argc, char *argv[])
 	configure_timeout();
 
 	/* ... then issue our barrier: */
-	err = vm_vcpu_barrier(vcpu);
+	if (all) {
+		/* libvmmapi has no wrapper for the all-vCPUs form */
+		err = 0;
+		if (ioctl(vm_get_device_fd(ctx), VM_VCPU_BARRIER, -1) != 0)
+			err = errno;
+	} else {
+		err = vm_vcpu_barrier(vcpu);
+	}
 	if (err != 0) {
-		test_fail_errno(err, "failed to issue vcpu barrier");
+		test_fail_errno(err, all ? "failed to issue all-vcpus barrier" :
+		    "failed to issue vcpu barrier");
 	}
 
 	void *status = NULL;
@@ -139,8 +135,32 @@ main(int argc, char *argv[])
 	(void) alarm(0);
 
 	if (timed_out) {
-		test_fail_msg("timed out while waiting for barrier\n");
+		test_fail_msg("timed out while waiting for %s barrier\n",
+		    all ? "all-vcpus" : "vcpu0");
 	}
+}
+
+int
+main(int argc, char *argv[])
+{
+	const char *suite_name = basename(argv[0]);
+	struct vmctx *ctx;
+	struct vcpu *vcpu;
+	int err;
+
+	ctx = test_initialize(suite_name);
+	assert(ctx != NULL);
+
+	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL)
+		test_fail_errno(errno, "Could not open vcpu0");
+
+	/* Activate vcpu0 as if it were running */
+	err = vm_activate_cpu(vcpu);
+	if (err != 0)
+		test_fail_errno(err, "could not activate vcpu0");
+
+	run_barrier(ctx, vcpu, false);
+	run_barrier(ctx, vcpu, true);
 
 	test_pass();
 }

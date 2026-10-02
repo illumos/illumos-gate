@@ -26,17 +26,21 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #ifndef _SVM_MSR_H_
 #define	_SVM_MSR_H_
 
-struct svm_softc;
+struct svm_vcpu;
 
-void svm_msr_guest_init(struct svm_softc *sc, int vcpu);
-void svm_msr_guest_enter(struct svm_softc *sc, int vcpu);
-void svm_msr_guest_exit(struct svm_softc *sc, int vcpu);
+void svm_msr_guest_init(struct svm_vcpu *vcpu);
+void svm_msr_guest_enter(struct svm_vcpu *vcpu);
+void svm_msr_guest_exit(struct svm_vcpu *vcpu);
 
-vm_msr_result_t svm_wrmsr(struct svm_softc *, int, uint32_t, uint64_t);
-vm_msr_result_t svm_rdmsr(struct svm_softc *, int, uint32_t, uint64_t *);
+vm_msr_result_t svm_wrmsr(struct svm_vcpu *, uint32_t, uint64_t);
+vm_msr_result_t svm_rdmsr(struct svm_vcpu *, uint32_t, uint64_t *);
 
 /*
  * TSC Frequency Multiplier MSR related values

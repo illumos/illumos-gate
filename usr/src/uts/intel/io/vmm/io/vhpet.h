@@ -41,21 +41,21 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _VHPET_H_
 #define	_VHPET_H_
+
+struct vcpu;
 
 #define	VHPET_BASE	0xfed00000
 #define	VHPET_SIZE	1024
 
 struct vhpet *vhpet_init(struct vm *vm);
 void vhpet_cleanup(struct vhpet *vhpet);
-int vhpet_mmio_write(struct vm *vm, int vcpuid, uint64_t gpa, uint64_t val,
-    int size);
-int vhpet_mmio_read(struct vm *vm, int vcpuid, uint64_t gpa, uint64_t *val,
-    int size);
+int vhpet_mmio_write(struct vcpu *vcpu, uint64_t gpa, uint64_t val, int size);
+int vhpet_mmio_read(struct vcpu *vcpu, uint64_t gpa, uint64_t *val, int size);
 int vhpet_getcap(struct vm_hpet_cap *cap);
 
 void vhpet_localize_resources(struct vhpet *vhpet);

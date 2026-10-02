@@ -37,7 +37,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -2100,12 +2100,11 @@ vm_rtc_gettime(struct vmctx *ctx, timespec_t *ts)
 #endif /* __FreeBSD__ */
 
 int
-vm_restart_instruction(void *ctxp, int vcpu __unused)
+vm_restart_instruction(struct vcpu *vcpu)
 {
-	struct vmctx *ctx = ctxp;
-	int arg;
+	int arg = vcpu->vcpuid;
 
-	return (ioctl(ctx->fd, VM_RESTART_INSTRUCTION, &arg));
+	return (vcpu_ioctl(vcpu, VM_RESTART_INSTRUCTION, &arg));
 }
 
 int

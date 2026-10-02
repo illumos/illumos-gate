@@ -229,7 +229,7 @@ cpuid_find_entry(const vcpu_cpuid_config_t *cfg, uint32_t func, uint32_t idx)
  * IA32_XSS MSR.
  */
 static void
-cpuid_apply_runtime_reg_state(struct vm *vm, int vcpuid, uint32_t func,
+cpuid_apply_runtime_reg_state(struct vcpu *vcpu, uint32_t func,
     uint32_t index, uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
 {
 	uint64_t cr4;
@@ -244,8 +244,7 @@ cpuid_apply_runtime_reg_state(struct vm *vm, int vcpuid, uint32_t func,
 		 */
 		*ecx &= ~CPUID2_OSXSAVE;
 		if ((*ecx & CPUID2_XSAVE) != 0) {
-			error = vm_get_register(vm, vcpuid,
-			    VM_REG_GUEST_CR4, &cr4);
+			error = vm_get_register(vcpu, VM_REG_GUEST_CR4, &cr4);
 			VERIFY0(error);
 			if ((cr4 & CR4_XSAVE) != 0) {
 				*ecx |= CPUID2_OSXSAVE;
@@ -259,7 +258,7 @@ cpuid_apply_runtime_reg_state(struct vm *vm, int vcpuid, uint32_t func,
 		 * feature flag for the APIC ... is also set to 0" when the APIC
 		 * enable bit is cleared.
 		 */
-		if (vlapic_hw_disabled(vm_lapic(vm, vcpuid))) {
+		if (vlapic_hw_disabled(vm_lapic(vcpu))) {
 			*edx &= ~CPUID_APIC;
 		}
 		break;
@@ -357,10 +356,10 @@ cpuid_apply_runtime_reg_state(struct vm *vm, int vcpuid, uint32_t func,
  * certain guest state (e.g. FPU state) remains loaded.
  */
 void
-vcpu_emulate_cpuid(struct vm *vm, int vcpuid, uint64_t *rax, uint64_t *rbx,
+vcpu_emulate_cpuid(struct vcpu *vcpu, uint64_t *rax, uint64_t *rbx,
     uint64_t *rcx, uint64_t *rdx)
 {
-	const vcpu_cpuid_config_t *cfg = vm_cpuid_config(vm, vcpuid);
+	const vcpu_cpuid_config_t *cfg = vm_cpuid_config(vcpu);
 	uint32_t func, index;
 
 	ASSERT3P(rax, !=, NULL);
@@ -374,7 +373,7 @@ vcpu_emulate_cpuid(struct vm *vm, int vcpuid, uint64_t *rax, uint64_t *rbx,
 
 	/* Fall back to legacy handling if specified */
 	if ((cfg->vcc_flags & VCC_FLAG_LEGACY_HANDLING) != 0) {
-		legacy_emulate_cpuid(vm, vcpuid, &regs[0], &regs[1], &regs[2],
+		legacy_emulate_cpuid(vcpu, &regs[0], &regs[1], &regs[2],
 		    &regs[3]);
 	} else {
 		const struct vcpu_cpuid_entry *ent = cpuid_find_entry(cfg, func,
@@ -402,7 +401,7 @@ vcpu_emulate_cpuid(struct vm *vm, int vcpuid, uint64_t *rax, uint64_t *rbx,
 	}
 
 	/* Fix up any returned values that vary with guest register state. */
-	cpuid_apply_runtime_reg_state(vm, vcpuid, func, index, &regs[0],
+	cpuid_apply_runtime_reg_state(vcpu, func, index, &regs[0],
 	    &regs[1], &regs[2], &regs[3]);
 
 	/* CPUID clears the upper 32-bits of the long-mode registers. */
@@ -424,13 +423,9 @@ vcpu_emulate_cpuid(struct vm *vm, int vcpuid, uint64_t *rax, uint64_t *rbx,
  * vcc_nent will be set to the number of existing entries.
  */
 int
-vm_get_cpuid(struct vm *vm, int vcpuid, vcpu_cpuid_config_t *res)
+vm_get_cpuid(struct vcpu *vcpu, vcpu_cpuid_config_t *res)
 {
-	if (vcpuid < 0 || vcpuid > VM_MAXCPU) {
-		return (EINVAL);
-	}
-
-	const vcpu_cpuid_config_t *src = vm_cpuid_config(vm, vcpuid);
+	const vcpu_cpuid_config_t *src = vm_cpuid_config(vcpu);
 	if (src->vcc_nent > res->vcc_nent) {
 		res->vcc_nent = src->vcc_nent;
 		return (E2BIG);
@@ -454,11 +449,8 @@ vm_get_cpuid(struct vm *vm, int vcpuid, vcpu_cpuid_config_t *res)
  * ones will be copied into their place.
  */
 int
-vm_set_cpuid(struct vm *vm, int vcpuid, const vcpu_cpuid_config_t *src)
+vm_set_cpuid(struct vcpu *vcpu, const vcpu_cpuid_config_t *src)
 {
-	if (vcpuid < 0 || vcpuid > VM_MAXCPU) {
-		return (EINVAL);
-	}
 	if (src->vcc_nent > VMM_MAX_CPUID_ENTRIES) {
 		return (EINVAL);
 	}
@@ -477,7 +469,7 @@ vm_set_cpuid(struct vm *vm, int vcpuid, const vcpu_cpuid_config_t *src)
 		}
 	}
 
-	vcpu_cpuid_config_t *cfg = vm_cpuid_config(vm, vcpuid);
+	vcpu_cpuid_config_t *cfg = vm_cpuid_config(vcpu);
 
 	/* Free any existing entries first */
 	vcpu_cpuid_cleanup(cfg);
@@ -547,9 +539,11 @@ log2(uint_t x)
  * masks to the data provided by the host CPU.
  */
 void
-legacy_emulate_cpuid(struct vm *vm, int vcpu_id, uint32_t *eax, uint32_t *ebx,
+legacy_emulate_cpuid(struct vcpu *vcpu, uint32_t *eax, uint32_t *ebx,
     uint32_t *ecx, uint32_t *edx)
 {
+	struct vm *vm = vcpu_vm(vcpu);
+	const int vcpu_id = vcpu_vcpuid(vcpu);
 	const struct xsave_limits *limits;
 	int error, enable_invpcid, level, width = 0, x2apic_id = 0;
 	unsigned int func, regs[4], logical_cpus = 0, param;
@@ -805,7 +799,7 @@ legacy_emulate_cpuid(struct vm *vm, int vcpu_id, uint32_t *eax, uint32_t *ebx,
 		case CPUID_0000_0001:
 			do_cpuid(1, regs);
 
-			error = vm_get_x2apic_state(vm, vcpu_id, &x2apic_state);
+			error = vm_get_x2apic_state(vcpu, &x2apic_state);
 			VERIFY0(error);
 
 			/*
@@ -935,7 +929,7 @@ legacy_emulate_cpuid(struct vm *vm, int vcpu_id, uint32_t *eax, uint32_t *ebx,
 				regs[3] &= CPUID_STDEXT3_MD_CLEAR;
 
 				/* Advertise INVPCID if it is enabled. */
-				error = vm_get_capability(vm, vcpu_id,
+				error = vm_get_capability(vcpu,
 				    VM_CAP_ENABLE_INVPCID, &enable_invpcid);
 				if (error == 0 && enable_invpcid)
 					regs[1] |= CPUID_STDEXT_INVPCID;

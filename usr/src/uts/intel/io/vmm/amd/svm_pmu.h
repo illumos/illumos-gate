@@ -11,7 +11,7 @@
 /* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SVM_PMU_H
@@ -45,12 +45,14 @@ struct svm_pmu {
 	svm_pmu_flavor_t sp_flavor;
 };
 
+struct svm_vcpu;
+
 void svm_pmu_init(struct svm_softc *);
 bool svm_pmu_owned_msr(uint32_t);
-vm_msr_result_t svm_pmu_rdmsr(struct svm_softc *, int, uint32_t, uint64_t *);
-vm_msr_result_t svm_pmu_wrmsr(struct svm_softc *, int, uint32_t, uint64_t);
-bool svm_pmu_rdpmc(struct svm_softc *, int, uint32_t, uint64_t *);
-void svm_pmu_enter(struct svm_softc *, int);
-void svm_pmu_exit(struct svm_softc *, int);
+vm_msr_result_t svm_pmu_rdmsr(struct svm_vcpu *, uint32_t, uint64_t *);
+vm_msr_result_t svm_pmu_wrmsr(struct svm_vcpu *, uint32_t, uint64_t);
+bool svm_pmu_rdpmc(struct svm_vcpu *, uint32_t, uint64_t *);
+void svm_pmu_enter(struct svm_vcpu *);
+void svm_pmu_exit(struct svm_vcpu *);
 
 #endif /* _SVM_PMU_H */

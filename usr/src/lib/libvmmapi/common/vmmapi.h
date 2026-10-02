@@ -37,7 +37,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _VMMAPI_H_
@@ -281,6 +281,7 @@ int	vm_get_pptdev_limits(struct vmctx *ctx, int pptfd, int *msi_limit,
 
 int	vm_get_intinfo(struct vcpu *vcpu, uint64_t *i1, uint64_t *i2);
 int	vm_set_intinfo(struct vcpu *vcpu, uint64_t exit_intinfo);
+int	vm_restart_instruction(struct vcpu *vcpu);
 
 /*
  * Return a pointer to the statistics buffer. Note that this is not MT-safe.

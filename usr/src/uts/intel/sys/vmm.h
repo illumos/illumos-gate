@@ -37,7 +37,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _VMM_H_
@@ -416,8 +416,6 @@ struct vm_entry {
 		struct vm_mmio mmio;
 	} u;
 };
-
-int vm_restart_instruction(void *vm, int vcpuid);
 
 enum vm_create_flags {
 	/*

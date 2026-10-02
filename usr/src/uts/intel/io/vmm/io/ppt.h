@@ -26,6 +26,10 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #ifndef _IO_PPT_H_
 #define	_IO_PPT_H_
 
@@ -33,9 +37,9 @@ void ppt_unassign_all(struct vm *vm);
 int ppt_map_mmio(struct vm *vm, int pptfd, vm_paddr_t gpa, size_t len,
     vm_paddr_t hpa);
 int ppt_unmap_mmio(struct vm *vm, int pptfd, vm_paddr_t gpa, size_t len);
-int ppt_setup_msi(struct vm *vm, int vcpu, int pptfd, uint64_t addr,
+int ppt_setup_msi(struct vm *vm, int pptfd, uint64_t addr,
     uint64_t msg, int numvec);
-int ppt_setup_msix(struct vm *vm, int vcpu, int pptfd, int idx, uint64_t addr,
+int ppt_setup_msix(struct vm *vm, int pptfd, int idx, uint64_t addr,
     uint64_t msg, uint32_t vector_control);
 int ppt_disable_msix(struct vm *vm, int pptfd);
 int ppt_assigned_devices(struct vm *vm);

@@ -41,7 +41,7 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -469,8 +469,7 @@ vhpet_timer_update_config(struct vhpet *vhpet, int n, uint64_t data,
 }
 
 int
-vhpet_mmio_write(struct vm *vm, int vcpuid, uint64_t gpa, uint64_t val,
-    int size)
+vhpet_mmio_write(struct vcpu *vcpu, uint64_t gpa, uint64_t val, int size)
 {
 	struct vhpet *vhpet;
 	uint64_t data, mask, oldval, val64;
@@ -478,7 +477,7 @@ vhpet_mmio_write(struct vm *vm, int vcpuid, uint64_t gpa, uint64_t val,
 	hrtime_t now;
 	int i, offset;
 
-	vhpet = vm_hpet(vm);
+	vhpet = vm_hpet(vcpu_vm(vcpu));
 	offset = gpa - VHPET_BASE;
 
 	VHPET_LOCK(vhpet);
@@ -612,14 +611,13 @@ done:
 }
 
 int
-vhpet_mmio_read(struct vm *vm, int vcpuid, uint64_t gpa, uint64_t *rval,
-    int size)
+vhpet_mmio_read(struct vcpu *vcpu, uint64_t gpa, uint64_t *rval, int size)
 {
 	int i, offset;
 	struct vhpet *vhpet;
 	uint64_t data;
 
-	vhpet = vm_hpet(vm);
+	vhpet = vm_hpet(vcpu_vm(vcpu));
 	offset = gpa - VHPET_BASE;
 
 	VHPET_LOCK(vhpet);

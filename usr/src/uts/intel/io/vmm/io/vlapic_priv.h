@@ -38,7 +38,7 @@
 /* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
- * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _VLAPIC_PRIV_H_
@@ -127,6 +127,7 @@ struct vlapic_stats {
 
 struct vlapic {
 	struct vm		*vm;
+	struct vcpu		*vcpu;
 	int			vcpuid;
 	struct LAPIC		*apic_page;
 	struct vlapic_ops	ops;

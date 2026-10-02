@@ -40,11 +40,13 @@
 
 /*
  * Copyright 2018 Joyent, Inc.
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _VLAPIC_H_
 #define	_VLAPIC_H_
+
+struct vcpu;
 
 void vlapic_reset(struct vlapic *vlapic);
 
@@ -90,7 +92,7 @@ int vlapic_trigger_lvt(struct vlapic *vlapic, int vector);
 
 void vlapic_sync_tpr(struct vlapic *vlapic);
 
-void vlapic_set_x2apic_state(struct vm *vm, int vcpuid, enum x2apic_state s);
+void vlapic_set_x2apic_state(struct vcpu *vcpu, enum x2apic_state s);
 
 void vlapic_deliver_intr(struct vm *vm, bool level, uint32_t dest, bool phys,
     int delmode, int vec);

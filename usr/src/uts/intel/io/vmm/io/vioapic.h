@@ -40,10 +40,13 @@
 
 /*
  * Copyright 2014 Pluribus Networks Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _VIOAPIC_H_
 #define	_VIOAPIC_H_
+
+struct vcpu;
 
 #define	VIOAPIC_BASE	0xFEC00000
 #define	VIOAPIC_SIZE	4096
@@ -55,11 +58,11 @@ int vioapic_assert_irq(struct vm *vm, int irq);
 int vioapic_deassert_irq(struct vm *vm, int irq);
 int vioapic_pulse_irq(struct vm *vm, int irq);
 
-int vioapic_mmio_write(struct vm *vm, int vcpuid, uint64_t gpa, uint64_t wval,
+int vioapic_mmio_write(struct vcpu *vcpu, uint64_t gpa, uint64_t wval,
     int size);
-int vioapic_mmio_read(struct vm *vm, int vcpuid, uint64_t gpa, uint64_t *rval,
+int vioapic_mmio_read(struct vcpu *vcpu, uint64_t gpa, uint64_t *rval,
     int size);
 
 int vioapic_pincount(struct vm *vm);
-void vioapic_process_eoi(struct vm *vm, int vcpuid, int vector);
+void vioapic_process_eoi(struct vm *vm, int vector);
 #endif

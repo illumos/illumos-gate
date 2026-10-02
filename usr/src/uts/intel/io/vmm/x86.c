@@ -40,7 +40,7 @@
 /*
  * Copyright 2014 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/cdefs.h>
@@ -68,7 +68,7 @@
  * and 'false' otherwise.
  */
 bool
-vm_cpuid_capability(struct vm *vm, int vcpuid, enum vm_cpuid_capability cap)
+vm_cpuid_capability(struct vcpu *vcpu __unused, enum vm_cpuid_capability cap)
 {
 	bool rv;
 

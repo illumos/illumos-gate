@@ -38,18 +38,18 @@
 /* This file is dual-licensed; see usr/src/contrib/bhyve/LICENSE */
 
 /*
- * Copyright 2021 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _VMX_MSR_H_
 #define	_VMX_MSR_H_
 
 void vmx_msr_init(void);
-void vmx_msr_guest_init(struct vmx *vmx, int vcpuid);
-void vmx_msr_guest_enter(struct vmx *vmx, int vcpuid);
-void vmx_msr_guest_exit(struct vmx *vmx, int vcpuid);
-vm_msr_result_t vmx_rdmsr(struct vmx *, int, uint32_t, uint64_t *);
-vm_msr_result_t vmx_wrmsr(struct vmx *, int, uint32_t, uint64_t);
+void vmx_msr_guest_init(struct vmx_vcpu *vcpu);
+void vmx_msr_guest_enter(struct vmx_vcpu *vcpu);
+void vmx_msr_guest_exit(struct vmx_vcpu *vcpu);
+vm_msr_result_t vmx_rdmsr(struct vmx_vcpu *, uint32_t, uint64_t *);
+vm_msr_result_t vmx_wrmsr(struct vmx_vcpu *, uint32_t, uint64_t);
 
 int vmx_set_ctlreg(int ctl_reg, int true_ctl_reg, uint32_t ones_mask,
     uint32_t zeros_mask, uint32_t *retval);
@@ -71,12 +71,12 @@ int vmx_set_ctlreg(int ctl_reg, int true_ctl_reg, uint32_t ones_mask,
 #define	MSR_BITMAP_ACCESS_RW	(MSR_BITMAP_ACCESS_READ|MSR_BITMAP_ACCESS_WRITE)
 void vmx_msr_bitmap_initialize(struct vmx *);
 void vmx_msr_bitmap_destroy(struct vmx *);
-void vmx_msr_bitmap_change_access(struct vmx *, int, uint_t, int);
+void vmx_msr_bitmap_change_access(struct vmx_vcpu *, uint_t, int);
 
-#define	guest_msr_rw(vmx, vcpuid, msr) \
-    vmx_msr_bitmap_change_access((vmx), (vcpuid), (msr), MSR_BITMAP_ACCESS_RW)
+#define	guest_msr_rw(vcpu, msr) \
+    vmx_msr_bitmap_change_access((vcpu), (msr), MSR_BITMAP_ACCESS_RW)
 
-#define	guest_msr_ro(vmx, vcpuid, msr) \
-    vmx_msr_bitmap_change_access((vmx), (vcpuid), (msr), MSR_BITMAP_ACCESS_READ)
+#define	guest_msr_ro(vcpu, msr) \
+    vmx_msr_bitmap_change_access((vcpu), (msr), MSR_BITMAP_ACCESS_READ)
 
 #endif
