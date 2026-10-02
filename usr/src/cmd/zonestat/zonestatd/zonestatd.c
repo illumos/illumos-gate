@@ -21,6 +21,7 @@
 
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 #include <alloca.h>
 #include <assert.h>
@@ -4343,51 +4344,63 @@ zsd_server(void *cookie, char *argp, size_t arg_size,
 	args = (int *)argp;
 	cmd = args[0];
 
-	/* If connection, return door to stat server */
-	if (cmd == ZSD_CMD_CONNECT) {
+	switch (cmd) {
+	case ZSD_CMD_CONNECT:
+		/* If connection, return door to stat server */
 
 		/* Verify client compilation version */
 		if (args[1] != ZS_VERSION) {
 			args[1] = ZSD_STATUS_VERSION_MISMATCH;
-			(void) door_return(argp, sizeof (cmd) * 2, NULL, 0);
-			thr_exit(NULL);
+			break;
 		}
 		ucred = alloca(ucred_size());
 		/* Verify client permission */
 		if (door_ucred(&ucred) != 0) {
 			args[1] = ZSD_STATUS_INTERNAL_ERROR;
-			(void) door_return(argp, sizeof (cmd) * 2, NULL, 0);
-			thr_exit(NULL);
+			break;
 		}
-
 		eset = ucred_getprivset(ucred, PRIV_EFFECTIVE);
 		if (eset == NULL) {
 			args[1] = ZSD_STATUS_INTERNAL_ERROR;
-			(void) door_return(argp, sizeof (cmd) * 2, NULL, 0);
+			break;
+		}
+		if (priv_ismember(eset, PRIV_PROC_INFO)) {
+			/* Success case: Return stat server door */
+			args[1] = ZSD_STATUS_OK;
+			door.d_attributes = DOOR_DESCRIPTOR;
+			door.d_data.d_desc.d_descriptor = g_stat_door;
+			(void) door_return(argp, sizeof (cmd) * 2, &door, 1);
 			thr_exit(NULL);
 		}
-		if (!priv_ismember(eset, PRIV_PROC_INFO)) {
-			args[1] = ZSD_STATUS_PERMISSION;
-			(void) door_return(argp, sizeof (cmd) * 2, NULL, 0);
+		args[1] = ZSD_STATUS_PERMISSION;
+		break;
+	case ZSD_CMD_NEW_ZONE:
+		/* Respond to zoneadmd informing zonestatd of a new zone */
+		ucred = alloca(ucred_size());
+		if (door_ucred(&ucred) != 0) {
+			args[1] = ZSD_STATUS_INTERNAL_ERROR;
+			break;
+		}
+		eset = ucred_getprivset(ucred, PRIV_EFFECTIVE);
+		if (eset == NULL) {
+			args[1] = ZSD_STATUS_INTERNAL_ERROR;
+			break;
+		}
+		if (ucred_getzoneid(ucred) == GLOBAL_ZONEID &&
+		    priv_ismember(eset, PRIV_SYS_CONFIG)) {
+			/* Success case: Attach the zone and return quietly. */
+			zsd_fattach_zone(args[1], g_server_door, B_FALSE);
+			(void) door_return(NULL, 0, NULL, 0);
 			thr_exit(NULL);
 		}
-
-		/* Return stat server door */
-		args[1] = ZSD_STATUS_OK;
-		door.d_attributes = DOOR_DESCRIPTOR;
-		door.d_data.d_desc.d_descriptor = g_stat_door;
-		(void) door_return(argp, sizeof (cmd) * 2, &door, 1);
-		thr_exit(NULL);
+		args[1] = ZSD_STATUS_PERMISSION;
+		break;
+	default:
+		args[1] = ZSD_STATUS_INTERNAL_ERROR;
+		break;
 	}
 
-	/* Respond to zoneadmd informing zonestatd of a new zone */
-	if (cmd == ZSD_CMD_NEW_ZONE) {
-		zsd_fattach_zone(args[1], g_server_door, B_FALSE);
-		(void) door_return(NULL, 0, NULL, 0);
-		thr_exit(NULL);
-	}
-
-	args[1] = ZSD_STATUS_INTERNAL_ERROR;
+	/* Error cases all arrive here. */
 	(void) door_return(argp, sizeof (cmd) * 2, NULL, 0);
 	thr_exit(NULL);
 }
