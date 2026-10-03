@@ -23,13 +23,14 @@
 # Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+#
 LIBRARY=	crypt_bsdbf.a
 VERS=		.1
 
 OBJECTS=	bsdbf.o \
 		bcrypt.o \
-		blowfish.o \
-		arc4random.o
+		blowfish.o
 
 include		../../Makefile.crypt_modules
 

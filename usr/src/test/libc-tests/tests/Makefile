@@ -13,7 +13,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
 # Copyright 2019 Joyent, Inc.
-# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2023 Bill Sommerfeld <sommerfeld@alum.mit.edu>
 # Copyright 2026 Oxide Computer Company
 #
@@ -48,6 +48,7 @@ PROGS = \
 	c11_tss \
 	call_once \
 	closefrom \
+	crypt_bsdbf \
 	dprintf \
 	endian \
 	env-7076 \
@@ -111,6 +112,9 @@ posix_memalign.64 :=	LDLIBS64 += -lproc
 
 asprintf-14933.32 :=	CSTD=$(CSTD_GNU17)
 asprintf-14933.64 :=	CSTD=$(CSTD_GNU17)
+
+crypt_bsdbf.32 :=	CSTD=$(CSTD_GNU17)
+crypt_bsdbf.64 :=	CSTD=$(CSTD_GNU17)
 
 dprintf.32 :=	CSTD=$(CSTD_GNU17)
 dprintf.64 :=	CSTD=$(CSTD_GNU17)

@@ -14,7 +14,7 @@
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
 # Copyright 2018 Joyent, Inc.
-# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2026 Bill Sommerfeld <sommerfeld@alum.mit.edu>
 # Copyright 2026 Oxide Computer Company
 #
@@ -52,6 +52,8 @@ file path=opt/libc-tests/tests/clock_lock.32 mode=0555
 file path=opt/libc-tests/tests/clock_lock.64 mode=0555
 file path=opt/libc-tests/tests/closefrom.32 mode=0555
 file path=opt/libc-tests/tests/closefrom.64 mode=0555
+file path=opt/libc-tests/tests/crypt_bsdbf.32 mode=0555
+file path=opt/libc-tests/tests/crypt_bsdbf.64 mode=0555
 file path=opt/libc-tests/tests/dprintf.32 mode=0555
 file path=opt/libc-tests/tests/dprintf.64 mode=0555
 file path=opt/libc-tests/tests/endian.32 mode=0555

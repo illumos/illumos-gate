@@ -24,40 +24,44 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 #include <crypt.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
 
-extern char *bcrypt_gensalt(uint8_t);
-extern char *bcrypt(const char *, const char *);
+extern int bcrypt_gensalt(uint8_t, char *, size_t);
+extern int bcrypt(const char *, const char *, char *, size_t);
 
-/*ARGSUSED2*/
 char *
-crypt_gensalt_impl(char *gsbuffer,
-	    size_t gsbufflen,
-	    const char *oldsalt,
-	    const struct passwd *userinfo,
-	    const char **params)
+crypt_gensalt_impl(char *gsbuffer, size_t gsbufflen,
+    const char *oldsalt __unused, const struct passwd *userinfo __unused,
+    const char **params)
 {
 	int logr = 4;	/* Default from pwd_gensalt.c on OpenBSD */
 
 	if (params != NULL) {
 		logr = atoi(params[0]);
 	}
-	(void) strlcpy(gsbuffer, bcrypt_gensalt(logr), gsbufflen);
+	if (bcrypt_gensalt(logr, gsbuffer, gsbufflen) != 0) {
+		errno = EINVAL;
+		return (NULL);
+	}
 	return (gsbuffer);
 }
 
 
-/*ARGSUSED4*/
 char *
-crypt_genhash_impl(char *ctbuffer,
-	    size_t ctbufflen,
-	    const char *plaintext,
-	    const char *salt,
-	    const char **params)
+crypt_genhash_impl(char *ctbuffer, size_t ctbufflen, const char *plaintext,
+    const char *salt, const char **params __unused)
 {
-	(void) strlcpy(ctbuffer, bcrypt(plaintext, salt), ctbufflen);
+	/*
+	 * A malformed salt yields ":", which can never match a stored hash.
+	 */
+	if (bcrypt(plaintext, salt, ctbuffer, ctbufflen) != 0)
+		(void) strlcpy(ctbuffer, ":", ctbufflen);
 	return (ctbuffer);
 }

@@ -3,6 +3,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
+ */
+
 /*	$OpenBSD: bcrypt.c,v 1.16 2002/02/19 19:39:36 millert Exp $	*/
 
 /*
@@ -62,8 +66,6 @@
 #include <pwd.h>
 #include <blf.h>
 
-extern uint32_t arc4random();
-
 /*
  * This implementation is adaptable to current computing power.
  * You can have up to 2^31 rounds which should be enough for some
@@ -76,15 +78,21 @@ extern uint32_t arc4random();
 #define	BCRYPT_MINLOGROUNDS	4	/* we have log2(rounds) in salt */
 #define	BCRYPT_MAXLOGROUNDS	31
 
-char   *bcrypt_gensalt(uint8_t);
+/*
+ * The buffer space needed for a salt, which is "$2a$NN$" followed by the
+ * base64 encoded salt and a terminating NUL, and for a complete hash, which
+ * is the salt followed by the base64 encoded ciphertext. Base64 encoding
+ * produces four characters for every three bytes, rounded up.
+ */
+#define	BCRYPT_SALTSPACE	(7 + (BCRYPT_MAXSALT * 4 + 2) / 3 + 1)
+#define	BCRYPT_HASHSPACE	\
+	(BCRYPT_SALTSPACE + ((4 * BCRYPT_BLOCKS - 1) * 4 + 2) / 3)
+
+int bcrypt_gensalt(uint8_t, char *, size_t);
 
 static void encode_salt(char *, uint8_t *, uint16_t, uint8_t);
 static void encode_base64(uint8_t *, uint8_t *, uint16_t);
 static void decode_base64(uint8_t *, uint16_t, uint8_t *);
-
-static char    encrypted[128]; /* _PASSWORD_LEN in <pwd.h> on OpenBSD */
-static char    gsalt[BCRYPT_MAXSALT * 4 / 3 + 1];
-static char    error[] = ":";
 
 static uint8_t Base64Code[] =
 "./ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -147,7 +155,7 @@ encode_salt(char *salt, uint8_t *csalt, uint16_t clen, uint8_t logr)
 {
 	salt[0] = '$';
 	salt[1] = BCRYPT_VERSION;
-	salt[2] = 'a';
+	salt[2] = 'b';
 	salt[3] = '$';
 
 	(void) snprintf(salt + 4, 4, "%2.2u$", logr);
@@ -158,21 +166,20 @@ encode_salt(char *salt, uint8_t *csalt, uint16_t clen, uint8_t logr)
  * Generates a salt for this version of crypt.
  * Since versions may change. Keeping this here
  * seems sensible.
+ *
+ * The salt is written to the caller's buffer, which must have room for
+ * BCRYPT_SALTSPACE bytes. Returns 0 on success and -1 if it does not.
  */
 
-char *
-bcrypt_gensalt(uint8_t log_rounds)
+int
+bcrypt_gensalt(uint8_t log_rounds, char *gsalt, size_t gsaltlen)
 {
 	uint8_t csalt[BCRYPT_MAXSALT];
-	uint16_t i;
-	uint32_t seed = 0;
 
-	for (i = 0; i < BCRYPT_MAXSALT; i++) {
-		if (i % 4 == 0)
-			seed = arc4random();
-		csalt[i] = seed & 0xff;
-		seed = seed >> 8;
-	}
+	if (gsaltlen < BCRYPT_SALTSPACE)
+		return (-1);
+
+	arc4random_buf(csalt, sizeof (csalt));
 
 	if (log_rounds < BCRYPT_MINLOGROUNDS)
 		log_rounds = BCRYPT_MINLOGROUNDS;
@@ -180,15 +187,20 @@ bcrypt_gensalt(uint8_t log_rounds)
 		log_rounds = BCRYPT_MAXLOGROUNDS;
 
 	encode_salt(gsalt, csalt, BCRYPT_MAXSALT, log_rounds);
-	return (gsalt);
+	return (0);
 }
 /*
  * We handle $Vers$log2(NumRounds)$salt+passwd$
  *  i.e. $2$04$iwouldntknowwhattosayetKdJ6iFtacBqJdKe6aW7ou
+ *
+ * The hash is written to the caller's buffer, which must have room for
+ * BCRYPT_HASHSPACE bytes. Returns 0 on success and -1 if the buffer is too
+ * small or the salt is malformed. The caller decides how to report that.
  */
 
-char *
-bcrypt(const char *key, const char *salt)
+int
+bcrypt(const char *key, const char *salt, char *encrypted,
+    size_t encryptedlen)
 {
 	blf_ctx state;
 	uint32_t rounds, i, k;
@@ -201,13 +213,14 @@ bcrypt(const char *key, const char *salt)
 	uint32_t cdata[BCRYPT_BLOCKS];
 	char arounds[3];
 
+	if (encryptedlen < BCRYPT_HASHSPACE)
+		return (-1);
+
 	/* Discard "$" identifier */
 	salt++;
 
-	if (*salt > BCRYPT_VERSION) {
-		/* How do I handle errors ? Return ':' */
-		return (error);
-	}
+	if (*salt > BCRYPT_VERSION)
+		return (-1);
 
 	/* Check for minor versions */
 	if (salt[1] != '$') {
@@ -218,7 +231,7 @@ bcrypt(const char *key, const char *salt)
 			salt++;
 			break;
 		default:
-			return (error);
+			return (-1);
 		}
 	} else
 		minor = 0;
@@ -228,14 +241,14 @@ bcrypt(const char *key, const char *salt)
 
 	if (salt[2] != '$')
 		/* Out of sync with passwd entry */
-		return (error);
+		return (-1);
 
 	(void) memcpy(arounds, salt, sizeof (arounds));
 	if (arounds[sizeof (arounds) - 1] != '$')
-		return (error);
+		return (-1);
 	if ((logr = atoi(arounds)) < BCRYPT_MINLOGROUNDS ||
 	    logr > BCRYPT_MAXLOGROUNDS)
-		return (error);
+		return (-1);
 	/* Computer power doesn't increase linear, 2^x should be fine */
 	rounds = 1U << logr;
 
@@ -243,7 +256,7 @@ bcrypt(const char *key, const char *salt)
 	salt += 3;
 
 	if (strlen(salt) * 3 / 4 < BCRYPT_MAXSALT)
-		return (error);
+		return (-1);
 
 	/* We dont want the base64 salt but the raw data */
 	decode_base64(csalt, BCRYPT_MAXSALT, (uint8_t *)salt);
@@ -305,7 +318,7 @@ bcrypt(const char *key, const char *salt)
 	encode_base64((uint8_t *)encrypted + i + 3, csalt, BCRYPT_MAXSALT);
 	encode_base64((uint8_t *)encrypted + strlen(encrypted), ciphertext,
 	    4 * BCRYPT_BLOCKS - 1);
-	return (encrypted);
+	return (0);
 }
 
 static void

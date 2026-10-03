@@ -13,7 +13,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2015 Garrett D'Amore <garrett@damore.org>
 # Copyright 2019 Joyent, Inc.
-# Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2026 Bill Sommerfeld <sommerfeld@hamachi.org>
 # Copyright 2026 Oxide Computer Company
 #
@@ -123,6 +123,8 @@ timeout = 600
 [/opt/libc-tests/tests/clock_lock.64]
 [/opt/libc-tests/tests/closefrom.32]
 [/opt/libc-tests/tests/closefrom.64]
+[/opt/libc-tests/tests/crypt_bsdbf.32]
+[/opt/libc-tests/tests/crypt_bsdbf.64]
 [/opt/libc-tests/tests/catopen]
 [/opt/libc-tests/tests/dprintf.32]
 [/opt/libc-tests/tests/dprintf.64]
