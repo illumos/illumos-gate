@@ -27,7 +27,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #ifndef	_MCS_H
@@ -58,9 +58,6 @@ extern "C" {
 #define	TMPDIR	"/tmp"
 
 #define	DELETED	-1	/* The section will be removed */
-#define	NULLED  -2	/* The section will be nulled */
-#define	EXPANDED -3	/* The size of the section expanded */
-#define	SHRUNK -4	/* The section shrinked */
 
 #define	ACT_NOP		0x00000000
 #define	ACT_DELETE	0x00000001
@@ -79,14 +76,11 @@ extern "C" {
 #define	GET_LOC(x)	(x & 0x000000f0)
 
 #define	CANDIDATE	0x00000100
-#define	MOVING		0x00000200
 #define	MODIFIED	0x00000400
 
 #define	UNSET_CANDIDATE(x)	x = x & ~CANDIDATE
 #define	SET_CANDIDATE(x)	x = x | CANDIDATE
 #define	ISCANDIDATE(x)		(x & CANDIDATE)
-#define	SET_MOVING(x)		x = (x | MOVING)
-#define	GET_MOVING(x)		(x & MOVING)
 #define	SET_MODIFIED(x)		x = (x | MODIFIED)
 #define	GET_MODIFIED(x)		(x & MODIFIED)
 
@@ -151,7 +145,6 @@ typedef struct cmd_info {
 	int	no_of_delete;
 	int	no_of_nulled;
 	int	no_of_compressed;
-	int	no_of_moved;
 	size_t	str_size;	/* size of string to be appended */
 	int	ci_flags;	/* Various flags */
 } Cmd_Info;

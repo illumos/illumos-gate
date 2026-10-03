@@ -29,7 +29,7 @@
  * Use is subject to license terms.
  */
 /*
- * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include "mcs.h"
@@ -123,14 +123,6 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 					    info->rel_name);
 				}
 				break;
-			} else if (GET_LOC(info->si_flags) == PRIOR) {
-				/*
-				 * I can not delete this
-				 * section. I can only NULL
-				 * this out.
-				 */
-				info->secno = (GElf_Word)NULLED;
-				(cmd_info->no_of_nulled)++;
 			} else {
 				info->secno = (GElf_Word)DELETED;
 				(cmd_info->no_of_delete)++;
@@ -155,8 +147,12 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 			info->secno = info->osecno;
 			SET_ACTION(info->si_flags, ACT_APPEND);
 			SET_MODIFIED(info->si_flags);
+			/*
+			 * A section which precedes a segment cannot grow in
+			 * place and is relocated after the segments instead.
+			 */
 			if (GET_LOC(info->si_flags) == PRIOR)
-				info->secno = (GElf_Word)EXPANDED;
+				SET_LOC(info->si_flags, AFTER);
 			break;
 		case ACT_COMPRESS:
 			/*
@@ -182,7 +178,7 @@ apply_action(section_info_table *info, char *cur_file, Cmd_Info *cmd_info)
 			SET_ACTION(info->si_flags, ACT_COMPRESS);
 			SET_MODIFIED(info->si_flags);
 			if (GET_LOC(info->si_flags) == PRIOR)
-				info->secno = (GElf_Word)SHRUNK;
+				SET_LOC(info->si_flags, AFTER);
 			break;
 		}
 	}

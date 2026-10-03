@@ -26,10 +26,11 @@
  * Copyright (c) 1995, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 /*
- * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
 #include <errno.h>
+#include <sys/sysmacros.h>
 #include "alist.h"
 #include "mcs.h"
 #include "extern.h"
@@ -45,8 +46,6 @@ typedef struct {
 	int		notesctndx;
 	Seg_Table	*b_e_seg_table;
 	section_info_table *sec_table;
-	int64_t		*off_table;	/* maintains section's offset; set to */
-					/*	retain old offset, else 0 */
 	int64_t		*nobits_table;	/* maintains NOBITS sections */
 	char		*new_sec_string;
 } file_state_t;
@@ -271,7 +270,6 @@ process_file(Elf *elf, char *cur_file, Cmd_Info *cmd_info)
 	state.notesctndx = -1;
 	state.b_e_seg_table = NULL;
 	state.sec_table = NULL;
-	state.off_table = 0;
 	state.nobits_table = NULL;
 	state.new_sec_string = NULL;
 
@@ -299,8 +297,6 @@ process_file(Elf *elf, char *cur_file, Cmd_Info *cmd_info)
 		free(state.b_e_seg_table);
 	if (state.sec_table != NULL)
 		free(state.sec_table);
-	if (state.off_table != NULL)
-		free(state.off_table);
 	if (state.nobits_table != NULL)
 		free(state.nobits_table);
 	if (state.new_sec_string != NULL)
@@ -322,7 +318,6 @@ traverse_file(Elf *elf, GElf_Ehdr * ehdr, char *cur_file, Cmd_Info *cmd_info,
 	GElf_Shdr	*shdr;
 	char		*temp_name;
 	section_info_table *sinfo;
-	GElf_Xword	x;
 	int		ret = 0, SYM = 0;	/* used by strip command */
 	int		phnum = ehdr->e_phnum;
 	unsigned	int i, scn_index;
@@ -444,8 +439,6 @@ traverse_file(Elf *elf, GElf_Ehdr * ehdr, char *cur_file, Cmd_Info *cmd_info,
 			SET_CANDIDATE(sinfo->si_flags);
 			state->Sect_exists++;
 		}
-		x = GET_LOC(sinfo->si_flags);
-
 		/*
 		 * Remember the note section index so that we can
 		 * reset the NOTE segment offset to point to it. Depending
@@ -464,8 +457,6 @@ traverse_file(Elf *elf, GElf_Ehdr * ehdr, char *cur_file, Cmd_Info *cmd_info,
 		    == shdr->sh_offset))
 			state->notesctndx = scn_index;
 
-		if (x == IN || x == PRIOR)
-			state->off_table[scn_index] = shdr->sh_offset;
 		if (shdr->sh_type == SHT_NOBITS)
 			state->nobits_table[scn_index] = 1;
 
@@ -484,7 +475,8 @@ traverse_file(Elf *elf, GElf_Ehdr * ehdr, char *cur_file, Cmd_Info *cmd_info,
 		    (CHK_OPT(cmd_info, xFLAG) == 0) &&
 		    (CHK_OPT(cmd_info, lFLAG) == 0)) {
 			if (shdr->sh_type == SHT_SYMTAB &&
-			    GET_LOC(sinfo->si_flags) == AFTER) {
+			    (GET_LOC(sinfo->si_flags) == AFTER ||
+			    GET_LOC(sinfo->si_flags) == PRIOR)) {
 				SYM = scn_index;
 			}
 		}
@@ -512,7 +504,6 @@ traverse_file(Elf *elf, GElf_Ehdr * ehdr, char *cur_file, Cmd_Info *cmd_info,
 		if (state->Sect_exists == 0)
 			++state->Sect_exists;
 		SET_ACTION(state->sec_table[SYM].si_flags, ACT_DELETE);
-		state->off_table[SYM] = 0;
 		/*
 		 * Can I remove section header
 		 * string table ?
@@ -521,7 +512,9 @@ traverse_file(Elf *elf, GElf_Ehdr * ehdr, char *cur_file, Cmd_Info *cmd_info,
 		    (tmp_shdr.sh_link != SHN_UNDEF) &&
 		    (tmp_shdr.sh_link != shstrndx) &&
 		    (GET_LOC(state->sec_table[tmp_shdr.sh_link].si_flags) ==
-		    AFTER)) {
+		    AFTER ||
+		    GET_LOC(state->sec_table[tmp_shdr.sh_link].si_flags) ==
+		    PRIOR)) {
 			state->sec_table[tmp_shdr.sh_link].secno =
 			    (GElf_Word)DELETED;
 			++(cmd_info->no_of_nulled);
@@ -529,7 +522,6 @@ traverse_file(Elf *elf, GElf_Ehdr * ehdr, char *cur_file, Cmd_Info *cmd_info,
 				++state->Sect_exists;
 			SET_ACTION(state->sec_table[tmp_shdr.sh_link].si_flags,
 			    ACT_DELETE);
-			state->off_table[tmp_shdr.sh_link] = 0;
 		}
 	}
 
@@ -595,20 +587,10 @@ traverse_file(Elf *elf, GElf_Ehdr * ehdr, char *cur_file, Cmd_Info *cmd_info,
 				 * If I am removed, then remove my
 				 * target section.
 				 */
-				if (((sinfo->secno ==
-				    (GElf_Word)DELETED) ||
-				    (sinfo->secno ==
-				    (GElf_Word)NULLED)) &&
+				if (sinfo->secno == (GElf_Word)DELETED &&
 				    sinfo->rel_loc != IN) {
-					if (GET_LOC(state->
-					    sec_table[rel_idx].si_flags) ==
-					    PRIOR) {
-						state->sec_table[rel_idx].
-						    secno = (GElf_Word)NULLED;
-					} else {
-						state->sec_table[rel_idx].
-						    secno = (GElf_Word)DELETED;
-					}
+					state->sec_table[rel_idx].secno =
+					    (GElf_Word)DELETED;
 					SET_ACTION(
 					    state->sec_table[rel_idx].si_flags,
 					    ACT_DELETE);
@@ -616,21 +598,13 @@ traverse_file(Elf *elf, GElf_Ehdr * ehdr, char *cur_file, Cmd_Info *cmd_info,
 
 				/*
 				 * I am not removed. Check if my target is
-				 * removed or nulled. If so, let me try to
+				 * removed. If so, let me try to
 				 * remove my self.
 				 */
-				if (((state->sec_table[rel_idx].secno ==
-				    (GElf_Word)DELETED) ||
-				    (state->sec_table[rel_idx].secno ==
-				    (GElf_Word)NULLED)) &&
-				    (GET_LOC(sinfo->si_flags) != IN)) {
-					if (GET_LOC(sinfo->si_flags) ==
-					    PRIOR)
-						sinfo->secno =
-						    (GElf_Word)NULLED;
-					else
-						sinfo->secno =
-						    (GElf_Word)DELETED;
+				if (state->sec_table[rel_idx].secno ==
+				    (GElf_Word)DELETED &&
+				    GET_LOC(sinfo->si_flags) != IN) {
+					sinfo->secno = (GElf_Word)DELETED;
 					SET_ACTION(sinfo->si_flags, ACT_DELETE);
 				}
 			}
@@ -698,6 +672,7 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 	GElf_Ehdr dst_ehdr;
 	GElf_Off  new_offset = 0, r;
 	size_t shnum, shstrndx;
+	int64_t i;
 
 
 	if (elf_getshdrnum(src_elf, &shnum) == -1) {
@@ -771,8 +746,40 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 		}
 
 		x = location(dst_ehdr.e_phoff, 0, src_elf, state);
-		if (x == AFTER)
+		if (x == AFTER) {
 			new_offset = (GElf_Off)src_ehdr->e_ehsize;
+		} else {
+			new_offset = MAX(new_offset, src_ehdr->e_phoff +
+			    (GElf_Off)src_ehdr->e_phnum *
+			    src_ehdr->e_phentsize);
+		}
+
+		/*
+		 * Sections which are in, or prior to, a segment retain their
+		 * original file offset and the remaining sections are packed
+		 * after them. The section header table is not necessarily in
+		 * file offset order (the Go linker, for example, places the
+		 * headers for .interp and the note sections last although
+		 * their data is at the start of the file) so start placing
+		 * the relocated sections beyond the end of every segment and
+		 * every section which is staying where it is.
+		 */
+		for (i = 0; i < src_ehdr->e_phnum; i++) {
+			new_offset = MAX(new_offset,
+			    (GElf_Off)state->b_e_seg_table[i].p_filesz);
+		}
+		for (i = 1; i < shnum; i++) {
+			info = &state->sec_table[i];
+
+			if (info->secno == (GElf_Word)DELETED ||
+			    state->nobits_table[i] != 0 ||
+			    (GET_LOC(info->si_flags) != IN &&
+			    GET_LOC(info->si_flags) != PRIOR)) {
+				continue;
+			}
+			new_offset = MAX(new_offset,
+			    info->shdr.sh_offset + info->shdr.sh_size);
+		}
 	}
 
 	scn_no = 1;
@@ -860,9 +867,7 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 						section_info_table *i;
 						i = &state->
 						    sec_table[csym.st_shndx];
-						if (((int)i->secno !=
-						    DELETED) &&
-						    ((int)i->secno != NULLED)) {
+						if ((int)i->secno != DELETED) {
 							csym.st_shndx =
 							    i->secno;
 						} else {
@@ -925,9 +930,7 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 						section_info_table *i;
 						i = &state->
 						    sec_table[oldshndx[c]];
-						if (((int)i->secno !=
-						    DELETED) &&
-						    ((int)i->secno != NULLED))
+						if ((int)i->secno != DELETED)
 							newshndx[c] = i->secno;
 						else
 							newshndx[c] =
@@ -943,42 +946,29 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 			 * do so.
 			 */
 			if (ISCANDIDATE(info->si_flags)) {
-				if ((GET_LOC(info->si_flags) == PRIOR) &&
-				    (((int)info->secno == NULLED) ||
-				    ((int)info->secno == EXPANDED) ||
-				    ((int)info->secno == SHRUNK))) {
-					/*
-					 * The section is updated,
-					 * but the position is not too
-					 * good. Need to NULL this out.
-					 */
-					dst_shdr.sh_name = 0;
-					dst_shdr.sh_type = SHT_PROGBITS;
-					if ((int)info->secno != NULLED) {
-						(cmd_info->no_of_moved)++;
-						SET_MOVING(info->si_flags);
-					}
-				} else {
-					/*
-					 * The section is positioned AFTER,
-					 * or there are no segments.
-					 * It is safe to update this section.
-					 */
-					data = state->sec_table[scn_no].mdata;
-					*elf_data = *data;
-					dst_shdr.sh_size = elf_data->d_size;
-				}
+				/*
+				 * Sections in a segment are only modified in
+				 * place. A section prior to a segment which
+				 * has been resized has been marked by
+				 * apply_action() to be relocated after the
+				 * segments.
+				 */
+				data = state->sec_table[scn_no].mdata;
+				*elf_data = *data;
+				dst_shdr.sh_size = elf_data->d_size;
 			}
 			/* add new section name to shstrtab? */
 			else if (!state->Sect_exists &&
 			    (state->new_sec_string != NULL) &&
 			    (scn_no == shstrndx) &&
-			    (dst_shdr.sh_type == SHT_STRTAB) &&
-			    ((src_ehdr->e_phnum == 0) ||
-			    ((x = scn_location(dst_scn, dst_elf, state))
-			    != IN) ||
-			    (x != PRIOR))) {
+			    (dst_shdr.sh_type == SHT_STRTAB)) {
 				size_t sect_len;
+
+				/*
+				 * The section is growing so it can no
+				 * longer stay where it is.
+				 */
+				SET_LOC(info->si_flags, AFTER);
 
 				sect_len = strlen(SECT_NAME);
 				if ((elf_data->d_buf =
@@ -1004,9 +994,11 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 			 */
 			if (src_ehdr->e_phnum != 0) {
 				/*
-				 * Compute section offset.
+				 * Compute section offset. Sections which
+				 * are not moving keep their original offset.
 				 */
-				if (state->off_table[scn_no] == 0) {
+				if (GET_LOC(info->si_flags) != IN &&
+				    GET_LOC(info->si_flags) != PRIOR) {
 					if (dst_shdr.sh_addralign != 0) {
 						r = new_offset %
 						    dst_shdr.sh_addralign;
@@ -1017,13 +1009,9 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 					}
 					dst_shdr.sh_offset = new_offset;
 					elf_data->d_off = 0;
-				} else {
 					if (state->nobits_table[scn_no] == 0)
-						new_offset =
-						    state->off_table[scn_no];
+						new_offset += dst_shdr.sh_size;
 				}
-				if (state->nobits_table[scn_no] == 0)
-					new_offset += dst_shdr.sh_size;
 			}
 
 			/* flush changes */
@@ -1079,71 +1067,6 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 	}
 
 	/*
-	 * If there are sections which needed to be moved,
-	 * then do it here.
-	 */
-	if (cmd_info->no_of_moved != 0) {
-		int cnt;
-		info = &state->sec_table[0];
-
-		for (cnt = 0; cnt < shnum; cnt++, info++) {
-			if ((GET_MOVING(info->si_flags)) == 0)
-				continue;
-
-			if ((src_scn = elf_getscn(src_elf, info->osecno)) ==
-			    NULL) {
-				error_message(LIBELF_ERROR,
-				    LIBelf_ERROR, elf_errmsg(-1), prog);
-				return (FAILURE);
-			}
-			if (gelf_getshdr(src_scn, &src_shdr) == NULL) {
-				error_message(LIBELF_ERROR,
-				    LIBelf_ERROR, elf_errmsg(-1), prog);
-				return (FAILURE);
-			}
-			if ((dst_scn = elf_newscn(dst_elf)) == NULL) {
-				error_message(LIBELF_ERROR,
-				    LIBelf_ERROR, elf_errmsg(-1), prog);
-				return (FAILURE);
-			}
-			if (gelf_getshdr(dst_scn, &dst_shdr) == NULL) {
-				error_message(LIBELF_ERROR,
-				    LIBelf_ERROR, elf_errmsg(-1), prog);
-				return (FAILURE);
-			}
-			dst_shdr = src_shdr;
-
-			data = info->mdata;
-
-			dst_shdr.sh_offset = new_offset;  /* UPDATE fields */
-			dst_shdr.sh_size = data->d_size;
-
-			if ((shnum >= src_shdr.sh_link) ||
-			    (src_shdr.sh_link == 0))
-				dst_shdr.sh_link = src_shdr.sh_link;
-			else
-				dst_shdr.sh_link =
-				    state->sec_table[src_shdr.sh_link].osecno;
-
-			if ((shnum >= src_shdr.sh_info) ||
-			    (src_shdr.sh_info == 0))
-				dst_shdr.sh_info = src_shdr.sh_info;
-			else
-				dst_shdr.sh_info =
-				    state->sec_table[src_shdr.sh_info].osecno;
-			(void) gelf_update_shdr(dst_scn, &dst_shdr);
-			if ((elf_data = elf_newdata(dst_scn)) == NULL) {
-				error_message(LIBELF_ERROR,
-				    LIBelf_ERROR, elf_errmsg(-1), prog);
-				return (FAILURE);
-			}
-			(void) memcpy(elf_data, data, sizeof (Elf_Data));
-
-			new_offset += data->d_size;
-		}
-	}
-
-	/*
 	 * In the event that the position of the sting table has changed,
 	 * as a result of deleted sections, update the ehdr->e_shstrndx.
 	 */
@@ -1182,7 +1105,8 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 				new_offset += align - r;
 
 			dst_ehdr.e_phoff = new_offset;
-			new_offset += dst_ehdr.e_phnum * dst_ehdr.e_phentsize;
+			new_offset += (GElf_Off)dst_ehdr.e_phnum *
+			    dst_ehdr.e_phentsize;
 		}
 		/* UPDATE location of section header table */
 		if ((location(dst_ehdr.e_shoff, 0, src_elf, state) == AFTER) ||
@@ -1253,7 +1177,11 @@ build_segment_table(Elf * elf, GElf_Ehdr * ehdr, file_state_t *state)
 	for (i = 0; i < ehdr->e_phnum; i++) {
 		GElf_Phdr ph;
 
-		(void) gelf_getphdr(elf, i, &ph);
+		if (gelf_getphdr(elf, i, &ph) == NULL) {
+			error_message(LIBELF_ERROR, LIBelf_ERROR,
+			    elf_errmsg(-1), prog);
+			return (FAILURE);
+		}
 
 		/*
 		 * remember the note SEGMENTS index so that we can
@@ -1477,6 +1405,10 @@ copy_file(int ofd, char *fname, Tmp_File *temp_file)
 	free_tempfile(temp_file);
 }
 
+/*
+ * Classify the byte at the given file offset as lying within a segment,
+ * before the start of a segment, or after every segment.
+ */
 static uint64_t
 location(int64_t offset, int mem_search, Elf * elf, file_state_t *state)
 {
@@ -1486,15 +1418,23 @@ location(int64_t offset, int mem_search, Elf * elf, file_state_t *state)
 
 	(void) gelf_getehdr(elf, &ehdr);
 
+	/*
+	 * The program headers are not necessarily sorted by offset, so
+	 * check every segment for containment before checking whether the
+	 * offset precedes any of them.
+	 */
 	for (i = 0; i < ehdr.e_phnum; i++) {
 		if (mem_search)
 			upper = state->b_e_seg_table[i].p_memsz;
 		else
 			upper = state->b_e_seg_table[i].p_filesz;
-		if ((offset >= state->b_e_seg_table[i].p_offset) &&
-		    (offset <= upper))
+		if (offset >= state->b_e_seg_table[i].p_offset &&
+		    offset < upper) {
 			return (IN);
-		else if (offset < state->b_e_seg_table[i].p_offset)
+		}
+	}
+	for (i = 0; i < ehdr.e_phnum; i++) {
+		if (offset < state->b_e_seg_table[i].p_offset)
 			return (PRIOR);
 	}
 	return (AFTER);
@@ -1504,17 +1444,26 @@ static uint64_t
 scn_location(Elf_Scn * scn, Elf * elf, file_state_t *state)
 {
 	GElf_Shdr shdr;
+	GElf_Off last;
 
 	(void) gelf_getshdr(scn, &shdr);
+
+	/*
+	 * A section is classified by the location of its last byte. An
+	 * empty section is classified by its offset.
+	 */
+	last = shdr.sh_offset;
+	if (shdr.sh_size > 0)
+		last += shdr.sh_size - 1;
 
 	/*
 	 * If the section is not a NOTE section and it has no
 	 * virtual address then it is not part of a mapped segment.
 	 */
 	if (shdr.sh_addr == 0)
-		return (location(shdr.sh_offset + shdr.sh_size, 0, elf, state));
+		return (location(last, 0, elf, state));
 
-	return (location(shdr.sh_offset + shdr.sh_size, 1, elf, state));
+	return (location(last, 1, elf, state));
 }
 
 static void
@@ -1524,19 +1473,12 @@ initialize(int shnum, Cmd_Info *cmd_info, file_state_t *state)
 	 * Initialize command info
 	 */
 	cmd_info->no_of_append = cmd_info->no_of_delete =
-	    cmd_info->no_of_nulled = cmd_info->no_of_compressed =
-	    cmd_info->no_of_moved = 0;
+	    cmd_info->no_of_nulled = cmd_info->no_of_compressed = 0;
 	cmd_info->sh_groups = NULL;
 
 	state->sec_table = (section_info_table *)
 	    calloc(shnum + 1, sizeof (section_info_table));
 	if (state->sec_table == NULL) {
-		error_message(MALLOC_ERROR, PLAIN_ERROR, NULL, prog);
-		mcs_exit(FAILURE);
-	}
-
-	state->off_table = (int64_t *)calloc(shnum, sizeof (int64_t));
-	if (state->off_table == NULL) {
 		error_message(MALLOC_ERROR, PLAIN_ERROR, NULL, prog);
 		mcs_exit(FAILURE);
 	}
