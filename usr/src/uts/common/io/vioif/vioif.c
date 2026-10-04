@@ -2037,6 +2037,19 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	/*
+	 * Interrupts must be enabled before any control queue request is
+	 * submitted. Until then, MSI-X is not enabled in the device's PCI
+	 * configuration and so the device signals through its fixed interrupt.
+	 * With no handler installed, a fixed interrupt that shares its line
+	 * with another device that is already active is raised repeatedly and
+	 * can monopolise a CPU.
+	 */
+	if (virtio_interrupts_enable(vio) != DDI_SUCCESS) {
+		dev_err(dip, CE_WARN, "failed to enable interrupts");
+		goto fail;
+	}
+
+	/*
 	 * If we negotiated multiple queue pairs, ask the device to use them.
 	 * If the request fails, fall back to using a single pair; the
 	 * additional allocated queues are simply left unused. If the device
@@ -2076,11 +2089,6 @@ vioif_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			dev_err(dip, CE_WARN,
 			    "!failed to reset the receive filtering mode");
 		}
-	}
-
-	if (virtio_interrupts_enable(vio) != DDI_SUCCESS) {
-		dev_err(dip, CE_WARN, "failed to enable interrupts");
-		goto fail;
 	}
 
 	if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
