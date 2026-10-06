@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2015 by Delphix. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -523,7 +524,7 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 		lr->lr_foid = zp->z_id;
 		lr->lr_offset = off;
 		lr->lr_length = len;
-		lr->lr_blkoff = 0;
+		lr->lr_flags = 0;
 		BP_ZERO(&lr->lr_blkptr);
 
 		itx->itx_private = zp->z_zfsvfs;

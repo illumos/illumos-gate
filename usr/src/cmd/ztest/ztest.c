@@ -27,6 +27,7 @@
  * Copyright 2017 Joyent, Inc.
  * Copyright (c) 2017, Intel Corporation.
  * Copyright 2017 RackTop Systems.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -2323,7 +2324,7 @@ ztest_write(ztest_ds_t *zd, uint64_t object, uint64_t offset, uint64_t size,
 	lr->lr_foid = object;
 	lr->lr_offset = offset;
 	lr->lr_length = size;
-	lr->lr_blkoff = 0;
+	lr->lr_flags = 0;
 	BP_ZERO(&lr->lr_blkptr);
 
 	bcopy(data, lr + 1, size);

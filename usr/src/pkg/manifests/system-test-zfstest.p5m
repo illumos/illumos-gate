@@ -3055,6 +3055,15 @@ file path=opt/zfs-tests/tests/functional/slog/slog_014_pos mode=0555
 file path=opt/zfs-tests/tests/functional/slog/slog_015_neg mode=0555
 file path=opt/zfs-tests/tests/functional/slog/slog_replay_fs_001 mode=0555
 file path=opt/zfs-tests/tests/functional/slog/slog_replay_fs_002 mode=0555
+file path=opt/zfs-tests/tests/functional/slog/slog_replay_fs_split_truncate \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/slog/slog_replay_fs_split_write \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/slog/slog_replay_volume_split_boundary \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/slog/slog_replay_volume_split_write \
+    mode=0555
 dir  path=opt/zfs-tests/tests/functional/snapshot
 file path=opt/zfs-tests/tests/functional/snapshot/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/snapshot/clone_001_pos mode=0555
