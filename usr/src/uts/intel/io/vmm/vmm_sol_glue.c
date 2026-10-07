@@ -40,12 +40,12 @@
 /*
  * Copyright 2014 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2020 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
 #include <sys/archsystm.h>
-#include <sys/cpuset.h>
+#include <sys/cpuvar.h>
 #include <sys/fp.h>
 #include <sys/kmem.h>
 #include <sys/queue.h>
@@ -114,29 +114,6 @@ vtophys(void *va)
 	pfn = hat_getpfnum(kas.a_hat, (caddr_t)va);
 	ASSERT(pfn != PFN_INVALID);
 	return (pfn << PAGE_SHIFT) | ((uintptr_t)va & PAGE_MASK);
-}
-
-int
-cpusetobj_ffs(const cpuset_t *set)
-{
-	uint_t large, small;
-
-	/*
-	 * Rather than reaching into the cpuset_t ourselves, leave that task to
-	 * cpuset_bounds().  The simplicity is worth the extra wasted work to
-	 * find the upper bound.
-	 */
-	cpuset_bounds(set, &small, &large);
-
-	if (small == CPUSET_NOTINSET) {
-		/* The FreeBSD version returns 0 if it find nothing */
-		return (0);
-	}
-
-	ASSERT3U(small, <=, INT_MAX);
-
-	/* Least significant bit index starts at 1 for valid results */
-	return (small + 1);
 }
 
 struct vmm_ptp_item {

@@ -27,7 +27,6 @@
 #include <sys/mkdev.h>
 #include <sys/sunddi.h>
 #include <sys/fs/dv_node.h>
-#include <sys/cpuset.h>
 #include <sys/id_space.h>
 #include <sys/fs/sdev_plugin.h>
 #include <sys/smt.h>
@@ -1573,27 +1572,19 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 
 	case VM_GET_CPUS: {
 		struct vm_cpuset vm_cpuset;
-		cpuset_t tempset;
-		void *srcp = &tempset;
-		int size;
+		vcpuset_t tempset;
+		size_t size;
 
 		if (ddi_copyin(datap, &vm_cpuset, sizeof (vm_cpuset), md)) {
 			error = EFAULT;
 			break;
 		}
-
-		/* Be more generous about sizing since our cpuset_t is large. */
-		size = vm_cpuset.cpusetsize;
-		if (size <= 0 || size > sizeof (cpuset_t)) {
+		if (vm_cpuset.cpusetsize <= 0 ||
+		    vm_cpuset.cpusetsize > PAGESIZE) {
 			error = ERANGE;
+			break;
 		}
-		/*
-		 * If they want a ulong_t or less, make sure they receive the
-		 * low bits with all the useful information.
-		 */
-		if (size <= sizeof (tempset.cpub[0])) {
-			srcp = &tempset.cpub[0];
-		}
+		size = vm_cpuset.cpusetsize;
 
 		if (vm_cpuset.which == VM_ACTIVE_CPUS) {
 			tempset = vm_active_cpus(sc->vmm_vm);
@@ -1601,13 +1592,33 @@ vmmdev_do_ioctl(vmm_softc_t *sc, int cmd, intptr_t arg, int md,
 			tempset = vm_debug_cpus(sc->vmm_vm);
 		} else {
 			error = EINVAL;
+			break;
 		}
 
-		ASSERT(size > 0 && size <= sizeof (tempset));
-		if (error == 0 &&
-		    ddi_copyout(srcp, vm_cpuset.cpus, size, md)) {
+		/*
+		 * The caller's set need not be the same size as ours. It
+		 * receives as much of ours as fits, provided that no member
+		 * would be lost, and any remainder of it is zeroed.
+		 */
+		if (size < sizeof (tempset) &&
+		    vcpuset_find(&tempset, size * NBBY) != -1) {
+			error = ERANGE;
+			break;
+		}
+		if (ddi_copyout(&tempset, vm_cpuset.cpus,
+		    MIN(size, sizeof (tempset)), md)) {
 			error = EFAULT;
 			break;
+		}
+		vcpuset_zero(&tempset);
+		for (size_t off = sizeof (tempset); off < size;
+		    off += sizeof (tempset)) {
+			if (ddi_copyout(&tempset,
+			    (uint8_t *)vm_cpuset.cpus + off,
+			    MIN(size - off, sizeof (tempset)), md)) {
+				error = EFAULT;
+				break;
+			}
 		}
 		break;
 	}

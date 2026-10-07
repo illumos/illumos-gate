@@ -97,7 +97,7 @@ void vlapic_set_x2apic_state(struct vcpu *vcpu, enum x2apic_state s);
 void vlapic_deliver_intr(struct vm *vm, bool level, uint32_t dest, bool phys,
     int delmode, int vec);
 
-void vlapic_calcdest(struct vm *vm, cpuset_t *dmask, uint32_t dest, bool phys,
+void vlapic_calcdest(struct vm *vm, vcpuset_t *dmask, uint32_t dest, bool phys,
     bool lowprio, bool x2apic_dest);
 
 void vlapic_set_cr8(struct vlapic *vlapic, uint64_t val);

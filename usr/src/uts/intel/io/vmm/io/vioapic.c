@@ -52,7 +52,6 @@
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/kmem.h>
-#include <sys/cpuset.h>
 
 #include <x86/apicreg.h>
 #include <machine/vmm.h>

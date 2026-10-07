@@ -11,7 +11,7 @@
 
 /*
  * Copyright 2019 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SYS_HMA_H
@@ -41,6 +41,14 @@ typedef struct hma_reg hma_reg_t;
 extern hma_reg_t *hma_register(const char *);
 extern hma_reg_t *hma_register_exclusive(const char *);
 extern void hma_unregister(hma_reg_t *);
+
+/*
+ * VPID 0 is reserved for instances where VPID is disabled. VPIDs in the range
+ * [1, HMA_VMX_VPID_RESERVED] are never allocated by HMA, but are left for
+ * a hypervisor to use as fallback VPIDs when unique ones cannot be allocated.
+ * This bounds the number of vCPUs a VM may have.
+ */
+#define	HMA_VMX_VPID_RESERVED	4096
 
 /*
  * Allocate or free a VPID for use with VMX.

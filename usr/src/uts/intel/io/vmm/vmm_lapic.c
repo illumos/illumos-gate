@@ -46,7 +46,6 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/cpuset.h>
 
 #include <x86/specialreg.h>
 #include <x86/apicreg.h>
@@ -86,20 +85,19 @@ int
 lapic_set_local_intr(struct vm *vm, struct vcpu *vcpu, int vector)
 {
 	struct vlapic *vlapic;
-	cpuset_t dmask;
+	vcpuset_t dmask;
 	int cpu, error;
 
 	if (vcpu == NULL)
 		dmask = vm_active_cpus(vm);
 	else
-		CPU_SETOF(vcpu_vcpuid(vcpu), &dmask);
+		vcpuset_only(&dmask, vcpu_vcpuid(vcpu));
 	error = 0;
-	while ((cpu = CPU_FFS(&dmask)) != 0) {
-		cpu--;
-		CPU_CLR(cpu, &dmask);
+	for (cpu = vcpuset_find(&dmask, 0); cpu != -1;
+	    cpu = vcpuset_find(&dmask, cpu + 1)) {
 		vlapic = vm_lapic(vm_vcpu(vm, cpu));
 		error = vlapic_trigger_lvt(vlapic, vector);
-		if (error)
+		if (error != 0)
 			break;
 	}
 

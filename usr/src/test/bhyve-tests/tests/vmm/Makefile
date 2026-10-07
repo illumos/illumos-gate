@@ -27,6 +27,7 @@ PROG =	mem_partial \
 	self_destruct \
 	drv_hold \
 	cpuid_ioctl \
+	cpuset_size \
 	default_capabs \
 	datarw_constraints \
 	datarw_msrs \

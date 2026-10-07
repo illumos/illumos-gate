@@ -24,6 +24,7 @@ user = root
 tests = [
 	'auto_destruct',
 	'cpuid_ioctl',
+	'cpuset_size',
 	'datarw_constraints',
 	'datarw_msrs',
 	'datarw_vcpu',

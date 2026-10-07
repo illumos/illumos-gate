@@ -51,7 +51,6 @@
 #include <sys/kmem.h>
 #include <sys/mutex.h>
 #include <sys/systm.h>
-#include <sys/cpuset.h>
 
 #include <x86/specialreg.h>
 #include <x86/apicreg.h>
@@ -811,13 +810,13 @@ vlapic_icrtmr_write_handler(struct vlapic *vlapic)
  * or xAPIC (8-bit) destination field.
  */
 void
-vlapic_calcdest(struct vm *vm, cpuset_t *dmask, uint32_t dest, bool phys,
+vlapic_calcdest(struct vm *vm, vcpuset_t *dmask, uint32_t dest, bool phys,
     bool lowprio, bool x2apic_dest)
 {
 	struct vlapic *vlapic;
 	uint32_t dfr, ldr, ldest, cluster;
 	uint32_t mda_flat_ldest, mda_cluster_ldest, mda_ldest, mda_cluster_id;
-	cpuset_t amask;
+	vcpuset_t amask;
 	int vcpuid;
 
 	if ((x2apic_dest && dest == 0xffffffff) ||
@@ -833,11 +832,13 @@ vlapic_calcdest(struct vm *vm, cpuset_t *dmask, uint32_t dest, bool phys,
 		/*
 		 * Physical mode: destination is APIC ID.
 		 */
-		CPU_ZERO(dmask);
+		vcpuset_zero(dmask);
 		vcpuid = vm_apicid2vcpuid(vm, dest);
 		amask = vm_active_cpus(vm);
-		if (vcpuid < vm_get_maxcpus(vm) && CPU_ISSET(vcpuid, &amask))
-			CPU_SET(vcpuid, dmask);
+		if (vcpuid >= 0 && vcpuid < vm_get_maxcpus(vm) &&
+		    vcpuset_isset(&amask, vcpuid)) {
+			vcpuset_add(dmask, vcpuid);
+		}
 	} else {
 		/*
 		 * In the "Flat Model" the MDA is interpreted as an 8-bit wide
@@ -861,12 +862,10 @@ vlapic_calcdest(struct vm *vm, cpuset_t *dmask, uint32_t dest, bool phys,
 		 * Logical mode: match each APIC that has a bit set
 		 * in its LDR that matches a bit in the ldest.
 		 */
-		CPU_ZERO(dmask);
+		vcpuset_zero(dmask);
 		amask = vm_active_cpus(vm);
-		while ((vcpuid = CPU_FFS(&amask)) != 0) {
-			vcpuid--;
-			CPU_CLR(vcpuid, &amask);
-
+		for (vcpuid = vcpuset_find(&amask, 0); vcpuid != -1;
+		    vcpuid = vcpuset_find(&amask, vcpuid + 1)) {
 			vlapic = vm_lapic(vm_vcpu(vm, vcpuid));
 			dfr = vlapic->apic_page->dfr;
 			ldr = vlapic->apic_page->ldr;
@@ -896,7 +895,7 @@ vlapic_calcdest(struct vm *vm, cpuset_t *dmask, uint32_t dest, bool phys,
 			}
 
 			if ((mda_ldest & ldest) != 0) {
-				CPU_SET(vcpuid, dmask);
+				vcpuset_add(dmask, vcpuid);
 				if (lowprio)
 					break;
 			}
@@ -1029,7 +1028,7 @@ void
 vlapic_icrlo_write_handler(struct vlapic *vlapic)
 {
 	int i;
-	cpuset_t dmask;
+	vcpuset_t dmask;
 	uint64_t icrval;
 	uint32_t dest, vec, mode, dsh;
 	struct LAPIC *lapic;
@@ -1070,14 +1069,14 @@ vlapic_icrlo_write_handler(struct vlapic *vlapic)
 		    vlapic_x2mode(vlapic));
 		break;
 	case APIC_DEST_SELF:
-		CPU_SETOF(vlapic->vcpuid, &dmask);
+		vcpuset_only(&dmask, vlapic->vcpuid);
 		break;
 	case APIC_DEST_ALLISELF:
 		dmask = vm_active_cpus(vlapic->vm);
 		break;
 	case APIC_DEST_ALLESELF:
 		dmask = vm_active_cpus(vlapic->vm);
-		CPU_CLR(vlapic->vcpuid, &dmask);
+		vcpuset_del(&dmask, vlapic->vcpuid);
 		break;
 	default:
 		/*
@@ -1087,12 +1086,10 @@ vlapic_icrlo_write_handler(struct vlapic *vlapic)
 		panic("unknown delivery shorthand: %x", dsh);
 	}
 
-	while ((i = CPU_FFS(&dmask)) != 0) {
-		struct vcpu *dvcpu;
+	for (i = vcpuset_find(&dmask, 0); i != -1;
+	    i = vcpuset_find(&dmask, i + 1)) {
+		struct vcpu *dvcpu = vm_vcpu(vlapic->vm, i);
 
-		i--;
-		CPU_CLR(i, &dmask);
-		dvcpu = vm_vcpu(vlapic->vm, i);
 		switch (mode) {
 		case APIC_DELMODE_FIXED:
 			(void) lapic_intr_edge(dvcpu, vec);
@@ -1746,7 +1743,7 @@ vlapic_deliver_intr(struct vm *vm, bool level, uint32_t dest, bool phys,
 {
 	bool lowprio;
 	int vcpuid;
-	cpuset_t dmask;
+	vcpuset_t dmask;
 
 	if (delmode != IOART_DELFIXED &&
 	    delmode != IOART_DELLOPRI &&
@@ -1763,12 +1760,10 @@ vlapic_deliver_intr(struct vm *vm, bool level, uint32_t dest, bool phys,
 	 */
 	vlapic_calcdest(vm, &dmask, dest, phys, lowprio, false);
 
-	while ((vcpuid = CPU_FFS(&dmask)) != 0) {
-		struct vcpu *vcpu;
+	for (vcpuid = vcpuset_find(&dmask, 0); vcpuid != -1;
+	    vcpuid = vcpuset_find(&dmask, vcpuid + 1)) {
+		struct vcpu *vcpu = vm_vcpu(vm, vcpuid);
 
-		vcpuid--;
-		CPU_CLR(vcpuid, &dmask);
-		vcpu = vm_vcpu(vm, vcpuid);
 		if (delmode == IOART_DELEXINT) {
 			(void) vm_inject_extint(vcpu);
 		} else {

@@ -387,18 +387,19 @@ vmx_unshadow_cr4(uint64_t cr4, uint64_t shadow)
 
 /*
  * A vCPU's VPID is 0 while VPIDs are disabled. Otherwise it comes from
- * HMA (which hands out values above NCPU). Failing that they are allocated
- * from the fallback range [1, maxcpus], which means that vCPUs of different
- * VMs end up sharing VPIDs. vpid_free() tells the two apart by range, so the
- * fallback range must stay within the [1, NCPU] that HMA reserves and never
- * allocates.
+ * HMA (which hands out values above HMA_VMX_VPID_RESERVED). Failing that
+ * they are allocated from the fallback range [1, maxcpus], which means that
+ * vCPUs of different VMs end up sharing VPIDs. vpid_free() tells the two
+ * apart by range, so the fallback range must stay within the
+ * [1, HMA_VMX_VPID_RESERVED] that HMA reserves and never allocates, which
+ * vmx_vminit() verifies.
  */
 static void
 vpid_free(struct vmx_vcpu *vcpu)
 {
 	const uint16_t vpid = vcpu->state.vpid;
 
-	if (vpid > vm_get_maxcpus(vcpu->vmx->vm))
+	if (vpid > HMA_VMX_VPID_RESERVED)
 		hma_vmx_vpid_free(vpid);
 }
 
@@ -683,6 +684,9 @@ vmx_vminit(struct vm *vm)
 	int error;
 	struct vmx *vmx;
 	uint32_t proc_ctls, proc2_ctls, pin_ctls;
+
+	/* Fallback VPIDs are vcpuid + 1, so every vCPU must fit the range */
+	VERIFY3U(vm_get_maxcpus(vm), <=, HMA_VMX_VPID_RESERVED);
 
 	vmx = kmem_zalloc(sizeof (struct vmx), KM_SLEEP);
 

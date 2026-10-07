@@ -51,6 +51,7 @@
 #include <x86/segments.h>
 #include <sys/vmm.h>
 #include <sys/vmm_data.h>
+#include <sys/vmm_vcpuset.h>
 #include <sys/linker_set.h>
 
 SDT_PROVIDER_DECLARE(vmm);
@@ -231,10 +232,8 @@ int vm_service_mmio_read(struct vcpu *vcpu, uint64_t gpa, uint64_t *rval,
 int vm_service_mmio_write(struct vcpu *vcpu, uint64_t gpa, uint64_t wval,
     int wsize);
 
-#ifdef _SYS__CPUSET_H_
-cpuset_t vm_active_cpus(struct vm *vm);
-cpuset_t vm_debug_cpus(struct vm *vm);
-#endif	/* _SYS__CPUSET_H_ */
+vcpuset_t vm_active_cpus(struct vm *vm);
+vcpuset_t vm_debug_cpus(struct vm *vm);
 
 bool vcpu_entry_bailout_checks(struct vcpu *vcpu, uint64_t rip);
 bool vcpu_run_state_pending(struct vcpu *vcpu);

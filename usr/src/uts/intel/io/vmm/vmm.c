@@ -221,9 +221,9 @@ struct vm {
 	struct vatpit	*vatpit;		/* (i) virtual atpit */
 	struct vpmtmr	*vpmtmr;		/* (i) virtual ACPI PM timer */
 	struct vrtc	*vrtc;			/* (o) virtual RTC */
-	volatile cpuset_t active_cpus;		/* (i) active vcpus */
-	volatile cpuset_t debug_cpus;		/* (i) vcpus stopped for dbg */
-	volatile cpuset_t halted_cpus;		/* (x) cpus in a hard halt */
+	vcpuset_t	active_cpus;		/* (i) active vcpus */
+	vcpuset_t	debug_cpus;		/* (i) vcpus stopped for dbg */
+	vcpuset_t	halted_cpus;		/* (x) cpus in a hard halt */
 	int		suspend_how;		/* (i) stop VM execution */
 	int		suspend_source;		/* (i) src vcpuid of suspend */
 	hrtime_t	suspend_when;		/* (i) time suspend asserted */
@@ -627,8 +627,8 @@ vm_init(struct vm *vm, bool create)
 	vm_inout_init(vm, &vm->ioports);
 	vm_mmiohook_init(vm, &vm->mmiohooks);
 
-	CPU_ZERO(&vm->active_cpus);
-	CPU_ZERO(&vm->debug_cpus);
+	vcpuset_zero(&vm->active_cpus);
+	vcpuset_zero(&vm->debug_cpus);
 
 	vm->suspend_how = 0;
 	vm->suspend_source = 0;
@@ -884,7 +884,7 @@ vm_pause_instance(struct vm *vm)
 	for (uint_t i = 0; i < vm->maxcpus; i++) {
 		struct vcpu *vcpu = vm->vcpu[i];
 
-		if (vcpu == NULL || !CPU_ISSET(i, &vm->active_cpus)) {
+		if (vcpu == NULL || !vcpuset_isset(&vm->active_cpus, i)) {
 			continue;
 		}
 		vlapic_pause(vcpu->vlapic);
@@ -917,7 +917,7 @@ vm_resume_instance(struct vm *vm)
 	for (uint_t i = 0; i < vm->maxcpus; i++) {
 		struct vcpu *vcpu = vm->vcpu[i];
 
-		if (vcpu == NULL || !CPU_ISSET(i, &vm->active_cpus)) {
+		if (vcpu == NULL || !vcpuset_isset(&vm->active_cpus, i)) {
 			continue;
 		}
 		vlapic_resume(vcpu->vlapic);
@@ -1648,7 +1648,8 @@ vm_handle_hlt(struct vcpu *vcpu, bool intr_disabled)
 	int vcpu_halted, vm_halted;
 	bool userspace_exit = false;
 
-	KASSERT(!CPU_ISSET(vcpuid, &vm->halted_cpus), ("vcpu already halted"));
+	KASSERT(!vcpuset_isset(&vm->halted_cpus, vcpuid),
+	    ("vcpu already halted"));
 
 	vcpu_halted = 0;
 	vm_halted = 0;
@@ -1689,9 +1690,10 @@ vm_handle_hlt(struct vcpu *vcpu, bool intr_disabled)
 		if (intr_disabled) {
 			if (!vcpu_halted && halt_detection_enabled) {
 				vcpu_halted = 1;
-				CPU_SET_ATOMIC(vcpuid, &vm->halted_cpus);
+				vcpuset_atomic_add(&vm->halted_cpus, vcpuid);
 			}
-			if (CPU_CMP(&vm->halted_cpus, &vm->active_cpus) == 0) {
+			if (vcpuset_isequal(&vm->halted_cpus,
+			    &vm->active_cpus)) {
 				vm_halted = 1;
 				break;
 			}
@@ -1705,7 +1707,7 @@ vm_handle_hlt(struct vcpu *vcpu, bool intr_disabled)
 	}
 
 	if (vcpu_halted)
-		CPU_CLR_ATOMIC(vcpuid, &vm->halted_cpus);
+		vcpuset_atomic_del(&vm->halted_cpus, vcpuid);
 
 	vcpu_unlock(vcpu);
 
@@ -2321,7 +2323,7 @@ vm_suspend(struct vm *vm, enum vm_suspend_how how, int source)
 
 		vcpu_lock(vcpu);
 
-		if (!CPU_ISSET(i, &vm->active_cpus)) {
+		if (!vcpuset_isset(&vm->active_cpus, i)) {
 			/*
 			 * vCPUs not already marked as active can be ignored,
 			 * since they cannot become marked as active unless the
@@ -2574,7 +2576,7 @@ vm_run(struct vcpu *vcpu, const struct vm_entry *entry)
 	bool intr_disabled;
 	int affinity_type = CPU_CURRENT;
 
-	if (!CPU_ISSET(vcpuid, &vm->active_cpus))
+	if (!vcpuset_isset(&vm->active_cpus, vcpuid))
 		return (EINVAL);
 	if (vm->is_paused) {
 		return (EBUSY);
@@ -3317,14 +3319,14 @@ vm_activate_cpu(struct vcpu *vcpu)
 	struct vm *vm = vcpu->vm;
 	const int vcpuid = vcpu->vcpuid;
 
-	if (CPU_ISSET(vcpuid, &vm->active_cpus))
+	if (vcpuset_isset(&vm->active_cpus, vcpuid))
 		return (EBUSY);
 
 	if (vm_is_suspended(vm, NULL)) {
 		return (EBUSY);
 	}
 
-	CPU_SET_ATOMIC(vcpuid, &vm->active_cpus);
+	vcpuset_atomic_add(&vm->active_cpus, vcpuid);
 
 	/*
 	 * It is possible that this vCPU was undergoing activation at the same
@@ -3345,14 +3347,14 @@ vm_suspend_cpu(struct vm *vm, struct vcpu *vcpu)
 	if (vcpu == NULL) {
 		vm->debug_cpus = vm->active_cpus;
 		for (i = 0; i < vm->maxcpus; i++) {
-			if (CPU_ISSET(i, &vm->active_cpus))
+			if (vcpuset_isset(&vm->active_cpus, i))
 				vcpu_notify_event(vm_vcpu(vm, i));
 		}
 	} else {
-		if (!CPU_ISSET(vcpu->vcpuid, &vm->active_cpus))
+		if (!vcpuset_isset(&vm->active_cpus, vcpu->vcpuid))
 			return (EINVAL);
 
-		CPU_SET_ATOMIC(vcpu->vcpuid, &vm->debug_cpus);
+		vcpuset_atomic_add(&vm->debug_cpus, vcpu->vcpuid);
 		vcpu_notify_event(vcpu);
 	}
 	return (0);
@@ -3362,12 +3364,12 @@ int
 vm_resume_cpu(struct vm *vm, struct vcpu *vcpu)
 {
 	if (vcpu == NULL) {
-		CPU_ZERO(&vm->debug_cpus);
+		vcpuset_zero(&vm->debug_cpus);
 	} else {
-		if (!CPU_ISSET(vcpu->vcpuid, &vm->debug_cpus))
+		if (!vcpuset_isset(&vm->debug_cpus, vcpu->vcpuid))
 			return (EINVAL);
 
-		CPU_CLR_ATOMIC(vcpu->vcpuid, &vm->debug_cpus);
+		vcpuset_atomic_del(&vm->debug_cpus, vcpu->vcpuid);
 	}
 	return (0);
 }
@@ -3426,7 +3428,7 @@ vcpu_bailout_checks(struct vcpu *vcpu)
 		vmm_stat_incr(vcpu, VMEXIT_ASTPENDING, 1);
 		return (true);
 	}
-	if (CPU_ISSET(vcpu->vcpuid, &vm->debug_cpus)) {
+	if (vcpuset_isset(&vm->debug_cpus, vcpu->vcpuid)) {
 		vme->exitcode = VM_EXITCODE_DEBUG;
 		return (true);
 	}
@@ -3476,7 +3478,7 @@ vm_vcpu_barrier(struct vm *vm, struct vcpu *vcpu)
 	if (vcpu != NULL) {
 		/* Push specified vCPU to barrier */
 		vcpu_lock(vcpu);
-		if (CPU_ISSET(vcpu->vcpuid, &vm->active_cpus)) {
+		if (vcpuset_isset(&vm->active_cpus, vcpu->vcpuid)) {
 			vcpu->reqbarrier = true;
 			vcpu_notify_event_locked(vcpu, VCPU_NOTIFY_EXIT);
 		}
@@ -3489,7 +3491,7 @@ vm_vcpu_barrier(struct vm *vm, struct vcpu *vcpu)
 				continue;
 
 			vcpu_lock(vcpu);
-			if (CPU_ISSET(i, &vm->active_cpus)) {
+			if (vcpuset_isset(&vm->active_cpus, i)) {
 				vcpu->reqbarrier = true;
 				vcpu_notify_event_locked(vcpu,
 				    VCPU_NOTIFY_EXIT);
@@ -3501,13 +3503,13 @@ vm_vcpu_barrier(struct vm *vm, struct vcpu *vcpu)
 	return (0);
 }
 
-cpuset_t
+vcpuset_t
 vm_active_cpus(struct vm *vm)
 {
 	return (vm->active_cpus);
 }
 
-cpuset_t
+vcpuset_t
 vm_debug_cpus(struct vm *vm)
 {
 	return (vm->debug_cpus);

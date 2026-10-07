@@ -37,7 +37,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2019 Joyent, Inc.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_VMM_DEV_H_
@@ -482,7 +482,7 @@ struct vm_legacy_cpuid {
  * best-effort activity.  Nothing is to be inferred about the magnitude of a
  * change when the version is modified.  It follows no rules like semver.
  */
-#define	VMM_CURRENT_INTERFACE_VERSION	18
+#define	VMM_CURRENT_INTERFACE_VERSION	19
 
 
 #define	VMMCTL_IOC_BASE		(('V' << 16) | ('M' << 8))

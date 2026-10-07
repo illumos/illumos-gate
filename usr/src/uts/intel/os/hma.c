@@ -269,13 +269,6 @@ hma_svm_cpu(processorid_t id)
 	return (&hma_cpu[id].hc_u.svm);
 }
 
-/*
- * VPID 0 is reserved for instances where VPID is disabled.  Some hypervisors
- * (read: bhyve) reserve lower-order VPIDs for use in fallback behavior if
- * unique VPIDs could not be allocated for all the vCPUs belonging to a VM.
- */
-#define	HMA_VPID_RESERVED	NCPU
-
 uint16_t
 hma_vmx_vpid_alloc(void)
 {
@@ -290,7 +283,7 @@ hma_vmx_vpid_alloc(void)
 	if (res == -1) {
 		return (0);
 	} else {
-		ASSERT(res > HMA_VPID_RESERVED && res <= UINT16_MAX);
+		ASSERT(res > HMA_VMX_VPID_RESERVED && res <= UINT16_MAX);
 		return (res);
 	}
 }
@@ -298,7 +291,7 @@ hma_vmx_vpid_alloc(void)
 void
 hma_vmx_vpid_free(uint16_t vpid)
 {
-	VERIFY(vpid > HMA_VPID_RESERVED);
+	VERIFY(vpid > HMA_VMX_VPID_RESERVED);
 	id_free(hma_vmx_vpid, (id_t)vpid);
 }
 
@@ -568,8 +561,8 @@ hma_vmx_init(void)
 	register_cpu_setup_func(hma_vmx_cpu_setup, NULL);
 	mutex_exit(&cpu_lock);
 
-	hma_vmx_vpid = id_space_create("hma_vmx_vpid", HMA_VPID_RESERVED + 1,
-	    UINT16_MAX);
+	hma_vmx_vpid = id_space_create("hma_vmx_vpid",
+	    HMA_VMX_VPID_RESERVED + 1, UINT16_MAX);
 	hma_vmx_ready = B_TRUE;
 
 	return (0);
