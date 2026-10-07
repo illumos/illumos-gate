@@ -1287,6 +1287,16 @@ daemon_update(void)
 		/*NOTREACHED*/
 	}
 
+	if (door_setparam(fd, DOOR_PARAM_DATA_MIN,
+	    sizeof (struct dca_off)) != 0 ||
+	    door_setparam(fd, DOOR_PARAM_DATA_MAX,
+	    sizeof (struct dca_off)) != 0) {
+		err_print(CANT_SET_DOOR_PARAM, door_file, strerror(errno));
+		(void) s_unlink(door_file);
+		devfsadm_exit(1);
+		/* NOTREACHED */
+	}
+
 	if (fattach(fd, door_file) == -1) {
 		err_print(CANT_CREATE_DOOR, door_file, strerror(errno));
 		(void) s_unlink(door_file);
@@ -1319,6 +1329,14 @@ daemon_update(void)
 		(void) s_unlink(door_file);
 		devfsadm_exit(1);
 		/*NOTREACHED*/
+	}
+
+	if (door_setparam(fd, DOOR_PARAM_DATA_MIN,
+	    sizeof (sdev_door_arg_t)) != 0) {
+		err_print(CANT_SET_DOOR_PARAM, door_file, strerror(errno));
+		(void) s_unlink(door_file);
+		devfsadm_exit(1);
+		/* NOTREACHED */
 	}
 
 	(void) fdetach(door_file);
@@ -8574,11 +8592,6 @@ devname_lookup_handler(void *cookie, char *argp, size_t arg_size,
 	sdev_door_res_t res;
 	sdev_door_arg_t *args;
 
-	if (argp == NULL || arg_size == 0) {
-		vprint(DEVNAME_MID, "devname_lookup_handler: argp wrong\n");
-		error = DEVFSADM_RUN_INVALID;
-		goto done;
-	}
 	vprint(DEVNAME_MID, "devname_lookup_handler\n");
 
 	if (door_cred(&dcred) != 0 || dcred.dc_euid != 0) {

@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2026 Oxide Computer Company
+ */
+
+/*
  * bridged - bridging control daemon.  This module provides the door-based
  * interface used by user applications to gather bridge status information.
  */
@@ -67,7 +71,7 @@ bridge_door_server(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 	struct portdata *pdp;
 	int twoints[2];
 
-	if (arg_size < sizeof (*bdc) || lock_engine() != 0) {
+	if (lock_engine() != 0) {
 		(void) door_return((char *)&retv, sizeof (retv), NULL, 0);
 		return;
 	}
@@ -204,6 +208,11 @@ init_door(void)
 	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL);
 	if (door_fd == -1) {
 		syslog(LOG_ERR, "unable to create control door: %m");
+		exit(EXIT_FAILURE);
+	}
+	if (door_setparam(door_fd, DOOR_PARAM_DATA_MIN,
+	    sizeof (bridge_door_cmd_t)) != 0) {
+		syslog(LOG_ERR, "unable to set control door parameters: %m");
 		exit(EXIT_FAILURE);
 	}
 

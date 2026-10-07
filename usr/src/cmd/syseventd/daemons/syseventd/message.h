@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #ifndef	_MESSAGE_H
 #define	_MESSAGE_H
 
@@ -96,6 +100,9 @@ extern "C" {
 
 #define	INIT_CREATE_DOOR_ERR \
 	gettext("Unable to create kernel event door: '%s'")
+
+#define	INIT_SETPARAM_DOOR_ERR \
+	gettext("Unable to set kernel event door parameters: '%s'")
 
 #define	INIT_FATTACH_ERR \
 	gettext("Kernel door failed to attach: '%s'")

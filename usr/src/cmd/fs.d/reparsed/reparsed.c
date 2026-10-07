@@ -238,11 +238,6 @@ reparsed_doorfunc(void *cookie, char *argp, size_t arg_size,
 		/* NOTREACHED */
 	}
 
-	if ((argp == NULL) || (arg_size == 0)) {
-		reparsed_door_call_error(EINVAL, 0);
-		/* NOTREACHED */
-	}
-
 	if (verbose) {
 		syslog(LOG_NOTICE, "reparsed_door: [%.*s, %zu]",
 		    (int)arg_size, argp, arg_size);
@@ -344,6 +339,12 @@ start_reparsed_svcs()
 	if ((doorfd = door_create(reparsed_doorfunc, NULL,
 	    DOOR_REFUSE_DESC|DOOR_NO_CANCEL)) == -1) {
 		syslog(LOG_ERR, "Unable to create door");
+		return (1);
+	}
+	/* A request is a string and so must contain at least one byte. */
+	if (door_setparam(doorfd, DOOR_PARAM_DATA_MIN, 1) != 0) {
+		syslog(LOG_ERR, "Unable to set door parameters");
+		(void) door_revoke(doorfd);
 		return (1);
 	}
 

@@ -22,6 +22,10 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #include <stdio.h>
 #include <ctype.h>
 #include <fcntl.h>
@@ -330,13 +334,18 @@ door_upcall(void *cookie, char *args, size_t alen,
 	if (subp->evsub_state == EVCHAN_SUB_STATE_CLOSING)
 		pthread_exit(NULL);
 
-	if (args == NULL || alen <= (size_t)0) {
-		/* Skip callback execution */
-		rval = EINVAL;
-	} else {
-		rval = subp->evsub_func((sysevent_t *)(void *)args,
-		    subp->evsub_cookie);
+	/*
+	 * The result is returned in the request buffer, so that must be large
+	 * enough to hold it. A zero-length request arrives with no buffer at
+	 * all.
+	 */
+	if (args == NULL || alen < sizeof (rval)) {
+		(void) door_return(NULL, 0, NULL, 0);
+		return;
 	}
+
+	rval = subp->evsub_func((sysevent_t *)(void *)args,
+	    subp->evsub_cookie);
 
 	/*
 	 * Fill in return values for door_return

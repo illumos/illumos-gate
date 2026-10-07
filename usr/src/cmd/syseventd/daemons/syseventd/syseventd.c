@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2026 Oxide Computer Company
+ */
+
+/*
  *	syseventd - The system event daemon
  *
  *		This daemon dispatches event buffers received from the
@@ -519,9 +523,7 @@ door_upcall(void *cookie, char *args, size_t alen,
 
 
 	(void) mutex_lock(&door_lock);
-	if (args == NULL) {
-		rval = EINVAL;
-	} else if (sema_trywait(&sema_eventbuf)) {
+	if (sema_trywait(&sema_eventbuf)) {
 		ev = (sysevent_t *)
 		    &((log_event_upcall_arg_t *)(void *)args)->buf;
 		syseventd_print(2, "door_upcall: busy event %llx "
@@ -1477,6 +1479,12 @@ syseventd_init()
 	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL);
 	if (upcall_door == -1) {
 		syseventd_err_print(INIT_CREATE_DOOR_ERR, strerror(errno));
+		syseventd_exit(5);
+	}
+	if (door_setparam(upcall_door, DOOR_PARAM_DATA_MIN,
+	    sizeof (log_event_upcall_arg_t)) != 0) {
+		syseventd_err_print(INIT_SETPARAM_DOOR_ERR, strerror(errno));
+		(void) door_revoke(upcall_door);
 		syseventd_exit(5);
 	}
 

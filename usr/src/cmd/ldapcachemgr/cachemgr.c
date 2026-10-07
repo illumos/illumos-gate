@@ -22,6 +22,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2019 Nexenta Systems, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -511,6 +512,16 @@ main(int argc, char ** argv)
 		exit(-1);
 	}
 
+	/* Every request begins with the call number. */
+	if (door_setparam(did, DOOR_PARAM_DATA_MIN,
+	    offsetof(ldap_call_t, ldap_u)) != 0) {
+		logit("door_setparam() call failed\n");
+		syslog(LOG_ERR, gettext(
+		    "ldap_cachemgr: door_setparam() call failed"));
+		perror("door_setparam");
+		exit(-1);
+	}
+
 	/*
 	 * bind to file system
 	 */
@@ -713,10 +724,6 @@ switcher(void *cookie, char *argp, size_t arg_size,
 		    "invalid door param"));
 		(void) printf(gettext("Door Slam... invalid door param\n"));
 		exit(0);
-	}
-
-	if (ptr == NULL) { /* empty door call */
-		(void) door_return(NULL, 0, 0, 0); /* return the favor */
 	}
 
 	bzero(&dataSource, sizeof (dataSource));

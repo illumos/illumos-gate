@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2026 Oxide Computer Company
+ */
+
+/*
  * The Solaris package installer in-memory database server.
  *
  * We'll keep the contents file as before; but we cache it
@@ -297,6 +301,10 @@ server_main(int argc, char **argv)
 		progerr("door_create: %s", strerror(errno));
 		exit(2);
 	}
+	if (door_setparam(did, DOOR_PARAM_DATA_MIN, sizeof (pkgcmd_t)) != 0) {
+		progerr("door_setparam: %s", strerror(errno));
+		exit(2);
+	}
 
 	(void) fdetach(door);
 
@@ -499,11 +507,6 @@ pkg_door_srv(void *cookie, char *argp, size_t asz, door_desc_t *dp,
 	int dnum = 0;
 	int one = 1;
 	int len = -1;
-
-	if (asz < sizeof (pkgcmd_t)) {
-		(void) door_return(NULL, 0, NULL, 0);
-		return;
-	}
 
 	if (door_ucred(&uc) != 0) {
 		(void) door_return(NULL, 0, NULL, 0);

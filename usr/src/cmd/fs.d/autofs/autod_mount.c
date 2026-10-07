@@ -25,6 +25,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
@@ -399,10 +403,6 @@ automountd_do_fork_exec(void *cookie, char *argp, size_t arg_size,
 
 
 	command = (command_t *)argp;
-	if (sizeof (*command) != arg_size) {
-		res = EINVAL;
-		door_return((char *)&res, sizeof (res), NULL, 0);
-	}
 
 	switch ((child_pid = fork1())) {
 	case -1:

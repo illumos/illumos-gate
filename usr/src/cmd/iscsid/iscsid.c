@@ -22,6 +22,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2012 Milan Jurik. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -205,6 +206,12 @@ main(
 		syslog(LOG_DAEMON | LOG_ERR, gettext("door_create failed"));
 		exit(SMF_EXIT_ERR_OTHER);
 	}
+	if (door_setparam(iscsi_kernel_door_handle, DOOR_PARAM_DATA_MIN,
+	    sizeof (iscsi_door_msg_hdr_t)) != 0) {
+		perror(gettext("door_setparam failed"));
+		syslog(LOG_DAEMON | LOG_ERR, gettext("door_setparam failed"));
+		exit(SMF_EXIT_ERR_OTHER);
+	}
 
 	/*
 	 * The iSCSI driver is opened.
@@ -375,18 +382,7 @@ iscsi_kernel_door(
 	/*
 	 * The validity of the request is checked before going any farther.
 	 */
-	if (req == NULL) {
-		/*
-		 * A request has to be passed.
-		 */
-		err_ind.status = ISCSI_DOOR_STATUS_REQ_INVALID;
-	} else if (alen < sizeof (iscsi_door_msg_hdr_t)) {
-		/*
-		 * The buffer containing the request must be at least as big
-		 * as message header.
-		 */
-		err_ind.status = ISCSI_DOOR_STATUS_REQ_LENGTH;
-	} else if (req->hdr.signature != ISCSI_DOOR_REQ_SIGNATURE) {
+	if (req->hdr.signature != ISCSI_DOOR_REQ_SIGNATURE) {
 		/*
 		 * The request must be correctly signed.
 		 */

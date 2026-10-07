@@ -25,6 +25,10 @@
  */
 
 /*
+ * Copyright 2026 Oxide Computer Company
+ */
+
+/*
  * PICL daemon
  */
 
@@ -805,9 +809,6 @@ picld_door_handler(void *cookie, char *argp, size_t asize,
 	/*LINTED*/
 	req = (picl_service_t *)argp;
 
-	if (req == NULL)
-		(void) door_return((char *)req, 0, NULL, 0);
-
 	check_denial_of_service(req->in.cnum);
 
 	(void) rw_rdlock(&init_lk);
@@ -1032,6 +1033,13 @@ setup_door(void)
 	 */
 	door_id = door_create(picld_door_handler, PICLD_DOOR_COOKIE,
 	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL | DOOR_PRIVATE);
+
+	/* Every request begins with the call number. */
+	if (door_id >= 0 && door_setparam(door_id, DOOR_PARAM_DATA_MIN,
+	    sizeof (picl_callnumber_t)) != 0) {
+		(void) door_revoke(door_id);
+		door_id = -1;
+	}
 
 	if (door_id < 0) {
 		(void) pthread_mutex_unlock(&door_mutex);

@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2026 Oxide Computer Company
+ */
+
+/*
  * Implementation of the vscan statistics interface
  */
 
@@ -70,6 +74,12 @@ vs_stats_init(void)
 	/* door initialization */
 	if ((vs_stats_door_fd = door_create(vs_stats_door_call,
 	    &vs_stats_door_cookie, (DOOR_UNREF | DOOR_REFUSE_DESC))) < 0) {
+		vs_stats_door_fd = -1;
+	} else if (door_setparam(vs_stats_door_fd, DOOR_PARAM_DATA_MIN,
+	    sizeof (vs_stats_req_t)) != 0 ||
+	    door_setparam(vs_stats_door_fd, DOOR_PARAM_DATA_MAX,
+	    sizeof (vs_stats_req_t)) != 0) {
+		(void) door_revoke(vs_stats_door_fd);
 		vs_stats_door_fd = -1;
 	} else {
 		(void) fdetach(VS_STATS_DOOR_NAME);
@@ -141,16 +151,14 @@ vs_stats_check_auth()
 /* ARGSUSED */
 static void
 vs_stats_door_call(void *cookie, char *ptr, size_t size, door_desc_t *dp,
-		uint_t n_desc)
+    uint_t n_desc)
 {
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	vs_stats_req_t *req = (vs_stats_req_t *)ptr;
 	vs_stats_rsp_t rsp;
 
-	if ((cookie != &vs_stats_door_cookie) ||
-	    (ptr == NULL) ||
-	    (size != sizeof (vs_stats_req_t)) ||
-	    (req->vsr_magic != VS_STATS_DOOR_MAGIC)) {
+	if (cookie != &vs_stats_door_cookie || ptr == DOOR_UNREF_DATA ||
+	    req->vsr_magic != VS_STATS_DOOR_MAGIC) {
 		return;
 	}
 

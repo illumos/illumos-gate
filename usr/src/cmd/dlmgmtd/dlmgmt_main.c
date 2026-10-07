@@ -23,6 +23,7 @@
  * Copyright 2010 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2011 Joyent, Inc.  All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -107,6 +108,15 @@ dlmgmt_door_init(void)
 		err = errno;
 		dlmgmt_log(LOG_ERR, "door_create() failed: %s",
 		    strerror(err));
+		return (err);
+	}
+	if (door_setparam(dlmgmt_door_fd, DOOR_PARAM_DATA_MIN,
+	    sizeof (dlmgmt_door_arg_t)) != 0) {
+		err = errno;
+		dlmgmt_log(LOG_ERR, "door_setparam() failed: %s",
+		    strerror(err));
+		(void) door_revoke(dlmgmt_door_fd);
+		dlmgmt_door_fd = -1;
 		return (err);
 	}
 	return (err);

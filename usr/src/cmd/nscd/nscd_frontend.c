@@ -968,11 +968,6 @@ switcher(void *cookie, char *argp, size_t arg_size,
 		exit(0);
 	}
 
-	if (argp == NULL) { /* empty door call */
-		arg_size = 0; /* Just to be sure! */
-		goto bail; /* return the favor */
-	}
-
 	/*
 	 *  need to restart if main nscd and config file(s) changed
 	 */
@@ -1225,11 +1220,21 @@ _nscd_setup_server(char *execname, char **argv)
 		return (-1);
 	}
 
+	/* Every request begins with a header. */
+	if (door_setparam(fd, DOOR_PARAM_DATA_MIN,
+	    sizeof (nss_pheader_t)) != 0) {
+		errnum = errno;
+		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
+		(me, "door_setparam(DATA_MIN): %s\n", strerror(errnum));
+		(void) door_revoke(fd);
+		return (-1);
+	}
+
 	/* Make sure we only accept ONE descriptor at a time. */
 	if (door_setparam(fd, DOOR_PARAM_DESC_MAX, 1) == -1) {
 		errnum = errno;
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
-		    (me, "door_setparam(DESC_MAX, 1): %s\n", strerror(errnum));
+		(me, "door_setparam(DESC_MAX, 1): %s\n", strerror(errnum));
 		(void) door_revoke(fd);
 		return (-1);
 	}
@@ -1365,6 +1370,16 @@ _nscd_setup_child_server(int did)
 		errnum = errno;
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 		(me, "door_create failed: %s", strerror(errnum));
+		return (-1);
+	}
+
+	/* Every request begins with a header. */
+	if (door_setparam(fd, DOOR_PARAM_DATA_MIN,
+	    sizeof (nss_pheader_t)) != 0) {
+		errnum = errno;
+		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
+		(me, "door_setparam failed: %s", strerror(errnum));
+		(void) door_revoke(fd);
 		return (-1);
 	}
 

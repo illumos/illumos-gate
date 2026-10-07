@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stropts.h>
@@ -188,7 +192,7 @@ thr_init(void)
 	 */
 	if (thr_create(NULL, 0, sig_handler, 0, thr_flags, &sig_thread)) {
 		syslog(LOG_ERR,
-			gettext("Failed to create signal handling thread"));
+		    gettext("Failed to create signal handling thread"));
 		exit(4);
 	}
 }
@@ -263,13 +267,19 @@ start_svcs(void)
 		syslog(LOG_ERR, "Unable to create door: %m\n");
 		return (1);
 	}
+	if (door_setparam(doorfd, DOOR_PARAM_DATA_MIN,
+	    sizeof (struct mapid_arg)) != 0) {
+		syslog(LOG_ERR, "Unable to set door parameters: %m\n");
+		(void) door_revoke(doorfd);
+		return (1);
+	}
 
 #ifdef DEBUG
 	/*
 	 * Create a file system path for the door
 	 */
 	if ((dfd = open(NFSMAPID_DOOR, O_RDWR|O_CREAT|O_TRUNC,
-				S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)) == -1) {
+	    S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)) == -1) {
 		syslog(LOG_ERR, "Unable to open %s: %m\n", NFSMAPID_DOOR);
 		(void) close(doorfd);
 		return (1);
@@ -334,7 +344,7 @@ main(int argc, char **argv)
 	if (__init_daemon_priv(PU_RESETGROUPS|PU_CLEARLIMITSET,
 	    DAEMON_UID, DAEMON_GID, PRIV_SYS_NFS, (char *)NULL) == -1) {
 		(void) fprintf(stderr, gettext("%s PRIV_SYS_NFS privilege "
-			"missing\n"), MyName);
+		    "missing\n"), MyName);
 		exit(1);
 	}
 #endif
@@ -350,8 +360,8 @@ main(int argc, char **argv)
 	 * XXX open_owner lock across rfscalls!
 	 */
 	(void) priv_set(PRIV_OFF, PRIV_PERMITTED,
-		PRIV_FILE_LINK_ANY, PRIV_PROC_SESSION,
-		(char *)NULL);
+	    PRIV_FILE_LINK_ANY, PRIV_PROC_SESSION,
+	    (char *)NULL);
 
 #ifndef DEBUG
 	daemonize();

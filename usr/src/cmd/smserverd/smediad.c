@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #include <stdio.h>
 #include <stdio_ext.h>
 #include <errno.h>
@@ -2440,14 +2444,6 @@ main_servproc(void *server_data, char *argp, size_t arg_size,
 	reterror.cnum = SMEDIA_CNUM_ERROR;
 	reterror.errnum = SMEDIA_FAILURE;
 
-	if (argp == NULL) {
-		debug(5, "argp is NULL\n");
-		if (ndesc > 0)
-			close_door_descs(dp, ndesc);
-		my_door_return((char *)&reterror,
-		    sizeof (smedia_reterror_t), 0, 0);
-	}
-
 	req = (smedia_services_t *)((void *)argp);
 
 	retok.cnum = req->in.cnum;
@@ -2550,10 +2546,14 @@ main_servproc(void *server_data, char *argp, size_t arg_size,
 		    door_create(client_servproc,
 		    (void *)ddata, DOOR_PRIVATE | DOOR_NO_CANCEL | DOOR_UNREF);
 
-		if (ddata->dd_cdoor_descriptor < 0) {
-			/* then door_create() failed */
+		if (ddata->dd_cdoor_descriptor < 0 ||
+		    door_setparam(ddata->dd_cdoor_descriptor,
+		    DOOR_PARAM_DATA_MIN, sizeof (smedia_callnumber_t)) != 0) {
+			/* then door_create() or door_setparam() failed */
 			int err = errno;
 
+			if (ddata->dd_cdoor_descriptor >= 0)
+				(void) door_revoke(ddata->dd_cdoor_descriptor);
 			(void) mutex_unlock(&ddata->dd_lock);
 
 			warning(gettext("main_servproc: door_create of Client "
@@ -2712,6 +2712,12 @@ init_server(void *argp)
 	server_door = door_create(main_servproc, (void *)&server_data, 0);
 	if (server_door == -1) {
 		debug(1, "main door_create");
+		exit(1);
+	}
+	/* Every request begins with the call number. */
+	if (door_setparam(server_door, DOOR_PARAM_DATA_MIN,
+	    sizeof (smedia_callnumber_t)) != 0) {
+		debug(1, "main door_setparam");
 		exit(1);
 	}
 

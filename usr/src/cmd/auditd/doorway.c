@@ -24,6 +24,7 @@
 
 /*
  * Copyright 2022 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -458,6 +459,11 @@ auditd_thread_init()
 		    DOOR_REFUSE_DESC | DOOR_NO_CANCEL);
 		if (doorfd < 0)
 			return (1);	/* can't create door -> fatal */
+		if (door_setparam(doorfd, DOOR_PARAM_DATA_MIN,
+		    AU_DBUF_HEADER) != 0) {
+			(void) door_revoke(doorfd);
+			return (1);
+		}
 
 		param.sched_priority = BASE_PRIORITY;
 		(void) pthread_setschedparam(pthread_self(), SCHED_OTHER,
@@ -1131,11 +1137,6 @@ input(void *cookie, void *argp, int arg_size, door_desc_t *dp,
 	int		loop_count = 0;
 	static int	call_counter = 0;
 #endif
-	if (argp == NULL) {
-		warn_or_fatal(0,
-		    gettext("invalid data received from c2audit\n"));
-		goto input_exit;
-	}
 	DPRINT((dbfp, "%d input new buffer: length=%u, "
 	    "partial=%u, arg_size=%d\n",
 	    ++call_counter, ((au_dbuf_t *)argp)->aub_size,

@@ -23,6 +23,10 @@
  * Copyright (c) 2000, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -818,11 +822,6 @@ event_deliver_service(void *cookie, char *args, size_t alen,
 	sysevent_handle_t *shp;
 	sysevent_queue_t *new_eq;
 
-	if (args == NULL || alen < sizeof (uint32_t)) {
-		ret = EINVAL;
-		goto return_from_door;
-	}
-
 	/* Publisher checking on subscriber */
 	if (alen == sizeof (uint32_t)) {
 		ret = 0;
@@ -1488,7 +1487,7 @@ cache_update_service(void *cookie, char *args, size_t alen,
 	sysevent_handle_t *shp;
 	subscriber_data_t *sub;
 
-	if (alen < sizeof (struct reg_args) || cookie == NULL) {
+	if (cookie == NULL) {
 		ret = EINVAL;
 		goto return_from_door;
 	}
@@ -1995,6 +1994,14 @@ sysevent_bind_publisher(sysevent_handle_t *shp)
 		goto fail;
 	}
 
+	if (door_setparam(SH_DOOR_DESC(shp), DOOR_PARAM_DATA_MIN,
+	    sizeof (struct reg_args)) != 0) {
+		dprint("sysevent_bind_publisher: door setparam failed: %s\n",
+		    strerror(errno));
+		error = EFAULT;
+		goto fail;
+	}
+
 	(void) fdetach(SH_DOOR_NAME(shp));
 	if (fattach(SH_DOOR_DESC(shp), SH_DOOR_NAME(shp)) != 0) {
 		dprint("sysevent_bind_publisher: unable to "
@@ -2195,6 +2202,14 @@ sysevent_bind_subscriber_cmn(sysevent_handle_t *shp,
 	if (SH_DOOR_DESC(shp) == -1) {
 		dprint("sysevent_bind_subscriber: door create failed: "
 		    "%s\n", strerror(errno));
+		error = EFAULT;
+		goto fail;
+	}
+
+	if (door_setparam(SH_DOOR_DESC(shp), DOOR_PARAM_DATA_MIN,
+	    sizeof (uint32_t)) != 0) {
+		dprint("sysevent_bind_subscriber: door setparam failed: %s\n",
+		    strerror(errno));
 		error = EFAULT;
 		goto fail;
 	}

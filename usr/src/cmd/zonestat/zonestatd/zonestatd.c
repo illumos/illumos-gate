@@ -4335,11 +4335,6 @@ zsd_server(void *cookie, char *argp, size_t arg_size,
 		thr_exit(NULL);
 	}
 
-	if (arg_size != sizeof (cmd) * 2) {
-		(void) door_return(NULL, 0, NULL, 0);
-		thr_exit(NULL);
-	}
-
 	/* LINTED */
 	args = (int *)argp;
 	cmd = args[0];
@@ -4430,10 +4425,6 @@ zsd_stat_server(void *cookie, char *argp, size_t arg_size,
 		g_hasclient = B_FALSE;
 		(void) cond_signal(&g_usage_cache_kick);
 		(void) mutex_unlock(&g_usage_cache_lock);
-		(void) door_return(NULL, 0, NULL, 0);
-		thr_exit(NULL);
-	}
-	if (arg_size != sizeof (cmd) * 2) {
 		(void) door_return(NULL, 0, NULL, 0);
 		thr_exit(NULL);
 	}
@@ -4829,12 +4820,25 @@ main(int argc, char *argv[])
 	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL);
 	if (g_server_door < 0)
 		zsd_error(gettext("Unable to create server door\n"));
+	if (door_setparam(g_server_door, DOOR_PARAM_DATA_MIN,
+	    sizeof (int) * 2) != 0 ||
+	    door_setparam(g_server_door, DOOR_PARAM_DATA_MAX,
+	    sizeof (int) * 2) != 0) {
+		zsd_error(gettext("Unable to set server door parameters\n"));
+	}
 
 
 	g_stat_door = door_create(zsd_stat_server, NULL, DOOR_UNREF_MULTI |
 	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL);
 	if (g_stat_door < 0)
 		zsd_error(gettext("Unable to create statistics door\n"));
+	if (door_setparam(g_stat_door, DOOR_PARAM_DATA_MIN,
+	    sizeof (uint64_t) * 2) != 0 ||
+	    door_setparam(g_stat_door, DOOR_PARAM_DATA_MAX,
+	    sizeof (uint64_t) * 2) != 0) {
+		zsd_error(gettext(
+		    "Unable to set statistics door parameters\n"));
+	}
 
 	fattach_all_zones(B_FALSE);
 

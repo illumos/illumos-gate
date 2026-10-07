@@ -22,6 +22,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/list.h>
@@ -138,7 +139,8 @@ static void smbd_door_release_async(smbd_arg_t *);
 int
 smbd_door_start(void)
 {
-	int	newfd;
+	smb_doorhdr_t	hdr;
+	int		newfd;
 
 	(void) mutex_lock(&smbd_doorsvc.sd_mutex);
 
@@ -162,6 +164,18 @@ smbd_door_start(void)
 	    &smbd_door_cookie, DOOR_UNREF)) < 0) {
 		(void) fprintf(stderr, "smb_doorsrv_start: door_create: %s",
 		    strerror(errno));
+		smbd_door_fd = -1;
+		(void) mutex_unlock(&smbd_doorsvc.sd_mutex);
+		return (-1);
+	}
+
+	/* Every request begins with an encoded header. */
+	bzero(&hdr, sizeof (hdr));
+	if (door_setparam(smbd_door_fd, DOOR_PARAM_DATA_MIN,
+	    xdr_sizeof(smb_doorhdr_xdr, &hdr)) != 0) {
+		(void) fprintf(stderr, "smb_doorsrv_start: door_setparam: %s",
+		    strerror(errno));
+		(void) door_revoke(smbd_door_fd);
 		smbd_door_fd = -1;
 		(void) mutex_unlock(&smbd_doorsvc.sd_mutex);
 		return (-1);
@@ -317,10 +331,8 @@ smbd_door_dispatch(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 	hdr = &dop_arg.hdr;
 	hdr_size = xdr_sizeof(smb_doorhdr_xdr, hdr);
 
-	if ((cookie != &smbd_door_cookie) || (argp == NULL) ||
-	    (arg_size < hdr_size)) {
+	if (cookie != &smbd_door_cookie || argp == DOOR_UNREF_DATA)
 		smbd_door_return(&smbd_door_sdh, NULL, 0, NULL, 0);
-	}
 
 	if (smb_doorhdr_decode(hdr, (uint8_t *)argp, hdr_size) == -1) {
 		syslog(LOG_DEBUG, "smbd_door_dispatch: header decode failed");

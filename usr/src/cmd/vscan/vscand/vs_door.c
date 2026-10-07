@@ -24,6 +24,10 @@
  */
 
 /*
+ * Copyright 2026 Oxide Computer Company
+ */
+
+/*
  * vscand door server
  */
 
@@ -69,6 +73,13 @@ vs_door_init(void)
 	    &vs_door_cookie, (DOOR_UNREF | DOOR_REFUSE_DESC))) < 0) {
 		syslog(LOG_ERR, "vscand: door create%s", strerror(errno));
 		vs_door_fd = -1;
+	} else if (door_setparam(vs_door_fd, DOOR_PARAM_DATA_MIN,
+	    sizeof (vs_scan_req_t)) != 0 ||
+	    door_setparam(vs_door_fd, DOOR_PARAM_DATA_MAX,
+	    sizeof (vs_scan_req_t)) != 0) {
+		syslog(LOG_ERR, "vscand: door setparam %s", strerror(errno));
+		(void) door_revoke(vs_door_fd);
+		vs_door_fd = -1;
 	}
 
 	(void) pthread_mutex_unlock(&vs_door_mutex);
@@ -111,7 +122,12 @@ vs_door_scan_req(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 	vs_scan_req_t *scan_req;
 	uint32_t result = VS_STATUS_ERROR;
 
-	if (ptr != NULL) {
+	/*
+	 * The door parameters ensure that any request is a complete
+	 * vs_scan_req_t. The only other invocation is the unreferenced
+	 * notification, which carries no data.
+	 */
+	if (ptr != DOOR_UNREF_DATA) {
 		/* LINTED E_BAD_PTR_CAST_ALIGN - to be fixed with encoding */
 		scan_req = (vs_scan_req_t *)ptr;
 		result = vs_svc_queue_scan_req(scan_req);

@@ -25,6 +25,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <syslog.h>
@@ -633,12 +637,6 @@ automountd_do_exec_map(void *cookie, char *argp, size_t arg_size,
 	int	rc;
 
 	command = (command_t *)argp;
-
-	if (sizeof (*command) != arg_size) {
-		rc = 0;
-		syslog(LOG_ERR, "read_execout: invalid door arguments");
-		door_return((char *)&rc, sizeof (rc), NULL, 0);
-	}
 
 	rc = read_execout(command->key, &lp, command->file, line, LINESZ);
 

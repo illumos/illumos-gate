@@ -22,6 +22,7 @@
  * Copyright (c) 2007, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2013 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2022 RackTop Systems, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -78,6 +79,17 @@ smbd_share_start(void)
 	    SMB_SHARE_DSRV_COOKIE, (DOOR_UNREF | DOOR_REFUSE_DESC))) < 0) {
 		syslog(LOG_ERR, "smbd_share_start: door_create: %s",
 		    strerror(errno));
+		(void) pthread_mutex_unlock(&smb_share_dsrv_mtx);
+		return (-1);
+	}
+
+	/* Every request begins with the request type. */
+	if (door_setparam(smb_share_dsrv_fd, DOOR_PARAM_DATA_MIN,
+	    sizeof (uint32_t)) != 0) {
+		syslog(LOG_ERR, "smbd_share_start: door_setparam: %s",
+		    strerror(errno));
+		(void) door_revoke(smb_share_dsrv_fd);
+		smb_share_dsrv_fd = -1;
 		(void) pthread_mutex_unlock(&smb_share_dsrv_mtx);
 		return (-1);
 	}
@@ -207,10 +219,8 @@ smbd_share_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 
 	smbd_door_enter(&smb_share_sdh);
 
-	if ((cookie != SMB_SHARE_DSRV_COOKIE) || (ptr == NULL) ||
-	    (size < sizeof (uint32_t))) {
+	if (cookie != SMB_SHARE_DSRV_COOKIE || ptr == DOOR_UNREF_DATA)
 		smbd_door_return(&smb_share_sdh, NULL, 0, NULL, 0);
-	}
 
 	dec_ctx = smb_dr_decode_start(ptr, size);
 	enc_ctx = smb_dr_encode_start(buf, sizeof (buf));

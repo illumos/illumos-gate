@@ -23,6 +23,7 @@
  * Copyright (c) 2003, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2014 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -1239,10 +1240,6 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		exit(0);
 	}
 
-	if (zargp == NULL) {
-		(void) door_return(NULL, 0, 0, 0);
-	}
-
 	rvalp = alloca(rlen);
 	bzero(rvalp, rlen);
 	zlog.logfile = NULL;
@@ -1252,15 +1249,6 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	/* defer initialization of zlog.locale until after credential check */
 	zlogp = &zlog;
 
-	if (alen != sizeof (zone_cmd_arg_t)) {
-		/*
-		 * This really shouldn't be happening.
-		 */
-		zerror(&logsys, B_FALSE, "argument size (%d bytes) "
-		    "unexpected (expected %d bytes)", alen,
-		    sizeof (zone_cmd_arg_t));
-		goto out;
-	}
 	cmd = zargp->cmd;
 
 	if (door_ucred(&uc) != 0) {
@@ -1665,6 +1653,15 @@ setup_door(zlog_t *zlogp)
 	if ((zone_door = door_create(server, NULL,
 	    DOOR_UNREF | DOOR_REFUSE_DESC | DOOR_NO_CANCEL)) < 0) {
 		zerror(zlogp, B_TRUE, "%s failed", "door_create");
+		return (-1);
+	}
+	if (door_setparam(zone_door, DOOR_PARAM_DATA_MIN,
+	    sizeof (zone_cmd_arg_t)) != 0 ||
+	    door_setparam(zone_door, DOOR_PARAM_DATA_MAX,
+	    sizeof (zone_cmd_arg_t)) != 0) {
+		zerror(zlogp, B_TRUE, "%s failed", "door_setparam");
+		(void) door_revoke(zone_door);
+		zone_door = -1;
 		return (-1);
 	}
 	(void) fdetach(zone_door_path);

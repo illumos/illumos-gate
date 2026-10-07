@@ -48,7 +48,7 @@
 static void ipmgmt_common_handler(char *, char *, db_wfunc_t *);
 
 /* Handler declaration for each door command */
-typedef void ipmgmt_door_handler_t(void *argp);
+typedef void ipmgmt_door_handler_t(void *argp, size_t argsz);
 
 static ipmgmt_door_handler_t	ipmgmt_getaddr_handler,
 				ipmgmt_getprop_handler,
@@ -66,28 +66,45 @@ static ipmgmt_door_handler_t	ipmgmt_getaddr_handler,
 typedef struct ipmgmt_door_info_s {
 	uint_t			idi_cmd;
 	boolean_t		idi_set;
+	size_t			idi_minargsz;
 	ipmgmt_door_handler_t	*idi_handler;
 } ipmgmt_door_info_t;
 
 /* maps door commands to door handler functions */
 static ipmgmt_door_info_t i_ipmgmt_door_info_tbl[] = {
-	{ IPMGMT_CMD_SETPROP,		B_TRUE,  ipmgmt_setprop_handler },
-	{ IPMGMT_CMD_SETIF,		B_TRUE,  ipmgmt_setif_handler },
-	{ IPMGMT_CMD_SETADDR,		B_TRUE,  ipmgmt_setaddr_handler },
-	{ IPMGMT_CMD_GETPROP,		B_FALSE, ipmgmt_getprop_handler },
-	{ IPMGMT_CMD_GETIF,		B_FALSE, ipmgmt_getif_handler },
-	{ IPMGMT_CMD_GETADDR,		B_FALSE, ipmgmt_getaddr_handler },
-	{ IPMGMT_CMD_RESETIF,		B_TRUE,  ipmgmt_resetif_handler },
-	{ IPMGMT_CMD_RESETADDR,		B_TRUE,  ipmgmt_resetaddr_handler },
-	{ IPMGMT_CMD_RESETPROP,		B_TRUE,  ipmgmt_resetprop_handler },
-	{ IPMGMT_CMD_INITIF,		B_TRUE,  ipmgmt_initif_handler },
-	{ IPMGMT_CMD_ADDROBJ_LOOKUPADD,	B_TRUE,  ipmgmt_aobjop_handler },
-	{ IPMGMT_CMD_ADDROBJ_SETLIFNUM,	B_TRUE,  ipmgmt_aobjop_handler },
-	{ IPMGMT_CMD_ADDROBJ_ADD,	B_TRUE,  ipmgmt_aobjop_handler },
-	{ IPMGMT_CMD_AOBJNAME2ADDROBJ,	B_FALSE, ipmgmt_aobjop_handler },
-	{ IPMGMT_CMD_LIF2ADDROBJ,	B_FALSE, ipmgmt_aobjop_handler },
-	{ IPMGMT_CMD_IPMP_UPDATE,	B_TRUE,  ipmgmt_ipmp_update_handler },
-	{ 0, 0, NULL },
+	{ IPMGMT_CMD_SETPROP, B_TRUE,
+	    sizeof (ipmgmt_prop_arg_t), ipmgmt_setprop_handler },
+	{ IPMGMT_CMD_SETIF, B_TRUE,
+	    sizeof (ipmgmt_if_arg_t), ipmgmt_setif_handler },
+	{ IPMGMT_CMD_SETADDR, B_TRUE,
+	    sizeof (ipmgmt_setaddr_arg_t), ipmgmt_setaddr_handler },
+	{ IPMGMT_CMD_GETPROP, B_FALSE,
+	    sizeof (ipmgmt_prop_arg_t), ipmgmt_getprop_handler },
+	{ IPMGMT_CMD_GETIF, B_FALSE,
+	    sizeof (ipmgmt_getif_arg_t), ipmgmt_getif_handler },
+	{ IPMGMT_CMD_GETADDR, B_FALSE,
+	    sizeof (ipmgmt_getaddr_arg_t), ipmgmt_getaddr_handler },
+	{ IPMGMT_CMD_RESETIF, B_TRUE,
+	    sizeof (ipmgmt_if_arg_t), ipmgmt_resetif_handler },
+	{ IPMGMT_CMD_RESETADDR, B_TRUE,
+	    sizeof (ipmgmt_addr_arg_t), ipmgmt_resetaddr_handler },
+	{ IPMGMT_CMD_RESETPROP, B_TRUE,
+	    sizeof (ipmgmt_prop_arg_t), ipmgmt_resetprop_handler },
+	{ IPMGMT_CMD_INITIF, B_TRUE,
+	    sizeof (ipmgmt_initif_arg_t), ipmgmt_initif_handler },
+	{ IPMGMT_CMD_ADDROBJ_LOOKUPADD, B_TRUE,
+	    sizeof (ipmgmt_aobjop_arg_t), ipmgmt_aobjop_handler },
+	{ IPMGMT_CMD_ADDROBJ_SETLIFNUM, B_TRUE,
+	    sizeof (ipmgmt_aobjop_arg_t), ipmgmt_aobjop_handler },
+	{ IPMGMT_CMD_ADDROBJ_ADD, B_TRUE,
+	    sizeof (ipmgmt_aobjop_arg_t), ipmgmt_aobjop_handler },
+	{ IPMGMT_CMD_AOBJNAME2ADDROBJ, B_FALSE,
+	    sizeof (ipmgmt_aobjop_arg_t), ipmgmt_aobjop_handler },
+	{ IPMGMT_CMD_LIF2ADDROBJ, B_FALSE,
+	    sizeof (ipmgmt_aobjop_arg_t), ipmgmt_aobjop_handler },
+	{ IPMGMT_CMD_IPMP_UPDATE, B_TRUE,
+	    sizeof (ipmgmt_ipmp_update_arg_t), ipmgmt_ipmp_update_handler },
+	{ 0, 0, 0, NULL },
 };
 
 /*
@@ -116,6 +133,18 @@ ipmgmt_handler(void *cookie, char *argp, size_t argsz, door_desc_t *dp,
 
 	if (infop == NULL) {
 		ipmgmt_log(LOG_ERR, "Invalid door command specified");
+		err = EINVAL;
+		goto fail;
+	}
+
+	/*
+	 * The door's minimum data size guarantees that the common command
+	 * header is present. Each command has its own, larger, argument
+	 * structure and that must also be complete before the handler for the
+	 * command is invoked.
+	 */
+	if (argsz < infop->idi_minargsz) {
+		ipmgmt_log(LOG_ERR, "Door request too small for command");
 		err = EINVAL;
 		goto fail;
 	}
@@ -153,7 +182,7 @@ ipmgmt_handler(void *cookie, char *argp, size_t argsz, door_desc_t *dp,
 	}
 
 	/* individual handlers take care of calling door_return */
-	infop->idi_handler((void *)argp);
+	infop->idi_handler((void *)argp, argsz);
 	return;
 fail:
 	ucred_free(cred);
@@ -166,7 +195,7 @@ fail:
  * property value for the given property.
  */
 static void
-ipmgmt_getprop_handler(void *argp)
+ipmgmt_getprop_handler(void *argp, size_t argsz __unused)
 {
 	ipmgmt_prop_arg_t	*pargp = argp;
 	ipmgmt_getprop_rval_t	rval, *rvalp = &rval;
@@ -185,7 +214,7 @@ ipmgmt_getprop_handler(void *argp)
  * for the given property in the DB.
  */
 static void
-ipmgmt_setprop_handler(void *argp)
+ipmgmt_setprop_handler(void *argp, size_t argsz __unused)
 {
 	ipmgmt_prop_arg_t	*pargp = argp;
 	ipmgmt_retval_t		rval;
@@ -325,7 +354,7 @@ i_ipmgmt_nvl2aobjnode(nvlist_t *nvl, ipmgmt_aobjmap_t *nodep)
  * information in the DB.
  */
 static void
-ipmgmt_setaddr_handler(void *argp)
+ipmgmt_setaddr_handler(void *argp, size_t argsz)
 {
 	ipmgmt_setaddr_arg_t	*sargp = argp;
 	ipmgmt_retval_t		rval;
@@ -337,6 +366,10 @@ ipmgmt_setaddr_handler(void *argp)
 	int			err = 0;
 
 	nvlbuf = (char *)argp + sizeof (ipmgmt_setaddr_arg_t);
+	if (nvlsize > argsz - sizeof (ipmgmt_setaddr_arg_t)) {
+		err = EINVAL;
+		goto ret;
+	}
 	if ((err = nvlist_unpack(nvlbuf, nvlsize, &nvl, 0)) != 0)
 		goto ret;
 	if (flags & (IPMGMT_ACTIVE|IPMGMT_INIT)) {
@@ -375,7 +408,7 @@ ret:
  *	interface associated with that address object.
  */
 static void
-ipmgmt_aobjop_handler(void *argp)
+ipmgmt_aobjop_handler(void *argp, size_t argsz __unused)
 {
 	ipmgmt_aobjop_arg_t	*largp = argp;
 	ipmgmt_retval_t		rval;
@@ -580,7 +613,7 @@ i_ipmgmt_delif_aobjs(char *ifname, sa_family_t af, uint32_t flags)
  * information in the DB.
  */
 static void
-ipmgmt_setif_handler(void *argp)
+ipmgmt_setif_handler(void *argp, size_t argsz __unused)
 {
 	ipmgmt_retval_t		rval;
 
@@ -594,7 +627,7 @@ ipmgmt_setif_handler(void *argp)
  * `aobjmap', all the address objects configured on the given interface.
  */
 static void
-ipmgmt_resetif_handler(void *argp)
+ipmgmt_resetif_handler(void *argp, size_t argsz __unused)
 {
 	ipmgmt_if_arg_t		*rargp = argp;
 	ipmgmt_retval_t		rval;
@@ -626,7 +659,7 @@ ipmgmt_resetif_handler(void *argp)
  * corresponding node, from `aobjmap'.
  */
 static void
-ipmgmt_resetaddr_handler(void *argp)
+ipmgmt_resetaddr_handler(void *argp, size_t argsz __unused)
 {
 	ipmgmt_addr_arg_t	*rargp = argp;
 	ipmgmt_retval_t		rval;
@@ -667,7 +700,7 @@ ipmgmt_resetaddr_handler(void *argp)
  * handler through library.
  */
 static void
-ipmgmt_getaddr_handler(void *argp)
+ipmgmt_getaddr_handler(void *argp, size_t argsz __unused)
 {
 	ipmgmt_getaddr_arg_t    *gargp = argp;
 
@@ -680,7 +713,7 @@ ipmgmt_getaddr_handler(void *argp)
  * from the DB.
  */
 static void
-ipmgmt_resetprop_handler(void *argp)
+ipmgmt_resetprop_handler(void *argp, size_t argsz __unused)
 {
 	ipmgmt_prop_arg_t	*pargp = argp;
 	ipmgmt_retval_t		rval;
@@ -699,7 +732,7 @@ ipmgmt_resetprop_handler(void *argp)
  * ipmgmt_common_handler().
  */
 static void
-ipmgmt_getif_handler(void *argp)
+ipmgmt_getif_handler(void *argp, size_t argsz __unused)
 {
 	ipmgmt_getif_arg_t  *getif = argp;
 
@@ -715,7 +748,7 @@ ipmgmt_getif_handler(void *argp)
  * interfaces that need to be initialized.
  */
 static void
-ipmgmt_initif_handler(void *argp)
+ipmgmt_initif_handler(void *argp, size_t argsz)
 {
 	ipmgmt_initif_arg_t	*initif = argp;
 	size_t			buflen, nvlsize;
@@ -729,6 +762,10 @@ ipmgmt_initif_handler(void *argp)
 	bzero(&cbarg, sizeof (cbarg));
 	invlbuf = (char *)argp + sizeof (ipmgmt_initif_arg_t);
 	nvlsize = initif->ia_nvlsize;
+	if (nvlsize > argsz - sizeof (ipmgmt_initif_arg_t)) {
+		err = EINVAL;
+		goto fail;
+	}
 	err = nvlist_unpack(invlbuf, nvlsize, &cbarg.cb_invl, 0);
 	if (err != 0)
 		goto fail;
@@ -882,7 +919,7 @@ fail:
  * Handles the door command IPMGMT_CMD_IPMP_UPDATE
  */
 static void
-ipmgmt_ipmp_update_handler(void *argp)
+ipmgmt_ipmp_update_handler(void *argp, size_t argsz __unused)
 {
 	ipmgmt_ipmp_update_arg_t *uargp = argp;
 	ipmgmt_retval_t	rval;

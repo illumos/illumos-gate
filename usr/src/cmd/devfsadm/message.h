@@ -23,6 +23,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #ifndef	_MESSAGE_H
 #define	_MESSAGE_H
 
@@ -54,16 +58,17 @@ extern "C" {
 #define	DAEMON_RUNNING gettext("daemon pid %d is already running\n")
 
 #define	ALIAS_TOO_LONG \
-gettext("alias name is too long; must be %d characters or less: %s\n")
+	gettext("alias name is too long; must be %d characters or less: %s\n")
 
 #define	MAJOR_AND_B_FLAG \
-gettext("must specify major number and driver name when using the -b flag\n")
+	gettext("must specify major number and driver name when using " \
+	    "the -b flag\n")
 
 #define	MODCTL_ADDMAJBIND \
-gettext("modctl failed to add major number binding.\n")
+	gettext("modctl failed to add major number binding.\n")
 
 #define	MODCTL_REMMAJBIND \
-gettext("modctl failed to remove major number binding.\n")
+	gettext("modctl failed to remove major number binding.\n")
 
 #define	DRIVER_FAILURE gettext("driver failed to attach: %s\n")
 
@@ -80,11 +85,14 @@ gettext("modctl failed to remove major number binding.\n")
 #define	REGCOMP_FAILED gettext("regcomp failed for %s: error code: %d\n")
 
 #define	IGNORING_ENTRY \
-gettext("ignoring devfsadm_create entry #%d in module %s\n")
+	gettext("ignoring devfsadm_create entry #%d in module %s\n")
 
 #define	CANT_CREATE_THREAD gettext("can not create thread %s: %s\n")
 
 #define	CANT_CREATE_DOOR gettext("can not create event door %s: %s\n")
+
+#define	CANT_SET_DOOR_PARAM \
+	gettext("can not set event door %s parameters: %s\n")
 
 #define	FAILED_FOR_MODULE gettext("%s failed for module %s\n")
 
@@ -95,7 +103,7 @@ gettext("ignoring devfsadm_create entry #%d in module %s\n")
 #define	SYMLINK_FAILED gettext("symlink failed for %s -> %s: %s\n")
 
 #define	MAX_ATTEMPTS \
-gettext("cannot create link: %s -> %s.  max attempts exceeded\n")
+	gettext("cannot create link: %s -> %s.  max attempts exceeded\n")
 
 #define	PERM_MSG gettext("chown/chmod %s %ul/%ul/%o\n")
 
@@ -114,7 +122,7 @@ gettext("cannot create link: %s -> %s.  max attempts exceeded\n")
 #define	CANT_LOAD_SYSCALL gettext("cannot load system call for inst_sync\n")
 
 #define	SUPER_TO_SYNC \
-gettext("you must be superuser to sync /etc/path_to_inst\n")
+	gettext("you must be superuser to sync /etc/path_to_inst\n")
 
 #define	INSTSYNC_FAILED gettext("inst_sync failed for %s: %s\n")
 
@@ -155,21 +163,23 @@ gettext("you must be superuser to sync /etc/path_to_inst\n")
 #define	IGNORING_LINE_IN gettext("line %d:  malformed in %s\n")
 
 #define	MISSING_TAB \
-gettext("line %d: configuration file %s has a missing tab -- ignoring\n")
+	gettext("line %d: configuration file %s has a missing tab -- " \
+	    "ignoring\n")
 
 #define	MISSING_DEVNAME \
-gettext("line %d: configuration file %s has a missing dev name field -- \
-ignoring\n")
+	gettext("line %d: configuration file %s has a missing dev name " \
+	    "field -- ignoring\n")
 
 #define	TOO_MANY_FIELDS \
-gettext("line %d:  configuration file %s has too many fields -- ignoring\n")
+	gettext("line %d:  configuration file %s has too many fields -- " \
+	    "ignoring\n")
 
 #define	LINE_TOO_LONG \
-gettext("Line %d too long in configuration file %s -- should be less \
+	gettext("Line %d too long in configuration file %s -- should be less \
 than %d characters\n")
 
 #define	UNRECOGNIZED_KEY \
-gettext("unrecognized keyword '%s' -- ignoring line %d of file %s\n")
+	gettext("unrecognized keyword '%s' -- ignoring line %d of file %s\n")
 
 #define	BADKEYWORD gettext("bad keyword '%s' on line %d of file %s\n")
 
@@ -177,7 +187,7 @@ gettext("unrecognized keyword '%s' -- ignoring line %d of file %s\n")
 	gettext("missing '=' in devfs_spec field line %d from file %s\n")
 
 #define	CONFIG_INCORRECT \
-gettext("line %d: configuration file %s incorrect: %s -- ignoring\n")
+	gettext("line %d: configuration file %s incorrect: %s -- ignoring\n")
 
 #define	NO_NODE gettext("no node name found for %s\n")
 

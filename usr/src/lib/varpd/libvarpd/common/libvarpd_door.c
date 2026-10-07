@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2015 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -369,11 +370,6 @@ libvarpd_door_server(void *cookie, char *argp, size_t argsz, door_desc_t *dp,
 	varpd_client_arg_t *vcap = (varpd_client_arg_t *)argp;
 
 	err.vce_command = VARPD_CLIENT_INVALID;
-	if (argsz < sizeof (varpd_client_arg_t)) {
-		err.vce_errno = EINVAL;
-		goto errout;
-	}
-
 	if ((ret = door_ucred(&credp)) != 0) {
 		err.vce_errno = ret;
 		goto errout;
@@ -416,6 +412,15 @@ libvarpd_door_server_create(varpd_handle_t *vhp, const char *path)
 	if (vip->vdi_doorfd == -1) {
 		mutex_exit(&vip->vdi_lock);
 		return (errno);
+	}
+
+	if (door_setparam(vip->vdi_doorfd, DOOR_PARAM_DATA_MIN,
+	    sizeof (varpd_client_arg_t)) != 0) {
+		ret = errno;
+		if (door_revoke(vip->vdi_doorfd) != 0)
+			libvarpd_panic("failed to revoke door: %d", errno);
+		mutex_exit(&vip->vdi_lock);
+		return (ret);
 	}
 
 	if ((fd = open(path, O_CREAT | O_RDWR, 0666)) == -1) {

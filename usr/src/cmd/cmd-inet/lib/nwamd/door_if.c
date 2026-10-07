@@ -543,15 +543,6 @@ nwamd_door_switch(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 	boolean_t found = B_FALSE;
 	int i;
 
-	/*
-	 * The door is accessible to all users, so validate the request before
-	 * touching it. A zero-length request arrives with a NULL argument.
-	 */
-	if (argp == NULL || arg_size < sizeof (nwamd_door_arg_t)) {
-		(void) door_return(NULL, 0, NULL, 0);
-		return;
-	}
-
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	req = (nwamd_door_arg_t *)argp;
 	req->nwda_error = NWAM_SUCCESS;
@@ -636,6 +627,16 @@ nwamd_door_init(void)
 	if ((doorfd = door_create(nwamd_door_switch, NULL,
 	    DOOR_NO_CANCEL | DOOR_REFUSE_DESC)) == -1)
 		pfail("Unable to create door: %s", strerror(errno));
+
+	if (door_setparam(doorfd, DOOR_PARAM_DATA_MIN,
+	    sizeof (nwamd_door_arg_t)) != 0 ||
+	    door_setparam(doorfd, DOOR_PARAM_DATA_MAX,
+	    sizeof (nwamd_door_arg_t)) != 0) {
+		int err = errno;
+		(void) door_revoke(doorfd);
+		doorfd = -1;
+		pfail("Unable to set door parameters: %s", strerror(err));
+	}
 
 	if (stat(NWAM_DOOR, &buf) < 0) {
 		int nwam_door_fd;

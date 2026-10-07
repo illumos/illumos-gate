@@ -23,6 +23,7 @@
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
  *
  * Copyright 2023 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -1039,9 +1040,7 @@ server_for_door(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	vtargp = (vt_cmd_arg_t *)args;
 
-	if (vtargp == NULL ||
-	    alen != sizeof (vt_cmd_arg_t) ||
-	    door_ucred(&uc) != 0) {
+	if (vtargp == DOOR_UNREF_DATA || door_ucred(&uc) != 0) {
 		(void) door_return(NULL, 0, NULL, 0);
 		return;
 	}
@@ -1081,6 +1080,16 @@ setup_door(void)
 		return (B_FALSE);
 	}
 
+	if (door_setparam(vt_door, DOOR_PARAM_DATA_MIN,
+	    sizeof (vt_cmd_arg_t)) != 0 ||
+	    door_setparam(vt_door, DOOR_PARAM_DATA_MAX,
+	    sizeof (vt_cmd_arg_t)) != 0) {
+		syslog(LOG_ERR, "door_setparam failed: %s", strerror(errno));
+		(void) door_revoke(vt_door);
+		vt_door = -1;
+		return (B_FALSE);
+	}
+
 	(void) fdetach(vt_door_path);
 
 	if (fattach(vt_door, vt_door_path) != 0) {
@@ -1106,18 +1115,18 @@ setup_door(void)
  * vnodes we could be dealing with.  Our strategy is as follows:
  *
  * - If the file we opened is a regular file (common case):
- * 	There is no fattach(3c)ed door, so we have a chance of becoming
- * 	the running vtdaemon. We attempt to lock the file: if it is
- * 	already locked, that means someone else raced us here, so we
- * 	lose and give up.
+ *	There is no fattach(3c)ed door, so we have a chance of becoming
+ *	the running vtdaemon. We attempt to lock the file: if it is
+ *	already locked, that means someone else raced us here, so we
+ *	lose and give up.
  *
  * - If the file we opened is a namefs file:
- * 	This means there is already an established door fattach(3c)'ed
- * 	to the rendezvous path.  We've lost the race, so we give up.
- * 	Note that in this case we also try to grab the file lock, and
- * 	will succeed in acquiring it since the vnode locked by the
- * 	"winning" vtdaemon was a regular one, and the one we locked was
- * 	the fattach(3c)'ed door node.  At any rate, no harm is done.
+ *	This means there is already an established door fattach(3c)'ed
+ *	to the rendezvous path.  We've lost the race, so we give up.
+ *	Note that in this case we also try to grab the file lock, and
+ *	will succeed in acquiring it since the vnode locked by the
+ *	"winning" vtdaemon was a regular one, and the one we locked was
+ *	the fattach(3c)'ed door node.  At any rate, no harm is done.
  */
 static boolean_t
 make_daemon_exclusive(void)

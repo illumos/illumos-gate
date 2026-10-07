@@ -22,6 +22,10 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -108,12 +112,6 @@ doorHandler(
 		syslog(LOG_DAEMON|LOG_WARNING,
 		    "descriptor passed to door %p %d", ddp, ndid);
 		result = EINVAL;
-	}
-
-	if (args == NULL || alen == 0) {
-		syslog(LOG_DAEMON|LOG_WARNING,
-		    "empty message passed to door %p %d", args, alen);
-		result = EFAULT;
 	}
 
 	if (result == 0)
@@ -358,6 +356,14 @@ open_proxy_driver()
 		    "could not create door: errno %d", errno);
 		return (SMF_EXIT_ERR_FATAL);
 	}
+	/* A message must contain at least one byte. */
+	if (door_setparam(drv_door_fd, DOOR_PARAM_DATA_MIN, 1) != 0) {
+		perror("door_setparam");
+		syslog(LOG_DAEMON|LOG_DEBUG,
+		    "could not set door parameters: errno %d", errno);
+		(void) door_revoke(drv_door_fd);
+		return (SMF_EXIT_ERR_FATAL);
+	}
 
 	stmf_ret = stmfInitProxyDoor(&proxy_hdl, drv_door_fd);
 	if (stmf_ret != STMF_STATUS_SUCCESS) {
@@ -400,7 +406,7 @@ main(int argc, char *argv[])
 {
 	struct	sockaddr_in sin;
 	int	rc;
-	struct sigaction 	act;
+	struct sigaction	act;
 	sigset_t		sigmask;
 	int	c;
 	int	node = 0;

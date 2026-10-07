@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2021 Tintri by DDN, Inc. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -186,6 +187,13 @@ ipmgmt_door_init()
 		err = errno;
 		ipmgmt_log(LOG_ERR, "failed to create door: %s", strerror(err));
 		return (err);
+	}
+	if (door_setparam(ipmgmt_door_fd, DOOR_PARAM_DATA_MIN,
+	    sizeof (ipmgmt_arg_t)) != 0) {
+		err = errno;
+		ipmgmt_log(LOG_ERR, "failed to set door parameters: %s",
+		    strerror(err));
+		goto fail;
 	}
 	/*
 	 * fdetach first in case a previous daemon instance exited

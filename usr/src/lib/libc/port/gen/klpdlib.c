@@ -24,6 +24,10 @@
  * Use is subject to license terms.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 #include "lint.h"
 #include "priv_private.h"
 #include "mtlib.h"
@@ -114,6 +118,12 @@ klpd_create(boolean_t (*callback)(void *, const priv_set_t *, void *),
 	    DOOR_REFUSE_DESC | DOOR_UNREF);
 	if (p->kd_doorfd == -1)
 		goto out;
+
+	if (door_setparam(p->kd_doorfd, DOOR_PARAM_DATA_MIN,
+	    sizeof (klpd_head_t)) != 0) {
+		(void) door_revoke(p->kd_doorfd);
+		goto out;
+	}
 
 	p->kd_user_cookie = cookie;
 	p->kd_callback = callback;

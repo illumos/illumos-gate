@@ -22,6 +22,10 @@
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 
 #include <stdio.h>
 #include <stdio_ext.h>
@@ -213,6 +217,17 @@ main(argc, argv)
 			syslog(LOG_ERR, "failed to door_revoke(%d) %m",
 			    did_fork_exec);
 		}
+		exit(errno);
+	}
+	if (door_setparam(did_fork_exec, DOOR_PARAM_DATA_MIN,
+	    sizeof (command_t)) != 0 ||
+	    door_setparam(did_fork_exec, DOOR_PARAM_DATA_MAX,
+	    sizeof (command_t)) != 0 ||
+	    door_setparam(did_exec_map, DOOR_PARAM_DATA_MIN,
+	    sizeof (command_t)) != 0 ||
+	    door_setparam(did_exec_map, DOOR_PARAM_DATA_MAX,
+	    sizeof (command_t)) != 0) {
+		syslog(LOG_ERR, "door_setparam failed: %m, Exiting.");
 		exit(errno);
 	}
 	/*
@@ -710,17 +725,6 @@ autofs_doorfunc(
 	autofs_door_res_t	*door_res;
 	autofs_door_res_t	 failed_res;
 
-	if (arg_size < sizeof (autofs_door_args_t)) {
-		failed_res.res_status = EINVAL;
-		error = door_return((char *)&failed_res,
-		    sizeof (autofs_door_res_t), NULL, 0);
-		/*
-		 * If we got here the door_return() failed.
-		 */
-		syslog(LOG_ERR, "Bad argument, door_return failure %d", error);
-		return;
-	}
-
 	timenow = time((time_t *)NULL);
 
 	which = ((autofs_door_args_t *)argp)->cmd;
@@ -919,6 +923,12 @@ start_autofs_svcs(void)
 	if ((doorfd = door_create(autofs_doorfunc, NULL,
 	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL)) == -1) {
 		syslog(LOG_ERR, gettext("Unable to create door\n"));
+		return (1);
+	}
+	if (door_setparam(doorfd, DOOR_PARAM_DATA_MIN,
+	    sizeof (autofs_door_args_t)) != 0) {
+		syslog(LOG_ERR, gettext("Unable to set door parameters\n"));
+		(void) door_revoke(doorfd);
 		return (1);
 	}
 

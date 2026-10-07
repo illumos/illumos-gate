@@ -24,6 +24,7 @@
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  * Copyright 2016 Nexenta Systems, Inc.  All rights reserved.
  * Copyright 2022 RackTop Systems.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -70,6 +71,7 @@
 #include <nfs/nfssys.h>
 #include <nfs/nfs.h>
 #include <nfs/nfs_sec.h>
+#include <nfs/nfs_cmd.h>
 #include <rpcsvc/daemon_utils.h>
 #include <deflt.h>
 #include "../../fslib.h"
@@ -233,6 +235,13 @@ cmd_svc(void *arg)
 	if ((doorfd = door_create(nfscmd_func, NULL,
 	    DOOR_REFUSE_DESC | DOOR_NO_CANCEL)) == -1) {
 		syslog(LOG_ERR, "Unable to create cmd door: %m\n");
+		exit(10);
+	}
+	if (door_setparam(doorfd, DOOR_PARAM_DATA_MIN,
+	    sizeof (nfscmd_arg_t)) != 0 ||
+	    door_setparam(doorfd, DOOR_PARAM_DATA_MAX,
+	    sizeof (nfscmd_arg_t)) != 0) {
+		syslog(LOG_ERR, "Unable to set cmd door parameters: %m\n");
 		exit(10);
 	}
 

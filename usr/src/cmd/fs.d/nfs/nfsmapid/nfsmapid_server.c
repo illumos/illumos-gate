@@ -22,6 +22,10 @@
  * Copyright (c) 2009, 2010, Oracle and/or its affiliates. All rights reserved.
  */
 
+/*
+ * Copyright 2026 Oxide Computer Company
+ */
+
 
 /*
  * Door server routines for nfsmapid daemon
@@ -681,22 +685,11 @@ send_response:
 /* ARGSUSED */
 void
 nfsmapid_func(void *cookie, char *argp, size_t arg_size,
-						door_desc_t *dp, uint_t n_desc)
+    door_desc_t *dp, uint_t n_desc)
 {
 	struct mapid_arg	*mapargp;
 	struct mapid_res	mapres;
 	refd_door_args_t	*referral_args;
-
-	/*
-	 * Make sure we have a valid argument
-	 */
-	if (arg_size < sizeof (struct mapid_arg)) {
-		mapres.status = NFSMAPID_INVALID;
-		mapres.u_res.len = 0;
-		(void) door_return((char *)&mapres, sizeof (struct mapid_res),
-		    NULL, 0);
-		return;
-	}
 
 	/* LINTED pointer cast */
 	mapargp = (struct mapid_arg *)argp;
