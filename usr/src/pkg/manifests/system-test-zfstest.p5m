@@ -3062,6 +3062,9 @@ file path=opt/zfs-tests/tests/functional/slog/slog_replay_fs_split_truncate \
     mode=0555
 file path=opt/zfs-tests/tests/functional/slog/slog_replay_fs_split_write \
     mode=0555
+file path=opt/zfs-tests/tests/functional/slog/slog_replay_indirect_eof mode=0555
+file path=opt/zfs-tests/tests/functional/slog/slog_replay_indirect_order \
+    mode=0555
 file \
     path=opt/zfs-tests/tests/functional/slog/slog_replay_volume_split_boundary \
     mode=0555

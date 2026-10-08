@@ -27,6 +27,7 @@
  * Copyright 2016 Nexenta Systems, Inc. All rights reserved.
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
  * Copyright (c) 2018 DilOS
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/dmu.h>
@@ -1812,11 +1813,25 @@ dmu_assign_arcbuf_by_dbuf(dmu_buf_t *handle, uint64_t offset, arc_buf_t *buf,
 	return (err);
 }
 
-typedef struct {
+/*
+ * A dmu_sync() that found another dmu_sync() of the same buffer in progress,
+ * and is waiting for that write's blkptr.  dsw_zio is an unissued child of
+ * the waiter's log block zio, which holds that log block until
+ * dmu_sync_done() fills in its blkptr and issues dsw_zio.
+ */
+typedef struct dmu_sync_waiter {
+	list_node_t		dsw_node;
+	dmu_sync_cb_t		*dsw_done;
+	zgd_t			*dsw_zgd;
+	zio_t			*dsw_zio;
+} dmu_sync_waiter_t;
+
+typedef struct dmu_sync_arg {
 	dbuf_dirty_record_t	*dsa_dr;
 	dmu_sync_cb_t		*dsa_done;
 	zgd_t			*dsa_zgd;
 	dmu_tx_t		*dsa_tx;
+	list_t			dsa_waiters;	/* dmu_sync_waiter_t */
 } dmu_sync_arg_t;
 
 /* ARGSUSED */
@@ -1855,6 +1870,7 @@ dmu_sync_done(zio_t *zio, arc_buf_t *buf, void *varg)
 	dbuf_dirty_record_t *dr = dsa->dsa_dr;
 	dmu_buf_impl_t *db = dr->dr_dbuf;
 	zgd_t *zgd = dsa->dsa_zgd;
+	dmu_sync_waiter_t *dsw;
 
 	/*
 	 * Record the vdev(s) backing this blkptr so they can be flushed after
@@ -1866,6 +1882,8 @@ dmu_sync_done(zio_t *zio, arc_buf_t *buf, void *varg)
 
 	mutex_enter(&db->db_mtx);
 	ASSERT(dr->dt.dl.dr_override_state == DR_IN_DMU_SYNC);
+	ASSERT3P(dr->dt.dl.dr_sync_arg, ==, dsa);
+	dr->dt.dl.dr_sync_arg = NULL;
 	if (zio->io_error == 0) {
 		dr->dt.dl.dr_nopwrite = !!(zio->io_flags & ZIO_FLAG_NOPWRITE);
 		if (dr->dt.dl.dr_nopwrite) {
@@ -1903,6 +1921,25 @@ dmu_sync_done(zio_t *zio, arc_buf_t *buf, void *varg)
 	mutex_exit(&db->db_mtx);
 
 	dsa->dsa_done(dsa->dsa_zgd, zio->io_error);
+
+	/*
+	 * Give our blkptr to the dmu_sync()s that waited for this write.
+	 * No more can be added, since dr_sync_arg is cleared.  Their log
+	 * blocks wait for their dsw_zio.
+	 */
+	while ((dsw = list_remove_head(&dsa->dsa_waiters)) != NULL) {
+		if (zio->io_error == 0) {
+			*dsw->dsw_zgd->zgd_bp = *zio->io_bp;
+			zil_lwb_add_block(dsw->dsw_zgd->zgd_lwb,
+			    dsw->dsw_zgd->zgd_bp);
+		} else {
+			dsw->dsw_zio->io_error = zio->io_error;
+		}
+		dsw->dsw_done(dsw->dsw_zgd, zio->io_error);
+		zio_nowait(dsw->dsw_zio);
+		kmem_free(dsw, sizeof (*dsw));
+	}
+	list_destroy(&dsa->dsa_waiters);
 
 	kmem_free(dsa, sizeof (*dsa));
 }
@@ -2012,9 +2049,6 @@ dmu_sync_late_arrival(zio_t *pio, objset_t *os, dmu_sync_cb_t *done, zgd_t *zgd,
  *	ENOENT: the block was dbuf_free_range()'d, so there's nothing to do.
  *		The caller should not log the write.
  *
- *	EALREADY: this block is already in the process of being synced.
- *		The caller should track its progress (somehow).
- *
  *	EIO: could not do the I/O.
  *		The caller should do a txg_wait_synced().
  *
@@ -2022,7 +2056,12 @@ dmu_sync_late_arrival(zio_t *pio, objset_t *os, dmu_sync_cb_t *done, zgd_t *zgd,
  *		The caller should log this blkptr in the done callback.
  *		It is possible that the I/O will fail, in which case
  *		the error will be reported to the done callback and
- *		propagated to pio from zio_done().
+ *		propagated to pio from zio_done().  If another dmu_sync()
+ *		of the block in this txg is in progress, *zgd_bp is set to
+ *		its blkptr, and the done callback is called with its error,
+ *		when it completes.  If one has completed, *zgd_bp is set to
+ *		its blkptr and the done callback is called before dmu_sync()
+ *		returns.
  */
 int
 dmu_sync(zio_t *pio, uint64_t txg, dmu_sync_cb_t *done, zgd_t *zgd)
@@ -2060,7 +2099,6 @@ dmu_sync(zio_t *pio, uint64_t txg, dmu_sync_cb_t *done, zgd_t *zgd)
 	 * sync thread will block in dbuf_sync_leaf() until we drop db_mtx.
 	 */
 	mutex_enter(&db->db_mtx);
-
 	if (txg <= spa_last_synced_txg(os->os_spa)) {
 		/*
 		 * This txg has already synced.  There's nothing to do.
@@ -2137,26 +2175,53 @@ dmu_sync(zio_t *pio, uint64_t txg, dmu_sync_cb_t *done, zgd_t *zgd)
 	DB_DNODE_EXIT(db);
 
 	ASSERT(dr->dr_txg == txg);
-	if (dr->dt.dl.dr_override_state == DR_IN_DMU_SYNC ||
-	    dr->dt.dl.dr_override_state == DR_OVERRIDDEN) {
+	if (dr->dt.dl.dr_override_state == DR_IN_DMU_SYNC) {
+		dmu_sync_arg_t *wdsa = dr->dt.dl.dr_sync_arg;
+		dmu_sync_waiter_t *dsw;
+
 		/*
-		 * We have already issued a sync write for this buffer,
-		 * or this buffer has already been synced.  It could not
-		 * have been dirtied since, or we would have cleared the state.
+		 * Another sync write of this buffer is in progress.  Its copy
+		 * holds our data: the buffer could not have been dirtied
+		 * since, or we would have cleared the state.  dmu_sync_done()
+		 * will give us its blkptr.  Until then, hold our log block
+		 * with a child of pio, as our own write would.
 		 */
+		dsw = kmem_alloc(sizeof (*dsw), KM_SLEEP);
+		dsw->dsw_done = done;
+		dsw->dsw_zgd = zgd;
+		dsw->dsw_zio = zio_null(pio, os->os_spa, NULL, NULL, NULL,
+		    ZIO_FLAG_CANFAIL);
+		list_insert_tail(&wdsa->dsa_waiters, dsw);
 		mutex_exit(&db->db_mtx);
-		return (SET_ERROR(EALREADY));
+		return (0);
+	}
+	if (dr->dt.dl.dr_override_state == DR_OVERRIDDEN) {
+		/*
+		 * This buffer has already been written by a sync write, and
+		 * not dirtied since.  Log that write's blkptr.  The same
+		 * blkptr may be in other log records; claim and free skip
+		 * duplicates.
+		 */
+		*zgd->zgd_bp = dr->dt.dl.dr_overridden_by;
+		mutex_exit(&db->db_mtx);
+		zil_lwb_add_block(zgd->zgd_lwb, zgd->zgd_bp);
+		done(zgd, 0);
+		return (0);
 	}
 
 	ASSERT(dr->dt.dl.dr_override_state == DR_NOT_OVERRIDDEN);
-	dr->dt.dl.dr_override_state = DR_IN_DMU_SYNC;
-	mutex_exit(&db->db_mtx);
 
 	dsa = kmem_alloc(sizeof (dmu_sync_arg_t), KM_SLEEP);
 	dsa->dsa_dr = dr;
 	dsa->dsa_done = done;
 	dsa->dsa_zgd = zgd;
 	dsa->dsa_tx = NULL;
+	list_create(&dsa->dsa_waiters, sizeof (dmu_sync_waiter_t),
+	    offsetof(dmu_sync_waiter_t, dsw_node));
+
+	dr->dt.dl.dr_override_state = DR_IN_DMU_SYNC;
+	dr->dt.dl.dr_sync_arg = dsa;
+	mutex_exit(&db->db_mtx);
 
 	zio_nowait(arc_write(pio, os->os_spa, txg,
 	    zgd->zgd_bp, dr->dt.dl.dr_data, DBUF_IS_L2CACHEABLE(db),

@@ -26,6 +26,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright (c) 2017, 2019, Datto Inc. All rights reserved.
  * Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/dsl_scan.h>
@@ -1396,6 +1397,10 @@ dsl_scan_zil_record(zilog_t *zilog, lr_t *lrc, void *arg, uint64_t claim_txg)
 		 * other records that are not synced)
 		 */
 		if (claim_txg == 0 || bp->blk_birth < claim_txg)
+			return (0);
+
+		/* Several records can share a dmu_sync() block. */
+		if (zil_bp_tree_add(zilog, bp) != 0)
 			return (0);
 
 		SET_BOOKMARK(&zb, zh->zh_log.blk_cksum.zc_word[ZIL_ZC_OBJSET],

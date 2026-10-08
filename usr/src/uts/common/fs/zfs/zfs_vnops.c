@@ -1332,19 +1332,6 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, struct lwb *lwb, zio_t *zio)
 			 */
 			if (error == 0)
 				return (0);
-
-			if (error == EALREADY) {
-				lr->lr_common.lrc_txtype = TX_WRITE2;
-				/*
-				 * TX_WRITE2 relies on the data previously
-				 * written by the TX_WRITE that caused
-				 * EALREADY.  We zero out the BP because
-				 * it is the old, currently-on-disk BP.
-				 */
-				zgd->zgd_bp = NULL;
-				BP_ZERO(bp);
-				error = 0;
-			}
 		}
 	}
 

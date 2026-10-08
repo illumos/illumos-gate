@@ -3484,15 +3484,11 @@ same_metaslab(spa_t *spa, uint64_t vdev, uint64_t off1, uint64_t off2)
 }
 
 static void
-zdb_count_block(zdb_cb_t *zcb, zilog_t *zilog, const blkptr_t *bp,
-    dmu_object_type_t type)
+zdb_count_block(zdb_cb_t *zcb, const blkptr_t *bp, dmu_object_type_t type)
 {
 	uint64_t refcnt = 0;
 
 	ASSERT(type < ZDB_OT_TOTAL);
-
-	if (zilog && zil_bp_tree_add(zilog, bp) != 0)
-		return;
 
 	spa_config_enter(zcb->zcb_spa, SCL_CONFIG, FTAG, RW_READER);
 
@@ -3671,8 +3667,7 @@ zdb_blkptr_cb(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
 
 	type = BP_GET_TYPE(bp);
 
-	zdb_count_block(zcb, zilog, bp,
-	    (type & DMU_OT_NEWTYPE) ? ZDB_OT_OTHER : type);
+	zdb_count_block(zcb, bp, (type & DMU_OT_NEWTYPE) ? ZDB_OT_OTHER : type);
 
 	is_metadata = (BP_GET_LEVEL(bp) != 0 || DMU_OT_IS_METADATA(type));
 
@@ -3849,7 +3844,7 @@ zdb_ddt_leak_init(spa_t *spa, zdb_cb_t *zcb)
 			ddt_bp_create(ddb.ddb_checksum,
 			    &dde.dde_key, ddp, &blk);
 			if (p == DDT_PHYS_DITTO) {
-				zdb_count_block(zcb, NULL, &blk, ZDB_OT_DITTO);
+				zdb_count_block(zcb, &blk, ZDB_OT_DITTO);
 			} else {
 				zcb->zcb_dedup_asize +=
 				    BP_GET_ASIZE(&blk) * (ddp->ddp_refcnt - 1);
@@ -4525,7 +4520,7 @@ count_block_cb(void *arg, const blkptr_t *bp, dmu_tx_t *tx)
 		(void) printf("[%s] %s\n",
 		    "deferred free", blkbuf);
 	}
-	zdb_count_block(zcb, NULL, bp, ZDB_OT_DEFERRED);
+	zdb_count_block(zcb, bp, ZDB_OT_DEFERRED);
 	return (0);
 }
 
