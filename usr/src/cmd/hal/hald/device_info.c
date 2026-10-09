@@ -43,6 +43,20 @@
 #include "device_store.h"
 #include "util.h"
 
+/*
+ * expat 2.9.0 deprecated XML_GetCurrent{Line,Column}Number in favor
+ * of XML_GetCurrent{Line,Column}Number64; the new version returns a
+ * value of type uint64_t instead of one of type XML_Size.
+ */
+#if XML_MAJOR_VERSION > 2 || (XML_MAJOR_VERSION == 2 && XML_MINOR_VERSION >= 9)
+
+#undef XML_GetCurrentLineNumber
+#undef XML_GetCurrentColumnNumber
+#define	XML_GetCurrentLineNumber(x) ((long)XML_GetCurrentLineNumber64(x))
+#define	XML_GetCurrentColumnNumber(x) ((long)XML_GetCurrentColumnNumber64(x))
+
+#endif
+
 /**
  * @defgroup DeviceInfo Device Info File Parsing
  * @ingroup HalDaemon
@@ -52,13 +66,13 @@
 
 
 /** Maximum nesting depth */
-#define MAX_DEPTH 32
+#define	MAX_DEPTH 32
 
 /** Maximum amount of CDATA */
-#define CDATA_BUF_SIZE  1024
+#define	CDATA_BUF_SIZE  1024
 
 /** Max length of property key */
-#define MAX_KEY_SIZE 128
+#define	MAX_KEY_SIZE 128
 
 /** Possible elements the parser can process */
 enum {
@@ -914,7 +928,7 @@ start (ParsingContext * pc, const char *el, const char **attr)
 	if (strcmp (el, "match") == 0) {
 		if (pc->curelem != CURELEM_DEVICE
 		    && pc->curelem != CURELEM_MATCH) {
-			HAL_ERROR (("%s:%d:%d: Element <match> can only be "
+			HAL_ERROR (("%s:%ld:%ld: Element <match> can only be "
 				    "inside <device> and <match>",
 				    pc->file,
 				    XML_GetCurrentLineNumber (pc->parser),
@@ -935,7 +949,7 @@ start (ParsingContext * pc, const char *el, const char **attr)
 	} else if (strcmp (el, "merge") == 0) {
 		if (pc->curelem != CURELEM_DEVICE
 		    && pc->curelem != CURELEM_MATCH) {
-			HAL_ERROR (("%s:%d:%d: Element <merge> can only be "
+			HAL_ERROR (("%s:%ld:%ld: Element <merge> can only be "
 				    "inside <device> and <match>",
 				    pc->file,
 				    XML_GetCurrentLineNumber (pc->parser),
@@ -952,7 +966,7 @@ start (ParsingContext * pc, const char *el, const char **attr)
 	} else if (strcmp (el, "append") == 0) {
 		if (pc->curelem != CURELEM_DEVICE
 		    && pc->curelem != CURELEM_MATCH) {
-			HAL_ERROR (("%s:%d:%d: Element <append> can only be "
+			HAL_ERROR (("%s:%ld:%ld: Element <append> can only be "
 				    "inside <device> and <match>",
 				    pc->file,
 				    XML_GetCurrentLineNumber (pc->parser),
@@ -969,7 +983,7 @@ start (ParsingContext * pc, const char *el, const char **attr)
 	} else if (strcmp (el, "prepend") == 0) {
 		if (pc->curelem != CURELEM_DEVICE
 		    && pc->curelem != CURELEM_MATCH) {
-			HAL_ERROR (("%s:%d:%d: Element <prepend> can only be "
+			HAL_ERROR (("%s:%ld:%ld: Element <prepend> can only be "
 				    "inside <device> and <match>",
 				    pc->file,
 				    XML_GetCurrentLineNumber (pc->parser),
@@ -986,7 +1000,7 @@ start (ParsingContext * pc, const char *el, const char **attr)
 	} else if (strcmp (el, "remove") == 0) {
 		if (pc->curelem != CURELEM_DEVICE
 		    && pc->curelem != CURELEM_MATCH) {
-			HAL_ERROR (("%s:%d:%d: Element <remove> can only be "
+			HAL_ERROR (("%s:%ld:%ld: Element <remove> can only be "
 				    "inside <device> and <match>",
 				    pc->file,
 				    XML_GetCurrentLineNumber (pc->parser),
@@ -1003,7 +1017,7 @@ start (ParsingContext * pc, const char *el, const char **attr)
 	} else if (strcmp (el, "clear") == 0) {
 		if (pc->curelem != CURELEM_DEVICE
 		    && pc->curelem != CURELEM_MATCH) {
-			HAL_ERROR (("%s:%d:%d: Element <remove> can only be "
+			HAL_ERROR (("%s:%ld:%ld: Element <remove> can only be "
 				    "inside <device> and <match>",
 				    pc->file,
 				    XML_GetCurrentLineNumber (pc->parser),
@@ -1019,7 +1033,7 @@ start (ParsingContext * pc, const char *el, const char **attr)
 		}
 	} else if (strcmp (el, "device") == 0) {
 		if (pc->curelem != CURELEM_DEVICE_INFO) {
-			HAL_ERROR (("%s:%d:%d: Element <device> can only be "
+			HAL_ERROR (("%s:%ld:%ld: Element <device> can only be "
 				    "inside <deviceinfo>",
 				    pc->file,
 				    XML_GetCurrentLineNumber (pc->parser),
@@ -1029,7 +1043,7 @@ start (ParsingContext * pc, const char *el, const char **attr)
 		pc->curelem = CURELEM_DEVICE;
 	} else if (strcmp (el, "deviceinfo") == 0) {
 		if (pc->curelem != CURELEM_UNKNOWN) {
-			HAL_ERROR (("%s:%d:%d: Element <deviceinfo> must be "
+			HAL_ERROR (("%s:%ld:%ld: Element <deviceinfo> must be "
 				    "a top-level element",
 				    pc->file,
 				    XML_GetCurrentLineNumber (pc->parser),
@@ -1039,7 +1053,7 @@ start (ParsingContext * pc, const char *el, const char **attr)
 		pc->curelem = CURELEM_DEVICE_INFO;
 	} else if (strcmp (el, "spawn") == 0) {
 		if (pc->curelem != CURELEM_MATCH) {
-			HAL_ERROR (("%s:%d:%d: Element <spawn> can only be "
+			HAL_ERROR (("%s:%ld:%ld: Element <spawn> can only be "
 				    "inside <match>",
 				    pc->file,
 				    XML_GetCurrentLineNumber (pc->parser),
@@ -1053,7 +1067,7 @@ start (ParsingContext * pc, const char *el, const char **attr)
 		}
 
 	} else {
-		HAL_ERROR (("%s:%d:%d: Unknown element <%s>",
+		HAL_ERROR (("%s:%ld:%ld: Unknown element <%s>",
 			    pc->file,
 			    XML_GetCurrentLineNumber (pc->parser),
 			    XML_GetCurrentColumnNumber (pc->parser), el));
@@ -1439,8 +1453,8 @@ process_fdi_file (const char *dir, const char *filename,
 
 	if (rc == 0) {
 		/* error parsing document */
-		HAL_ERROR (("Error parsing XML document %s at line %d, "
-			    "column %d : %s",
+		HAL_ERROR (("Error parsing XML document %s at line %ld, "
+			    "column %ld : %s",
 			    buf,
 			    XML_GetCurrentLineNumber (parser),
 			    XML_GetCurrentColumnNumber (parser),
