@@ -13,7 +13,7 @@
 # Copyright (c) 2012 by Delphix. All rights reserved.
 # Copyright 2014 Garrett D'Amore <garrett@damore.org>
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
-# Copyright 2017 Jason King
+# Copyright 2026 Jason King
 # Copyright 2020 Joyent, Inc.
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2025 Edgecast Cloud LLC
@@ -39,6 +39,7 @@ SUBDIRS =		\
 	libdhcputil	\
 	libjedec	\
 	libnvpair_json	\
+	libofmt		\
 	libsff		\
 	make		\
 	mdb		\

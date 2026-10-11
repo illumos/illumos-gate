@@ -14,7 +14,7 @@
 # Copyright 2014, OmniTI Computer Consulting, Inc. All rights reserved.
 # Copyright 2014 Nexenta Systems, Inc. All rights reserved.
 # Copyright 2020 Joyent, Inc.
-# Copyright 2017 Jason King.
+# Copyright 2026 Jason King
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2026 Oxide Computer Company
 # Copyright 2026 Hans Rosenfeld
@@ -1639,6 +1639,8 @@ file path=opt/util-tests/tests/libnvpair_json/json_05_strings mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_06_nested mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_07_nested_arrays mode=0555
 file path=opt/util-tests/tests/libnvpair_json/json_common mode=0555
+file path=opt/util-tests/tests/libofmt_print.32 mode=0555
+file path=opt/util-tests/tests/libofmt_print.64 mode=0555
 dir  path=opt/util-tests/tests/libsff
 file path=opt/util-tests/tests/libsff/libsff mode=0555
 file path=opt/util-tests/tests/libsff/libsff_8472 mode=0555

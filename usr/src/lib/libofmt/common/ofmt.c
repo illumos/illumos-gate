@@ -27,6 +27,7 @@
 /*
  * Copyright (c) 2015 by Delphix. All rights reserved.
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2026 Jason King
  */
 
 #include <errno.h>
@@ -333,7 +334,7 @@ ofmt_print_field(ofmt_state_t *os, ofmt_field_t *ofp, const char *value,
 {
 	uint_t	width = ofp->of_width;
 	uint_t	valwidth;
-	uint_t	compress;
+	uint_t	col;
 	boolean_t parsable = (os->os_flags & OFMT_PARSABLE);
 	boolean_t multiline = (os->os_flags & OFMT_MULTILINE);
 	boolean_t rightjust = (os->os_flags & OFMT_RIGHTJUST);
@@ -363,34 +364,57 @@ ofmt_print_field(ofmt_state_t *os, ofmt_field_t *ofp, const char *value,
 		if (!os->os_lastfield)
 			(void) putchar('\n');
 	} else {
+		/*
+		 * os_overflow is how far the fields printed so far on this
+		 * line extend past their columns. To keep the rest of the
+		 * line aligned, it is taken back out of the padding of the
+		 * fields that follow.
+		 *
+		 * col is the number of characters the field is allotted,
+		 * including the space separating it from the next field. A
+		 * left justified field is printed as "%-*s", so of_width
+		 * already includes the separator. A right justified field is
+		 * printed as "%*s ", with the separator in addition to
+		 * of_width.
+		 */
+		valwidth = strlen(value);
+		col = rightjust ? width + 1 : width;
+
 		if (os->os_lastfield) {
-			if (rightjust)
+			/*
+			 * A right justified field must end at the right edge
+			 * of its column, so it takes back what overflow
+			 * remains. Nothing follows a left justified field, so
+			 * it needs no padding.
+			 */
+			if (rightjust) {
+				width -= MIN(os->os_overflow,
+				    width - MIN(valwidth, width));
 				(void) printf("%*s", width, value);
-			else
+			} else {
 				(void) printf("%s", value);
+			}
 			os->os_overflow = 0;
 			return;
 		}
 
-		valwidth = strlen(value);
-		if (valwidth + os->os_overflow >= width) {
-			os->os_overflow += valwidth - width + 1;
-			if (rightjust)
-				(void) printf("%*s ", width, value);
-			else
-				(void) printf("%s ", value);
+		/*
+		 * If the field, followed by a separator, doesn't fit in what
+		 * remains of its column, print it without any padding and
+		 * carry the excess on to the following fields.
+		 */
+		if (valwidth + 1 + os->os_overflow > col) {
+			os->os_overflow += valwidth + 1 - col;
+			(void) printf("%s ", value);
 			return;
 		}
 
-		if (os->os_overflow > 0) {
-			compress = MIN(os->os_overflow, width - valwidth);
-			os->os_overflow -= compress;
-			width -= compress;
-		}
+		col -= os->os_overflow;
+		os->os_overflow = 0;
 		if (rightjust)
-			(void) printf("%*s ", width, value);
+			(void) printf("%*s ", col - 1, value);
 		else
-			(void) printf("%-*s", width, value);
+			(void) printf("%-*s", col, value);
 	}
 }
 
