@@ -3,7 +3,7 @@
  *
  * Copyright (c) 2015 Nahanni Systems, Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -388,6 +388,40 @@ pci_fbuf_render(struct bhyvegc *gc, void *arg)
 	}
 }
 
+#ifndef __FreeBSD__
+#define	VGA_MEM_BASE	(640 * KB)
+#define	VGA_MEM_END	(768 * KB)
+
+/*
+ * Low memory is mapped into the guest as a single segment starting at 0,
+ * which covers the legacy VGA window at 0xa0000-0xbffff. Accesses there never
+ * reach the VGA memory emulation, so split the low memory mapping to leave a
+ * hole in which they fault through to it instead.
+ */
+static int
+pci_fbuf_vga_hole(struct vmctx *ctx)
+{
+	size_t lowmem = vm_get_lowmem_size(ctx);
+
+	if (lowmem <= VGA_MEM_END) {
+		EPRINTLN("pci_fbuf: not enough low memory for VGA");
+		return (-1);
+	}
+
+	if (vm_munmap_memseg(ctx, 0, lowmem) != 0 ||
+	    vm_mmap_memseg(ctx, 0, VM_LOWMEM, 0, VGA_MEM_BASE,
+	    PROT_READ | PROT_WRITE | PROT_EXEC) != 0 ||
+	    vm_mmap_memseg(ctx, VGA_MEM_END, VM_LOWMEM, VGA_MEM_END,
+	    lowmem - VGA_MEM_END, PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
+		EPRINTLN("pci_fbuf: failed to create VGA memory hole: %s",
+		    strerror(errno));
+		return (-1);
+	}
+
+	return (0);
+}
+#endif
+
 static int
 pci_fbuf_init(struct pci_devinst *pi, nvlist_t *nvl)
 {
@@ -441,15 +475,18 @@ pci_fbuf_init(struct pci_devinst *pi, nvlist_t *nvl)
 	if (error != 0)
 		goto done;
 
+#ifdef __FreeBSD__
 	/* XXX until VGA rendering is enabled */
 	if (sc->vga_full != 0) {
 		EPRINTLN("pci_fbuf: VGA rendering not enabled");
-#ifndef __FreeBSD__
-		errno = ENOTSUP;
-		error = -1;
-#endif
 		goto done;
 	}
+#else
+	if (sc->vga_full != 0 && pci_fbuf_vga_hole(pi->pi_vmctx) != 0) {
+		error = -1;
+		goto done;
+	}
+#endif
 
 	DPRINTF(DEBUG_INFO, ("fbuf frame buffer base: %p [sz %lu]",
 	        sc->fb_base, FB_SIZE));
@@ -460,6 +497,17 @@ pci_fbuf_init(struct pci_devinst *pi, nvlist_t *nvl)
 	if (sc->vga_enabled)
 		sc->vgasc = vga_init(!sc->vga_full);
 	sc->gc_image = console_get_image();
+
+#ifndef __FreeBSD__
+	/*
+	 * Like a real adapter, come out of reset displaying legacy
+	 * VGA. The first write of a non-zero resolution to the device
+	 * registers, such as by a UEFI GOP driver, switches to the
+	 * linear framebuffer.
+	 */
+	if (sc->vga_full != 0)
+		sc->gc_image->vgamode = 1;
+#endif
 
 	fbuf_sc = sc;
 
