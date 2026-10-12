@@ -23,13 +23,14 @@
 
 function cleanup
 {
-	log_must set_tunable64 metaslab_force_ganging $((2**17 + 1))
+	log_must set_tunable64 metaslab_force_ganging $orig_force_ganging
 	default_cleanup_noexit
 }
 
+typeset orig_force_ganging=$(get_tunable metaslab_force_ganging)
+log_onexit cleanup
 default_setup_noexit "$DISKS"
 log_must set_tunable64 metaslab_force_ganging $((2**14))
-log_onexit cleanup
 
 FILE_CONTENTS="Leeloo Dallas mul-ti-pass."
 
