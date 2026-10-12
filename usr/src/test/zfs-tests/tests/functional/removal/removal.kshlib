@@ -119,6 +119,13 @@ function start_random_writer # file
 	) &
 }
 
+function test_removal_with_operation_kill
+{
+	kill $killpid
+	wait $killpid
+	return 0
+}
+
 function test_removal_with_operation # callback [args]
 {
 	#

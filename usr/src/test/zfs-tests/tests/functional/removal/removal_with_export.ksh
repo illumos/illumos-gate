@@ -26,6 +26,7 @@ log_onexit default_cleanup_noexit
 
 function callback
 {
+	test_removal_with_operation_kill
 	log_must zpool export $TESTPOOL
 
 	#
