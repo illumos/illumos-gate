@@ -34,9 +34,8 @@
 
 _Static_assert(RFB_VERSION_LEN == 12, "RFB_VERSION length incorrect");
 
-/* Keep synchronised with pci_fbuf.c */
-#define	RFB_MAX_WIDTH			1920
-#define	RFB_MAX_HEIGHT			1200
+#define	RFB_MAX_WIDTH			GC_COLS_MAX
+#define	RFB_MAX_HEIGHT			GC_ROWS_MAX
 
 #define	RFB_MAX_CLIENTS			10
 
