@@ -253,6 +253,15 @@ struct vm {
 };
 
 static int vmm_initialized;
+
+/*
+ * The number of vCPUs that a VM may have, which may be lowered via
+ * system(5). It's clamped to the capacity of a vcpuset_t and by the number
+ * of VPIDs that HMA leaves in the fallback pool.
+ */
+#define	VMM_MAXCPUS_LIMIT	\
+	MIN(VM_MAXCPU, MIN(HMA_VMX_VPID_RESERVED, UINT16_MAX))
+uint_t vmm_maxcpus = VMM_MAXCPUS_LIMIT;
 static uint64_t vmm_host_freq;
 
 static void
@@ -708,7 +717,9 @@ vm_create(uint64_t flags, struct vm **retvm)
 	vm->sockets = 1;
 	vm->cores = cores_per_package;	/* XXX backwards compatibility */
 	vm->threads = threads_per_core;	/* XXX backwards compatibility */
-	vm->maxcpus = VM_MAXCPU;	/* XXX temp to keep code working */
+	/* Read the tunable once, since it can be changed at any time */
+	const uint_t maxcpus = vmm_maxcpus;
+	vm->maxcpus = MIN(MAX(maxcpus, 1), VMM_MAXCPUS_LIMIT);
 
 	mutex_init(&vm->vcpu_alloc_lock, NULL, MUTEX_DEFAULT, NULL);
 	vm->vcpu = kmem_zalloc(sizeof (struct vcpu *) * vm->maxcpus, KM_SLEEP);
@@ -768,11 +779,9 @@ vm_set_topology(struct vm *vm, uint16_t sockets, uint16_t cores,
 		return (EINVAL);	/* XXX remove when supported */
 	if ((sockets * cores * threads) > vm->maxcpus)
 		return (EINVAL);
-	/* XXX need to check sockets * cores * threads == vCPU, how? */
 	vm->sockets = sockets;
 	vm->cores = cores;
 	vm->threads = threads;
-	vm->maxcpus = VM_MAXCPU;	/* XXX temp to keep code working */
 	return (0);
 }
 

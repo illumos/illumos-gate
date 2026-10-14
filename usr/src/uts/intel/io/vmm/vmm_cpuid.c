@@ -878,7 +878,12 @@ legacy_emulate_cpuid(struct vcpu *vcpu, uint32_t *eax, uint32_t *ebx,
 				vm_get_topology(vm, &sockets, &cores, &threads,
 				    &maxcpus);
 				regs[0] &= 0x3ff;
-				regs[0] |= (cores - 1) << 26;
+				/*
+				 * The cores-per-package field is only 6 bits,
+				 * so it isn't big enough for larger guests.
+				 * Leaf 0xB carries the full topology.
+				 */
+				regs[0] |= MIN(cores - 1U, 0x3f) << 26;
 				/*
 				 * Cache topology:
 				 * - L1 and L2 are shared only by the logical

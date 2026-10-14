@@ -37,7 +37,7 @@
  *
  * Copyright 2015 Pluribus Networks Inc.
  * Copyright 2018 Joyent, Inc.
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
  */
 
@@ -610,9 +610,6 @@ do_open(const char *vmname)
 			exit(4);
 		}
 	}
-	error = vm_set_topology(ctx, cpu_sockets, cpu_cores, cpu_threads, 0);
-	if (error)
-		errx(EX_OSERR, "vm_set_topology");
 	return (ctx);
 }
 
@@ -739,6 +736,17 @@ main(int argc, char *argv[])
 		fprintf(stderr, "%d vCPUs requested but only %d available\n",
 			guest_ncpus, max_vcpus);
 		exit(4);
+	}
+
+	/*
+	 * The kernel refuses a topology with more vCPUs than the VM may have,
+	 * so this follows the check above, which says what the limit is.
+	 */
+	error = vm_set_topology(ctx, cpu_sockets, cpu_cores, cpu_threads, 0);
+	if (error != 0) {
+		err(EX_OSERR, "could not set a topology of %u sockets, "
+		    "%u cores and %u threads", cpu_sockets, cpu_cores,
+		    cpu_threads);
 	}
 
 	bhyve_init_vcpu(bsp);

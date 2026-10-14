@@ -145,7 +145,13 @@ enum x2apic_state {
 #define	VM_MAX_SEG_NAMELEN	128
 
 #ifdef _KERNEL
-#define	VM_MAXCPU	32			/* maximum virtual cpus */
+/*
+ * The greatest number of vCPUs that a VM may have. A vCPU is addressed by its
+ * vcpuid as an APIC ID so, until guests can use x2APIC, this must stay below
+ * the xAPIC broadcast ID of 0xff. The limit applied to each VM is vmm_maxcpus,
+ * see vmm.c.
+ */
+#define	VM_MAXCPU	254
 #endif
 
 /*
