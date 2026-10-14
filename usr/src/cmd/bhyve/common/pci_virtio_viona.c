@@ -96,6 +96,24 @@
 #define	VIONA_DEFAULT_LINK_SPEED	1000 /* In Mb/s, so this is 1Gb/s */
 
 /*
+ * The features offered by the viona driver that this userspace component
+ * knows how to support. A newer driver may offer features outside of these
+ * under the same kernel API version, and some of those may need userland
+ * support that we don't have.
+ */
+#define	VIONA_S_KERNCAPS		\
+	(VIRTIO_NET_F_CSUM |		\
+	VIRTIO_NET_F_GUEST_CSUM |	\
+	VIRTIO_NET_F_GUEST_TSO4 |	\
+	VIRTIO_NET_F_GUEST_TSO6 |	\
+	VIRTIO_NET_F_HOST_TSO4 |	\
+	VIRTIO_NET_F_HOST_TSO6 |	\
+	VIRTIO_NET_F_MRG_RXBUF |	\
+	VIRTIO_F_NOTIFY_ON_EMPTY |	\
+	VIRTIO_RING_F_INDIRECT_DESC |	\
+	VIRTIO_RING_F_EVENT_IDX)
+
+/*
  * These macros work in terms of TX/RX queues only, which is always what we
  * need when interfacing with viona since the control queue is implemented
  * entirely in userspace.
@@ -1456,12 +1474,13 @@ static uint64_t
 pci_viona_get_hv_features(void *vsc, bool modern)
 {
 	struct pci_viona_softc *sc = vsc;
-	uint64_t value;
+	uint64_t value = 0;
 	int err;
 
 	err = ioctl(sc->vsc_vnafd, VNA_IOC_GET_FEATURES, &value);
 	if (err != 0)
 		WPRINTF("ioctl get host features returned err = %d", errno);
+	value &= VIONA_S_KERNCAPS;
 	/*
 	 * Supplementary device capabilities provided in the userspace
 	 * component.

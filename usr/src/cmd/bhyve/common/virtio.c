@@ -62,6 +62,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <pthread_np.h>
+#include <unistd.h>
 
 #include "bhyverun.h"
 #include "config.h"
@@ -954,6 +955,16 @@ vq_relchain(struct vqueue_info *vq, uint16_t idx, uint32_t iolen)
 	vq_relchain_prepare(vq, idx, iolen);
 	vq_relchain_publish(vq);
 }
+
+#ifndef __FreeBSD__
+volatile uint32_t vq_kick_delay_us = 0;
+
+void
+vq_kick_delay(void)
+{
+	(void) usleep(vq_kick_delay_us);
+}
+#endif
 
 /*
  * Driver has finished processing "available" chains and calling

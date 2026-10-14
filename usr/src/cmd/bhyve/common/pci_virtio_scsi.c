@@ -71,6 +71,13 @@
 
 #include "pci_virtio_scsi.h"
 
+#ifdef __FreeBSD__
+#define	VTSCSI_S_HOSTCAPS	VIRTIO_RING_F_INDIRECT_DESC
+#else
+#define	VTSCSI_S_HOSTCAPS	\
+	(VIRTIO_RING_F_INDIRECT_DESC | VIRTIO_RING_F_EVENT_IDX)
+#endif
+
 enum pci_vtscsi_walk {
 	PCI_VTSCSI_WALK_CONTINUE = 0,
 	PCI_VTSCSI_WALK_STOP,
@@ -143,8 +150,8 @@ static struct virtio_consts vtscsi_vi_consts = {
 	.vc_cfgread =		pci_vtscsi_cfgread,
 	.vc_cfgwrite =		pci_vtscsi_cfgwrite,
 	.vc_apply_features =	pci_vtscsi_neg_features,
-	.vc_hv_caps_legacy =	VIRTIO_RING_F_INDIRECT_DESC,
-	.vc_hv_caps_modern =	VIRTIO_RING_F_INDIRECT_DESC,
+	.vc_hv_caps_legacy =	VTSCSI_S_HOSTCAPS,
+	.vc_hv_caps_modern =	VTSCSI_S_HOSTCAPS,
 };
 
 static const struct pci_vtscsi_config vtscsi_config = {
@@ -937,6 +944,7 @@ pci_vtscsi_controlq_notify(void *vsc, struct vqueue_info *vq)
 	size_t bufsize;
 	int n;
 
+#ifdef __FreeBSD__
 	while (vq_has_descs(vq)) {
 		n = vq_getchain(vq, iov, numseg, &req);
 		assert(n >= 1 && n <= numseg);
@@ -950,6 +958,35 @@ pci_vtscsi_controlq_notify(void *vsc, struct vqueue_info *vq)
 		 */
 		vq_relchain(vq, req.idx, bufsize);
 	}
+#else
+	if (vq_ring_ready(vq) == 0) {
+		free(iov);
+		return;
+	}
+
+	/*
+	 * Suppress notifications while draining the ring. Once they are
+	 * enabled again, check the ring once more to pick up any descriptors
+	 * that the guest made available while they were suppressed.
+	 */
+	do {
+		vq_kick_disable(vq);
+		while (vq_has_descs(vq)) {
+			n = vq_getchain(vq, iov, numseg, &req);
+			assert(n >= 1 && n <= numseg);
+
+			bufsize = iov_to_buf(iov, n, &buf);
+			pci_vtscsi_control_handle(sc, buf, bufsize);
+			buf_to_iov((uint8_t *)buf, bufsize, iov, n);
+
+			/*
+			 * Release this chain and handle more
+			 */
+			vq_relchain(vq, req.idx, bufsize);
+		}
+		vq_kick_enable(vq);
+	} while (vq_has_descs(vq));
+#endif
 	vq_endchains(vq, 1);	/* Generate interrupt if appropriate. */
 	free(buf);
 	free(iov);
@@ -964,9 +1001,22 @@ pci_vtscsi_eventq_notify(void *vsc __unused, struct vqueue_info *vq)
 static void
 pci_vtscsi_requestq_notify(void *vsc, struct vqueue_info *vq)
 {
+#ifdef __FreeBSD__
 	while (vq_has_descs(vq)) {
 		pci_vtscsi_queue_request(vsc, vq);
 	}
+#else
+	if (vq_ring_ready(vq) == 0)
+		return;
+
+	/* See pci_vtscsi_controlq_notify(). */
+	do {
+		vq_kick_disable(vq);
+		while (vq_has_descs(vq))
+			pci_vtscsi_queue_request(vsc, vq);
+		vq_kick_enable(vq);
+	} while (vq_has_descs(vq));
+#endif
 }
 
 static int

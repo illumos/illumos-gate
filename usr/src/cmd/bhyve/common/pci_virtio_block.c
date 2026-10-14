@@ -102,12 +102,22 @@ _Static_assert(VTBLK_RINGSZ <= BLOCKIF_RING_MAX, "Each ring entry must be able t
 /*
  * Host capabilities
  */
+#ifdef __FreeBSD__
 #define	VTBLK_S_HOSTCAPS	\
 	(VTBLK_F_SEG_MAX  |						\
 	VTBLK_F_BLK_SIZE |						\
 	VTBLK_F_FLUSH    |						\
 	VTBLK_F_TOPOLOGY |						\
 	VIRTIO_RING_F_INDIRECT_DESC)	/* indirect descriptors */
+#else
+#define	VTBLK_S_HOSTCAPS	\
+	(VTBLK_F_SEG_MAX  |						\
+	VTBLK_F_BLK_SIZE |						\
+	VTBLK_F_FLUSH    |						\
+	VTBLK_F_TOPOLOGY |						\
+	VIRTIO_RING_F_INDIRECT_DESC |	/* indirect descriptors */	\
+	VIRTIO_RING_F_EVENT_IDX)	/* event indices */
+#endif
 
 /*
  * The current blockif_delete() interface only allows a single delete
@@ -470,8 +480,25 @@ pci_vtblk_notify(void *vsc, struct vqueue_info *vq)
 {
 	struct pci_vtblk_softc *sc = vsc;
 
+#ifdef __FreeBSD__
 	while (vq_has_descs(vq))
 		pci_vtblk_proc(sc, vq);
+#else
+	if (vq_ring_ready(vq) == 0)
+		return;
+
+	/*
+	 * Suppress notifications while draining the ring. Once they are
+	 * enabled again, check the ring once more to pick up any descriptors
+	 * that the guest made available while they were suppressed.
+	 */
+	do {
+		vq_kick_disable(vq);
+		while (vq_has_descs(vq))
+			pci_vtblk_proc(sc, vq);
+		vq_kick_enable(vq);
+	} while (vq_has_descs(vq));
+#endif
 }
 
 static void
