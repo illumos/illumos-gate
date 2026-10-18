@@ -960,6 +960,22 @@ zil_check_log_chain(dsl_pool_t *dp, dsl_dataset_t *ds, void *tx)
 }
 
 /*
+ * Returns true if an lwb failed and the txg that frees it hasn't synced.
+ * Until then, the on-disk log may end at the failed lwb, so the waiters of
+ * lwbs written since then must wait for txg sync.
+ */
+static boolean_t
+zil_lwb_error_pending(zilog_t *zilog)
+{
+	ASSERT(MUTEX_HELD(&zilog->zl_lock));
+	uint64_t etxg = zilog->zl_lwb_error_txg;
+
+	/* In a frozen pool, txgs after the freeze never reach disk. */
+	return (etxg > spa_last_synced_txg(zilog->zl_spa) ||
+	    etxg > spa_freeze_txg(zilog->zl_spa));
+}
+
+/*
  * When an itx is "skipped", this function is used to properly mark the
  * waiter as "done, and signal any thread(s) waiting on it. An itx can
  * be skipped (and not committed to an lwb) for a variety of reasons,
@@ -1144,6 +1160,28 @@ zil_lwb_flush_vdevs_done(zio_t *zio)
 		zilog->zl_commit_lr_seq = zilog->zl_lr_seq;
 	}
 
+	/*
+	 * Everything this lwb's contents depend on is in or before its tx,
+	 * and the error handling below relies on this.
+	 */
+	ASSERT3U(lwb->lwb_max_txg, <=, dmu_tx_get_txg(tx));
+
+	int error = zio->io_error;
+	if (error != 0) {
+		/*
+		 * This lwb may not be on disk, in which case the on-disk log
+		 * chain ends here.  If another lwb is issued, it will not
+		 * have a zio dependency on this lwb's flush zio, but it
+		 * still needs this lwb for the chain of log records.  Record
+		 * the txg that will eventually free this broken lwb; this
+		 * ensures that zil_commit() waits for it before returning.
+		 */
+		zilog->zl_lwb_error_txg = MAX(zilog->zl_lwb_error_txg,
+		    dmu_tx_get_txg(tx));
+	} else if (zil_lwb_error_pending(zilog)) {
+		error = SET_ERROR(EIO);
+	}
+
 	while ((zcw = list_head(&lwb->lwb_waiters)) != NULL) {
 		mutex_enter(&zcw->zcw_lock);
 
@@ -1167,7 +1205,7 @@ zil_lwb_flush_vdevs_done(zio_t *zio)
 		 * comment above the call to "zio_flush" for details.
 		 */
 
-		zcw->zcw_zio_error = zio->io_error;
+		zcw->zcw_zio_error = error;
 
 		ASSERT3B(zcw->zcw_done, ==, B_FALSE);
 		zcw->zcw_done = B_TRUE;
@@ -1514,10 +1552,17 @@ zil_lwb_write_issue(zilog_t *zilog, lwb_t *lwb)
 	error = zio_alloc_zil(spa, zilog->zl_os, txg, bp, &lwb->lwb_blk,
 	    zil_blksz, &slog);
 
+	/*
+	 * zil_read_log_block() accepts this lwb only if zc_next_blk has the
+	 * next block's checksum verifier, so set it even if the allocation
+	 * failed.  This lwb then ends the on-disk log, and
+	 * zil_commit_writer_stall() waits for it to be freed.
+	 */
+	bp->blk_cksum = lwb->lwb_blk.blk_cksum;
+	bp->blk_cksum.zc_word[ZIL_ZC_SEQ]++;
+
 	if (error == 0) {
 		ASSERT3U(bp->blk_birth, ==, txg);
-		bp->blk_cksum = lwb->lwb_blk.blk_cksum;
-		bp->blk_cksum.zc_word[ZIL_ZC_SEQ]++;
 
 		/*
 		 * Allocate a new log write block (lwb).
@@ -2142,9 +2187,14 @@ zil_prune_commit_list(zilog_t *zilog)
 			 * All of the itxs this waiter was waiting on
 			 * must have already completed (or there were
 			 * never any itx's for it to wait on), so it's
-			 * safe to skip this waiter and mark it done.
+			 * safe to skip this waiter and mark it done.  But
+			 * if a failed lwb ended the on-disk log, it must
+			 * wait for txg sync.
 			 */
-			zil_commit_waiter_skip(itx->itx_private);
+			zil_commit_waiter_t *zcw = itx->itx_private;
+			if (zil_lwb_error_pending(zilog))
+				zcw->zcw_zio_error = SET_ERROR(EIO);
+			zil_commit_waiter_skip(zcw);
 		} else {
 			zil_commit_waiter_link_lwb(itx->itx_private, last_lwb);
 			itx->itx_private = NULL;
