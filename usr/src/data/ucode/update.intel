@@ -9,6 +9,7 @@
 # source. A copy of the CDDL is also available via the Internet at
 # http://www.illumos.org/license/CDDL.
 
+# Copyright 2026 Oxide Computer Company
 # Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2019 Joyent, Inc.
 
@@ -21,9 +22,7 @@ function errexit {
 	exit 1
 }
 
-[[ -n "$1" && -f "$1" ]] || errexit "Syntax: $0 <path to microcode tar>"
-
-ucodetar="$1"
+ucode="$1"
 
 FW=platform/i86pc/ucode/GenuineIntel
 LINKSF=intel/Makefile.links
@@ -60,14 +59,26 @@ tmp=$(mktemp -d)
 mkdir $tmp/out || errexit "Failed to create temporary directory"
 trap 'rm -rf $tmp' EXIT
 
-# The distributed microcode archive uses GNU extensions
-$GTAR -C $tmp -xvf "$ucodetar"
+if [[ -f $ucode ]]; then
+	# The distributed microcode archive uses GNU extensions
+	$GTAR -C $tmp -xvf "$ucode"
+	path=$({ cd $tmp; echo Intel-Linux-Processor-Microcode-Data*; })
+	ver=${path##*-}
+	fullpath=$tmp/$path
+elif [[ -d $ucode/.git || -f $ucode/.git ]]; then
+	fullpath=$ucode
 
-path=$({ cd $tmp; echo Intel-Linux-Processor-Microcode-Data*; })
-ver=${path##*-}
+	# Dependent on commit message format.
+	ver=$(git -C $fullpath log -1 | \
+	    fgrep Release | awk '{print $1}' | awk -F- '{print $2}')
+else
+	rm -rf $tmp
+	errexit "Syntax: $0 <path to microcode tar, or git repo>"
+fi
+
 echo "** Updating to microcode version $ver"
 
-find $tmp/$path/intel-ucode*/ -type f | while read f; do
+find $fullpath/intel-ucode*/ -type f | while read f; do
 	echo "Converting $(basename $f)"
 	cp $f $tmp/intel-fw
 	$UCODEADM -i -R $tmp/out $tmp/intel-fw
@@ -81,7 +92,7 @@ rm -f $mf.tmp
 
 rm -f intel/*-*
 
-cp $tmp/$path/license intel/THIRDPARTYLICENSE
+cp $fullpath/license intel/THIRDPARTYLICENSE
 echo Intel Processor Microcode Data Files > intel/THIRDPARTYLICENSE.descrip
 
 rm -f $LINKSF
