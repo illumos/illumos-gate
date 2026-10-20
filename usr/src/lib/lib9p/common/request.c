@@ -849,7 +849,7 @@ l9p_dispatch_tstat(struct l9p_request *req)
 			req->lr_resp.rstat.stat.qid.type |= L9P_QTAUTH;
 
 		/* should we check req->lr_resp.rstat.qid.type L9P_QTDIR bit? */
-		if (req->lr_resp.rstat.stat.qid.type &= L9P_QTDIR)
+		if ((req->lr_resp.rstat.stat.qid.type & L9P_QTDIR) != 0)
 			l9p_fid_setdir(fid);
 		else
 			l9p_fid_unsetdir(fid);

@@ -746,6 +746,26 @@ static struct {
 	{ ACE_EVERYONE, 		L9P_ACEF_EVERYONE }
 };
 
+static struct {
+	uint32_t ace_mask;
+	uint32_t l9_mask;
+} ace_mask_tbl[] = {
+	{ ACE_READ_DATA,		L9P_ACE_READ_DATA },
+	{ ACE_WRITE_DATA,		L9P_ACE_WRITE_DATA },
+	{ ACE_APPEND_DATA,		L9P_ACE_APPEND_DATA },
+	{ ACE_READ_NAMED_ATTRS,		L9P_ACE_READ_NAMED_ATTRS },
+	{ ACE_WRITE_NAMED_ATTRS,	L9P_ACE_WRITE_NAMED_ATTRS },
+	{ ACE_EXECUTE,			L9P_ACE_EXECUTE },
+	{ ACE_DELETE_CHILD,		L9P_ACE_DELETE_CHILD },
+	{ ACE_READ_ATTRIBUTES,		L9P_ACE_READ_ATTRIBUTES },
+	{ ACE_WRITE_ATTRIBUTES,		L9P_ACE_WRITE_ATTRIBUTES },
+	{ ACE_DELETE,			L9P_ACE_DELETE },
+	{ ACE_READ_ACL,			L9P_ACE_READ_ACL },
+	{ ACE_WRITE_ACL,		L9P_ACE_WRITE_ACL },
+	{ ACE_WRITE_OWNER,		L9P_ACE_WRITE_OWNER },
+	{ ACE_SYNCHRONIZE,		L9P_ACE_SYNCHRONIZE }
+};
+
 struct l9p_acl *
 l9p_illumos_nfsv4acl_to_acl(acl_t *sysacl)
 {
@@ -791,16 +811,22 @@ l9p_illumos_nfsv4acl_to_acl(acl_t *sysacl)
 		}
 
 		/*
-		 * In a bit of good fortune, the bit values for ace_t masks
-		 * and l9p masks are the same (l9p does have WRITE_RETENTION
-		 * and WRITE_RETENTION_HOLD which aren't used -- we're also
-		 * going ace_t->l9p so they dont matter in this context).
+		 * The low bits of the ace_t and l9p masks are the same, but
+		 * DELETE and above differ so translate each one.
 		 */
-		l9ace->ace_mask = ent->a_access_mask;
+		l9ace->ace_mask = 0;
+		for (j = 0; j < ARRAY_SIZE(ace_mask_tbl); j++) {
+			if ((ent->a_access_mask & ace_mask_tbl[j].ace_mask) !=
+			    0) {
+				l9ace->ace_mask |= ace_mask_tbl[j].l9_mask;
+			}
+		}
+
 		l9ace->ace_idsize = sizeof (ent->a_who);
-		memcpy(l9acl->acl_aces, &ent->a_who, sizeof (ent->a_who));
+		memcpy(l9ace->ace_idbytes, &ent->a_who, sizeof (ent->a_who));
 	}
 
+	l9acl->acl_nace = sysacl->acl_cnt;
 	return (l9acl);
 }
 #endif
