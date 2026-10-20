@@ -15,6 +15,7 @@
 
 /*
  * Copyright (c) 2017, Datto, Inc. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_SYS_ZIO_CRYPT_H
@@ -135,7 +136,8 @@ int zio_crypt_do_indirect_mac_checksum_abd(boolean_t generate, abd_t *abd,
 int zio_crypt_do_hmac(zio_crypt_key_t *key, uint8_t *data, uint_t datalen,
     uint8_t *digestbuf, uint_t digestlen);
 int zio_crypt_do_objset_hmacs(zio_crypt_key_t *key, void *data, uint_t datalen,
-    boolean_t byteswap, uint8_t *portable_mac, uint8_t *local_mac);
+    boolean_t byteswap, boolean_t zero_incomplete, uint8_t *portable_mac,
+    uint8_t *local_mac);
 int zio_do_crypt_data(boolean_t encrypt, zio_crypt_key_t *key,
     dmu_object_type_t ot, boolean_t byteswap, uint8_t *salt, uint8_t *iv,
     uint8_t *mac, uint_t datalen, uint8_t *plainbuf, uint8_t *cipherbuf,

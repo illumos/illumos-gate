@@ -15,6 +15,7 @@
 
 /*
  * Copyright (c) 2017, Datto, Inc. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/zio_crypt.h>
@@ -1134,7 +1135,8 @@ error:
 /* ARGSUSED */
 int
 zio_crypt_do_objset_hmacs(zio_crypt_key_t *key, void *data, uint_t datalen,
-    boolean_t should_bswap, uint8_t *portable_mac, uint8_t *local_mac)
+    boolean_t should_bswap, boolean_t zero_incomplete, uint8_t *portable_mac,
+    uint8_t *local_mac)
 {
 	int ret;
 	crypto_mechanism_t mech;
@@ -1212,10 +1214,28 @@ zio_crypt_do_objset_hmacs(zio_crypt_key_t *key, void *data, uint_t datalen,
 	bcopy(raw_portable_mac, portable_mac, ZIO_OBJSET_MAC_LEN);
 
 	/*
+	 * Until dmu_objset_id_quota_upgrade_cb() or
+	 * dmu_objset_userspace_upgrade_cb() sets
+	 * OBJSET_FLAG_USERACCOUNTING_COMPLETE, the stored local MAC may be
+	 * zeroed (by a raw receive) or cover accounting that is being
+	 * recomputed. With zero_incomplete, used when verifying, the local
+	 * MAC is then zeroed, and spa_do_crypt_objset_mac_abd() accepts any
+	 * stored value. When generating, the local MAC still covers the
+	 * accounting dnodes, so that releases that don't check the flag can
+	 * read the objset.
+	 */
+	intval = osp->os_flags;
+	if (should_bswap)
+		intval = BSWAP_64(intval);
+	boolean_t uacct_incomplete = zero_incomplete &&
+	    !(intval & OBJSET_FLAG_USERACCOUNTING_COMPLETE);
+
+	/*
 	 * The local MAC protects the user, group and project accounting.
 	 * If these objects are not present, the local MAC is zeroed out.
 	 */
-	if ((datalen >= OBJSET_PHYS_SIZE_V3 &&
+	if (uacct_incomplete ||
+	    (datalen >= OBJSET_PHYS_SIZE_V3 &&
 	    osp->os_userused_dnode.dn_type == DMU_OT_NONE &&
 	    osp->os_groupused_dnode.dn_type == DMU_OT_NONE &&
 	    osp->os_projectused_dnode.dn_type == DMU_OT_NONE) ||

@@ -26,6 +26,7 @@
  * Copyright (c) 2013, Joyent, Inc. All rights reserved.
  * Copyright (c) 2014 Spectra Logic Corporation, All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/zfs_context.h>
@@ -1078,6 +1079,48 @@ dbuf_read_verify_dnode_crypt(dmu_buf_impl_t *db, uint32_t flags)
 		err = 0;
 
 	DB_DNODE_EXIT(db);
+
+	return (err);
+}
+
+/*
+ * Make the bonus buffer in dn_phys readable: dnode_hold() reads blocks of
+ * dnodes raw, so in an encrypted objset they may still be encrypted.
+ */
+int
+dnode_decrypt_bonus(dnode_t *dn)
+{
+	objset_t *os = dn->dn_objset;
+	dmu_buf_impl_t *dndb = dn->dn_dbuf;
+	zbookmark_phys_t zb;
+	int err;
+
+	if (!os->os_encrypted || os->os_raw_receive || dndb == NULL)
+		return (0);
+
+	mutex_enter(&dndb->db_mtx);
+
+	/*
+	 * The block can't be decrypted in place while it is being written
+	 * out, since the write uses the same buffer.
+	 */
+	for (;;) {
+		dbuf_dirty_record_t *dr = dndb->db_data_pending;
+
+		if (dndb->db_buf == NULL || !arc_is_encrypted(dndb->db_buf)) {
+			mutex_exit(&dndb->db_mtx);
+			return (0);
+		}
+		if (dr == NULL || dr->dt.dl.dr_data != dndb->db_buf)
+			break;
+		cv_wait(&dndb->db_changed, &dndb->db_mtx);
+	}
+
+	SET_BOOKMARK(&zb, dmu_objset_id(os),
+	    DMU_META_DNODE_OBJECT, 0, dndb->db_blkid);
+	err = arc_untransform(dndb->db_buf, os->os_spa, &zb, B_TRUE);
+
+	mutex_exit(&dndb->db_mtx);
 
 	return (err);
 }
@@ -2184,6 +2227,34 @@ dmu_buf_set_crypt_params(dmu_buf_t *db_fake, boolean_t byteorder,
 	bcopy(salt, dr->dt.dl.dr_salt, ZIO_DATA_SALT_LEN);
 	bcopy(iv, dr->dt.dl.dr_iv, ZIO_DATA_IV_LEN);
 	bcopy(mac, dr->dt.dl.dr_mac, ZIO_DATA_MAC_LEN);
+}
+
+/*
+ * This function is effectively the same as dmu_buf_will_dirty(), but
+ * indicates the caller expects raw encrypted data in the db, which will not
+ * be modified by the caller.  Changes that the block's MAC doesn't cover,
+ * such as non-portable dnode flags, can then be made without the key.  This
+ * is only used for blocks of dnodes, during raw receive.
+ */
+int
+dmu_buf_will_rewrite_raw(dmu_buf_t *db_fake, dmu_tx_t *tx)
+{
+	dmu_buf_impl_t *db = (dmu_buf_impl_t *)db_fake;
+	boolean_t byteorder;
+	uint8_t salt[ZIO_DATA_SALT_LEN];
+	uint8_t iv[ZIO_DATA_IV_LEN];
+	uint8_t mac[ZIO_DATA_MAC_LEN];
+
+	mutex_enter(&db->db_mtx);
+	if (db->db_buf == NULL || !arc_is_encrypted(db->db_buf)) {
+		mutex_exit(&db->db_mtx);
+		return (SET_ERROR(EIO));
+	}
+	arc_get_raw_params(db->db_buf, &byteorder, salt, iv, mac);
+	mutex_exit(&db->db_mtx);
+
+	dmu_buf_set_crypt_params(db_fake, byteorder, salt, iv, mac, tx);
+	return (0);
 }
 
 #pragma weak dmu_buf_fill_done = dbuf_fill_done

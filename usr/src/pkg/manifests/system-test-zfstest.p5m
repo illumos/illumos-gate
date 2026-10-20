@@ -3173,6 +3173,15 @@ file path=opt/zfs-tests/tests/functional/userquota/userquota_common.kshlib \
 file path=opt/zfs-tests/tests/functional/userquota/userspace_001_pos mode=0555
 file path=opt/zfs-tests/tests/functional/userquota/userspace_002_pos mode=0555
 file path=opt/zfs-tests/tests/functional/userquota/userspace_003_pos mode=0555
+file path=opt/zfs-tests/tests/functional/userquota/userspace_encrypted mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/userquota/userspace_encrypted_incomplete_mac \
+    mode=0555
+file path=opt/zfs-tests/tests/functional/userquota/userspace_send_encrypted \
+    mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/userquota/userspace_send_encrypted_changes \
+    mode=0555
 dir  path=opt/zfs-tests/tests/functional/utils_test
 file path=opt/zfs-tests/tests/functional/utils_test/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/utils_test/setup mode=0555

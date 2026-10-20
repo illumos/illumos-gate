@@ -26,6 +26,7 @@
  * Copyright 2014 HybridCluster. All rights reserved.
  * Copyright 2016 RackTop Systems.
  * Copyright (c) 2014 Integros [integros.com]
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/dmu.h>
@@ -2297,6 +2298,143 @@ receive_process_record(struct receive_writer_arg *rwa,
 }
 
 /*
+ * A raw receive can't account for the objects that it changes or frees,
+ * because their owners and sizes are encrypted.  If the dataset already has
+ * user accounting, it is now incorrect, so we throw all of it away.  This
+ * leaves the dataset as a full raw receive does, with no accounting objects
+ * and no accounted flags. When it is next mounted, the accounting will be
+ * rebuilt.
+ *
+ * Each block of dnodes that has accounted flags is rewritten raw with the
+ * crypt params it already has, since its MAC doesn't cover the flags, and
+ * dnode_sync() clears the flags of the dnodes dirtied in a raw receive.
+ * The accounting objects are then freed like any other object.
+ *
+ * If this is interrupted, the receive is not complete, so the dataset can't
+ * be mounted; a resumed receive does it again.
+ */
+static int
+receive_reset_accounting(objset_t *os)
+{
+	dnode_t *mdn = DMU_META_DNODE(os);
+	int epbs = mdn->dn_datablkshift - DNODE_SHIFT;
+	dmu_tx_t *tx = NULL;
+	uint64_t txblk = 0;
+	uint64_t obj = 0;
+	uint64_t txg;
+	int err;
+
+	if (DMU_USERUSED_DNODE(os) == NULL ||
+	    DMU_USERUSED_DNODE(os)->dn_type == DMU_OT_NONE)
+		return (0);
+
+	zfs_dbgmsg("resetting user accounting of objset %llu after raw "
+	    "receive", (u_longlong_t)dmu_objset_id(os));
+
+	/*
+	 * The dnode blocks' cached crypt params must be the ones on disk.
+	 * The receive's txs are all committed, so they are in txgs no later
+	 * than the one a new tx is assigned to.
+	 */
+	tx = dmu_tx_create(os);
+	err = dmu_tx_assign(tx, TXG_WAIT | TXG_NOTHROTTLE);
+	if (err != 0) {
+		dmu_tx_abort(tx);
+		return (err);
+	}
+	txg = dmu_tx_get_txg(tx);
+	dmu_tx_commit(tx);
+	tx = NULL;
+	txg_wait_synced(dmu_objset_pool(os), txg);
+
+	while ((err = dmu_object_next(os, &obj, B_FALSE, 0)) == 0) {
+		dnode_t *dn;
+		uint64_t flags;
+
+		if (tx != NULL && (obj >> epbs) != txblk) {
+			dmu_tx_commit(tx);
+			tx = NULL;
+		}
+		if (issig(JUSTLOOKING) && issig(FORREAL)) {
+			err = SET_ERROR(EINTR);
+			break;
+		}
+
+		err = dnode_hold(os, obj, FTAG, &dn);
+		if (err != 0)
+			break;
+		mutex_enter(&dn->dn_mtx);
+		flags = dn->dn_phys->dn_flags;
+		mutex_exit(&dn->dn_mtx);
+		if (!(flags & (DNODE_FLAG_USERUSED_ACCOUNTED |
+		    DNODE_FLAG_USEROBJUSED_ACCOUNTED))) {
+			dnode_rele(dn, FTAG);
+			continue;
+		}
+
+		if (tx == NULL) {
+			dmu_buf_t *db;
+
+			tx = dmu_tx_create(os);
+			dmu_tx_hold_bonus(tx, obj);
+			err = dmu_tx_assign(tx, TXG_WAIT);
+			if (err != 0) {
+				dmu_tx_abort(tx);
+				tx = NULL;
+				dnode_rele(dn, FTAG);
+				break;
+			}
+			txblk = obj >> epbs;
+			err = dmu_buf_hold_by_dnode(mdn,
+			    txblk << mdn->dn_datablkshift, FTAG, &db,
+			    DMU_READ_NO_PREFETCH | DMU_READ_NO_DECRYPT);
+			if (err == 0) {
+				err = dmu_buf_will_rewrite_raw(db, tx);
+				dmu_buf_rele(db, FTAG);
+			}
+			if (err != 0) {
+				dnode_rele(dn, FTAG);
+				break;
+			}
+		}
+		dnode_setdirty(dn, tx);
+		dnode_rele(dn, FTAG);
+	}
+	if (tx != NULL)
+		dmu_tx_commit(tx);
+	if (err != ESRCH)
+		return (err);
+
+	dnode_t *used[] = { DMU_USERUSED_DNODE(os), DMU_GROUPUSED_DNODE(os),
+	    DMU_PROJECTUSED_DNODE(os) };
+
+	tx = dmu_tx_create(os);
+	for (int i = 0; i < ARRAY_SIZE(used); i++) {
+		if (used[i] != NULL && used[i]->dn_type != DMU_OT_NONE) {
+			dmu_tx_hold_free_by_dnode(tx, used[i], 0,
+			    DMU_OBJECT_END);
+		}
+	}
+	dmu_tx_mark_netfree(tx);
+	err = dmu_tx_assign(tx, TXG_WAIT);
+	if (err != 0) {
+		dmu_tx_abort(tx);
+		return (err);
+	}
+	for (int i = 0; i < ARRAY_SIZE(used); i++) {
+		if (used[i] != NULL && used[i]->dn_type != DMU_OT_NONE) {
+			dnode_free_range(used[i], 0, DMU_OBJECT_END, tx);
+			dnode_free(used[i], tx);
+		}
+	}
+	os->os_flags &= ~(OBJSET_FLAG_USERACCOUNTING_COMPLETE |
+	    OBJSET_FLAG_USEROBJACCOUNTING_COMPLETE |
+	    OBJSET_FLAG_PROJECTQUOTA_COMPLETE);
+	dmu_tx_commit(tx);
+	return (0);
+}
+
+/*
  * dmu_recv_stream's worker thread; pull records off the queue, and then call
  * receive_process_record  When we're done, signal the main thread and exit.
  */
@@ -2412,6 +2550,12 @@ dmu_recv_stream(dmu_recv_cookie_t *drc, vnode_t *vp, offset_t *voffp,
 	ASSERT0(ra.os->os_encrypted &&
 	    (featureflags & DMU_BACKUP_FEATURE_EMBED_DATA));
 
+	/*
+	 * Set this before the key payload creates a new dataset's objset,
+	 * so that user accounting is never enabled for it.
+	 */
+	ra.os->os_raw_receive = drc->drc_raw;
+
 	/* if this stream is dedup'ed, set up the avl tree for guid mapping */
 	if (featureflags & DMU_BACKUP_FEATURE_DEDUP) {
 		minor_t minor;
@@ -2513,7 +2657,6 @@ dmu_recv_stream(dmu_recv_cookie_t *drc, vnode_t *vp, offset_t *voffp,
 	rwa.resumable = drc->drc_resumable;
 	rwa.raw = drc->drc_raw;
 	rwa.spill = drc->drc_spill;
-	rwa.os->os_raw_receive = drc->drc_raw;
 
 	(void) thread_create(NULL, 0, receive_writer_thread, &rwa, 0, curproc,
 	    TS_RUN, minclsyspri);
@@ -2605,6 +2748,8 @@ dmu_recv_stream(dmu_recv_cookie_t *drc, vnode_t *vp, offset_t *voffp,
 	bqueue_destroy(&rwa.q);
 	if (err == 0)
 		err = rwa.err;
+	if (err == 0 && drc->drc_raw)
+		err = receive_reset_accounting(rwa.os);
 
 out:
 	/*

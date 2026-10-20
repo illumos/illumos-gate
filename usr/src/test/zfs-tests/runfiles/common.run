@@ -846,6 +846,8 @@ tests = [
     'userquota_010_pos', 'userquota_011_pos', 'userquota_012_neg',
     'userquota_013_pos',
     'userspace_001_pos', 'userspace_002_pos', 'userspace_003_pos',
+    'userspace_encrypted', 'userspace_encrypted_incomplete_mac',
+    'userspace_send_encrypted', 'userspace_send_encrypted_changes',
     'groupspace_001_pos', 'groupspace_002_pos', 'groupspace_003_pos' ]
 tags = ['functional', 'userquota']
 

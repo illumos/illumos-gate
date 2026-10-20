@@ -29,6 +29,7 @@
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright (c) 2017 Open-E, Inc. All Rights Reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -784,11 +785,15 @@ dmu_objset_own(const char *name, dmu_objset_type_t type,
 	 * speed up pool import times and to keep this txg reserved
 	 * completely for recovery work.
 	 */
-	if ((dmu_objset_userobjspace_upgradable(*osp) ||
-	    dmu_objset_projectquota_upgradable(*osp)) &&
-	    !readonly && !dp->dp_spa->spa_claiming &&
-	    (ds->ds_dir->dd_crypto_obj == 0 || decrypt))
-		dmu_objset_id_quota_upgrade(*osp);
+	if (!readonly && !dp->dp_spa->spa_claiming &&
+	    (ds->ds_dir->dd_crypto_obj == 0 || decrypt)) {
+		if (dmu_objset_userobjspace_upgradable(*osp) ||
+		    dmu_objset_projectquota_upgradable(*osp)) {
+			dmu_objset_id_quota_upgrade(*osp);
+		} else if (dmu_objset_userused_enabled(*osp)) {
+			dmu_objset_userspace_upgrade(*osp);
+		}
+	}
 
 	dsl_pool_rele(dp, FTAG);
 	return (0);
@@ -1072,11 +1077,10 @@ dmu_objset_create_impl_dnstats(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 	os->os_phys->os_type = type;
 
 	/*
-	 * Enable user accounting if it is enabled and this is not an
-	 * encrypted receive.
+	 * Enable user accounting if it is enabled and this is not a raw
+	 * receive.
 	 */
-	if (dmu_objset_userused_enabled(os) &&
-	    (!os->os_encrypted || !dmu_objset_is_receiving(os))) {
+	if (dmu_objset_userused_enabled(os) && !os->os_raw_receive) {
 		os->os_phys->os_flags |= OBJSET_FLAG_USERACCOUNTING_COMPLETE;
 		if (dmu_objset_userobjused_enabled(os)) {
 			ds->ds_feature_activation[
@@ -1663,7 +1667,6 @@ sync_dnodes_task(void *arg)
 	kmem_free(sda, sizeof (*sda));
 }
 
-
 /* called from dsl */
 void
 dmu_objset_sync(objset_t *os, zio_t *pio, dmu_tx_t *tx)
@@ -1744,8 +1747,7 @@ dmu_objset_sync(objset_t *os, zio_t *pio, dmu_tx_t *tx)
 
 	txgoff = tx->tx_txg & TXG_MASK;
 
-	if (dmu_objset_userused_enabled(os) &&
-	    (!os->os_encrypted || !dmu_objset_is_receiving(os))) {
+	if (dmu_objset_userused_enabled(os) && !os->os_raw_receive) {
 		/*
 		 * We must create the list here because it uses the
 		 * dn_dirty_link[] of this txg.  But it may already
@@ -2078,7 +2080,7 @@ dmu_objset_do_userquota_updates(objset_t *os, dmu_tx_t *tx)
 	 * for the duration of claiming and this txg should only be
 	 * used for recovery.
 	 */
-	if (os->os_encrypted && dmu_objset_is_receiving(os))
+	if (os->os_raw_receive)
 		return;
 
 	if (tx->tx_txg <= os->os_spa->spa_claim_max_txg)
@@ -2175,20 +2177,25 @@ dmu_objset_userquota_get_ids(dnode_t *dn, boolean_t before, dmu_tx_t *tx)
 	 * receives cannot update the user accounting info because the
 	 * user ids and the sizes are encrypted. To guarantee that we
 	 * never end up with bad user accounting, we simply disable it
-	 * during raw receives. We also disable this for normal receives
-	 * so that an incremental raw receive may be done on top of an
-	 * existing non-raw receive.
+	 * during raw receives, and receive_reset_accounting() discards
+	 * any existing accounting.
 	 */
-	if (os->os_encrypted && dmu_objset_is_receiving(os))
+	if (os->os_raw_receive)
 		return;
 
 	if (before && (flags & (DN_ID_CHKED_BONUS|DN_ID_OLD_EXIST|
 	    DN_ID_CHKED_SPILL)))
 		return;
 
-	if (before && dn->dn_bonuslen != 0)
+	if (before && dn->dn_bonuslen != 0) {
+		if (dnode_decrypt_bonus(dn) != 0) {
+			mutex_enter(&dn->dn_mtx);
+			dn->dn_id_flags |= DN_ID_CHKED_BONUS;
+			mutex_exit(&dn->dn_mtx);
+			return;
+		}
 		data = DN_BONUS(dn->dn_phys);
-	else if (!before && dn->dn_bonuslen != 0) {
+	} else if (!before && dn->dn_bonuslen != 0) {
 		if (dn->dn_bonus) {
 			db = dn->dn_bonus;
 			mutex_enter(&db->db_mtx);
@@ -2347,8 +2354,8 @@ dmu_objset_space_upgrade(objset_t *os)
 	return (0);
 }
 
-int
-dmu_objset_userspace_upgrade(objset_t *os)
+static int
+dmu_objset_userspace_upgrade_cb(objset_t *os)
 {
 	int err = 0;
 
@@ -2368,6 +2375,12 @@ dmu_objset_userspace_upgrade(objset_t *os)
 	return (0);
 }
 
+void
+dmu_objset_userspace_upgrade(objset_t *os)
+{
+	dmu_objset_upgrade(os, dmu_objset_userspace_upgrade_cb);
+}
+
 static int
 dmu_objset_id_quota_upgrade_cb(objset_t *os)
 {
@@ -2378,14 +2391,15 @@ dmu_objset_id_quota_upgrade_cb(objset_t *os)
 		return (0);
 	if (dmu_objset_is_snapshot(os))
 		return (SET_ERROR(EINVAL));
-	if (!dmu_objset_userobjused_enabled(os))
+	if (!dmu_objset_userused_enabled(os))
 		return (SET_ERROR(ENOTSUP));
 	if (!dmu_objset_projectquota_enabled(os) &&
 	    dmu_objset_userobjspace_present(os))
 		return (SET_ERROR(ENOTSUP));
 
-	dmu_objset_ds(os)->ds_feature_activation[
-	    SPA_FEATURE_USEROBJ_ACCOUNTING] = (void *)(uintptr_t)B_TRUE;
+	if (dmu_objset_userobjused_enabled(os))
+		dmu_objset_ds(os)->ds_feature_activation[
+		    SPA_FEATURE_USEROBJ_ACCOUNTING] = (void *)(uintptr_t)B_TRUE;
 	if (dmu_objset_projectquota_enabled(os))
 		dmu_objset_ds(os)->ds_feature_activation[
 		    SPA_FEATURE_PROJECT_QUOTA] = (void *)(uintptr_t)B_TRUE;
@@ -2394,7 +2408,9 @@ dmu_objset_id_quota_upgrade_cb(objset_t *os)
 	if (err)
 		return (err);
 
-	os->os_flags |= OBJSET_FLAG_USEROBJACCOUNTING_COMPLETE;
+	os->os_flags |= OBJSET_FLAG_USERACCOUNTING_COMPLETE;
+	if (dmu_objset_userobjused_enabled(os))
+		os->os_flags |= OBJSET_FLAG_USEROBJACCOUNTING_COMPLETE;
 	if (dmu_objset_projectquota_enabled(os))
 		os->os_flags |= OBJSET_FLAG_PROJECTQUOTA_COMPLETE;
 
