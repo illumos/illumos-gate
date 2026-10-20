@@ -440,7 +440,7 @@ natinfo_t *ni;
 				port = np->in_pnext;
 			} else {
 				port = ipf_random() % (ntohs(np->in_pmax) -
-						       ntohs(np->in_pmin));
+						       ntohs(np->in_pmin) + 1);
 				port += ntohs(np->in_pmin);
 			}
 			port = htons(port);
