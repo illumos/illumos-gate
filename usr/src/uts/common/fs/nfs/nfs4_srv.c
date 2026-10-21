@@ -328,233 +328,382 @@ static struct rfsv4disp rfsv4disptab[] = {
 	/*
 	 * NFS VERSION 4
 	 */
-
 	/* RFS_NULL = 0 */
-	{rfs4_op_illegal, nullfree, 0},
-
+	[0] = {
+		.dis_proc = rfs4_op_illegal,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
 	/* UNUSED = 1 */
-	{rfs4_op_illegal, nullfree, 0},
-
+	[1] = {
+		.dis_proc = rfs4_op_illegal,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
 	/* UNUSED = 2 */
-	{rfs4_op_illegal, nullfree, 0},
-
-	/* OP_ACCESS = 3 */
-	{rfs4_op_access, nullfree, OP_IDEMPOTENT},
-
-	/* OP_CLOSE = 4 */
-	{rfs4_op_close, nullfree, OP_CLEAR_STATEID},
-
-	/* OP_COMMIT = 5 */
-	{rfs4_op_commit, nullfree, OP_IDEMPOTENT},
-
-	/* OP_CREATE = 6 */
-	{rfs4_op_create, nullfree, OP_CLEAR_STATEID},
-
-	/* OP_DELEGPURGE = 7 */
-	{rfs4_op_delegpurge, nullfree, 0},
-
-	/* OP_DELEGRETURN = 8 */
-	{rfs4_op_delegreturn, nullfree, 0},
-
-	/* OP_GETATTR = 9 */
-	{rfs4_op_getattr, rfs4_op_getattr_free, OP_IDEMPOTENT},
-
-	/* OP_GETFH = 10 */
-	{rfs4_op_getfh, rfs4_op_getfh_free, OP_IDEMPOTENT},
-
-	/* OP_LINK = 11 */
-	{rfs4_op_link, nullfree, 0},
-
-	/* OP_LOCK = 12 */
-	{rfs4_op_lock, lock_denied_free, 0},
-
-	/* OP_LOCKT = 13 */
-	{rfs4_op_lockt, lock_denied_free, 0},
-
-	/* OP_LOCKU = 14 */
-	{rfs4_op_locku, nullfree, 0},
-
-	/* OP_LOOKUP = 15 */
-	{rfs4_op_lookup, nullfree, (OP_IDEMPOTENT | OP_CLEAR_STATEID)},
-
-	/* OP_LOOKUPP = 16 */
-	{rfs4_op_lookupp, nullfree, (OP_IDEMPOTENT | OP_CLEAR_STATEID)},
-
-	/* OP_NVERIFY = 17 */
-	{rfs4_op_nverify, nullfree, OP_IDEMPOTENT},
-
-	/* OP_OPEN = 18 */
-	{rfs4_op_open, rfs4_free_reply, 0},
-
-	/* OP_OPENATTR = 19 */
-	{rfs4_op_openattr, nullfree, 0},
-
-	/* OP_OPEN_CONFIRM = 20 */
-	{rfs4_op_open_confirm, nullfree, 0},
-
-	/* OP_OPEN_DOWNGRADE = 21 */
-	{rfs4_op_open_downgrade, nullfree, 0},
-
-	/* OP_OPEN_PUTFH = 22 */
-	{rfs4_op_putfh, nullfree, (OP_IDEMPOTENT | OP_CLEAR_STATEID)},
-
-	/* OP_PUTPUBFH = 23 */
-	{rfs4_op_putpubfh, nullfree, OP_IDEMPOTENT},
-
-	/* OP_PUTROOTFH = 24 */
-	{rfs4_op_putrootfh, nullfree, (OP_IDEMPOTENT | OP_CLEAR_STATEID)},
-
-	/* OP_READ = 25 */
-	{rfs4_op_read, rfs4_op_read_free, OP_IDEMPOTENT},
-
-	/* OP_READDIR = 26 */
-	{rfs4_op_readdir, rfs4_op_readdir_free, OP_IDEMPOTENT},
-
-	/* OP_READLINK = 27 */
-	{rfs4_op_readlink, rfs4_op_readlink_free, OP_IDEMPOTENT},
-
-	/* OP_REMOVE = 28 */
-	{rfs4_op_remove, nullfree, 0},
-
-	/* OP_RENAME = 29 */
-	{rfs4_op_rename, nullfree, 0},
-
-	/* OP_RENEW = 30 */
-	{rfs4_op_renew, nullfree, 0},
-
-	/* OP_RESTOREFH = 31 */
-	{rfs4_op_restorefh, nullfree, OP_IDEMPOTENT},
-
-	/* OP_SAVEFH = 32 */
-	{rfs4_op_savefh, nullfree, OP_IDEMPOTENT},
-
-	/* OP_SECINFO = 33 */
-	{rfs4_op_secinfo, rfs4_op_secinfo_free, 0},
-
-	/* OP_SETATTR = 34 */
-	{rfs4_op_setattr, nullfree, 0},
-
-	/* OP_SETCLIENTID = 35 */
-	{rfs4_op_setclientid, nullfree, 0},
-
-	/* OP_SETCLIENTID_CONFIRM = 36 */
-	{rfs4_op_setclientid_confirm, nullfree, 0},
-
-	/* OP_VERIFY = 37 */
-	{rfs4_op_verify, nullfree, OP_IDEMPOTENT},
-
-	/* OP_WRITE = 38 */
-	{rfs4_op_write, nullfree, 0},
-
-	/* OP_RELEASE_LOCKOWNER = 39 */
-	{rfs4_op_release_lockowner, nullfree, 0},
+	[2] = {
+		.dis_proc = rfs4_op_illegal,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_ACCESS] = {
+		.dis_proc = rfs4_op_access,
+		.dis_resfree = nullfree,
+		.dis_flags = OP_IDEMPOTENT
+	},
+	[OP_CLOSE] = {
+		.dis_proc = rfs4_op_close,
+		.dis_resfree = nullfree,
+		.dis_flags = OP_CLEAR_STATEID
+	},
+	[OP_COMMIT] = {
+		.dis_proc = rfs4_op_commit,
+		.dis_resfree = nullfree,
+		.dis_flags = OP_IDEMPOTENT
+	},
+	[OP_CREATE] = {
+		.dis_proc = rfs4_op_create,
+		.dis_resfree = nullfree,
+		.dis_flags = OP_CLEAR_STATEID
+	},
+	[OP_DELEGPURGE] = {
+		.dis_proc = rfs4_op_delegpurge,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_DELEGRETURN] = {
+		.dis_proc = rfs4_op_delegreturn,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_GETATTR] = {
+		.dis_proc = rfs4_op_getattr,
+		.dis_resfree = rfs4_op_getattr_free,
+		.dis_flags = OP_IDEMPOTENT
+	},
+	[OP_GETFH] = {
+		.dis_proc = rfs4_op_getfh,
+		.dis_resfree = rfs4_op_getfh_free,
+		.dis_flags = OP_IDEMPOTENT
+	},
+	[OP_LINK] = {
+		.dis_proc = rfs4_op_link,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_LOCK] = {
+		.dis_proc = rfs4_op_lock,
+		.dis_resfree = lock_denied_free,
+		.dis_flags = 0
+	},
+	[OP_LOCKT] = {
+		.dis_proc = rfs4_op_lockt,
+		.dis_resfree = lock_denied_free,
+		.dis_flags = 0
+	},
+	[OP_LOCKU] = {
+		.dis_proc = rfs4_op_locku,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_LOOKUP] = {
+		.dis_proc = rfs4_op_lookup,
+		.dis_resfree = nullfree,
+		.dis_flags = (OP_IDEMPOTENT | OP_CLEAR_STATEID)
+	},
+	[OP_LOOKUPP] = {
+		.dis_proc = rfs4_op_lookupp,
+		.dis_resfree = nullfree,
+		.dis_flags = (OP_IDEMPOTENT | OP_CLEAR_STATEID)
+	},
+	[OP_NVERIFY] = {
+		.dis_proc = rfs4_op_nverify,
+		.dis_resfree = nullfree,
+		.dis_flags = OP_IDEMPOTENT
+	},
+	[OP_OPEN] = {
+		.dis_proc = rfs4_op_open,
+		.dis_resfree = rfs4_free_reply,
+		.dis_flags = 0
+	},
+	[OP_OPENATTR] = {
+		.dis_proc = rfs4_op_openattr,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_OPEN_CONFIRM] = {
+		.dis_proc = rfs4_op_open_confirm,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_OPEN_DOWNGRADE] = {
+		.dis_proc = rfs4_op_open_downgrade,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_PUTFH] = {
+		.dis_proc = rfs4_op_putfh,
+		.dis_resfree = nullfree,
+		.dis_flags = (OP_IDEMPOTENT | OP_CLEAR_STATEID)
+	},
+	[OP_PUTPUBFH] = {
+		.dis_proc = rfs4_op_putpubfh,
+		.dis_resfree = nullfree,
+		.dis_flags = OP_IDEMPOTENT
+	},
+	[OP_PUTROOTFH] = {
+		.dis_proc = rfs4_op_putrootfh,
+		.dis_resfree = nullfree,
+		.dis_flags = (OP_IDEMPOTENT | OP_CLEAR_STATEID)
+	},
+	[OP_READ] = {
+		.dis_proc = rfs4_op_read,
+		.dis_resfree = rfs4_op_read_free,
+		.dis_flags = OP_IDEMPOTENT
+	},
+	[OP_READDIR] = {
+		.dis_proc = rfs4_op_readdir,
+		.dis_resfree = rfs4_op_readdir_free,
+		.dis_flags = OP_IDEMPOTENT
+	},
+	[OP_READLINK] = {
+		.dis_proc = rfs4_op_readlink,
+		.dis_resfree = rfs4_op_readlink_free,
+		.dis_flags = OP_IDEMPOTENT
+	},
+	[OP_REMOVE] = {
+		.dis_proc = rfs4_op_remove,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_RENAME] = {
+		.dis_proc = rfs4_op_rename,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_RENEW] = {
+		.dis_proc = rfs4_op_renew,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_RESTOREFH] = {
+		.dis_proc = rfs4_op_restorefh,
+		.dis_resfree = nullfree,
+		.dis_flags = OP_IDEMPOTENT
+	},
+	[OP_SAVEFH] = {
+		.dis_proc = rfs4_op_savefh,
+		.dis_resfree = nullfree,
+		.dis_flags = OP_IDEMPOTENT
+	},
+	[OP_SECINFO] = {
+		.dis_proc = rfs4_op_secinfo,
+		.dis_resfree = rfs4_op_secinfo_free,
+		.dis_flags = 0
+	},
+	[OP_SETATTR] = {
+		.dis_proc = rfs4_op_setattr,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_SETCLIENTID] = {
+		.dis_proc = rfs4_op_setclientid,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_SETCLIENTID_CONFIRM] = {
+		.dis_proc = rfs4_op_setclientid_confirm,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_VERIFY] = {
+		.dis_proc = rfs4_op_verify,
+		.dis_resfree = nullfree,
+		.dis_flags = OP_IDEMPOTENT
+	},
+	[OP_WRITE] = {
+		.dis_proc = rfs4_op_write,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_RELEASE_LOCKOWNER] = {
+		.dis_proc = rfs4_op_release_lockowner,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
 
 	/*
 	 * NFSv4.1 operations
 	 */
-
-	/* OP_BACKCHANNEL_CTL = 40 */
-	{rfs4x_op_backchannel_ctl,  nullfree,  0},
-
-	/*  OP_BIND_CONN_TO_SESSION = 41 */
-	{rfs4x_op_bind_conn_to_session,  nullfree,  0},
-
-	/* OP_EXCHANGE_ID  = 42 */
-	{rfs4x_op_exchange_id,  rfs4x_exchange_id_free,  0},
-
-	/* OP_CREATE_SESSION = 43 */
-	{rfs4x_op_create_session,  nullfree,  0},
-
-	/* OP_DESTROY_SESSION = 44 */
-	{rfs4x_op_destroy_session,  nullfree,  0},
-
-	/* OP_FREE_STATEID = 45 */
-	{rfs4x_op_free_stateid,  nullfree,  0},
-
-	/* OP_GET_DIR_DELEGATION = 46 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_GETDEVICEINFO = 47 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_GETDEVICELIST = 48 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_LAYOUTCOMMIT = 49 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_LAYOUTGET = 50 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_LAYOUTRETURN = 51 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_SECINFO_NO_NAME = 52 */
-	{rfs4x_op_secinfo_noname, rfs4_op_secinfo_free, 0},
-
-	/* OP_SEQUENCE = 53 */
-	{rfs4x_op_sequence,  nullfree,  0},
-
-	/* OP_SET_SSV = 54 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_TEST_STATEID = 55 */
-	{rfs4x_op_test_stateid, rfs4_op_test_stateid_free,  0},
-
-	/* OP_WANT_DELEGATION = 56 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_DESTROY_CLIENTID = 57 */
-	{rfs4x_op_destroy_clientid,  nullfree,  0},
-
-	/* OP_RECLAIM_COMPLETE = 58 */
-	{rfs4x_op_reclaim_complete,  nullfree,  0},
+	[OP_BACKCHANNEL_CTL] = {
+		.dis_proc = rfs4x_op_backchannel_ctl,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_BIND_CONN_TO_SESSION] = {
+		.dis_proc = rfs4x_op_bind_conn_to_session,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_EXCHANGE_ID] = {
+		.dis_proc = rfs4x_op_exchange_id,
+		.dis_resfree = rfs4x_exchange_id_free,
+		.dis_flags = 0
+	},
+	[OP_CREATE_SESSION] = {
+		.dis_proc = rfs4x_op_create_session,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_DESTROY_SESSION] = {
+		.dis_proc = rfs4x_op_destroy_session,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_FREE_STATEID] = {
+		.dis_proc = rfs4x_op_free_stateid,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_GET_DIR_DELEGATION] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_GETDEVICEINFO] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_GETDEVICELIST] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_LAYOUTCOMMIT] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_LAYOUTGET] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_LAYOUTRETURN] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_SECINFO_NO_NAME] = {
+		.dis_proc = rfs4x_op_secinfo_noname,
+		.dis_resfree = rfs4_op_secinfo_free,
+		.dis_flags = 0
+	},
+	[OP_SEQUENCE] = {
+		.dis_proc = rfs4x_op_sequence,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_SET_SSV] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_TEST_STATEID] = {
+		.dis_proc = rfs4x_op_test_stateid,
+		.dis_resfree = rfs4_op_test_stateid_free,
+		.dis_flags = 0
+	},
+	[OP_WANT_DELEGATION] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_DESTROY_CLIENTID] = {
+		.dis_proc = rfs4x_op_destroy_clientid,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_RECLAIM_COMPLETE] = {
+		.dis_proc = rfs4x_op_reclaim_complete,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
 
 	/*
 	 * NFSv4.2 operations
 	 */
-	/* OP_ALLOCATE = 59 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_COPY = 60 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_COPY_NOTIFY = 61 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_DEALLOCATE = 62 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_IO_ADVISE = 63 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_LAYOUTERROR = 64 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_LAYOUTSTATS = 65 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_OFFLOAD_CANCEL = 66 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_OFFLOAD_STATUS = 67 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_READ_PLUS = 68 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_SEEK = 69 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_WRITE_SAME = 70 */
-	{rfs4_op_notsup,  nullfree,  0},
-
-	/* OP_CLONE = 71 */
-	{rfs4_op_notsup,  nullfree,  0},
-
+	[OP_ALLOCATE] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_COPY] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_COPY_NOTIFY] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_DEALLOCATE] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_IO_ADVISE] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_LAYOUTERROR] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_LAYOUTSTATS] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_OFFLOAD_CANCEL] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_OFFLOAD_STATUS] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_READ_PLUS] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_SEEK] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_WRITE_SAME] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
+	[OP_CLONE] = {
+		.dis_proc = rfs4_op_notsup,
+		.dis_resfree = nullfree,
+		.dis_flags = 0
+	},
 };
 
-static uint_t rfsv4disp_cnt = sizeof (rfsv4disptab) / sizeof (rfsv4disptab[0]);
+#define	rfsv4disp_cnt	ARRAY_SIZE(rfsv4disptab)
+
+CTASSERT(rfsv4disp_cnt == LAST_NFS4_OP + 1);
 
 #define	OP_ILLEGAL_IDX (rfsv4disp_cnt)
 
@@ -757,6 +906,14 @@ void
 rfs4_srvrinit(void)
 {
 	extern void rfs4_attr_init();
+	uint_t i;
+
+	/*
+	 * All entries in rfsv4disptab must be initialised.
+	 */
+	for (i = 0; i < rfsv4disp_cnt; i++) {
+		VERIFY(rfsv4disptab[i].dis_proc && rfsv4disptab[i].dis_resfree);
+	}
 
 	rfs4_attr_init();
 
