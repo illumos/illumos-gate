@@ -32,6 +32,7 @@
 #include <sys/systm.h>
 
 #include <nfs/nfs.h>
+#include <nfs/nfs4.h>
 #include <nfs/nfs4_kprot.h>
 
 /*
@@ -438,6 +439,19 @@ static const kstat_named_t rfsproccnt_v4_tmpl[] = {
 	{ "want_delegation",	KSTAT_DATA_UINT64 },
 	{ "destroy_clientid",	KSTAT_DATA_UINT64 },
 	{ "reclaim_complete",	KSTAT_DATA_UINT64 },
+	{ "allocate",	KSTAT_DATA_UINT64 },
+	{ "copy",	KSTAT_DATA_UINT64 },
+	{ "copy_notify",	KSTAT_DATA_UINT64 },
+	{ "deallocate",	KSTAT_DATA_UINT64 },
+	{ "io_advise",	KSTAT_DATA_UINT64 },
+	{ "layouterror",	KSTAT_DATA_UINT64 },
+	{ "layoutstats",	KSTAT_DATA_UINT64 },
+	{ "offload_cancel",	KSTAT_DATA_UINT64 },
+	{ "offload_status",	KSTAT_DATA_UINT64 },
+	{ "read_plus",	KSTAT_DATA_UINT64 },
+	{ "seek",	KSTAT_DATA_UINT64 },
+	{ "write_same",	KSTAT_DATA_UINT64 },
+	{ "clone",	KSTAT_DATA_UINT64 },
 	{ "illegal",	KSTAT_DATA_UINT64 },
 };
 
@@ -519,6 +533,8 @@ nfsstat_zone_fini(zoneid_t zoneid, void *data)
 
 	kmem_free(nfs_stats_ptr, sizeof (*nfs_stats_ptr));
 }
+
+CTASSERT(ARRAY_SIZE(rfsproccnt_v4_tmpl) == LAST_NFS4_OP + 2);
 
 void
 rfs_stat_zone_init(nfs_globals_t *ng)
