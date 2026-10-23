@@ -25,6 +25,7 @@
  * Copyright 2015 Garrett D'Amore <garrett@damore.org>
  * Copyright 2016 Joyent, Inc.
  * Copyright 2023 Oxide Computer Company
+ * Copyright 2026 Chelsio Communications
  */
 
 #ifndef	_SYS_MAC_ETHER_H
@@ -234,7 +235,13 @@ typedef enum {
 	ETHER_MEDIA_400GBASE_CR4,
 	ETHER_MEDIA_400GBASE_SR4,
 	ETHER_MEDIA_400GBASE_DR4,
-	ETHER_MEDIA_400GBASE_FR4
+	ETHER_MEDIA_400GBASE_FR4,
+
+	/*
+	 * 400G based on 50 GbE
+	 */
+	ETHER_MEDIA_400GBASE_CR8,
+	ETHER_MEDIA_400GBASE_SR8
 } mac_ether_media_t;
 
 #ifdef	_KERNEL

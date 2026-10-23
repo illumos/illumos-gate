@@ -14,8 +14,9 @@
 .\" Copyright 2023 Oxide Computer Company
 .\" Copyright 2023 Jason King
 .\" Copyright 2023 Peter Tribble
+.\" Copyright 2026 Chelsio Communications
 .\"
-.Dd July 17, 2023
+.Dd Oct 19, 2026
 .Dt MAC 9E
 .Os
 .Sh NAME
@@ -1593,6 +1594,15 @@ Utilizes wavelength multiplexing as the electrical interface is eight 50
 Gbit/s signals and generally based upon a QSFP-DD connector.
 The maximum fiber length is 40km.
 Defined by 802.3cn.
+.It Dv ETHER_MEDIA_400GBASE_CR8
+400 Gbit/s Ethernet utilizing an eight lane passive copper twinaxial
+cable.
+Defined by the 25/50 Gigabit Ethernet Consortium.
+.It Dv ETHER_MEDIA_400GBASE_SR8
+400 Gbit/s Ethernet based upon using eight pairs of multi-mode fiber,
+each operating at 50 Gbit/s, with one fiber in the pair being used for
+transmit and the other for receive.
+Defined by 802.3cm.
 .It Dv ETHER_MEDIA_400GAUI_8
 400 Gbit/s signalling utilizing eight lanes each operating at 50 Gbit/s.
 Used for chip-to-chip and chip-to-module connections.
