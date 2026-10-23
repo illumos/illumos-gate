@@ -28,6 +28,7 @@
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 # Copyright 2020 Joyent, Inc.
 # Copyright 2024 MNX Cloud, Inc.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -134,4 +135,39 @@ function is_swap_inuse
 	swap -l | awk 'NR > 1 { print $1 }' | \
 	    grep "^$device\$" > /dev/null 2>&1
 	return $?
+}
+
+#
+# Issue DKIOCFREE on a device for one or more extents, each given as a
+# start and a length in bytes.  dfl_offset is the -o argument, or 0.  If
+# the ioctl fails, exit with its errno.
+#
+# Usage: dkiocfree [-o offset] <device> <start> <length> [<start> <length>]...
+#
+function dkiocfree
+{
+	typeset offset=0 opt
+
+	OPTIND=1
+	while getopts "o:" opt; do
+		case $opt in
+		o)	offset=$OPTARG ;;
+		*)	log_fail "dkiocfree: invalid option" ;;
+		esac
+	done
+	shift $((OPTIND - 1))
+
+	python -c '
+import fcntl, os, struct, sys
+DKIOCFREE = (0x04 << 8) | 50
+fd = os.open(sys.argv[1], os.O_RDWR)
+exts = [int(a) for a in sys.argv[3:]]
+# dfl_flags, dfl_num_exts, dfl_offset, dfl_exts[].{dfle_start,dfle_length}
+dfl = struct.pack("=%dQ" % (3 + len(exts)), 0, len(exts) // 2,
+    int(sys.argv[2]), *exts)
+try:
+	fcntl.ioctl(fd, DKIOCFREE, dfl)
+except OSError as e:
+	sys.exit(e.errno)
+' "$1" $offset "${@:2}"
 }

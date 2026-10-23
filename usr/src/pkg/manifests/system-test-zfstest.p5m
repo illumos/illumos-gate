@@ -3243,6 +3243,8 @@ file path=opt/zfs-tests/tests/functional/zvol/zvol_dump/zvol_dump_raidz \
 dir  path=opt/zfs-tests/tests/functional/zvol/zvol_misc
 file path=opt/zfs-tests/tests/functional/zvol/zvol_misc/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/zvol/zvol_misc/setup mode=0555
+file path=opt/zfs-tests/tests/functional/zvol/zvol_misc/zvol_free_offset \
+    mode=0555
 file path=opt/zfs-tests/tests/functional/zvol/zvol_misc/zvol_misc_001_neg \
     mode=0555
 file path=opt/zfs-tests/tests/functional/zvol/zvol_misc/zvol_misc_002_pos \
