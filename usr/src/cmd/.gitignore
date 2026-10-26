@@ -611,6 +611,8 @@ ed/ed.xpg6
 
 eeprom/i386/eeprom
 
+efibootmgr/efibootmgr
+
 eject/eject
 
 emul64ioctl/emul64ioctl

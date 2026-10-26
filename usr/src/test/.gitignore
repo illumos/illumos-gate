@@ -126,6 +126,9 @@ elf-tests/tests/tls/amd64/ie/amd64-ie-test
 elf-tests/tests/tls/amd64/ld/amd64-ld-test
 elf-tests/tests/tls/i386/ld/i386-ld-test
 
+header-tests/tests/c-symbols/setup
+header-tests/tests/cxx-symbols/setup
+
 i2c-tests/i2csimd/i2csimd
 
 libc-tests/tests/catopen/catopen

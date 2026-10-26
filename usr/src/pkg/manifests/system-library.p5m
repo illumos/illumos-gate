@@ -134,8 +134,8 @@ file path=lib/$(ARCH64)/libdoor.so.1
 file path=lib/$(ARCH64)/libdwarf.so.1
 link path=lib/$(ARCH64)/libefi.so target=libefi.so.1
 file path=lib/$(ARCH64)/libefi.so.1
-link path=lib/$(ARCH64)/libefivar.so target=libefivar.so.1
-file path=lib/$(ARCH64)/libefivar.so.1
+$(i386_ONLY)link path=lib/$(ARCH64)/libefivar.so target=libefivar.so.1
+$(i386_ONLY)file path=lib/$(ARCH64)/libefivar.so.1
 link path=lib/$(ARCH64)/libelf.so target=libelf.so.1
 file path=lib/$(ARCH64)/libelf.so.1
 file path=lib/$(ARCH64)/libfakekernel.so.1
@@ -510,9 +510,9 @@ link path=usr/lib/$(ARCH64)/libdwarf.so.1 \
 link path=usr/lib/$(ARCH64)/libefi.so target=../../../lib/$(ARCH64)/libefi.so.1
 link path=usr/lib/$(ARCH64)/libefi.so.1 \
     target=../../../lib/$(ARCH64)/libefi.so.1
-link path=usr/lib/$(ARCH64)/libefivar.so \
+$(i386_ONLY)link path=usr/lib/$(ARCH64)/libefivar.so \
     target=../../../lib/$(ARCH64)/libefivar.so.1
-link path=usr/lib/$(ARCH64)/libefivar.so.1 \
+$(i386_ONLY)link path=usr/lib/$(ARCH64)/libefivar.so.1 \
     target=../../../lib/$(ARCH64)/libefivar.so.1
 link path=usr/lib/$(ARCH64)/libelf.so target=../../../lib/$(ARCH64)/libelf.so.1
 link path=usr/lib/$(ARCH64)/libelf.so.1 \
