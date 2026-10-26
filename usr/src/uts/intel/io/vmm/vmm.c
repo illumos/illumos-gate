@@ -42,6 +42,7 @@
  * Copyright 2018 Joyent, Inc.
  * Copyright 2026 Oxide Computer Company
  * Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 #include <sys/cdefs.h>
@@ -1718,6 +1719,23 @@ vm_service_mmio_write(struct vcpu *vcpu, uint64_t gpa, uint64_t wval, int wsize)
 	return (err);
 }
 
+/*
+ * Finish up a successfully emulated instruction.  If the emulation injected an
+ * exception (all of which request that the instruction be restarted), %rip
+ * must be left pointing at the faulting instruction rather than advanced past
+ * it.  Any pending exception is consumed on VM entry, so one which is present
+ * now must have been injected by the emulation.
+ */
+static void
+vm_complete_emul(struct vcpu *vcpu)
+{
+	if (VM_INTINFO_PENDING(vcpu->exc_pending)) {
+		vie_reset(vcpu->vie_ctx);
+	} else {
+		vie_advance_pc(vcpu->vie_ctx, &vcpu->nextrip);
+	}
+}
+
 static int
 vm_handle_mmio_emul(struct vcpu *vcpu)
 {
@@ -1793,7 +1811,7 @@ repeat:
 		}
 	} else if (error == 0) {
 		/* Update %rip now that instruction has been emulated */
-		vie_advance_pc(vie, &vcpu->nextrip);
+		vm_complete_emul(vcpu);
 	}
 	return (error);
 }
@@ -1843,7 +1861,7 @@ repeat:
 		return (-1);
 	}
 
-	vie_advance_pc(vie, &vcpu->nextrip);
+	vm_complete_emul(vcpu);
 	return (0);
 }
 
@@ -1889,7 +1907,7 @@ vm_handle_inst_emul(struct vcpu *vcpu)
 		vie_fallback_exitinfo(vie, vme);
 	} else {
 		/* Update %rip now that instruction has been emulated */
-		vie_advance_pc(vie, &vcpu->nextrip);
+		vm_complete_emul(vcpu);
 	}
 	return (error);
 }
@@ -2397,7 +2415,7 @@ vm_entry_actions(struct vcpu *vcpu, const struct vm_entry *entry,
 		if (err == 0) {
 			err = vie_emulate_mmio(vie, vcpu);
 			if (err == 0) {
-				vie_advance_pc(vie, &vcpu->nextrip);
+				vm_complete_emul(vcpu);
 			} else if (err < 0) {
 				vie_exitinfo(vie, vme);
 			} else if (err == EAGAIN) {
@@ -2416,7 +2434,7 @@ vm_entry_actions(struct vcpu *vcpu, const struct vm_entry *entry,
 		if (err == 0) {
 			err = vie_emulate_inout(vie, vcpu);
 			if (err == 0) {
-				vie_advance_pc(vie, &vcpu->nextrip);
+				vm_complete_emul(vcpu);
 			} else if (err < 0) {
 				vie_exitinfo(vie, vme);
 			} else if (err == EAGAIN) {

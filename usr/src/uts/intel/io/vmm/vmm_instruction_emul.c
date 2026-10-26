@@ -43,6 +43,7 @@
  * Copyright 2018 Joyent, Inc.
  * Copyright 2026 Oxide Computer Company
  * Copyright 2022 OmniOS Community Edition (OmniOSce) Association.
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 #include <sys/cdefs.h>
@@ -612,32 +613,36 @@ vie_update_register(struct vcpu *vcpu, enum vm_reg_name reg,
 }
 
 /*
- * Check if this instruction needs to repeat and set the emulation's status
- * appropriately.
+ * Check if this instruction has iterations remaining, given its count register.
  */
-static int
-vie_needs_repeat(uint64_t rcx, struct vie *vie)
+static bool
+vie_needs_repeat(uint64_t rcx, const struct vie *vie)
 {
 	/*
 	 * The count register may be %rcx, %ecx, or %cx depending on the address
 	 * size of the instruction.
 	 */
-	if ((rcx & vie_size2mask(vie->addrsize)) == 0) {
-		vie->status &= ~VIES_REPEAT;
-		return (false);
-	}
-
-	vie->status |= VIES_REPEAT;
-
-	return (true);
+	return ((rcx & vie_size2mask(vie->addrsize)) != 0);
 }
 
+/*
+ * Called after an iteration of a rep-prefixed instruction has completed, to
+ * set the emulation's status according to whether further iterations remain.
+ *
+ * VIES_REPEAT is only set here, once an iteration has completed, rather than
+ * when first checking the count register.  An iteration which instead ends by
+ * injecting a fault into the guest leaves the instruction to be restarted
+ * (see vm_complete_emul()), which discards this status.
+ */
 static int
 vie_repeat(uint64_t rcx, struct vie *vie)
 {
 	if (!vie_needs_repeat(rcx, vie)) {
+		vie->status &= ~VIES_REPEAT;
 		return (0);
 	}
+
+	vie->status |= VIES_REPEAT;
 
 	/*
 	 * Clear out any cached operation values so the repeated instruction can
@@ -1236,11 +1241,13 @@ vie_emulate_movs(struct vie *vie, struct vcpu *vcpu, uint64_t gpa)
 		/*
 		 * 'vm_copy_setup()' is expected to fail for cases (3) and (4)
 		 * if 'srcaddr' is in the mmio space.
+		 * Discard the vm_copy_setup() error for 'srcaddr'.
 		 */
 
 		if (vie_get_gla(vie, vcpu, opsize, vie->addrsize,
 		    PROT_WRITE, VM_REG_GUEST_ES, VM_REG_GUEST_RDI,
 		    &dstaddr) != 0) {
+			error = 0;
 			goto done;
 		}
 
