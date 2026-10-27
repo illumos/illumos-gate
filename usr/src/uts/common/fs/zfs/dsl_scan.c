@@ -1899,6 +1899,7 @@ dsl_scan_visitbp(blkptr_t *bp, const zbookmark_phys_t *zb,
 {
 	dsl_pool_t *dp = scn->scn_dp;
 	blkptr_t *bp_toread = NULL;
+	spa_feature_t f;
 
 	if (dsl_scan_check_suspend(scn, zb))
 		return;
@@ -1925,6 +1926,17 @@ dsl_scan_visitbp(blkptr_t *bp, const zbookmark_phys_t *zb,
 		scn->scn_holes_this_txg++;
 		return;
 	}
+
+	/*
+	 * Check if this block contradicts any filesystem flags.
+	 */
+	f = SPA_FEATURE_LARGE_BLOCKS;
+	if (BP_GET_LSIZE(bp) > SPA_OLD_MAXBLOCKSIZE)
+		ASSERT(dsl_dataset_feature_is_active(ds, f));
+
+	f = zio_checksum_to_feature(BP_GET_CHECKSUM(bp));
+	if (f != SPA_FEATURE_NONE)
+		ASSERT(dsl_dataset_feature_is_active(ds, f));
 
 	if (bp->blk_birth <= scn->scn_phys.scn_cur_min_txg) {
 		scn->scn_lt_min_this_txg++;

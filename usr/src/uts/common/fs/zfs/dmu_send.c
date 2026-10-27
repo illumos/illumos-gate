@@ -292,6 +292,7 @@ dump_write(dmu_sendarg_t *dsp, dmu_object_type_t type, uint64_t object,
 
 	/* only set the compression fields if the buf is compressed or raw */
 	if (raw || lsize != psize) {
+		ASSERT(bp != NULL);
 		ASSERT(!BP_IS_EMBEDDED(bp));
 		ASSERT3S(psize, >, 0);
 

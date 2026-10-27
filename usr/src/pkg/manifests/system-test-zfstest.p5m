@@ -3016,6 +3016,7 @@ file path=opt/zfs-tests/tests/functional/rsend/send_encrypted_truncated_files \
 file path=opt/zfs-tests/tests/functional/rsend/send_freeobjects mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send_holds mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send_mixed_raw mode=0555
+file path=opt/zfs-tests/tests/functional/rsend/send_raw_large_blocks mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send_realloc_dnode_size mode=0555
 file path=opt/zfs-tests/tests/functional/rsend/send_realloc_encrypted_files \
     mode=0555
