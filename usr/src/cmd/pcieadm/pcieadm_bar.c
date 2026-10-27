@@ -619,7 +619,7 @@ pcieadm_bar_read(pcieadm_t *pcip, int argc, char *argv[])
 		(void) printf("0x%x\n", *(uint32_t *)buf);
 		break;
 	case 8:
-		(void) printf("0x%x\n", *(uint64_t *)buf);
+		(void) printf("0x%" PRIx64 "\n", *(uint64_t *)buf);
 		break;
 	default:
 		abort();
