@@ -49,14 +49,14 @@ function cleanup
 	if is_pool_suspended $TESTPOOL; then
 		zpool clear $TESTPOOL >/dev/null 2>&1 &
 		pid=$!
-		if ! wait_for 60 is_done $pid; then
+		if ! wait_for 60 is_process_exited $pid; then
 			log_note "zpool clear in cleanup hung"
 			stuck=1
 		fi
 	fi
 	for pid in $clear_pid $sync_pid; do
 		kill $pid 2>/dev/null
-		if ! wait_for 60 is_done $pid; then
+		if ! wait_for 60 is_process_exited $pid; then
 			log_note "process $pid did not exit"
 			stuck=1
 		fi
@@ -69,22 +69,6 @@ function cleanup
 	fi
 	rm -f $SRC
 	[[ -n $throttle ]] && set_tunable32 zio_dva_throttle_enabled $throttle
-}
-
-function is_done # pid
-{
-	! kill -0 $1 2>/dev/null
-}
-
-function wait_for # seconds command ...
-{
-	typeset -i tries=$1
-	shift
-	while ((tries-- > 0)); do
-		"$@" && return 0
-		sleep 1
-	done
-	return 1
 }
 
 log_assert "Write errors injected on a top-level vdev do not trip the" \
@@ -115,10 +99,10 @@ wait_for 60 is_pool_suspended $TESTPOOL || log_fail "pool did not suspend"
 log_must zinject -c all
 zpool clear $TESTPOOL &
 clear_pid=$!
-wait_for 60 is_done $clear_pid || log_fail "zpool clear hung"
+wait_for 60 is_process_exited $clear_pid || log_fail "zpool clear hung"
 wait $clear_pid || log_fail "zpool clear failed"
 clear_pid=""
-wait_for 60 is_done $sync_pid || log_fail "txg sync hung"
+wait_for 60 is_process_exited $sync_pid || log_fail "txg sync hung"
 wait $sync_pid || log_fail "txg sync failed"
 sync_pid=""
 is_pool_suspended $TESTPOOL && log_fail "pool still suspended"

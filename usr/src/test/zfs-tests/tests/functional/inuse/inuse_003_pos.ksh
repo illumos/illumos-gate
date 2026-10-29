@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -57,7 +58,7 @@ function cleanup
 	poolexists $TESTPOOL2 && destroy_pool $TESTPOOL2
 
 	log_note "Kill off ufsdump process if still running"
-	kill -0 $PIDUFSDUMP > /dev/null 2>&1 && \
+	is_process_running $PIDUFSDUMP && \
 	    log_must kill -9 $PIDUFSDUMP  > /dev/null 2>&1
 	#
 	# Note: It would appear that ufsdump spawns a number of processes
@@ -70,7 +71,7 @@ function cleanup
 	done
 
 	log_note "Kill off ufsrestore process if still running"
-	kill -0 $PIDUFSRESTORE > /dev/null 2>&1 && \
+	is_process_running $PIDUFSRESTORE && \
 	    log_must kill -9 $PIDUFSRESTORE  > /dev/null 2>&1
 
 	ismounted $UFSMP ufs && log_must umount $UFSMP

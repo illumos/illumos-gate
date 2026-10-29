@@ -565,7 +565,7 @@ tags = ['functional', 'async_destroy']
 [tests/functional/fault]
 tests = ['zpool_status_-s', 'auto_spare_sorted_001_pos',
     'objset_open_prop_error', 'zil_get_data_error', 'write_error_throttle',
-    'deadlist_read_error']
+    'deadlist_read_error', 'suspend_resume_reexecute']
 tags = ['functional', 'fault']
 
 [tests/functional/grow_pool]

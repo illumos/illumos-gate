@@ -2983,6 +2983,38 @@ function arcstat_quiescence_echo # stat
 }
 
 #
+# Return 0 if the process <pid> is still running, 1 otherwise.  A zombie
+# that has not been reaped yet counts as running.
+#
+function is_process_running #pid
+{
+	kill -0 $1 2>/dev/null
+}
+
+#
+# Return 0 if the process <pid> has exited, 1 otherwise.
+#
+function is_process_exited #pid
+{
+	! kill -0 $1 2>/dev/null
+}
+
+#
+# Run <command> with its arguments once a second until it succeeds, for up to
+# <seconds> seconds.  Return 0 if it succeeded, 1 if it never did.
+#
+function wait_for #seconds command [args ...]
+{
+	typeset -i tries=$1
+	shift
+	until "$@"; do
+		((tries-- > 0)) || return 1
+		sleep 1
+	done
+	return 0
+}
+
+#
 # Compute SHA256 digest for given file or stdin if no file given.
 # Note: file path must not contain spaces
 #
