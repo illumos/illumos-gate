@@ -5794,14 +5794,23 @@ ztest_fault_inject(ztest_ds_t *zd, uint64_t id)
 			 * grab a reference on the dataset which may cause
 			 * dmu_objset_destroy() to fail with EBUSY thus
 			 * leaving the dataset in an inconsistent state.
+			 *
+			 * Offlining a slog also resets the logs of every
+			 * dataset (spa_reset_logs()), so hold the
+			 * ztest_vdev_lock to keep ztest_zil_remount() from
+			 * closing a ZIL while it is being suspended.
 			 */
-			if (islog)
+			if (islog) {
+				mutex_enter(&ztest_vdev_lock);
 				rw_enter(&ztest_name_lock, RW_WRITER);
+			}
 
 			VERIFY(vdev_offline(spa, guid0, flags) != EBUSY);
 
-			if (islog)
+			if (islog) {
 				rw_exit(&ztest_name_lock);
+				mutex_exit(&ztest_vdev_lock);
+			}
 		} else {
 			/*
 			 * Ideally we would like to be able to randomly
