@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <stdbool.h>
@@ -29,6 +29,7 @@
 #include <sys/vmm_dev.h>
 #include <vmmapi.h>
 
+#include "common.h"
 #include "in_guest.h"
 
 enum test_state {
@@ -168,10 +169,18 @@ main(int argc, char *argv[])
 	 * Since the kernel behavior varies based on hardware features, detect
 	 * DecodeAssist here as well to check for what we expect the kernel to
 	 * do on this processor.
+	 *
+	 * DecodeAssist is an AMD feature. VMX always provides the port, size
+	 * and direction of `ins` and `outs` in the exit qualification, so
+	 * Intel processors behave as though they have it.
 	 */
-	uint_t regs[4];
-	do_cpuid(0x8000000a, regs);
-	const bool have_decodeassist = (regs[3] & (1 << 7)) != 0;
+	bool have_decodeassist = true;
+	if (cpu_vendor_amd()) {
+		uint_t regs[4];
+
+		do_cpuid(0x8000000a, regs);
+		have_decodeassist = (regs[3] & (1 << 7)) != 0;
+	}
 
 	if ((vcpu = vm_vcpu_open(ctx, 0)) == NULL) {
 		test_fail_errno(errno, "Could not open vcpu0");
