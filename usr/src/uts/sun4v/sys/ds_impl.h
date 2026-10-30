@@ -477,7 +477,6 @@ void ds_port_common_fini(ds_port_t *port);
 /* misc utilities */
 ds_vers_check_t ds_vers_isvalid(ds_ver_t *vers, int nvers);
 char *ds_errno_to_str(int ds_errno, char *ebuf);
-char *ds_strdup(char *str);
 boolean_t negotiate_version(int num_versions, ds_ver_t *sup_versionsp,
     uint16_t req_major, uint16_t *new_majorp, uint16_t *new_minorp);
 

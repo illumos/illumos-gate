@@ -38,6 +38,8 @@
 #include <sys/sysmacros.h>
 #include <sys/ksynch.h>
 #include <sys/kidmap.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 #include <rpcsvc/idmap_prot.h>
 #include "kidmap_priv.h"
 
@@ -114,18 +116,6 @@ kidmap_purge_sid2pid_cache(idmap_sid2pid_cache_t *cache, size_t limit);
 
 static void
 kidmap_purge_pid2sid_cache(idmap_pid2sid_cache_t *cache, size_t limit);
-
-
-static char *
-kidmap_strdup(const char *s)
-{
-	int	len = strlen(s) + 1;
-	char	*ret = kmem_alloc(len, KM_SLEEP);
-
-	bcopy(s, ret, len);
-	return (ret);
-}
-
 
 static int
 kidmap_compare_sid(const void *p1, const void *p2)
@@ -996,7 +986,7 @@ kidmap_find_sid_prefix(const char *sid_prefix) {
 	}
 
 	new = kmem_alloc(sizeof (sid_prefix_node_t), KM_SLEEP);
-	new->sid_prefix = kidmap_strdup(sid_prefix);
+	new->sid_prefix = strdup(sid_prefix);
 	avl_insert(&kidmap_sid_prefix_store->tree, new, where);
 	rw_exit(&kidmap_sid_prefix_store->lock);
 

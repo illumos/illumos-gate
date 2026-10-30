@@ -41,6 +41,8 @@
  * the ds.c module, which is common to both Solaris and VBSC (linux).
  */
 
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 #include <sys/modctl.h>
 #include <sys/ksynch.h>
 #include <sys/taskq.h>
@@ -361,7 +363,7 @@ ds_set_my_dom_hdl_name(ds_domain_hdl_t dhdl, char *name)
 		ds_my_domain_name = NULL;
 	}
 	if (name != NULL) {
-		ds_my_domain_name = ds_strdup(name);
+		ds_my_domain_name = strdup(name);
 	}
 }
 
@@ -776,7 +778,7 @@ ds_add_port(uint64_t port_id, uint64_t ldc_id, ds_domain_hdl_t dhdl,
 			newport->domain_hdl = dhdl;
 		}
 		if (newport->domain_name == NULL && dom_name != NULL) {
-			newport->domain_name = ds_strdup(dom_name);
+			newport->domain_name = strdup(dom_name);
 		}
 		return (EBUSY);
 	}
@@ -786,7 +788,7 @@ ds_add_port(uint64_t port_id, uint64_t ldc_id, ds_domain_hdl_t dhdl,
 	newport->ldc.id = ldc_id;
 	newport->domain_hdl = dhdl;
 	if (dom_name) {
-		newport->domain_name = ds_strdup(dom_name);
+		newport->domain_name = strdup(dom_name);
 	} else
 		newport->domain_name = NULL;
 	ds_port_common_init(newport);

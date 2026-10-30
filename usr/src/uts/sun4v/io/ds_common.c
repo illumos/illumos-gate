@@ -30,6 +30,8 @@
  * module.
  */
 
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
 #include <sys/modctl.h>
 #include <sys/ksynch.h>
 #include <sys/taskq.h>
@@ -198,16 +200,6 @@ static ds_svc_t *ds_find_svc_by_id_port(char *svc_id, int is_client,
 static ds_svc_t *ds_svc_clone(ds_svc_t *svc);
 static void ds_check_for_dup_services(ds_svc_t *svc);
 static void ds_delete_svc_entry(ds_svc_t *svc);
-
-char *
-ds_strdup(char *str)
-{
-	char *newstr;
-
-	newstr = DS_MALLOC(strlen(str) + 1);
-	(void) strcpy(newstr, str);
-	return (newstr);
-}
 
 void
 ds_common_init(void)
@@ -2579,7 +2571,7 @@ ds_ucap_init(ds_capability_t *cap, ds_clnt_ops_t *ops, uint32_t flags,
 	(void) memcpy(&svc->cap, cap, sizeof (ds_capability_t));
 
 	/* make a copy of the service name */
-	svc->cap.svc_id = ds_strdup(cap->svc_id);
+	svc->cap.svc_id = strdup(cap->svc_id);
 
 	/* make a copy of the version array */
 	svc->cap.vers = DS_MALLOC(cap->nvers * sizeof (ds_ver_t));
@@ -3207,7 +3199,7 @@ ds_svc_clone(ds_svc_t *svc)
 	newsvc->flags &= ~DSSF_LOOPBACK;
 	newsvc->port = NULL;
 	newsvc->svc_hdl = DS_BADHDL2;
-	newsvc->cap.svc_id = ds_strdup(svc->cap.svc_id);
+	newsvc->cap.svc_id = strdup(svc->cap.svc_id);
 	newsvc->cap.vers = DS_MALLOC(svc->cap.nvers * sizeof (ds_ver_t));
 	(void) memcpy(newsvc->cap.vers, svc->cap.vers,
 	    svc->cap.nvers * sizeof (ds_ver_t));

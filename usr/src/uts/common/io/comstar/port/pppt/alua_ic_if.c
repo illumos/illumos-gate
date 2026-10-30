@@ -309,7 +309,6 @@ stmf_ic_msg_status_t stmf_ic_transmit(char *buf, size_t size);
 static stmf_ic_msg_t *stmf_ic_alloc_msg_header(stmf_ic_msg_type_t msg_type,
 	stmf_ic_msgid_t msgid);
 static size_t sizeof_scsi_devid_desc(int ident_length);
-static char *stmf_ic_strdup(char *str);
 static scsi_devid_desc_t *scsi_devid_desc_dup(scsi_devid_desc_t *did);
 static stmf_remote_port_t *remote_port_dup(stmf_remote_port_t *rport);
 static void scsi_devid_desc_free(scsi_devid_desc_t *did);
@@ -618,7 +617,7 @@ stmf_ic_reg_dereg_lun_msg_alloc(
 	    kmem_zalloc(sizeof (*icrl), KM_SLEEP);
 	icm->icm_msg = (void *)icrl;
 
-	icrl->icrl_lu_provider_name = stmf_ic_strdup(lu_provider_name);
+	icrl->icrl_lu_provider_name = strdup(lu_provider_name);
 
 	bcopy(lun_id, icrl->icrl_lun_id, sizeof (icrl->icrl_lun_id));
 
@@ -2271,18 +2270,6 @@ remote_port_dup(stmf_remote_port_t *rport)
 /*
  * Helper functions, returns NULL if no memory.
  */
-static char *
-stmf_ic_strdup(char *str)
-{
-	char *copy;
-
-	ASSERT(str);
-
-	copy = kmem_zalloc(strlen(str) + 1, KM_SLEEP);
-	(void) strcpy(copy, str);
-	return (copy);
-}
-
 static inline void
 stmf_ic_nvlookup_warn(const char *func, char *field)
 {
