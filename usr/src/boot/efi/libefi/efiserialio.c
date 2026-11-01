@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 1998 Michael Smith (msmith@freebsd.org)
+ * Copyright 2026 Atiq Rahman
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -49,6 +50,14 @@ EFI_GUID gEfiSioProtocolGuid = EFI_SIO_PROTOCOL_GUID;
 #define	COM4_IOADDR	0x2e8
 
 #define	PNP0501		0x501		/* 16550A-compatible COM port */
+
+/*
+ * Upper bounds for efi_serial_drain(). A working UART empties its FIFO
+ * in microseconds; at 115200 baud a continuously transmitting peer
+ * delivers roughly 11500 characters per second.
+ */
+#define	EFI_SERIAL_DRAIN_SECS	1
+#define	EFI_SERIAL_DRAIN_MAX	65536
 
 /* List of serial ports, set up by efi_serial_ini() */
 serial_list_t serials = STAILQ_HEAD_INITIALIZER(serials);
@@ -658,10 +667,6 @@ efi_serial_create_port(uint_t c, EFI_HANDLE handle)
 	efi_serial_putchar(tty, '[');
 	efi_serial_putchar(tty, '0');
 	efi_serial_putchar(tty, 'm');
-	/* drain input from random data */
-	while (efi_serial_getchar(tty) != -1)
-		;
-
 	/* check if we are listed in ConIn */
 	efi_check_and_set_condev(port, "ConIn");
 	efi_serial_setup_env(tty);
@@ -1053,6 +1058,46 @@ efi_serial_rtsdtr_set(struct env_var *ev, int flags, const void *value)
  * In case of error, we also reset ACTIVE flags, so the console
  * framefork will try alternate consoles.
  */
+/*
+ * Discard stale input, such as noise left in the receive buffer.
+ *
+ * Some firmware reports input as permanently available. For example,
+ * the EDK2 SerialDxe port on a ThinkPad P16s Gen 4 AMD, which has no
+ * UART, never sets EFI_SERIAL_INPUT_BUFFER_EMPTY, and its Read() returns
+ * EFI_SUCCESS with one byte read without storing any data. Bound the
+ * work by time and, in case the clock does not advance, by the number
+ * of characters read, as the ISA and BIOS serial drivers do.
+ *
+ * Returns true if the input ran dry, false if we gave up.
+ */
+static bool
+efi_serial_drain(struct serial *sp)
+{
+	EFI_STATUS status;
+	UINT32 control;
+	UINTN bufsz;
+	char c;
+	time_t deadline;
+	uint_t n;
+
+	deadline = getsecs() + EFI_SERIAL_DRAIN_SECS;
+	for (n = 0; n < EFI_SERIAL_DRAIN_MAX; n++) {
+		status = sp->io.sio->GetControl(sp->io.sio, &control);
+		if (EFI_ERROR(status) ||
+		    (control & EFI_SERIAL_INPUT_BUFFER_EMPTY) != 0)
+			return (true);
+
+		bufsz = 1;
+		status = sp->io.sio->Read(sp->io.sio, &bufsz, &c);
+		if (EFI_ERROR(status) || bufsz == 0)
+			return (true);
+
+		if (getsecs() > deadline)
+			break;
+	}
+	return (false);
+}
+
 static bool
 efi_serial_setup(struct console *cp)
 {
@@ -1136,6 +1181,13 @@ efi_serial_setup(struct console *cp)
 
 	if (control != new_control)
 		(void) sp->io.sio->SetControl(sp->io.sio, new_control);
+
+	/*
+	 * A port whose input never drains would flood us with phantom
+	 * input; do not use it.
+	 */
+	if (!efi_serial_drain(sp))
+		return (false);
 
 	/* Mark this port usable. */
 	cp->c_flags |= (C_PRESENTIN | C_PRESENTOUT);

@@ -248,9 +248,7 @@ comc_ini(void)
 		comc_putchar(tty, '[');
 		comc_putchar(tty, '0');
 		comc_putchar(tty, 'm');
-		/* drain input from random data */
-		while (comc_getchar(tty) != -1)
-			;
+		/* comc_setup() drains stale input when the port is used. */
 	}
 	consoles[c] = NULL;
 }

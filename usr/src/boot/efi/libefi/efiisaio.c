@@ -381,7 +381,7 @@ efi_isa_create_io(EFI_ISA_IO_PROTOCOL **iop)
 static EFI_STATUS EFIAPI
 _Read(EFI_ISA_IO_PROTOCOL *this __unused,
     EFI_ISA_IO_PROTOCOL_WIDTH Width __unused,
-    UINT32 Offset, UINTN Count, VOID *Buffer)
+    UINT32 Offset, UINTN Count, void *Buffer)
 {
 	uint8_t *buf = (uint8_t *)Buffer;
 
@@ -395,7 +395,7 @@ _Read(EFI_ISA_IO_PROTOCOL *this __unused,
 static EFI_STATUS EFIAPI
 _Write(EFI_ISA_IO_PROTOCOL *this __unused,
     EFI_ISA_IO_PROTOCOL_WIDTH Width __unused,
-    UINT32 Offset, UINTN Count, VOID *Buffer)
+    UINT32 Offset, UINTN Count, void *Buffer)
 {
 	uint8_t *buf = (uint8_t *)Buffer;
 
@@ -607,9 +607,7 @@ efi_isa_ini(void)
 		efi_isa_putchar(tty, '[');
 		efi_isa_putchar(tty, '0');
 		efi_isa_putchar(tty, 'm');
-		/* drain input from random data */
-		while (efi_isa_getchar(tty) != -1)
-			;
+		/* efi_isa_setup() drains stale input when the port is used. */
 	}
 	consoles[c] = NULL;
 }
