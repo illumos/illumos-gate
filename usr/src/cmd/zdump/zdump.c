@@ -650,6 +650,10 @@ main(int argc, char *argv[])
 		  t = newt;
 		  tm_ok = newtm_ok;
 		  if (newtm_ok) {
+#ifndef TM_ZONE
+		    /* re-run localtime to reset tzname */
+		    (void) localtime_rz(tz, &newt, &newtm);
+#endif
 		    ab = saveabbr(&abbrev, &abbrevsize, &newtm);
 		    tm = newtm;
 		  }
