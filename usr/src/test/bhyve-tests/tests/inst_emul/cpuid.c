@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -103,6 +103,20 @@ static const struct vcpu_cpuid_entry test_entries[] = {
 	},
 };
 
+/*
+ * No "std" leaves for Intel-style fallback to emit.
+ */
+static const struct vcpu_cpuid_entry nostd_entries[] = {
+	{
+		.vce_function = 0x80000000,
+		.vce_eax = 0x80000001,
+	},
+	{
+		.vce_function = 0x80000001,
+		.vce_eax = 0x8000,
+	},
+};
+
 int
 main(int argc, char *argv[])
 {
@@ -151,20 +165,49 @@ main(int argc, char *argv[])
 			test_pass();
 			break;
 		case VEK_TEST_FAIL:
-			test_fail_msg("failed result %rip: %x", vexit.rip);
+			test_fail_msg("failed result %%rip: 0x%lx\n",
+			    vexit.rip);
+			break;
+		case VEK_TEST_MSG:
+			test_msg_print(ctx);
 			break;
 		case VEK_UNHANDLED: {
 			uint32_t val;
 			if (vexit_match_inout(&vexit, false, IOP_TEST_VALUE, 4,
 			    &val)) {
 				/*
-				 * The payload has requested switch to AMD-style
-				 * fallback to run the second half of the test.
+				 * The payload has requested a new configuration
+				 * to test.
 				 */
-				cfg.vvcc_flags = 0;
+				switch (val) {
+				case 0:
+					/* AMD-style fallback */
+					cfg.vvcc_flags = 0;
+					break;
+				case 1:
+					/* Intel-style, with no "std" leaves */
+					cfg.vvcc_flags =
+					    VCC_FLAG_INTEL_FALLBACK;
+					cfg.vvcc_nent =
+					    ARRAY_SIZE(nostd_entries);
+					cfg.vvcc_entries =
+					    (struct vcpu_cpuid_entry *)
+					    nostd_entries;
+					break;
+				case 2:
+					/* Intel-style, with no leaves at all */
+					cfg.vvcc_flags =
+					    VCC_FLAG_INTEL_FALLBACK;
+					cfg.vvcc_nent = 0;
+					cfg.vvcc_entries = NULL;
+					break;
+				default:
+					test_fail_vmexit(&vexit);
+					break;
+				}
 				err = ioctl(vmfd, VM_SET_CPUID, &cfg);
 				if (err != 0) {
-					test_fail_errno(err,
+					test_fail_errno(errno,
 					    "ioctl(VM_SET_CPUID) failed");
 				}
 				ventry_fulfill_inout(&vexit, &ventry, 0);

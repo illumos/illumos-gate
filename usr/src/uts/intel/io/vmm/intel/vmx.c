@@ -1172,8 +1172,9 @@ vmx_idtvec_to_intinfo(uint32_t info, uint32_t errcode)
 	}
 
 	uint64_t intinfo = VM_INTINFO_VALID | type | vec;
-	if (info & VMCS_IDT_VEC_ERRCODE_VALID) {
-		intinfo |= (uint64_t)errcode << 32;
+	if (VM_INTINFO_HAS_ERRCODE(info)) {
+		intinfo |= VM_INTINFO_DEL_ERRCODE;
+		intinfo |= (uint64_t)errcode << VM_INTINFO_SHIFT_ERRCODE;
 	}
 
 	return (intinfo);

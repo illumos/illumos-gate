@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2022 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "payload_common.h"
@@ -152,17 +152,61 @@ do_test(int intel_fallback)
 	}
 }
 
+/*
+ * With Intel-style fallback but no "std" leaves, there's nothing to fall back
+ * on, so anything which doesn't match should get all-zeroes.
+ */
+void
+do_nostd_test(bool have_extd)
+{
+	uint32_t regs[4];
+	const uint32_t zero[4] = { 0 };
+
+	cpuid(0x80000000, 0, regs);
+	if (have_extd && regs[0] != 0x80000001) {
+		TEST_ABORT("extd leaf did not match");
+	}
+	if (!have_extd && !leaf_cmp(regs, zero)) {
+		TEST_ABORT("missing extd leaf not all zeroes");
+	}
+
+	/*
+	 * A "std" leaf, whose search stops at the first (non-matching) entry
+	 * when "extd" leaves are present.
+	 */
+	cpuid(0, 0, regs);
+	if (!leaf_cmp(regs, zero)) {
+		TEST_ABORT("leaf 0 not all zeroes");
+	}
+	cpuid(6, 0, regs);
+	if (!leaf_cmp(regs, zero)) {
+		TEST_ABORT("leaf 6 not all zeroes");
+	}
+
+	/* An "extd" leaf, beyond the last present one */
+	cpuid(0x80000002, 0, regs);
+	if (!leaf_cmp(regs, zero)) {
+		TEST_ABORT("leaf 0x80000002 not all zeroes");
+	}
+}
+
 void
 start(void)
 {
 	/* Check results expecting Intel-style fallback */
 	do_test(1);
 
-	/* Notify userspace component to change fallback style */
+	/* AMD-style fallback */
 	outl(IOP_TEST_VALUE, 0);
-
-	/* Check results expecting AMD-style fallback */
 	do_test(0);
+
+	/* Intel-style fallback, with only "extd" leaves */
+	outl(IOP_TEST_VALUE, 1);
+	do_nostd_test(true);
+
+	/* Intel-style fallback, with no leaves at all */
+	outl(IOP_TEST_VALUE, 2);
+	do_nostd_test(false);
 
 	/* If all is well by this point, indicate success */
 	outb(IOP_TEST_RESULT, TEST_RESULT_PASS);

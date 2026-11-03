@@ -13,7 +13,7 @@
  * This test verifies that CPUID emulation properly adjusts output values that
  * vary with the state of the calling processor.
  *
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <stdio.h>
@@ -178,21 +178,29 @@ main(int argc, char *argv[])
 	};
 
 	for (int i = 0; i < ARRAY_SIZE(phases); i++) {
-		kind = test_run_vcpu(vcpu, &ventry, &vexit);
+		/*
+		 * The payload may print a message before failure.
+		 */
+		while ((kind = test_run_vcpu(vcpu, &ventry, &vexit)) ==
+		    VEK_TEST_MSG) {
+			test_msg_print(ctx);
+		}
+
 		switch (kind) {
 		case VEK_REENTR:
-			test_fail_msg("unexpected exit in %s", phases[i].name);
+			test_fail_msg("unexpected exit in %s\n",
+			    phases[i].name);
 			goto done;
 		case VEK_TEST_PASS:
 			if (phases[i].pass_expected) {
 				test_pass();
 			} else {
-				test_fail_msg("unexpected pass from %s",
+				test_fail_msg("unexpected pass from %s\n",
 				    phases[i].name);
 			}
 			goto done;
 		case VEK_TEST_FAIL:
-			test_fail_msg("failed result in %s, %rip: %x",
+			test_fail_msg("failed result in %s, %%rip: 0x%lx\n",
 			    phases[i].name, vexit.rip);
 			goto done;
 		case VEK_UNHANDLED: {
@@ -239,14 +247,14 @@ main(int argc, char *argv[])
 			    (struct vcpu_cpuid_entry *)fallback_test_entries;
 			break;
 		default:
-			test_fail_msg("phase %d fell through without passing",
+			test_fail_msg("phase %d fell through without passing\n",
 			    i);
 			goto done;
 		}
 
 		err = ioctl(vmfd, VM_SET_CPUID, &cfg);
 		if (err != 0) {
-			test_fail_errno(err, "ioctl(VM_SET_CPUID) failed");
+			test_fail_errno(errno, "ioctl(VM_SET_CPUID) failed");
 		}
 		ventry_fulfill_inout(&vexit, &ventry, 0);
 	}

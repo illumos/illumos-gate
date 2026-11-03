@@ -27,6 +27,7 @@ PROG =	rdmsr \
 # These should probably go in the `vmm` tests, but since they depend on
 # in-guest payloads, it is easier to build them here.
 PROG +=	triple_fault \
+	reinject_errcode \
 	exit_paging \
 	page_dirty \
 	exit_consistent \

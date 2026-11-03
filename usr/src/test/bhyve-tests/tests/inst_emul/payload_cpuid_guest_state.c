@@ -10,7 +10,7 @@
  */
 
 /*
- * Copyright 2025 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include "payload_common.h"
@@ -25,6 +25,25 @@
 
 #define	XCR0_X87_SSE		0x00000003
 #define	XCR0_AVX		0x00000004
+
+#define	CPUID_D_1_XSAVEC	0x00000002
+#define	CPUID_D_1_XSAVES	0x00000008
+
+/* "GenuineIntel", as returned by leaf 0 in %ebx, %edx, %ecx */
+#define	CPUID_VENDOR_INTEL_EBX	0x756e6547
+#define	CPUID_VENDOR_INTEL_EDX	0x49656e69
+#define	CPUID_VENDOR_INTEL_ECX	0x6c65746e
+
+bool
+vendor_is_intel(void)
+{
+	uint32_t regs[4];
+
+	cpuid(0, 0, regs);
+	return (regs[1] == CPUID_VENDOR_INTEL_EBX &&
+	    regs[3] == CPUID_VENDOR_INTEL_EDX &&
+	    regs[2] == CPUID_VENDOR_INTEL_ECX);
+}
 
 int
 leaf_cmp(const uint32_t *a, const uint32_t *b)
@@ -48,47 +67,57 @@ test_leaf_1_explicit()
 	cpuid(1, 0, regs);
 	if (regs[0] != TEST_CPUID_1_EAX || regs[1] != TEST_CPUID_1_EBX ||
 	    regs[3] != TEST_CPUID_1_EDX) {
-		test_result_fail();
+		TEST_ABORT("leaf 1 eax/ebx/edx != explicit values");
 	}
 }
 
 /* Verifies that leaf 1 ecx's value varies as cr4's OSXSAVE bit changes. */
 void
-test_leaf_1_osxsave()
+test_leaf_1_osxsave(bool using_explicit)
 {
 	uint32_t regs[4];
 	uint32_t orig_cr4 = getcr4();
+	uint32_t ecx;
 
 	setcr4(getcr4() & ~CR4_OSXSAVE);
 	cpuid(1, 0, regs);
-	if (regs[2] != (TEST_CPUID_1_ECX & ~CPUID2_OSXSAVE)) {
-		test_result_fail();
+	ecx = regs[2];
+	if ((ecx & CPUID2_OSXSAVE) != 0) {
+		TEST_ABORT("leaf 1 OSXSAVE set with CR4.OSXSAVE clear");
+	}
+	if (using_explicit && ecx != (TEST_CPUID_1_ECX & ~CPUID2_OSXSAVE)) {
+		TEST_ABORT("leaf 1 ecx != explicit value");
 	}
 
 	/* Turn OSXSAVE back on and check that it reappears in CPUID. */
 	setcr4(getcr4() | CR4_OSXSAVE);
 	cpuid(1, 0, regs);
-	if (regs[2] != (TEST_CPUID_1_ECX | CPUID2_OSXSAVE)) {
-		test_result_fail();
+	if (regs[2] != (ecx | CPUID2_OSXSAVE)) {
+		TEST_ABORT("leaf 1 ecx wrong with CR4.OSXSAVE set");
 	}
 	setcr4(orig_cr4);
 }
 
 /* Verifies that leaf 1 edx's value varies as the APIC enable flag changes. */
 void
-test_leaf_1_apic()
+test_leaf_1_apic(bool using_explicit)
 {
 	uint32_t regs[4];
+	uint32_t edx;
 
 	wrmsr(0x1B, rdmsr(0x1B) & ~APICBASE_ENABLED);
 	cpuid(1, 0, regs);
-	if (regs[3] != (TEST_CPUID_1_EDX & ~CPUID_APIC)) {
-		test_result_fail();
+	edx = regs[3];
+	if ((edx & CPUID_APIC) != 0) {
+		TEST_ABORT("leaf 1 APIC set with APIC disabled");
+	}
+	if (using_explicit && edx != (TEST_CPUID_1_EDX & ~CPUID_APIC)) {
+		TEST_ABORT("leaf 1 edx != explicit value");
 	}
 	wrmsr(0x1B, rdmsr(0x1B) | APICBASE_ENABLED);
 	cpuid(1, 0, regs);
-	if (regs[3] != (TEST_CPUID_1_EDX | CPUID_APIC)) {
-		test_result_fail();
+	if (regs[3] != (edx | CPUID_APIC)) {
+		TEST_ABORT("leaf 1 edx wrong with APIC enabled");
 	}
 }
 
@@ -106,20 +135,20 @@ test_leaf_d_index_0(bool using_explicit)
 	if (using_explicit) {
 		if (regs[0] != TEST_CPUID_D_0_EAX ||
 		    regs[2] != XSAVE_AREA_SIZE_MAX || regs[3] != 0) {
-			test_result_fail();
+			TEST_ABORT("leaf D.0 eax/ecx/edx != explicit values");
 		}
 	}
 
 	setxcr(0, XCR0_X87_SSE);
 	cpuid(0xD, 0, regs);
 	if (regs[1] != XSAVE_AREA_SIZE_BASE) {
-		test_result_fail();
+		TEST_ABORT("leaf D.0 ebx wrong for x87/SSE");
 	}
 
 	setxcr(0, XCR0_X87_SSE | XCR0_AVX);
 	cpuid(0xD, 0, regs);
 	if (regs[1] != XSAVE_AREA_SIZE_BASE + XSAVE_AREA_SIZE_AVX) {
-		test_result_fail();
+		TEST_ABORT("leaf D.0 ebx wrong for x87/SSE/AVX");
 	}
 
 	setxcr(0, orig_xcr0);
@@ -134,6 +163,8 @@ test_leaf_d_index_1(bool using_explicit, bool via_fallback)
 	uint32_t regs[4];
 	uint64_t orig_cr4 = getcr4();
 	uint64_t orig_xcr0;
+	uint32_t size_base = XSAVE_AREA_SIZE_BASE;
+	uint32_t size_avx = XSAVE_AREA_SIZE_BASE + XSAVE_AREA_SIZE_AVX;
 
 	if (via_fallback) {
 		leaf = 0xE;
@@ -147,20 +178,35 @@ test_leaf_d_index_1(bool using_explicit, bool via_fallback)
 	if (using_explicit) {
 		if (regs[0] != TEST_CPUID_D_1_EAX || regs[2] != 0 ||
 		    regs[3] != 0) {
-			test_result_fail();
+			TEST_ABORT("leaf D.1 eax/ecx/edx != explicit values");
 		}
+	}
+
+	/*
+	 * On Intel hosts, bhyve follows the SDM in reporting a size of 0 in ebx
+	 * when eax advertises neither XSAVEC nor XSAVES.
+	 *
+	 * The explicit values (checked above) advertise both, but legacy
+	 * emulation advertises only XSAVEOPT, in which case the expected size
+	 * depends on the host vendor.  Legacy emulation passes that through
+	 * in leaf 0, so it can be checked for here.
+	 */
+	if ((regs[0] & (CPUID_D_1_XSAVEC | CPUID_D_1_XSAVES)) == 0 &&
+	    vendor_is_intel()) {
+		size_base = 0;
+		size_avx = 0;
 	}
 
 	setxcr(0, XCR0_X87_SSE);
 	cpuid(leaf, 1, regs);
-	if (regs[1] != XSAVE_AREA_SIZE_BASE) {
-		test_result_fail();
+	if (regs[1] != size_base) {
+		TEST_ABORT("leaf D.1 ebx wrong for x87/SSE");
 	}
 
 	setxcr(0, XCR0_X87_SSE | XCR0_AVX);
 	cpuid(leaf, 1, regs);
-	if (regs[1] != XSAVE_AREA_SIZE_BASE + XSAVE_AREA_SIZE_AVX) {
-		test_result_fail();
+	if (regs[1] != size_avx) {
+		TEST_ABORT("leaf D.1 ebx wrong for x87/SSE/AVX");
 	}
 
 	setxcr(0, orig_xcr0);
@@ -184,14 +230,14 @@ do_basic_test(bool using_explicit)
 	if (using_explicit) {
 		cpuid(0, 0, regs);
 		if (!leaf_cmp(regs, expected_base)) {
-			test_result_fail();
+			TEST_ABORT("leaf 0 != explicit values");
 		}
 
 		test_leaf_1_explicit();
 	}
 
-	test_leaf_1_osxsave();
-	test_leaf_1_apic();
+	test_leaf_1_osxsave(using_explicit);
+	test_leaf_1_apic(using_explicit);
 	test_leaf_d_index_0(using_explicit);
 	test_leaf_d_index_1(using_explicit, false);
 }
@@ -218,7 +264,7 @@ do_fallback_test()
 	setcr4(getcr4() | CR4_OSXSAVE);
 	cpuid(1, 0, regs);
 	if (!leaf_cmp(regs, zero_cpuid)) {
-		test_result_fail();
+		TEST_ABORT("missing leaf 1 not all zeroes");
 	}
 
 	/*

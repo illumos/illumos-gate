@@ -472,7 +472,8 @@ struct vcpu_cpuid_entry {
 /*
  * Emulate Intel-style fallback behavior (emit highest "standard" entry) if the
  * queried function/index do not match.  If not set, emulate AMD-style, where
- * all zeroes are returned in such cases.
+ * all zeroes are returned in such cases.  If set, but there are no "standard"
+ * entries, all zeroes are likewise returned.
  */
 #define	VCC_FLAG_INTEL_FALLBACK		(1 << 1)
 

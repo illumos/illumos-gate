@@ -144,7 +144,9 @@ static const struct vcpu_cpuid_entry cpuid_empty_entry = { 0 };
  * first valid match based on the function/index and flags will be emitted.
  *
  * If no match is found, but Intel-style fallback is configured, then the
- * highest standard leaf encountered will be emitted.
+ * highest standard leaf encountered will be emitted.  If there is no such leaf
+ * (no standard leaves were configured), there is nothing to fall back to,
+ * and so an all-zeroes entry is emitted.
  */
 static const struct vcpu_cpuid_entry *
 cpuid_find_entry(const vcpu_cpuid_config_t *cfg, uint32_t func, uint32_t idx)
@@ -208,7 +210,7 @@ cpuid_find_entry(const vcpu_cpuid_config_t *cfg, uint32_t func, uint32_t idx)
 	if (matched_leaf || !intel_fallback) {
 		return (&cpuid_empty_entry);
 	} else {
-		return (last_std);
+		return (last_std != NULL ? last_std : &cpuid_empty_entry);
 	}
 }
 
@@ -283,7 +285,9 @@ cpuid_apply_runtime_reg_state(struct vcpu *vcpu, uint32_t func,
 			 */
 			*ebx = regs[1];
 			break;
-		case 1:
+		case 1: {
+			const uint32_t xsavec_xsaves = CPUID_EXTSTATE_XSAVEC |
+			    CPUID_EXTSTATE_XSAVES;
 			/*
 			 * Subleaf 1 reports the XSAVE area size required for
 			 * features enabled in %xcr0 and the IA32_XSS MSR via
@@ -298,11 +302,15 @@ cpuid_apply_runtime_reg_state(struct vcpu *vcpu, uint32_t func,
 			 * XSAVEC and IA32_XSS support, but the APM does not. To
 			 * handle these cases:
 			 *
-			 * 1. If the guest isn't a VMX guest, just copy the
-			 *    current reported save area size.
-			 * 2. If both the XSAVEC and XSAVES bits are clear in
-			 *    %eax, return a save area size of 0 in %ebx to
-			 *    match the SDM description.
+			 * 1. If the guest is a VMX guest, and both the XSAVEC
+			 *    and XSAVES bits are clear in %eax, return a save
+			 *    area size of 0 in %ebx to match the SDM.
+			 * 2. If %eax advertises XSAVEC or XSAVES, but the host
+			 *    supports neither, the host's reported save area
+			 *    size is not meaningful (it may be 0).  Report the
+			 *    size of the standard-format area for the features
+			 *    enabled in %xcr0 (subleaf 0 %ebx) instead, as
+			 *    would be needed by XSAVE.
 			 * 3. Otherwise, copy the host's reported save area
 			 *    size.
 			 *
@@ -315,24 +323,24 @@ cpuid_apply_runtime_reg_state(struct vcpu *vcpu, uint32_t func,
 			 *   the reported save area size will be too large, but
 			 *   the guest can still use XSAVEC safely.
 			 * - If the VM's explicit CPUID values advertise XSAVES
-			 *   support, but the host doesn't support XSAVES, the
+			 *   support, but the host supports only XSAVEC, the
 			 *   host's reported save area size will still be large
 			 *   enough for the xcr0-controlled state saved by
 			 *   XSAVEC. The area will be undersized for XSAVES,
 			 *   but this is OK because the guest can't execute
 			 *   XSAVES anyway (it will #UD).
 			 */
-			if (!vmm_is_intel()) {
+			if (vmm_is_intel() && (*eax & xsavec_xsaves) == 0) {
+				*ebx = 0;
+			} else if ((*eax & xsavec_xsaves) != 0 &&
+			    (regs[0] & xsavec_xsaves) == 0) {
+				cpuid_count(func, 0, regs);
 				*ebx = regs[1];
 			} else {
-				if ((*eax & (CPUID_EXTSTATE_XSAVEC |
-				    CPUID_EXTSTATE_XSAVES)) == 0) {
-					*ebx = 0;
-				} else {
-					*ebx = regs[1];
-				}
+				*ebx = regs[1];
 			}
 			break;
+		}
 		default:
 			/*
 			 * Other subleaves of leaf D report the relative sizes
@@ -378,7 +386,7 @@ vcpu_emulate_cpuid(struct vcpu *vcpu, uint64_t *rax, uint64_t *rbx,
 	} else {
 		const struct vcpu_cpuid_entry *ent = cpuid_find_entry(cfg, func,
 		    index);
-		ASSERT(ent != NULL);
+		VERIFY3P(ent, !=, NULL);
 
 		/*
 		 * The function and index in the found entry may differ from
