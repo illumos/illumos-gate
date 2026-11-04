@@ -22,6 +22,7 @@
 /*
  * Copyright (c) 1994, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SYS_KMEM_IMPL_H
@@ -306,6 +307,7 @@ typedef struct kmem_defrag {
 	uint64_t	kmd_slabs_freed;	/* slabs freed by moves */
 	uint64_t	kmd_defrags;		/* kmem_cache_defrag() */
 	uint64_t	kmd_scans;		/* kmem_cache_scan() */
+	uint64_t	kmd_deadlist_stopped;	/* releases stopped by moves */
 
 	/*
 	 * Consolidator fields
