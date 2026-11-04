@@ -25,6 +25,7 @@
 #include "defs.h"
 #include "tables.h"
 #include <fcntl.h>
+#include <sys/ccompile.h>
 #include <sys/un.h>
 
 static void	initlog(void);
@@ -66,8 +67,12 @@ static char **argv0;		/* Saved for re-exec on SIGHUP */
 
 static uint64_t packet[(IP_MAXPACKET + 1)/8];
 
+#define	WAIT_REPORT_INTERVAL	10000	/* milliseconds */
+
 static int	show_ifs = 0;
 static boolean_t	already_daemonized = _B_FALSE;
+static uint_t		start_time;
+static uint_t		wait_reported;
 int		debug = 0;
 int		no_loopback = 0; /* Do not send RA packets to ourselves */
 
@@ -904,11 +909,31 @@ check_to_solicit(struct phyint *pi, enum solicit_events event)
 	}
 }
 
+/*
+ * Report start-up progress on stderr. While we are in the foreground, stderr
+ * is the SMF service log. logmsg() goes to syslog once initlog() has been
+ * called, and daemon() discards stderr.
+ */
+static void __PRINTFLIKE(1)
+startmsg(const char *fmt, ...)
+{
+	va_list ap;
+
+	(void) fprintf(stderr, "in.ndpd: [%u ms] ",
+	    getcurrenttime() - start_time);
+	va_start(ap, fmt);
+	(void) vfprintf(stderr, fmt, ap);
+	va_end(ap);
+	(void) fputc('\n', stderr);
+}
+
 static void
-daemonize_ndpd(void)
+daemonize_ndpd(const char *reason)
 {
 	struct itimerval it;
 	boolean_t timerval = _B_TRUE;
+
+	startmsg("moving to the background: %s", reason);
 
 	/*
 	 * Need to get current timer settings so they can be restored
@@ -944,6 +969,42 @@ daemonize_ndpd(void)
 	}
 }
 
+static boolean_t
+phyint_soliciting(const struct phyint *pi)
+{
+	return (pi->pi_AdvSendAdvertisements == 0 &&
+	    (pi->pi_kernel_state & PI_PRESENT) &&
+	    pi->pi_sol_state == INIT_SOLICIT);
+}
+
+/*
+ * Report which interfaces are holding up start-up, at most once per
+ * WAIT_REPORT_INTERVAL. A normal start finishes before the first report.
+ */
+static void
+report_solicit_wait(void)
+{
+	struct phyint *pi;
+	const char *first = NULL;
+	uint_t waiting = 0, total = 0;
+
+	if (getcurrenttime() - wait_reported < WAIT_REPORT_INTERVAL)
+		return;
+	wait_reported = getcurrenttime();
+
+	for (pi = phyints; pi != NULL; pi = pi->pi_next) {
+		total++;
+		if (phyint_soliciting(pi)) {
+			waiting++;
+			if (first == NULL)
+				first = pi->pi_name;
+		}
+	}
+
+	startmsg("waiting for router solicitation on %u of %u interfaces, "
+	    "including %s", waiting, total, first);
+}
+
 /*
  * Check to see if the time is right to daemonize.  The right time is when:
  *
@@ -972,21 +1033,19 @@ check_daemonize(void)
 	 * to hold up progress.
 	 */
 	if (pi == NULL) {
-		daemonize_ndpd();
+		daemonize_ndpd("no interface can transmit");
 		return;
 	}
 
 	/* Check all interfaces.  If any are still soliciting, just return. */
 	for (pi = phyints; pi != NULL; pi = pi->pi_next) {
-		if (pi->pi_AdvSendAdvertisements ||
-		    !(pi->pi_kernel_state & PI_PRESENT))
-			continue;
-
-		if (pi->pi_sol_state == INIT_SOLICIT)
+		if (phyint_soliciting(pi)) {
+			report_solicit_wait();
 			return;
+		}
 	}
 
-	daemonize_ndpd();
+	daemonize_ndpd("router solicitation complete");
 }
 
 /*
@@ -1011,6 +1070,16 @@ solicit_event(struct phyint *pi, enum solicit_events event, uint_t elapsed)
 			logmsg(LOG_DEBUG, "Suppress sending RS packet on %s "
 			    "(no route exchange on interface)\n",
 			    pi->pi_name);
+		}
+		/*
+		 * Route exchange can be disabled while solicitation is under
+		 * way. No further solicitations will be sent on this interface
+		 * so it must not be left in INIT_SOLICIT, which would hold up
+		 * daemonizing indefinitely.
+		 */
+		if (pi->pi_sol_state == INIT_SOLICIT) {
+			pi->pi_sol_state = NO_SOLICIT;
+			check_daemonize();
 		}
 		return (TIMER_INFINITY);
 	}
@@ -1982,6 +2051,7 @@ main(int argc, char *argv[])
 	boolean_t file_required = _B_FALSE;
 
 	argv0 = argv;
+	start_time = wait_reported = getcurrenttime();
 	srandom(gethostid());
 	(void) umask(0022);
 
@@ -2039,7 +2109,9 @@ main(int argc, char *argv[])
 	rtsock = setup_rtsock();
 	mibsock = setup_mibsock();
 	timer_init();
+	startmsg("scanning interfaces");
 	initifs(_B_TRUE);
+	startmsg("interface scan complete");
 
 	check_daemonize();
 

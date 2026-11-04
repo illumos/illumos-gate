@@ -1,9 +1,10 @@
 '\" te
 .\" Copyright (C) 2003, Sun Microsystems, Inc. All Rights Reserved
+.\" Copyright 2026 Oxide Computer Company
 .\" The contents of this file are subject to the terms of the Common Development and Distribution License (the "License").  You may not use this file except in compliance with the License.
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE or http://www.opensolaris.org/os/licensing.  See the License for the specific language governing permissions and limitations under the License.
 .\" When distributing Covered Code, include this CDDL HEADER in each file and include the License file at usr/src/OPENSOLARIS.LICENSE.  If applicable, add the following below this CDDL HEADER, with the fields enclosed by brackets "[]" replaced with your own identifying information: Portions Copyright [yyyy] [name of copyright owner]
-.TH IN.NDPD 8 "September 12, 2020"
+.TH IN.NDPD 8 "November 4, 2026"
 .SH NAME
 in.ndpd \- daemon for IPv6 autoconfiguration
 .SH SYNOPSIS
@@ -255,7 +256,10 @@ Narten, T., and Draves, R. \fIRFC 3041, Privacy Extensions for Stateless
 Address Autoconfiguration in IPv6\fR. The Internet Society. January 2001.
 .SH DIAGNOSTICS
 Receipt of a \fBSIGHUP\fR signal will make \fBin.ndpd\fR restart and reread
-\fB/etc/inet/ndpd.conf\fR.
+\fB/etc/inet/ndpd.conf\fR. Refreshing the service with
+.BR svcadm (8)
+sends this signal. Options are kept across this restart, so changes to SMF
+service properties take effect only when the service itself is restarted.
 .SH NOTES
 The \fBin.ndpd\fR daemon service is managed by the service management facility,
 \fBsmf\fR(7), under the service identifier:

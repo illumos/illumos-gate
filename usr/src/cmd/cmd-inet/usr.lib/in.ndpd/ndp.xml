@@ -3,6 +3,7 @@
 <!--
  Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
+ Copyright 2026 Oxide Computer Company
 
  CDDL HEADER START
 
@@ -55,6 +56,16 @@
 		timeout_seconds='60'>
 		<method_context working_directory='/'>
 			<method_credential user='root' group='root' />
+		</method_context>
+	</exec_method>
+
+	<exec_method
+		type='method'
+		name='refresh'
+		exec=':kill -HUP'
+		timeout_seconds='60'>
+		<method_context working_directory='/'>
+			<method_credential user='root' group='root'/>
 		</method_context>
 	</exec_method>
 
