@@ -23,7 +23,7 @@
 # Copyright (c) 2019, Joyent, Inc.
 # Copyright 2021 OmniOS Community Edition (OmniOSce) Association.
 # Copyright 2024 Bill Sommerfeld
-# Copyright 2024 Oxide Computer Company
+# Copyright 2026 Oxide Computer Company
 #
 
 from __future__ import print_function
@@ -184,6 +184,27 @@ def git_file_list(parent, paths=None):
 
     return sorted(ret)
 
+def git_imported_files(parent):
+    """Return the set of files which have changed on this branch only in
+    commits imported from another project, that is, commits whose comments
+    contain an "Imported from:" line."""
+
+    importre = re.compile(r'^Imported[ -]from[: ]')
+    imported = set()
+    local = set()
+
+    for commit in git("rev-list %s.." % parent):
+        commit = commit.strip()
+        comments = git("log -1 --pretty=format:%%B %s" % commit)
+        files = [f.strip() for f in
+                 git("diff-tree --no-commit-id --name-only -r %s" % commit)]
+        if any(importre.match(line) for line in comments):
+            imported.update(files)
+        else:
+            local.update(files)
+
+    return imported - local
+
 def not_check(root, cmd):
     """Return a function which returns True if a file given as an argument
     should be excluded from the check named by 'cmd'"""
@@ -294,10 +315,13 @@ def comchk(root, parent, flist, output):
 def copyright(root, parent, flist, output):
     """Check that each source file contains a copyright notice for the current
 year. You don't need to fix this if you, the potential new copyright holder,
-chooses not to."""
+chooses not to. Files changed only in commits imported from another project
+are not checked."""
     ret = 0
     output.write("Copyrights:\n")
-    for f in flist():
+    imported = set(os.path.relpath(os.path.join(root, f), '.')
+                   for f in git_imported_files(parent))
+    for f in flist(lambda x: x not in imported):
         with io.open(f, encoding='utf-8', errors='replace') as fh:
             ret |= Copyright.copyright(fh, output=output)
     return ret

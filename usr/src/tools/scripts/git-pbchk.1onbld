@@ -13,8 +13,9 @@
 .\" Copyright 2015 Elysium Digital, L.L.C.
 .\" Copyright 2018 Joyent, Inc.
 .\" Copyright 2024 Bill Sommerfeld <sommerfeld@hamachi.org>
+.\" Copyright 2026 Oxide Computer Company
 .\"
-.Dd February 1, 2024
+.Dd November 4, 2026
 .Dt GIT-PBCHK 1ONBLD
 .Os
 .Sh NAME
@@ -79,7 +80,10 @@ Check that putback comments follow the prescribed format
 .It Copyrights: Cm copyright
 Check that each source file contains a copyright notice for the current
 year\. You don't need to fix this if you, the potential new copyright holder,
-chooses not to
+chooses not to.
+Files changed only in commits imported from another project, which have an
+.Dq Imported from:
+line in their comments, are not checked.
 .It C style: Cm cstyle
 Check that C source files conform to the illumos C style rules
 .It Header check: Cm hdrchk
