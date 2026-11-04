@@ -12,6 +12,7 @@
 /*
  * Copyright 2020 Joyent, Inc.
  * Copyright 2022 Jason King
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/debug.h>
@@ -554,25 +555,18 @@ sort_names(void *a, void *b)
 		if (n->n_is_symlink)
 			continue;
 
-		if (first == NULL) {
-			first = n;
-			continue;
-		}
-
 		/*
 		 * If we're treating isaexec as special, we always
 		 * want it to be the first entry. Otherwise, pick
 		 * the 'lowest' sorted pathname.
 		 */
-		if (do_special) {
-			if (is_special(n->n_name)) {
-				first = n;
-				break;
-			}
-
-			if (strcmp(n->n_name, first->n_name) < 0)
-				first = n;
+		if (do_special && is_special(n->n_name)) {
+			first = n;
+			break;
 		}
+
+		if (first == NULL || strcmp(n->n_name, first->n_name) < 0)
+			first = n;
 	}
 
 	/*
