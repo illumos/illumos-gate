@@ -3219,6 +3219,7 @@ file path=opt/zfs-tests/tests/functional/xattr/xattr_010_neg mode=0555
 file path=opt/zfs-tests/tests/functional/xattr/xattr_011_pos mode=0555
 file path=opt/zfs-tests/tests/functional/xattr/xattr_012_pos mode=0555
 file path=opt/zfs-tests/tests/functional/xattr/xattr_013_pos mode=0555
+file path=opt/zfs-tests/tests/functional/xattr/xattr_014_pos mode=0555
 file path=opt/zfs-tests/tests/functional/xattr/xattr_common.kshlib mode=0444
 dir  path=opt/zfs-tests/tests/functional/zvol
 file path=opt/zfs-tests/tests/functional/zvol/zvol.cfg mode=0444

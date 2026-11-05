@@ -24,6 +24,7 @@
  * Copyright (c) 2013, 2016 by Delphix. All rights reserved.
  * Copyright 2017 Nexenta Systems, Inc.
  * Copyright (c) 2015, Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/types.h>
@@ -59,6 +60,20 @@
 #include <sys/zfs_sa.h>
 #include <sys/dnlc.h>
 #include <sys/extdirent.h>
+
+/*
+ * Entries of an extended attribute directory are not cached in the DNLC.
+ * Each DNLC entry holds its directory's vnode, and nothing purges the
+ * entries of an xattr directory when its file is removed, so the unlinked
+ * xattr directory and the attributes in it would stay allocated (and
+ * charged to the file's user, group and project) until the DNLC entries
+ * age out or the file system is unmounted.
+ */
+static inline boolean_t
+zfs_dnlc_ok(znode_t *dzp)
+{
+	return ((dzp->z_pflags & ZFS_XATTR) == 0);
+}
 
 /*
  * zfs_match_find() is used by zfs_dirent_lock() to peform zap lookups
@@ -209,10 +224,13 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 	 *
 	 * Maybe can add TO-UPPERed version of name to dnlc in ci-only
 	 * case for performance improvement?
+	 *
+	 * Never cache the contents of an extended attribute directory:
+	 * see zfs_dnlc_ok().
 	 */
-	update = !zfsvfs->z_norm ||
+	update = zfs_dnlc_ok(dzp) && (!zfsvfs->z_norm ||
 	    (zfsvfs->z_case == ZFS_CASE_MIXED &&
-	    !(zfsvfs->z_norm & ~U8_TEXTPREP_TOUPPER) && !(flag & ZCILOOK));
+	    !(zfsvfs->z_norm & ~U8_TEXTPREP_TOUPPER) && !(flag & ZCILOOK)));
 
 	/*
 	 * ZRENAMING indicates we are in a situation where we should
@@ -833,7 +851,8 @@ zfs_link_create(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag)
 	    8, 1, &value, tx);
 	ASSERT(error == 0);
 
-	dnlc_update(ZTOV(dzp), dl->dl_name, vp);
+	if (zfs_dnlc_ok(dzp))
+		dnlc_update(ZTOV(dzp), dl->dl_name, vp);
 
 	return (0);
 }

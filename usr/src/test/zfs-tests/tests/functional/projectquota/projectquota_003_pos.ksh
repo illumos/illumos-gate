@@ -28,6 +28,7 @@
 #
 # Copyright (c) 2017 by Fan Yong. All rights reserved.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/tests/functional/projectquota/projectquota_common.kshlib
@@ -54,8 +55,11 @@ sync_pool
 typeset project_used=$(get_value "projectused@$PRJID1" $QFS)
 typeset file_size='10m'
 
-if [[ $project_used -ge 8192 ]]; then
-	log_fail "FAIL: projectused is $project_used, should be less than 8k"
+# A removed empty directory stays charged to its project (512 bytes, for its
+# dnode) for as long as a negative DNLC entry holds it, and
+# projectquota_001_pos leaves one such directory in $PRJID1.
+if (( project_used > 512 )); then
+	log_fail "FAIL: projectused is $project_used, should be at most 512"
 fi
 
 mkmount_writable $QFS
@@ -76,7 +80,7 @@ log_must rm -rf $PRJDIR
 typeset project_obj_used=$(get_value "projectobjused@$PRJID2" $QFS)
 typeset file_count=100
 
-if [[ $project_obj_used -ge 2 ]]; then
+if (( project_obj_used >= 2 )); then
 	log_fail "FAIL: projectobjused is $project_obj_used, should be " \
 	"less than 2"
 fi
@@ -90,7 +94,7 @@ log_must user_run $PUSER mkfiles $PRJDIR/qf_ $((file_count - 1))
 sync_pool
 project_obj_used=$(get_value "projectobjused@$PRJID2" $QFS)
 exp_count=$((file_count + 1))
-if [[ $project_obj_used -gt $exp_count ]]; then
+if (( project_obj_used > exp_count )); then
 	log_note "project $PRJID2 used is $project_obj_used"
 	log_fail "projectobjused for project $PRJID2 expected to be less than" \
 	    "$exp_count, not $project_obj_used"
