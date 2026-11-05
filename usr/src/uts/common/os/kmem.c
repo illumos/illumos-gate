@@ -4385,8 +4385,6 @@ kmem_init(void)
 	kmem_oversize_arena = vmem_create("kmem_oversize", NULL, 0, PAGESIZE,
 	    segkmem_alloc, segkmem_free, heap_arena, 0, VM_SLEEP);
 
-	kmem_reap_interval = 15 * hz;
-
 	/*
 	 * Read /etc/system.  This is a chicken-and-egg problem because
 	 * kmem_flags may be set in /etc/system, but mod_read_system_file()
@@ -4560,6 +4558,14 @@ void
 kmem_thread_init(void)
 {
 	kmem_move_init();
+
+	/*
+	 * hz is not final until param_init() has run, which is after
+	 * kmem_init(), so the reap interval is calculated here. A value set
+	 * via system(5) is left alone.
+	 */
+	if (kmem_reap_interval == 0)
+		kmem_reap_interval = 15 * hz;
 
 	/*
 	 * This taskq is used for various kmem maintenance functions, including
