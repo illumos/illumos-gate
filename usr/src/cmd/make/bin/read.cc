@@ -2111,8 +2111,17 @@ enter_target_groups_and_dependencies(Name_vector target, Name_vector depes, Cmd_
 						       depes,
 						       command);
 				}
-				/* Check if this is a "a%b : x%y" type rule */
-				else if (target->names[i]->percent) {
+				/*
+				 * Check if this is a "a%b : x%y" type rule.
+				 * The state file and dependency reports only
+				 * record real targets, whose names may contain
+				 * a literal '%'; do not turn those into
+				 * pattern rules.
+				 */
+				else if (target->names[i]->percent &&
+				    makefile_type != reading_statefile &&
+				    makefile_type != rereading_statefile &&
+				    makefile_type != reading_cpp_file) {
 					percent_ptr =
 					  enter_percent(target->names[i],
 							target->target_group[i],
