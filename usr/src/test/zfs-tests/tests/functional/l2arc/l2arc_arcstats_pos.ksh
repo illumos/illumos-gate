@@ -16,6 +16,7 @@
 
 #
 # Copyright (c) 2020, George Amanakis. All rights reserved.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -74,7 +75,7 @@ arcstat_quiescence_noecho l2_size
 typeset l2_mfu_init=$(kstat arcstats.l2_mfu_asize)
 typeset l2_mru_init=$(kstat arcstats.l2_mru_asize)
 typeset l2_prefetch_init=$(kstat arcstats.l2_prefetch_asize)
-typeset l2_asize_init=$(kstat arcsats.l2_asize)
+typeset l2_asize_init=$(kstat arcstats.l2_asize)
 
 log_must zpool online $TESTPOOL $VDEV_CACHE
 arcstat_quiescence_noecho l2_size
