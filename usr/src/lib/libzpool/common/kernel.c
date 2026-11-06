@@ -36,6 +36,7 @@
 #include <libgen.h>
 #include <sys/spa.h>
 #include <sys/stat.h>
+#include <sys/dkio.h>
 #include <sys/processor.h>
 #include <sys/zfs_context.h>
 #include <zfs_fletcher.h>
@@ -164,6 +165,19 @@ vn_open(char *path, int x1, int flags, int mode, vnode_t **vpp, int x2, int x3)
 	vp->v_path = spa_strdup(path);
 	vp->v_dump_fd = dump_fd;
 
+	/*
+	 * A disk rejects I/O that is not aligned to its logical block size,
+	 * so remember that size to keep vn_rdwr()'s split writes aligned.
+	 */
+	vp->v_secshift = SPA_MINBLOCKSHIFT;
+	if (S_ISCHR(st.st_mode) || S_ISBLK(st.st_mode)) {
+		struct dk_minfo dkm;
+
+		if (ioctl(fd, DKIOCGMEDIAINFO, &dkm) == 0 &&
+		    ISP2(dkm.dki_lbsize) && dkm.dki_lbsize > SPA_MINBLOCKSIZE)
+			vp->v_secshift = highbit64(dkm.dki_lbsize) - 1;
+	}
+
 	return (0);
 }
 
@@ -204,13 +218,19 @@ vn_rdwr(int uio, vnode_t *vp, void *addr, ssize_t len, offset_t offset,
 		/*
 		 * To simulate partial disk writes, we split writes into two
 		 * system calls so that the process can be killed in between.
+		 * Split on a sector boundary so both writes stay aligned.
 		 */
-		int sectors = len >> SPA_MINBLOCKSHIFT;
+		int sectors = len >> vp->v_secshift;
+		ssize_t rc;
+
 		split = (sectors > 0 ? rand() % sectors : 0) <<
-		    SPA_MINBLOCKSHIFT;
+		    vp->v_secshift;
 		iolen = pwrite64(vp->v_fd, addr, split, offset);
-		iolen += pwrite64(vp->v_fd, (char *)addr + split,
-		    len - split, offset + split);
+		if (iolen != -1) {
+			rc = pwrite64(vp->v_fd, (char *)addr + split,
+			    len - split, offset + split);
+			iolen = (rc == -1) ? -1 : iolen + rc;
+		}
 	}
 
 	if (iolen == -1)

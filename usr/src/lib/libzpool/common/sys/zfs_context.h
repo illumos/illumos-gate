@@ -24,6 +24,7 @@
  * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
  * Copyright 2019 Joyent, Inc.
  * Copyright 2017 RackTop Systems.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef _SYS_ZFS_CONTEXT_H
@@ -178,6 +179,7 @@ typedef struct vnode {
 	int		v_fd;
 	char		*v_path;
 	int		v_dump_fd;
+	uint_t		v_secshift;	/* log2 of device logical block size */
 } vnode_t;
 
 extern char *vn_dumpdir;
