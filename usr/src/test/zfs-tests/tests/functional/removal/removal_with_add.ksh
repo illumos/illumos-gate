@@ -16,6 +16,7 @@
 
 #
 # Copyright (c) 2014, 2017 by Delphix. All rights reserved.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -34,12 +35,21 @@ function cleanup
 default_setup_noexit "$DISKS"
 log_onexit cleanup
 
+#
+# During a removal, only vdevs with the pool's ashift can be added.  A file
+# vdev gets ashift 9, so give it the largest ashift of the pool's disks, which
+# have 4K sectors on some systems.
+#
+ashift=$(zdb -C $TESTPOOL | \
+    awk '$1 == "ashift:" && $2 > a {a = $2} END {print a}')
+[[ -n $ashift ]] || log_fail "could not get the ashift of $TESTPOOL"
+
 function callback
 {
 	log_mustnot zpool attach -f $TESTPOOL $TMPDIR/dsk1 $TMPDIR/dsk2
 	log_mustnot zpool add -f $TESTPOOL \
 	    raidz $TMPDIR/dsk1 $TMPDIR/dsk2
-	log_must zpool add -f $TESTPOOL $TMPDIR/dsk1
+	log_must zpool add -f -o ashift=$ashift $TESTPOOL $TMPDIR/dsk1
 	return 0
 }
 
