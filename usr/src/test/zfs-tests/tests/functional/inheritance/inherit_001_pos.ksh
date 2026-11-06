@@ -27,6 +27,7 @@
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
 # Copyright 2020 Joyent, Inc.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -426,6 +427,8 @@ if [[ ${#config_files[*]} != ${#state_files[*]} ]]; then
 	log_fail "Must have the same number of config files " \
 	    " (${#config_files[*]}) and state files ${#state_files[*]}"
 fi
+
+log_onexit default_cleanup_noexit
 
 while ((k < ${#config_files[*]})); do
 	default_cleanup_noexit

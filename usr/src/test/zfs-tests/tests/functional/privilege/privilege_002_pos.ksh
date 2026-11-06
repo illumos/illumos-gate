@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -53,12 +54,25 @@
 #
 #	(destroy)
 #       5. Remove the FS profile, then attempt to destroy the fs, which
-# 	   should fail.
+#	   should fail.
 #	6. Assign the FS profile, then attempt to destroy the fs, which
 #	   should succeed.
 #
 
 verify_runnable "both"
+
+function cleanup
+{
+	usermod -P, $ZFS_USER
+	if is_global_zone; then
+		destroy_pool $TESTPOOL
+	else
+		datasetexists $DATASET/zfsprivfs &&
+		    destroy_dataset $DATASET/zfsprivfs
+	fi
+}
+
+log_onexit cleanup
 
 log_assert "The RBAC profile \"ZFS File System Management\" works"
 
@@ -96,6 +110,5 @@ log_mustnot su $ZFS_USER -c "pfexec zfs create $DATASET/zfsprivfs2"
 # assign the profile again and destroy the fs.
 usermod -P "ZFS File System Management" $ZFS_USER
 log_must su $ZFS_USER -c "pfexec zfs destroy $DATASET/zfsprivfs"
-usermod -P, $ZFS_USER
 
 log_pass "The RBAC profile \"ZFS File System Management\" works"
