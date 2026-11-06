@@ -16,6 +16,7 @@
 #
 # Copyright (c) 2016 by Delphix. All rights reserved.
 # Copyright (c) 2019 by Lawrence Livermore National Security, LLC.
+# Copyright 2026 Oxide Computer Company
 #
 
 function trim_prog_line # pool disk
@@ -28,6 +29,36 @@ function trim_prog_line # pool disk
 function trim_progress # pool disk
 {
 	trim_prog_line "$1" "$2" | sed 's/.*(\([0-9]\{1,\}\)% trimmed.*/\1/g'
+}
+
+#
+# Wait for the manual TRIM of a vdev to complete. Until the new TRIM's thread
+# starts, the vdev still reports the previous TRIM's progress, which may be
+# 100%, so wait for "completed at" rather than for 100%.
+#
+function wait_trim_complete # pool disk
+{
+	typeset -i tries=0
+
+	while ! trim_prog_line "$1" "$2" | grep -q "completed at"; do
+		(( tries++ < 600 )) ||
+		    log_fail "TRIM did not complete: $(zpool status -t $1)"
+		sleep 0.5
+	done
+}
+
+#
+# Print a file's allocated size in bytes, as du(1) reports it, once every pool
+# has synced. When the file is on ZFS, du reports the blocks it had at the last
+# txg sync of its pool. For a file vdev that is usually the root pool, which
+# zfstest excludes from zpool commands that act on all pools
+# (__ZFS_POOL_EXCLUDE), so sync_all_pools would skip it; sync(8) waits for
+# every pool.
+#
+function file_alloc_bytes # file
+{
+	sync
+	echo $(( $(du "$1" | cut -f1) * 512 ))
 }
 
 function cleanup

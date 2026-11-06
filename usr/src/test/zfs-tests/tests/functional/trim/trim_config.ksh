@@ -18,6 +18,7 @@
 # Copyright (c) 2019 by Tim Chase. All rights reserved.
 # Copyright (c) 2019 Lawrence Livermore National Security, LLC.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -31,11 +32,11 @@
 # STRATEGY:
 #	1. Create a pool on file vdevs to trim.
 #	2. Fill the pool to a known percentage of capacity.
-#	3. Verify the vdevs contain 75% or more allocated blocks.
+#	3. Verify the vdevs contain 65% or more allocated blocks.
 #	4. Remove all files making it possible to trim the entire pool.
 #	5. Manually trim the pool.
 #	6. Wait for trim to issue trim IOs for the free blocks.
-#	7. Verify the disks contain 30% or less allocated blocks.
+#	7. Verify the disks contain 40% or less allocated blocks.
 #	8. Repeat for test for striped, mirrored, and RAIDZ pools.
 
 verify_runnable "global"
@@ -68,8 +69,8 @@ log_must set_tunable32 zfs_trim_txg_batch 8
 typeset vdev_min_ms_count=$(get_tunable zfs_vdev_min_ms_count)
 log_must set_tunable32 zfs_vdev_min_ms_count 32
 
-typeset VDEV_MAX_MB=$(( floor(4 * MINVDEVSIZE * 0.75 / 1024 / 1024) ))
-typeset VDEV_MIN_MB=$(( floor(4 * MINVDEVSIZE * 0.30 / 1024 / 1024) ))
+typeset VDEV_MAX_MB=$(( floor(4 * MINVDEVSIZE * 0.65 / 1024 / 1024) ))
+typeset VDEV_MIN_MB=$(( floor(4 * MINVDEVSIZE * 0.40 / 1024 / 1024) ))
 
 for type in "" "mirror" "raidz2"; do
 
@@ -88,7 +89,9 @@ for type in "" "mirror" "raidz2"; do
 	typeset fill_mb=$(( floor(availspace * 0.90 / 1024 / 1024) ))
 
 	# Fill the pool, verify the vdevs are no longer sparse.
-	file_write -o create -f /$TESTPOOL/file -b 1048576 -c $fill_mb -d R
+	# Use random data, so the pool holding the vdevs cannot compress it.
+	log_must dd if=/dev/urandom of=/$TESTPOOL/file bs=1048576 \
+	    count=$fill_mb
 	verify_vdevs "-gt" "$VDEV_MAX_MB" $VDEVS
 
 	# Remove the file, issue trim, verify the vdevs are now sparse.

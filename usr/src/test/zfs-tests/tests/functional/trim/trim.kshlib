@@ -14,6 +14,7 @@
 # Copyright (c) 2019 by Tim Chase. All rights reserved.
 # Copyright (c) 2019 Lawrence Livermore National Security, LLC.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/tests/functional/cli_root/zpool_trim/zpool_trim.kshlib
@@ -23,9 +24,7 @@
 #
 function get_size_mb
 {
-	typeset rval=$(du -s "$1" | awk '{print $1}')
-	rval=$((rval * 2048))
-	echo -n "$rval"
+	du -m -s "$1" | cut -f1
 }
 
 #
@@ -42,12 +41,12 @@ function get_trim_io
 	"ind")
 		rval=$(zpool iostat -pr $pool | awk \
 		    '$1 ~ /[0-9].*/ { sum += $12 } END { print sum }')
-		echo -n "$rval"
+		echo "$rval"
 		;;
 	"agg")
 		rval=$(zpool iostat -pr $pool | awk \
 		    '$1 ~ /[0-9].*/ { sum += $13 } END { print sum }')
-		echo -n "$rval"
+		echo "$rval"
 		;;
 	*)
 		log_fail "Type must be 'ind' or 'agg'"
@@ -75,29 +74,41 @@ function verify_trim_io
 }
 
 #
-# Run N txgs which should be enough to trim the entire pool.
+# Wait until each file vdev uses at most size MB on disk.
 #
-function wait_trim_io # pool type txgs
+function wait_trim_io # pool type size vdevs
 {
 	typeset pool="${1-:$TESTPOOL}"
 	typeset type="${2-:ind}"
-	typeset txgs=${3:-10}
+	typeset size=$3
+	typeset vdev
+	shift 3
 	typeset timeout=120
 	typeset stop_time=$(( $(date +%s) + $timeout ))
 
 	typeset -i i=0
-	while [[ $i -lt $txgs ]]; do
+	while :; do
+		typeset trimmed=1
+		for vdev in "$@"; do
+			if (( $(get_size_mb "$vdev") > size )); then
+				trimmed=0
+				break
+			fi
+		done
+		(( trimmed )) && break
 		if [ "$(date +%s)" -ge $stop_time ]; then
+			verify_vdevs "-le" "$size" "$@"
 			log_fail "Exceeded trim time limit of ${timeout}s"
-			return
 		fi
 
-		sync_all_pools true
+		# sync(8), not sync_all_pools: get_size_mb reads the vdevs'
+		# sizes from the pool they are on (see file_alloc_bytes).
+		sync
 		((i = i + 1))
 	done
 
 	typeset ios=$(get_trim_io $pool $type)
-	log_note "Waited for $txgs txgs, $ios $type TRIM IOs"
+	log_note "Waited for $i txgs, $ios $type TRIM IOs"
 }
 
 #
@@ -109,6 +120,9 @@ function verify_vdevs # op size vdevs
 	typeset tgt_size=$2
 	shift 2
 	typeset vdevs=$@
+
+	# Sync every pool, including the one the vdevs are on.
+	log_must sync
 
 	for vdev in $vdevs; do
 		typeset size=$(get_size_mb $vdev)
@@ -123,34 +137,16 @@ function verify_vdevs # op size vdevs
 }
 
 #
-# Wait for up to 120 seconds for trimming of the listed vdevs to complete.
+# Wait for the manual TRIM of each listed vdev to complete.
 #
 function wait_trim # pool vdevs
 {
-	typeset stop_time=$(( $(date +%s) + 120 ))
 	typeset pool="$1"
+	typeset vdev
 	shift
-	typeset vdevs=$@
-	typeset complete
 
-	while [[ $complete -eq 0 ]]; do
-		complete=1
-
-		for vdev in $vdevs; do
-			if [[ "$(trim_progress $pool $vdev)" -lt "100" ]]; then
-				complete=0
-				break
-			else
-				log_must eval "trim_prog_line $pool $vdev | \
-				    grep complete"
-			fi
-		done
-
-		if [ "$(date +%s)" -ge $stop_time ]; then
-			log_fail "Exceeded trim time limit of 120s"
-		fi
-
-		sleep 0.5
+	for vdev in "$@"; do
+		wait_trim_complete $pool $vdev
 	done
 
 	log_note "Pool completed trim successfully."

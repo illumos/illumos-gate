@@ -18,6 +18,7 @@
 # Copyright (c) 2019 by Tim Chase. All rights reserved.
 # Copyright (c) 2019 Lawrence Livermore National Security, LLC.
 # Copyright 2019 Joyent, Inc.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -70,10 +71,8 @@ log_must zpool create $TESTPOOL "$LARGEFILE"
 fsize=$(( floor(LARGESIZE * 0.80) ))
 cnt=$((fsize / 1048576))
 log_must dd if=/dev/urandom of=/$TESTPOOL/file bs=1048576 count=$cnt
-sync_all_pools
 
-new_size=$(du "$LARGEFILE" | cut -f1)
-new_size=$((new_size * 512))
+new_size=$(file_alloc_bytes "$LARGEFILE")
 log_must test $new_size -le $LARGESIZE
 log_must test $new_size -gt $(( floor(LARGESIZE * 0.70) ))
 
@@ -85,8 +84,7 @@ log_must dd if=/dev/urandom of=$LARGEFILE conv=notrunc \
 log_must zpool import -d $TESTDIR $TESTPOOL
 log_must zpool online -e $TESTPOOL "$LARGEFILE"
 
-new_size=$(du "$LARGEFILE" | cut -f1)
-new_size=$((new_size * 512))
+new_size=$(file_alloc_bytes "$LARGEFILE")
 log_must test $new_size -gt $((4 * floor(LARGESIZE * 0.70) ))
 
 # Perform a partial trim, we expect it to skip most of the new metaslabs
@@ -94,28 +92,18 @@ log_must test $new_size -gt $((4 * floor(LARGESIZE * 0.70) ))
 log_must set_tunable32 zfs_trim_metaslab_skip 1
 log_must zpool trim $TESTPOOL
 log_must set_tunable32 zfs_trim_metaslab_skip 0
+wait_trim_complete $TESTPOOL $LARGEFILE
 
-sync_all_pools
-while [[ "$(trim_progress $TESTPOOL $LARGEFILE)" -lt "100" ]]; do
-	sleep 0.5
-done
-
-new_size=$(du "$LARGEFILE" | cut -f1)
-new_size=$((new_size * 512))
+new_size=$(file_alloc_bytes "$LARGEFILE")
 log_must test $new_size -gt $LARGESIZE
 
 # Perform a full trim, all metaslabs will be trimmed the pool vdev
 # size will be reduced but not down to its original size due to the
 # space usage of the new metaslabs.
 log_must zpool trim $TESTPOOL
+wait_trim_complete $TESTPOOL $LARGEFILE
 
-sync_all_pools
-while [[ "$(trim_progress $TESTPOOL $LARGEFILE)" -lt "100" ]]; do
-	sleep 0.5
-done
-
-new_size=$(du "$LARGEFILE" | cut -f1)
-new_size=$((new_size * 512))
+new_size=$(file_alloc_bytes "$LARGEFILE")
 log_must test $new_size -le $(( 2.1 * LARGESIZE))
 log_must test $new_size -gt $(( floor(LARGESIZE * 0.70) ))
 
