@@ -16,6 +16,7 @@
 
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -36,7 +37,7 @@ verify_runnable "both"
 
 function cleanup
 {
-	set_tunable64 zfs_override_estimate_recordsize 8192
+	set_tunable64 zfs_override_estimate_recordsize $saved_recordsize
 	for ds in $datasets; do
                 datasetexists $ds && zfs destroy -rf $ds
 	done
@@ -92,6 +93,7 @@ function verify_size_estimates
 }
 
 log_assert "Verify 'zfs send -nvP' generates valid stream estimates"
+typeset saved_recordsize=$(get_tunable zfs_override_estimate_recordsize)
 log_onexit cleanup
 set_tunable64 zfs_override_estimate_recordsize 0
 typeset -l block_count=0
