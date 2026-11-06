@@ -27,6 +27,7 @@
  * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * Copyright 2025 MNX Cloud, Inc.
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 /*
@@ -1181,6 +1182,7 @@ _ndoprnt(const CHAR_T *format, va_list in_args, FILE *iop, int prflag)
 						flagword |= LZERO;
 					}
 					break;
+				case 'p':
 				case 'x':
 					prefix = _P_ZEROx;
 					prefixlength = 2;

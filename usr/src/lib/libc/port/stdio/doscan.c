@@ -22,6 +22,8 @@
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ *
+ * Copyright 2026 Edgecast Cloud LLC.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
@@ -743,10 +745,10 @@ number(int *chcount, int *flag_eof, int stow, int type, int len, int size,
 		/* FALLTHROUGH */
 	case '0':
 		/*
-		 * If %i or %x, the characters 0x or 0X may optionally precede
-		 * the sequence of letters and digits (base 16).
+		 * If %i or %x or %p, the characters 0x or 0X may optionally
+		 * precede the sequence of letters and digits (base 16).
 		 */
-		if ((type != 'i' && type != 'x') || (len <= 1))
+		if ((type != 'i' && type != 'x' && type != 'p') || (len <= 1))
 			break;
 		if (((inchar = locgetc((*chcount))) == 'x') ||
 		    (inchar == 'X')) {

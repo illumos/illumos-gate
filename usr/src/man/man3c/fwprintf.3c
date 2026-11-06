@@ -42,8 +42,9 @@
 .\"
 .\" Copyright (c) 1992, X/Open Company Limited. All Rights Reserved.
 .\" Portions Copyright (c) 2003, Sun Microsystems, Inc. All Rights Reserved.
+.\" Copyright 2026 Edgecast Cloud LLC.
 .\"
-.TH FWPRINTF 3C "Feb 17, 2023"
+.TH FWPRINTF 3C "Nov 08, 2026"
 .SH NAME
 fwprintf, wprintf, swprintf \- print formatted wide-character output
 .SH SYNOPSIS
@@ -248,8 +249,9 @@ flag will be ignored.
 .RS 9n
 This flag specifies that the value is to be converted to an alternative form.
 For \fBo\fR conversion, it increases the precision (if necessary) to force the
-first digit of the result to be 0. For \fBx\fR or \fBX\fR conversions, a
-non-zero result will have 0x (or 0X) prefixed to it. For \fBa\fR, \fBA\fR,
+first digit of the result to be 0. For For \fBp\fR, \fBx\fR or \fBX\fR
+conversions, a non-zero result will have 0x (or 0X) prefixed to it.
+For \fBa\fR, \fBA\fR,
 \fBe\fR, \fBE\fR, \fBf\fR, \fBF\fR, \fBg\fR, or \fBG\fR conversions, the result
 will always contain a radix character, even if no digits follow it. Without
 this flag, a radix character appears in the result of these conversions only if

@@ -180,6 +180,8 @@ user = root
 [/opt/libc-tests/tests/printf-6961.64]
 [/opt/libc-tests/tests/printf-9511.32]
 [/opt/libc-tests/tests/printf-9511.64]
+[/opt/libc-tests/tests/printf-altp.32]
+[/opt/libc-tests/tests/printf-altp.64]
 [/opt/libc-tests/tests/printf-intmax]
 [/opt/libc-tests/tests/priv_gettext]
 [/opt/libc-tests/tests/psignal]

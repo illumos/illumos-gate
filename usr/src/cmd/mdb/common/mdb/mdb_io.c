@@ -1443,6 +1443,11 @@ iob_doprnt(mdb_iob_t *iob, const char *format, varglist_t *ap)
 		case 'p':
 			u.ptr = VA_PTRARG(ap);
 			u.str = numtostr((uintptr_t)u.ptr, 16, NTOS_UNSIGNED);
+
+			if (f_alt && !zero) {
+				altstr = "0x";
+				altlen = 2;
+			}
 			break;
 
 		case 'q':

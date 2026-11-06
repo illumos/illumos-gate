@@ -45,8 +45,9 @@
 .\" Copyright (c) 2001, The IEEE and The Open Group.  All Rights Reserved.
 .\" Copyright (c) 2009, Sun Microsystems, Inc. All Rights Reserved.
 .\" Copyright 2025 Hans Rosenfeld
+.\" Copyright 2026 Edgecast Cloud LLC.
 .\"
-.TH PRINTF 3C "April 25, 2024"
+.TH PRINTF 3C "November 08, 2026"
 .SH NAME
 printf, dprintf, fprintf, sprintf, snprintf, asprintf \- print formatted output
 .SH SYNOPSIS
@@ -323,11 +324,12 @@ flag will be ignored.
 The value is to be converted to an alternate form. For \fBc\fR, \fBd\fR,
 \fBi\fR, \fBs\fR, and \fBu\fR conversions, the flag has no effect. For an
 \fBo\fR conversion, it increases the precision (if necessary) to force the
-first digit of the result to be a zero. For \fBx\fR or \fBX\fR conversion, a
-non-zero result will have \fB0x\fR (or \fB0X\fR) prepended to it. For \fBa\fR,
-\fBA\fR, \fBe\fR, \fBE\fR, \fBf\fR, \fBF\fR, \fBg\fR, and \fBG\fR conversions,
-the result will always contain a radix character, even if no digits follow the
-radix character. Without this flag, the radix character appears in the result
+first digit of the result to be a zero. For \fBp\fR, \fBx\fR or \fBX\fR
+conversion, a non-zero result will have \fB0x\fR (or \fB0X\fR) prepended to it.
+For \fBa\fR, \fBA\fR, \fBe\fR, \fBE\fR, \fBf\fR, \fBF\fR, \fBg\fR, and
+\fBG\fR conversions, the result will always contain a radix character,
+even if no digits follow the radix character.
+Without this flag, the radix character appears in the result
 of these conversions only if a digit follows it. For \fBg\fR and \fBG\fR
 conversions, trailing zeros will not be removed from the result as they
 normally are.
