@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -85,6 +86,8 @@ for num in 0 1 2 3 ; do
 	slice=${slice##*s}
 	log_must set_partition $slice "" $FS_SIZE $disk
 done
+
+verify_ufs_capable $vdisks $sdisks
 
 while (( i < ${#vdevs[*]} )); do
 	if [[ -n $SINGLE_DISK && -n ${vdevs[i]} ]]; then

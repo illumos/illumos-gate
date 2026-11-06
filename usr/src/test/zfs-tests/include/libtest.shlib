@@ -2944,6 +2944,40 @@ function new_fs #<args>
 }
 
 #
+# Print the logical sector size of a disk, slice or raw device path, or
+# nothing if it cannot be determined (e.g. the disk has no label).
+#
+function get_sector_size #<disk>
+{
+	typeset dev=$1
+
+	is_illumos || return 0
+
+	if [[ $dev != /* ]]; then
+		dev=$DEV_RDSKDIR/$dev
+		[[ -e $dev ]] || dev=${dev}s2
+	fi
+	prtvtoc $dev 2>/dev/null | awk '/bytes\/sector/ {print $2; exit}'
+}
+
+#
+# Skip the test unless UFS can be created on all of the given disks or
+# slices.  UFS supports only 512-byte sectors.  A disk whose sector size is
+# unknown is assumed to be usable.
+#
+function verify_ufs_capable #<disk> ...
+{
+	typeset disk
+	typeset secsize
+
+	for disk in "$@"; do
+		secsize=$(get_sector_size $disk)
+		[[ -z $secsize || $secsize == 512 ]] || log_unsupported \
+		    "UFS does not support the $secsize-byte sectors of $disk"
+	done
+}
+
+#
 # Wait for the specified arcstat to reach non-zero quiescence.
 # If echo is 1 echo the value after reaching quiescence, otherwise
 # if echo is 0 print the arcstat we are waiting on.

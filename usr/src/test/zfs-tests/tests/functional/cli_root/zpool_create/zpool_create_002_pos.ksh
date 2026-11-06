@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -76,9 +77,17 @@ else
 	disk=$DISK0
 fi
 create_pool "$TESTPOOL" "${disk}s${SLICE0}"
-log_must eval "new_fs ${DEV_RDSKDIR}/${disk}s${SLICE1} >/dev/null 2>&1"
-create_blockfile $FILESIZE $TESTDIR0/$FILEDISK0 ${disk}s${SLICE4}
-create_blockfile $FILESIZE1 $TESTDIR1/$FILEDISK1 ${disk}s${SLICE5}
+
+# UFS supports only 512-byte sectors.
+typeset secsize=$(get_sector_size $disk)
+typeset ufs=false
+[[ -z $secsize || $secsize == 512 ]] && ufs=true
+
+if $ufs; then
+	log_must eval "new_fs ${DEV_RDSKDIR}/${disk}s${SLICE1} >/dev/null 2>&1"
+fi
+create_blockfile $FILESIZE $TESTDIR0/$FILEDISK0
+create_blockfile $FILESIZE1 $TESTDIR1/$FILEDISK1
 log_must mkfile $SIZE /var/tmp/$FILEDISK0
 log_must mkfile $SIZE /var/tmp/$FILEDISK1
 log_must mkfile $SIZE /var/tmp/$FILEDISK2
@@ -91,11 +100,16 @@ log_mustnot zpool create "$TESTPOOL1" "${disk}s${SLICE0}"
 create_pool "$TESTPOOL1" "${disk}s${SLICE0}"
 log_must poolexists $TESTPOOL1
 
-log_note "'zpool create' without '-f' will fail " \
-	"while device is using by an ufs filesystem."
-log_mustnot zpool create "$TESTPOOL2" "${disk}s${SLICE1}"
-create_pool "$TESTPOOL2" "${disk}s${SLICE1}"
-log_must poolexists $TESTPOOL2
+if $ufs; then
+	log_note "'zpool create' without '-f' will fail " \
+		"while device is using by an ufs filesystem."
+	log_mustnot zpool create "$TESTPOOL2" "${disk}s${SLICE1}"
+	create_pool "$TESTPOOL2" "${disk}s${SLICE1}"
+	log_must poolexists $TESTPOOL2
+else
+	log_note "Skipping the ufs case: UFS does not support the" \
+	    "$secsize-byte sectors of $disk"
+fi
 
 log_note "'zpool create' mirror without '-f' will fail " \
 	"while devices have different size."

@@ -103,6 +103,8 @@ for num in 0 1 2; do
 	log_must set_partition $slice "" $FS_SIZE $disk
 done
 
+verify_ufs_capable $FS_SIDE1
+
 log_note "Make a ufs filesystem on source $rawdisk1"
 new_fs $rawdisk1 > /dev/null 2>&1
 (($? != 0)) && log_untested "Unable to create ufs filesystem on $rawdisk1"

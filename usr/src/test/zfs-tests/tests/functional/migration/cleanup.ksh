@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -36,23 +37,12 @@ verify_runnable "global"
 
 ismounted $NONZFS_TESTDIR ufs
 (( $? == 0 )) && log_must umount -f $NONZFS_TESTDIR
+lofiadm $NONZFS_FILE > /dev/null 2>&1 && log_must lofiadm -d $NONZFS_FILE
+rm -f $NONZFS_FILE
 
 ismounted $TESTPOOL/$TESTFS
 [[ $? == 0 ]] && log_must zfs umount -f $TESTDIR
 destroy_pool $TESTPOOL
-
-# recreate and destroy a zpool over the disks to restore the partitions to
-# normal
-case $DISK_COUNT in
-0)
-	log_note "No disk devices to restore"
-	;;
-1)
-	log_must cleanup_devices $ZFS_DISK
-	;;
-*)
-	log_must cleanup_devices $ZFS_DISK $NONZFS_DISK
-	;;
-esac
+log_must rm -rf $TESTDIR
 
 log_pass

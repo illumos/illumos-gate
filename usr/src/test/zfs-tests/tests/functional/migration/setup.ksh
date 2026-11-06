@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -34,22 +35,9 @@
 
 verify_runnable "global"
 
-case $DISK_COUNT in
-0)
-	log_untested "Need at least 1 disk device for test"
-	;;
-1)
-	log_note "Partitioning a single disk ($SINGLE_DISK)"
-	;;
-*)
-	log_note "Partitioning disks ($ZFS_DISK $NONZFS_DISK)"
-	;;
-esac
+verify_disk_count "$DISKS" 1
 
-set_partition ${ZFSSIDE_DISK##*s} "" $FS_SIZE $ZFS_DISK
-set_partition ${NONZFSSIDE_DISK##*s} "" $FS_SIZE $NONZFS_DISK
-
-create_pool $TESTPOOL "$ZFSSIDE_DISK"
+create_pool $TESTPOOL "$ZFS_DISK"
 
 rm -rf $TESTDIR  || log_unresolved Could not remove $TESTDIR
 mkdir -p $TESTDIR || log_unresolved Could not create $TESTDIR
@@ -60,10 +48,15 @@ log_must zfs set mountpoint=$TESTDIR $TESTPOOL/$TESTFS
 rm -rf $NONZFS_TESTDIR  || log_unresolved Could not remove $NONZFS_TESTDIR
 mkdir -p $NONZFS_TESTDIR || log_unresolved Could not create $NONZFS_TESTDIR
 
-new_fs ${DEV_RDSKDIR}/$NONZFSSIDE_DISK
-(( $? != 0 )) &&
-	log_untested "Unable to setup a UFS file system"
-
-log_must mount /dev/dsk/$NONZFSSIDE_DISK $NONZFS_TESTDIR
+#
+# Put the UFS file system on a lofi device, which always has 512-byte
+# sectors, since UFS does not support disks with larger sectors.  First
+# detach any lofi device left by an aborted run.
+#
+lofiadm $NONZFS_FILE > /dev/null 2>&1 && log_must lofiadm -d $NONZFS_FILE
+log_must mkfile -n $FS_SIZE $NONZFS_FILE
+lofidev=$(lofiadm -a $NONZFS_FILE) || log_fail "lofiadm -a $NONZFS_FILE failed"
+log_must new_fs ${lofidev/lofi/rlofi}
+log_must mount $lofidev $NONZFS_TESTDIR
 
 log_pass

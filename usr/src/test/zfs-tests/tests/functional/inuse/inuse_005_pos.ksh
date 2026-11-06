@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -60,9 +61,9 @@ function verify_assertion #slices
 
 	for t in $targets; do
 		new_fs $t > /dev/null 2>&1
-		(( $? !=0 )) || \
-			log_fail "newfs over active pool " \
-			"unexpected return code of 0"
+		typeset -i ret=$?
+		(( ret == 2 )) || log_fail "newfs over active pool $t" \
+		    "returned $ret, expected 2 (device in use)"
 	done
 
 	return 0

@@ -27,6 +27,7 @@
 
 #
 # Copyright (c) 2012, 2015 by Delphix. All rights reserved.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -72,13 +73,13 @@ set -A keywords "" "mirror" "raidz" "raidz1"
 case $DISK_ARRAY_NUM in
 0|1)
 	typeset disk=""
-	if (( $DISK_ARRAY_NUM == 0 )); then
+	if (( DISK_ARRAY_NUM == 0 )); then
 		disk=$DISK
 	else
 		disk=$DISK0
 	fi
-	create_blockfile $FILESIZE $TESTDIR0/$FILEDISK0 ${disk}s${SLICE5}
-        create_blockfile $FILESIZE $TESTDIR1/$FILEDISK1 ${disk}s${SLICE6}
+	create_blockfile $FILESIZE $TESTDIR0/$FILEDISK0
+	create_blockfile $FILESIZE $TESTDIR1/$FILEDISK1
 
 	pooldevs="${disk}s${SLICE0} \
                   /dev/dsk/${disk}s${SLICE0} \
@@ -92,8 +93,8 @@ case $DISK_ARRAY_NUM in
 	mirrordevs=$raidzdevs
 	;;
 2|*)
-	create_blockfile $FILESIZE $TESTDIR0/$FILEDISK0 ${DISK0}s${SLICE5}
-        create_blockfile $FILESIZE $TESTDIR1/$FILEDISK1 ${DISK1}s${SLICE5}
+	create_blockfile $FILESIZE $TESTDIR0/$FILEDISK0
+	create_blockfile $FILESIZE $TESTDIR1/$FILEDISK1
 
 	pooldevs="${DISK0}s${SLICE0}\
                  \"/dev/dsk/${DISK0}s${SLICE0} ${DISK1}s${SLICE0}\" \
@@ -111,7 +112,7 @@ case $DISK_ARRAY_NUM in
 esac
 
 typeset -i i=0
-while (( $i < ${#keywords[*]} )); do
+while (( i < ${#keywords[*]} )); do
 	case ${keywords[i]} in
 	"")
 		create_pool_test "$TESTPOOL" "${keywords[i]}" "$pooldevs";;
