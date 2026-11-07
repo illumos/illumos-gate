@@ -26,6 +26,7 @@
 
 #
 # Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright 2026 Oxide Computer Company
 #
 
 . $STF_SUITE/include/libtest.shlib
@@ -252,6 +253,12 @@ function replace_missing_devs
 
 	typeset vdev
 	for vdev in $@; do
+		#
+		# The pool still has the old file open.  Recreating it in place
+		# would let the pool write its labels into the new file, which
+		# would then look in use, so create a new file instead.
+		#
+		log_must rm -f $vdev
 		log_must mkfile $MINVDEVSIZE $vdev
 		log_must zpool replace -wf $pool $vdev $vdev
 	done
