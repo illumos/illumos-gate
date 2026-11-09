@@ -984,8 +984,7 @@ pcitool_bar_find(uint8_t bar, boolean_t bridge, boolean_t cfg_io,
 					return (EINVAL);
 				}
 				addr = raw[idx] & PCI_BASE_M_ADDR_M;
-				addr |= (uint64_t)(raw[idx + 1] &
-				    PCI_BASE_M_ADDR_M) << 32;
+				addr |= (uint64_t)raw[idx + 1] << 32;
 				break;
 			case PCI_BASE_TYPE_RES:
 				cfg->status = PCITOOL_INVALID_ADDRESS;
