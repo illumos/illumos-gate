@@ -1557,6 +1557,9 @@ file path=opt/zfs-tests/tests/functional/cli_root/zpool_detach/setup mode=0555
 file \
     path=opt/zfs-tests/tests/functional/cli_root/zpool_detach/zpool_detach_001_neg \
     mode=0555
+file \
+    path=opt/zfs-tests/tests/functional/cli_root/zpool_detach/zpool_detach_spare_throttle \
+    mode=0555
 dir  path=opt/zfs-tests/tests/functional/cli_root/zpool_expand
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_expand/cleanup mode=0555
 file path=opt/zfs-tests/tests/functional/cli_root/zpool_expand/setup mode=0555

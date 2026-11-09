@@ -24,6 +24,7 @@
  * Copyright (c) 2011, 2015 by Delphix. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright 2017 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/spa.h>
@@ -542,7 +543,13 @@ log_internal(nvlist_t *nvl, const char *operation, spa_t *spa,
 	fnvlist_add_string(nvl, ZPOOL_HIST_INT_NAME, operation);
 	fnvlist_add_uint64(nvl, ZPOOL_HIST_TXG, tx->tx_txg);
 
-	if (dmu_tx_is_syncing(tx)) {
+	/*
+	 * In open context, use a sync task even for a tx from
+	 * dmu_tx_create_assigned(), used by callers that hold the config
+	 * lock.
+	 */
+	if (dsl_pool_sync_context(spa_get_dsl(spa))) {
+		ASSERT(dmu_tx_is_syncing(tx));
 		spa_history_log_sync(nvl, tx);
 	} else {
 		dsl_sync_task_nowait(spa_get_dsl(spa),
