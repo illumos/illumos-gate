@@ -23,7 +23,7 @@
 # All Rights Reserved.
 #
 # Copyright (c) 2018, Joyent, Inc.
-# Copyright 2019 OmniOS Community Edition (OmniOSce) Association.
+# Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 
 PROG = latencytop
 OBJS = latencytop.o display.o dwrapper.o klog.o stat.o table.o util.o
@@ -39,7 +39,7 @@ CERRWARN += $(CNOWARN_UNINIT)
 SMATCH=off
 
 CPPFLAGS += -DEMBED_CONFIGS -I$(ADJUNCT_PROTO)/usr/include/glib-2.0 \
-	-I$(ADJUNCT_PROTO)/usr/lib/glib-2.0/include
+	-I$(ADJUNCT_PROTO)/usr/lib/64/glib-2.0/include
 CSTD = $(CSTD_GNU99)
 LDLIBS += -lcurses -ldtrace
 NATIVE_LIBS += libglib-2.0.so
