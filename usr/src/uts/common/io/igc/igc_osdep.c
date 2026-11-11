@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 SkyLime GmbH
  */
 
 /*
@@ -57,12 +58,10 @@ IGC_WRITE_REG(struct igc_hw *hw, uint32_t reg, uint32_t val)
 }
 
 void
-IGC_WRITE_REG_ARRAY(struct igc_hw *hw, uint32_t reg, uint32_t offset,
+IGC_WRITE_REG_ARRAY(struct igc_hw *hw, uint32_t reg, uint32_t index,
     uint32_t val)
 {
 	igc_t *igc = hw->back;
 
-	ASSERT3U(reg, <, igc->igc_regs_size);
-	ASSERT3U(offset + reg, <=, igc->igc_regs_size);
-	igc_write32(igc, reg + offset, val);
+	igc_write32(igc, reg + (index << 2), val);
 }
