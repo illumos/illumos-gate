@@ -11,6 +11,7 @@
 
 /*
  * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 SkyLime GmbH
  */
 
 /*
@@ -133,7 +134,7 @@ igc_m_getstat(void *drv, uint_t stat, uint64_t *valp)
 		*valp = stats->is_tpr.value.ui64;
 		break;
 	case MAC_STAT_OBYTES:
-		igc_stats_update_u64(igc, &stats->is_tor, IGC_TOTL);
+		igc_stats_update_u64(igc, &stats->is_tot, IGC_TOTL);
 		*valp = stats->is_tot.value.ui64;
 		break;
 	case MAC_STAT_OPACKETS:
