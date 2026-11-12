@@ -20,6 +20,7 @@ PROG =	rdmsr \
 	imul \
 	cpuid \
 	cpuid_guest_state \
+	cpuid_legacy_intel_8000_0008 \
 	inout \
 	rep_instrs
 

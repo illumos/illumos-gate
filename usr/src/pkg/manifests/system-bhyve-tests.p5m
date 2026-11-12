@@ -33,6 +33,7 @@ dir  path=opt/bhyve-tests/tests
 dir  path=opt/bhyve-tests/tests/inst_emul
 file path=opt/bhyve-tests/tests/inst_emul/cpuid mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/cpuid_guest_state mode=0555
+file path=opt/bhyve-tests/tests/inst_emul/cpuid_legacy_intel_8000_0008 mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/exit_consistent mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/exit_paging mode=0555
 file path=opt/bhyve-tests/tests/inst_emul/imul mode=0555

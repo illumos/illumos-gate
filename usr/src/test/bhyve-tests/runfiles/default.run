@@ -65,6 +65,7 @@ user = root
 tests = [
 	'cpuid',
 	'cpuid_guest_state',
+	'cpuid_legacy_intel_8000_0008',
 	'imul',
 	'rdmsr',
 	'wrmsr',

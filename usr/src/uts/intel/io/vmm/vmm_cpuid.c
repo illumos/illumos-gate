@@ -619,6 +619,26 @@ legacy_emulate_cpuid(struct vcpu *vcpu, uint32_t *eax, uint32_t *ebx,
 				logical_cpus = MIN(0xFF, threads * cores - 1);
 				regs[2] = (width << AMDID_COREID_SIZE_SHIFT) |
 				    logical_cpus;
+			} else if (vmm_is_intel()) {
+				/*
+				 * Some nested virtualization configurations set
+				 * AMD-specific bits even on Intel hardware. For
+				 * example, KVM sets the AMD
+				 * Fn8000_0008_EBX[IBRS] bit for guests when an
+				 * Intel CPU has CPUID.07H.00H:EDX[26]
+				 * (IBRS_IBPB) set. To prevent bhyve guests from
+				 * seeing features we don't support, we mask out
+				 * everything other than EAX, which has a shared
+				 * definition on Intel and AMD.
+				 *
+				 * See AMD APM Rev. 3.39 Vol. 3 E.4.7 and Intel
+				 * SDM Rev. 093US Vol. 1 Table 21-98 for details
+				 * on the respective definitions of 8000_0008
+				 * leaves.
+				 */
+				regs[1] = 0;
+				regs[2] = 0;
+				regs[3] = 0;
 			}
 			break;
 

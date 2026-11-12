@@ -32,6 +32,7 @@ bhyve-tests/tests/*/pobj_*.s
 # All the rest
 bhyve-tests/tests/inst_emul/cpuid
 bhyve-tests/tests/inst_emul/cpuid_guest_state
+bhyve-tests/tests/inst_emul/cpuid_legacy_intel_8000_0008
 bhyve-tests/tests/inst_emul/exit_consistent
 bhyve-tests/tests/inst_emul/exit_paging
 bhyve-tests/tests/inst_emul/imul
@@ -39,6 +40,7 @@ bhyve-tests/tests/inst_emul/inout
 bhyve-tests/tests/inst_emul/page_dirty
 bhyve-tests/tests/inst_emul/payload_cpuid
 bhyve-tests/tests/inst_emul/payload_cpuid_guest_state
+bhyve-tests/tests/inst_emul/payload_cpuid_legacy_intel_8000_0008
 bhyve-tests/tests/inst_emul/payload_exit_consistent
 bhyve-tests/tests/inst_emul/payload_exit_paging
 bhyve-tests/tests/inst_emul/payload_imul
