@@ -12,6 +12,7 @@
 /*
  * Copyright 2017 Toomas Soome <tsoome@me.com>
  * Copyright 2019, Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -834,25 +835,36 @@ multiboot2_exec(struct preloaded_file *fp)
 #if defined(EFI)
 	multiboot_tag_module_t *module, *mp;
 	struct relocator *relocator = NULL;
+	EFI_PHYSICAL_ADDRESS relocator_pa;
 	EFI_MEMORY_DESCRIPTOR *map;
 	UINTN map_size, desc_size;
 	struct chunk_head *head;
 	struct chunk *chunk;
 	vm_offset_t tmp;
+	EFI_STATUS status;
 
 	efi_getdev((void **)(&rootdev), NULL, NULL);
 
 	/*
-	 * We need 5 pages for relocation. We'll allocate from the heap: while
-	 * it's possible that our heap got placed low down enough to be in the
-	 * way of where we're going to relocate our kernel, it's hopefully not
-	 * likely.
+	 * We need 5 pages for relocation. Code is executed from them and so
+	 * they cannot come from the heap, which is EfiLoaderData and may be
+	 * mapped without execute permission by the firmware. We allocate them
+	 * as EfiLoaderCode below 4GB, since the trampoline finishes in 32-bit
+	 * mode. The firmware chooses where they go, and they must not be where
+	 * the kernel is going to be relocated to. That is checked below. The
+	 * modules are relocated to free memory or left where they are, so
+	 * these pages cannot be in their way.
 	 */
-	if ((relocator = malloc(EFI_PAGE_SIZE * 5)) == NULL) {
-		printf("relocator malloc failed!\n");
+	relocator_pa = UINT32_MAX;
+	status = BS->AllocatePages(AllocateMaxAddress, EfiLoaderCode, 5,
+	    &relocator_pa);
+	if (EFI_ERROR(status)) {
+		printf("failed to allocate relocator pages: %lu\n",
+		    DECODE_ERROR(status));
 		error = ENOMEM;
 		goto error;
 	}
+	relocator = (struct relocator *)(uintptr_t)relocator_pa;
 
 	if (overlaps((uintptr_t)relocator, EFI_PAGE_SIZE * 5,
 	    load_addr, fp->f_size)) {
@@ -1164,7 +1176,6 @@ multiboot2_exec(struct preloaded_file *fp)
 	{
 		multiboot_tag_efi_mmap_t *tag;
 		UINTN key;
-		EFI_STATUS status;
 
 		tag = (multiboot_tag_efi_mmap_t *)
 		    mb_malloc(sizeof (*tag));
@@ -1305,7 +1316,8 @@ error:
 	free(cmdline);
 
 #if defined(EFI)
-	free(relocator);
+	if (relocator != NULL)
+		efi_free_loadaddr((vm_offset_t)relocator, 5);
 
 	if (mbi != NULL)
 		efi_free_loadaddr((vm_offset_t)mbi, EFI_SIZE_TO_PAGES(size));
