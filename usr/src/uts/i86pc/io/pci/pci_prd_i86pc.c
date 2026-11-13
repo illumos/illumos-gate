@@ -694,6 +694,37 @@ typedef struct {
 	void			*ppac_arg;
 } pci_prd_acpi_cb_t;
 
+/*
+ * A host bridge doesn't need to use one of the PCI identifiers as its _HID. A
+ * CXL host bridge has a _HID of ACPI0016 and lists the PCI identifiers in its
+ * _CID, so check the compatible IDs as well.
+ */
+static boolean_t
+pci_prd_is_root_bridge(const ACPI_DEVICE_INFO *adi)
+{
+	if ((adi->Valid & ACPI_VALID_HID) == 0)
+		return (B_FALSE);
+
+	if (strcmp(adi->HardwareId.String, PCI_ROOT_HID_STRING) == 0 ||
+	    strcmp(adi->HardwareId.String, PCI_EXPRESS_ROOT_HID_STRING) == 0) {
+		return (B_TRUE);
+	}
+
+	if ((adi->Valid & ACPI_VALID_CID) == 0)
+		return (B_FALSE);
+
+	for (uint_t i = 0; i < adi->CompatibleIdList.Count; i++) {
+		const char *id = adi->CompatibleIdList.Ids[i].String;
+
+		if (strcmp(id, PCI_ROOT_HID_STRING) == 0 ||
+		    strcmp(id, PCI_EXPRESS_ROOT_HID_STRING) == 0) {
+			return (B_TRUE);
+		}
+	}
+
+	return (B_FALSE);
+}
+
 static ACPI_STATUS
 pci_process_acpi_device(ACPI_HANDLE hdl, UINT32 level, void *ctx, void **rv)
 {
@@ -709,15 +740,7 @@ pci_process_acpi_device(ACPI_HANDLE hdl, UINT32 level, void *ctx, void **rv)
 	if (ACPI_FAILURE(AcpiGetObjectInfo(hdl, &adi)))
 		return (AE_OK);
 
-	if (!(adi->Valid & ACPI_VALID_HID)) {
-		AcpiOsFree(adi);
-		return (AE_OK);
-	}
-
-	if (strncmp(adi->HardwareId.String, PCI_ROOT_HID_STRING,
-	    sizeof (PCI_ROOT_HID_STRING)) &&
-	    strncmp(adi->HardwareId.String, PCI_EXPRESS_ROOT_HID_STRING,
-	    sizeof (PCI_EXPRESS_ROOT_HID_STRING))) {
+	if (!pci_prd_is_root_bridge(adi)) {
 		AcpiOsFree(adi);
 		return (AE_OK);
 	}

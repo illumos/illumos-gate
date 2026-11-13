@@ -24,6 +24,7 @@
  * Use is subject to license terms.
  * Copyright 2018 Joyent, Inc.
  * Copyright 2019 Western Digital Corporation
+ * Copyright 2026 Oxide Computer Company
  */
 /*
  * Copyright (c) 2009-2010, Intel Corporation.
@@ -1328,6 +1329,37 @@ acpica_get_busno(ACPI_HANDLE hdl, int *busno)
 }
 
 /*
+ * A PCI or PCIe host bridge doesn't need to use one of the PCI identifiers as
+ * its _HID. A CXL host bridge, for example, has a _HID of ACPI0016 and lists
+ * the PCI identifiers in its _CID. Determine whether a device's compatible IDs
+ * mark it as a host bridge.
+ */
+static boolean_t
+acpica_cid_is_pci_host_bridge(ACPI_HANDLE hdl)
+{
+	ACPI_DEVICE_INFO *adi;
+	boolean_t ret = B_FALSE;
+
+	if (ACPI_FAILURE(AcpiGetObjectInfo(hdl, &adi)))
+		return (B_FALSE);
+
+	if ((adi->Valid & ACPI_VALID_CID) != 0) {
+		for (uint_t i = 0; i < adi->CompatibleIdList.Count; i++) {
+			const char *id = adi->CompatibleIdList.Ids[i].String;
+
+			if (strcmp(id, PCI_ROOT_HID_STRING) == 0 ||
+			    strcmp(id, PCI_EXPRESS_ROOT_HID_STRING) == 0) {
+				ret = B_TRUE;
+				break;
+			}
+		}
+	}
+
+	AcpiOsFree(adi);
+	return (ret);
+}
+
+/*
  * Device tree binding
  */
 static ACPI_STATUS
@@ -1351,8 +1383,9 @@ acpica_find_pcibus_walker(ACPI_HANDLE hdl, UINT32 lvl, void *ctxp, void **rvpp)
 		return (AE_CTRL_DEPTH);
 	}
 
-	if (ACPI_FAILURE(acpica_eval_hid(hdl, "_HID", &hid)) ||
-	    (hid != HID_PCI_BUS && hid != HID_PCI_EXPRESS_BUS)) {
+	if ((ACPI_FAILURE(acpica_eval_hid(hdl, "_HID", &hid)) ||
+	    (hid != HID_PCI_BUS && hid != HID_PCI_EXPRESS_BUS)) &&
+	    !acpica_cid_is_pci_host_bridge(hdl)) {
 		/* Non PCI/PCIe host bridge. */
 		return (AE_OK);
 	}
@@ -1429,8 +1462,9 @@ acpica_query_bbn_walker(ACPI_HANDLE hdl, UINT32 lvl, void *ctxp, void **rvpp)
 		return (AE_CTRL_DEPTH);
 	}
 
-	if (ACPI_FAILURE(acpica_eval_hid(hdl, "_HID", &hid)) ||
-	    (hid != HID_PCI_BUS && hid != HID_PCI_EXPRESS_BUS)) {
+	if ((ACPI_FAILURE(acpica_eval_hid(hdl, "_HID", &hid)) ||
+	    (hid != HID_PCI_BUS && hid != HID_PCI_EXPRESS_BUS)) &&
+	    !acpica_cid_is_pci_host_bridge(hdl)) {
 		/* Non PCI/PCIe host bridge. */
 		return (AE_OK);
 	} else if (ACPI_SUCCESS(acpica_eval_int(hdl, "_BBN", &bbn)) &&
