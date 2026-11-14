@@ -1546,6 +1546,8 @@ zfsvfs_hold(const char *name, void *tag, zfsvfs_t **zfvp, boolean_t writer)
 			 * objset from the zfsvfs.
 			 */
 			rrm_exit(&(*zfvp)->z_teardown_lock, tag);
+			if ((*zfvp)->z_vfs != NULL)
+				VFS_RELE((*zfvp)->z_vfs);
 			return (SET_ERROR(EBUSY));
 		}
 	}

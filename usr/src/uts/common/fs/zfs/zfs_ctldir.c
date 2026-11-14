@@ -22,6 +22,7 @@
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2012, 2017 by Delphix. All rights reserved.
  * Copyright 2015, OmniTI Computer Consulting, Inc. All rights reserved.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -1326,7 +1327,12 @@ zfsctl_umount_snapshots(vfs_t *vfsp, int fflags, cred_t *cr)
 	int error;
 
 	ASSERT(zfsvfs->z_ctldir != NULL);
-	error = zfsctl_root_lookup(zfsvfs->z_ctldir, "snapshot", &dvp,
+	/*
+	 * The .zfs directories are gfs vnodes that don't use the objset, so
+	 * look up "snapshot" without ZFS_ENTER().  That lets a file system
+	 * that's unusable after a failed zfs_resume_fs() still be unmounted.
+	 */
+	error = gfs_vop_lookup(zfsvfs->z_ctldir, "snapshot", &dvp,
 	    NULL, 0, NULL, cr, NULL, NULL, NULL);
 	if (error != 0)
 		return (error);

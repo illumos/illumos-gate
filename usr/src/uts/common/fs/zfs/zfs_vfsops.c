@@ -26,7 +26,7 @@
  * Copyright 2019 Joyent, Inc.
  * Copyright 2020 Joshua M. Clulow <josh@sysmgr.org>
  * Copyright 2020 OmniOS Community Edition (OmniOSce) Association.
- * Copyright 2024 Oxide Computer Company
+ * Copyright 2026 Oxide Computer Company
  * Copyright 2025 MNX Cloud, Inc.
  */
 
@@ -2515,7 +2515,9 @@ zfs_resume_fs(zfsvfs_t *zfsvfs, dsl_dataset_t *ds)
 	if (err != 0)
 		goto bail;
 
-	VERIFY(zfsvfs_setup(zfsvfs, B_FALSE) == 0);
+	err = zfsvfs_setup(zfsvfs, B_FALSE);
+	if (err != 0)
+		goto bail;
 
 	zfs_set_fuid_feature(zfsvfs);
 
@@ -2543,14 +2545,23 @@ zfs_resume_fs(zfsvfs_t *zfsvfs, dsl_dataset_t *ds)
 	}
 
 bail:
+	if (err != 0) {
+		/*
+		 * z_os and the SA framework may not be set up, so no vnode or
+		 * vfs operation may use the file system until it's unmounted.
+		 */
+		zfsvfs->z_unmounted = B_TRUE;
+	}
+
 	/* release the VOPs */
 	rw_exit(&zfsvfs->z_teardown_inactive_lock);
 	rrm_exit(&zfsvfs->z_teardown_lock, FTAG);
 
-	if (err) {
+	if (err != 0) {
 		/*
-		 * Since we couldn't setup the sa framework, try to force
-		 * unmount this file system.
+		 * Try to force unmount this file system.  If that isn't
+		 * possible, e.g. while a lookup is crossing its mount point,
+		 * it stays mounted but unusable until it's unmounted.
 		 */
 		if (vn_vfswlock(zfsvfs->z_vfs->vfs_vnodecovered) == 0)
 			(void) dounmount(zfsvfs->z_vfs, MS_FORCE, CRED());
