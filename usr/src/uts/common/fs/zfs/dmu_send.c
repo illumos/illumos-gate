@@ -26,6 +26,7 @@
  * Copyright 2014 HybridCluster. All rights reserved.
  * Copyright 2016 RackTop Systems.
  * Copyright (c) 2014 Integros [integros.com]
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/dmu.h>
@@ -987,19 +988,9 @@ dmu_send_impl(void *tag, dsl_pool_t *dp, dsl_dataset_t *to_ds,
 	 * it can't be modified.
 	 */
 	if (!rawok && os->os_encrypted &&
-	    arc_is_unauthenticated(os->os_phys_buf)) {
-		zbookmark_phys_t zb;
-
-		SET_BOOKMARK(&zb, to_ds->ds_object, ZB_ROOT_OBJECT,
-		    ZB_ROOT_LEVEL, ZB_ROOT_BLKID);
-		err = arc_untransform(os->os_phys_buf, os->os_spa,
-		    &zb, B_FALSE);
-		if (err != 0) {
-			dsl_pool_rele(dp, tag);
-			return (err);
-		}
-
-		ASSERT0(arc_is_unauthenticated(os->os_phys_buf));
+	    (err = dmu_objset_authenticate(os)) != 0) {
+		dsl_pool_rele(dp, tag);
+		return (err);
 	}
 
 	drr = kmem_zalloc(sizeof (dmu_replay_record_t), KM_SLEEP);
