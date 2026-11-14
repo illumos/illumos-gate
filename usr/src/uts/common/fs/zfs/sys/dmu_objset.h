@@ -215,8 +215,7 @@ struct objset {
 
 /* called from zpl */
 int dmu_objset_hold(const char *name, void *tag, objset_t **osp);
-int dmu_objset_hold_flags(const char *name, boolean_t decrypt, void *tag,
-    objset_t **osp);
+int dmu_objset_hold_decrypt(const char *name, void *tag, objset_t **osp);
 int dmu_objset_own(const char *name, dmu_objset_type_t type,
     boolean_t readonly, boolean_t decrypt, void *tag, objset_t **osp);
 int dmu_objset_own_obj(struct dsl_pool *dp, uint64_t obj,
@@ -225,7 +224,7 @@ int dmu_objset_own_obj(struct dsl_pool *dp, uint64_t obj,
 void dmu_objset_refresh_ownership(struct dsl_dataset *ds,
     struct dsl_dataset **newds, boolean_t key_needed, void *tag);
 void dmu_objset_rele(objset_t *os, void *tag);
-void dmu_objset_rele_flags(objset_t *os, boolean_t decrypt, void *tag);
+void dmu_objset_rele_decrypt(objset_t *os, void *tag);
 void dmu_objset_disown(objset_t *os, boolean_t decrypt, void *tag);
 int dmu_objset_from_ds(struct dsl_dataset *ds, objset_t **osp);
 int dmu_objset_authenticate(objset_t *os);

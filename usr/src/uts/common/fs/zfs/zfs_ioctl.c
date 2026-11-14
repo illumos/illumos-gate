@@ -1924,16 +1924,15 @@ zfs_ioc_obj_to_path(zfs_cmd_t *zc)
 	int error;
 
 	/* XXX reading from objset not owned */
-	if ((error = dmu_objset_hold_flags(zc->zc_name, B_TRUE,
-	    FTAG, &os)) != 0)
+	if ((error = dmu_objset_hold_decrypt(zc->zc_name, FTAG, &os)) != 0)
 		return (error);
 	if (dmu_objset_type(os) != DMU_OST_ZFS) {
-		dmu_objset_rele_flags(os, B_TRUE, FTAG);
+		dmu_objset_rele_decrypt(os, FTAG);
 		return (SET_ERROR(EINVAL));
 	}
 	error = zfs_obj_to_path(os, zc->zc_obj, zc->zc_value,
 	    sizeof (zc->zc_value));
-	dmu_objset_rele_flags(os, B_TRUE, FTAG);
+	dmu_objset_rele_decrypt(os, FTAG);
 
 	return (error);
 }
@@ -1954,16 +1953,15 @@ zfs_ioc_obj_to_stats(zfs_cmd_t *zc)
 	int error;
 
 	/* XXX reading from objset not owned */
-	if ((error = dmu_objset_hold_flags(zc->zc_name, B_TRUE,
-	    FTAG, &os)) != 0)
+	if ((error = dmu_objset_hold_decrypt(zc->zc_name, FTAG, &os)) != 0)
 		return (error);
 	if (dmu_objset_type(os) != DMU_OST_ZFS) {
-		dmu_objset_rele_flags(os, B_TRUE, FTAG);
+		dmu_objset_rele_decrypt(os, FTAG);
 		return (SET_ERROR(EINVAL));
 	}
 	error = zfs_obj_to_stats(os, zc->zc_obj, &zc->zc_stat, zc->zc_value,
 	    sizeof (zc->zc_value));
-	dmu_objset_rele_flags(os, B_TRUE, FTAG);
+	dmu_objset_rele_decrypt(os, FTAG);
 
 	return (error);
 }
@@ -5693,7 +5691,7 @@ zfs_ioc_userspace_upgrade(zfs_cmd_t *zc)
 		objset_t *os;
 
 		/* XXX kind of reading contents without owning */
-		error = dmu_objset_hold_flags(zc->zc_name, B_TRUE, FTAG, &os);
+		error = dmu_objset_hold_decrypt(zc->zc_name, FTAG, &os);
 		if (error != 0)
 			return (error);
 
