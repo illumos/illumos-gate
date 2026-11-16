@@ -236,9 +236,47 @@ dsl_dataset_block_kill(dsl_dataset_t *ds, const blkptr_t *bp, dmu_tx_t *tx,
 
 	if (bp->blk_birth > dsl_dataset_phys(ds)->ds_prev_snap_txg) {
 		int64_t delta;
+		boolean_t defer;
 
-		dprintf_bp(bp, "freeing ds=%llu", ds->ds_object);
-		dsl_free(tx->tx_pool, tx->tx_txg, bp);
+		/*
+		 * dsl_free() -> zio_free() frees an ordinary block at once.
+		 * Gang and deduplicated blocks need I/O to be freed (the
+		 * gang header, the DDT), so zio_free() puts them on
+		 * spa_free_bplist, and spa_sync_frees() later issues a
+		 * ZIO_TYPE_FREE zio for every one of them under a single
+		 * root zio, all at once.
+		 *
+		 * Freeing a large object calls us once per block, so a
+		 * single unlink of a large gang or dedup object queues one
+		 * zio per block in one sync pass.  For a big enough object
+		 * that is more memory than the kernel has, and the same
+		 * happens again on the next import.
+		 *
+		 * Put those blocks on the pool's free bpobj instead.  That is
+		 * where blocks from destroyed datasets already go; the async
+		 * destroy code in dsl_scan.c frees them at a bounded rate
+		 * (see zfs_max_async_dedup_frees).
+		 *
+		 * When async, we are in a zio write-done callback, and
+		 * bpobj_enqueue() may have to read the bpobj's tail block,
+		 * which we can't wait for there.  Like the deadlist case
+		 * below, put the bp on a pending list instead, and let
+		 * dsl_dataset_sync_done() move it onto the free bpobj.
+		 */
+		defer = spa_version(spa) >= SPA_VERSION_DEADLISTS &&
+		    (BP_IS_GANG(bp) || BP_GET_DEDUP(bp));
+
+		if (defer && async) {
+			dprintf_bp(bp, "putting on pending free list: %s", "");
+			bplist_append(&ds->ds_pending_freelist, bp);
+		} else if (defer) {
+			dprintf_bp(bp, "putting on free list: %s", "");
+			bpobj_enqueue(&ds->ds_dir->dd_pool->dp_free_bpobj,
+			    bp, tx);
+		} else {
+			dprintf_bp(bp, "freeing ds=%llu", ds->ds_object);
+			dsl_free(tx->tx_pool, tx->tx_txg, bp);
+		}
 
 		mutex_enter(&ds->ds_lock);
 		ASSERT(dsl_dataset_phys(ds)->ds_unique_bytes >= used ||
@@ -250,6 +288,17 @@ dsl_dataset_block_kill(dsl_dataset_t *ds, const blkptr_t *bp, dmu_tx_t *tx,
 		    delta, -compressed, -uncompressed, tx);
 		dsl_dir_transfer_space(ds->ds_dir, -used - delta,
 		    DD_USED_REFRSRV, DD_USED_HEAD, tx);
+
+		/*
+		 * The block is now owned by the free bpobj rather than by
+		 * this dataset, so charge it to the free dir.  The async
+		 * destroy pass credits it back in dsl_scan_free_block_cb()
+		 * when it actually frees the block.
+		 */
+		if (defer) {
+			dsl_dir_diduse_space(tx->tx_pool->dp_free_dir,
+			    DD_USED_HEAD, used, compressed, uncompressed, tx);
+		}
 	} else {
 		dprintf_bp(bp, "putting on dead list: %s", "");
 		if (async) {
@@ -393,6 +442,7 @@ dsl_dataset_evict_async(void *dbu)
 	}
 
 	bplist_destroy(&ds->ds_pending_deadlist);
+	bplist_destroy(&ds->ds_pending_freelist);
 	if (dsl_deadlist_is_open(&ds->ds_deadlist))
 		dsl_deadlist_close(&ds->ds_deadlist);
 	if (dsl_deadlist_is_open(&ds->ds_remap_deadlist))
@@ -553,6 +603,7 @@ dsl_dataset_hold_obj(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 		zfs_refcount_create(&ds->ds_longholds);
 
 		bplist_create(&ds->ds_pending_deadlist);
+		bplist_create(&ds->ds_pending_freelist);
 
 		list_create(&ds->ds_sendstreams, sizeof (dmu_sendarg_t),
 		    offsetof(dmu_sendarg_t, dsa_link));
@@ -636,6 +687,7 @@ dsl_dataset_hold_obj(dsl_pool_t *dp, uint64_t dsobj, void *tag,
 
 		if (err != 0 || winner != NULL) {
 			bplist_destroy(&ds->ds_pending_deadlist);
+			bplist_destroy(&ds->ds_pending_freelist);
 			if (dsl_deadlist_is_open(&ds->ds_deadlist))
 				dsl_deadlist_close(&ds->ds_deadlist);
 			if (dsl_deadlist_is_open(&ds->ds_remap_deadlist))
@@ -1985,6 +2037,14 @@ deadlist_enqueue_cb(void *arg, const blkptr_t *bp, dmu_tx_t *tx)
 	return (0);
 }
 
+static int
+free_bpobj_enqueue_cb(void *arg, const blkptr_t *bp, dmu_tx_t *tx)
+{
+	bpobj_t *bpo = arg;
+	bpobj_enqueue(bpo, bp, tx);
+	return (0);
+}
+
 void
 dsl_dataset_sync_done(dsl_dataset_t *ds, dmu_tx_t *tx)
 {
@@ -1992,6 +2052,8 @@ dsl_dataset_sync_done(dsl_dataset_t *ds, dmu_tx_t *tx)
 
 	bplist_iterate(&ds->ds_pending_deadlist,
 	    deadlist_enqueue_cb, &ds->ds_deadlist, tx);
+	bplist_iterate(&ds->ds_pending_freelist,
+	    free_bpobj_enqueue_cb, &ds->ds_dir->dd_pool->dp_free_bpobj, tx);
 
 	if (os->os_synced_dnodes != NULL) {
 		multilist_destroy(os->os_synced_dnodes);
