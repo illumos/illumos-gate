@@ -127,6 +127,10 @@ $(YACC_FILES) := YTABC = $(LY_BASE)parse.c
 
 $(YACC_C_FILES:.c=.o) := CERRWARN += -_gcc=-Wno-char-subscripts
 
+# Newer flex emits feature test macros (_POSIX_C_SOURCE etc.) ahead of the
+# user code, which hides declarations the ACPI headers depend on.
+$(LEX_C_FILES:.c=.o) := CPPFLAGS += -D__EXTENSIONS__
+
 OBJS += $(LEX_C_FILES:.c=.o) $(YACC_C_FILES:.c=.o)
 
 # We are using stack pointer value there
