@@ -23,6 +23,7 @@
  * Copyright 2015 Nexenta Systems, Inc.  All rights reserved.
  * Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright 2019 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <assert.h>
@@ -838,6 +839,8 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	cb.cb_guid = pool_guid;
 	cb.cb_zhp = NULL;
 	if (zhdl != NULL && zpool_iter(zhdl, find_pool, &cb) != 0) {
+		if (cb.cb_zhp != NULL)
+			zpool_close(cb.cb_zhp);
 		zfs_stats.pool_drops.fmds_value.ui64++;
 		return;
 	}
@@ -864,6 +867,7 @@ zfs_fm_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 			nvlist_free(vd_nvl);
 		}
 		fmd_hdl_free(hdl, vdg, MAX_ULL_STR);
+		zpool_close(zhp);
 	}
 
 	/*
