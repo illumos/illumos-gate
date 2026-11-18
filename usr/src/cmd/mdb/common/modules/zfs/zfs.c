@@ -1138,7 +1138,7 @@ dbgmsg_cb(uintptr_t addr, const void *unknown __unused, void *arg)
 		mdb_nicetime(diff, dbuf, sizeof (dbuf));
 		mdb_printf("%-20s ", dbuf);
 	} else if (da->da_hrtime) {
-		mdb_printf("%016x ", hrtime);
+		mdb_printf("%016llx ", hrtime);
 	} else if (da->da_time) {
 		mdb_printf("%Y ", timestamp);
 	}
