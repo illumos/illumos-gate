@@ -91,6 +91,7 @@ bhyve-tests/tests/viona/rx_delivery
 bhyve-tests/tests/vmm/auto_destruct
 bhyve-tests/tests/vmm/check_iommu
 bhyve-tests/tests/vmm/cpuid_ioctl
+bhyve-tests/tests/vmm/cpuset_size
 bhyve-tests/tests/vmm/datarw_constraints
 bhyve-tests/tests/vmm/datarw_msrs
 bhyve-tests/tests/vmm/datarw_vcpu
@@ -109,6 +110,7 @@ bhyve-tests/tests/vmm/npt_ops
 bhyve-tests/tests/vmm/pause_resume
 bhyve-tests/tests/vmm/self_destruct
 bhyve-tests/tests/vmm/time_data
+bhyve-tests/tests/vmm/vcpu_alloc
 
 crypto-tests/tests/longhash/longhash_32
 crypto-tests/tests/longhash/longhash_64
