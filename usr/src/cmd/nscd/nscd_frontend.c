@@ -79,6 +79,7 @@ static sema_t	common_sema;
 static thread_key_t	lookup_state_key;
 static mutex_t		create_lock = DEFAULTMUTEX;
 static int		num_servers = 0;
+static int		server_create_errnum = 0;
 static thread_key_t	server_key;
 
 static void
@@ -118,10 +119,13 @@ server_tsd_bind(void *arg)
 /*
  * Server threads are created here.
  */
-/*ARGSUSED*/
 static void
-server_create(door_info_t *dip)
+server_create(door_info_t *dip __unused)
 {
+	int	errnum;
+	const char *me = "server_create";
+
+	server_create_errnum = 0;
 	(void) mutex_lock(&create_lock);
 	if (++num_servers > max_servers) {
 		num_servers--;
@@ -129,8 +133,16 @@ server_create(door_info_t *dip)
 		return;
 	}
 	(void) mutex_unlock(&create_lock);
-	(void) thr_create(NULL, 0, server_tsd_bind, NULL,
+	errnum = thr_create(NULL, 0, server_tsd_bind, NULL,
 	    THR_BOUND|THR_DETACHED, NULL);
+	if (errnum != 0) {
+		server_create_errnum = errnum;
+		(void) mutex_lock(&create_lock);
+		num_servers--;
+		(void) mutex_unlock(&create_lock);
+		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
+		(me, "thr_create (server thread): %s\n", strerror(errnum));
+	}
 }
 
 /*
@@ -1197,14 +1209,17 @@ _nscd_setup_server(char *execname, char **argv)
 	 */
 	max_servers_set = 1;
 
-	(void) thr_keycreate(&lookup_state_key, NULL);
+	if ((errnum = thr_keycreate(&lookup_state_key, NULL)) != 0) {
+		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
+		(me, "thr_keycreate (lookup state): %s\n", strerror(errnum));
+		return (-1);
+	}
 	(void) sema_init(&common_sema, frontend_cfg_g.common_worker_threads,
 	    USYNC_THREAD, 0);
 
 	/* Establish server thread pool */
 	(void) door_server_create(server_create);
-	if (thr_keycreate(&server_key, server_destroy) != 0) {
-		errnum = errno;
+	if ((errnum = thr_keycreate(&server_key, server_destroy)) != 0) {
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
 		(me, "thr_keycreate (server thread): %s\n",
 		    strerror(errnum));
@@ -1226,6 +1241,17 @@ _nscd_setup_server(char *execname, char **argv)
 		errnum = errno;
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
 		(me, "door_setparam(DATA_MIN): %s\n", strerror(errnum));
+		(void) door_revoke(fd);
+		return (-1);
+	}
+
+	/*
+	 * door_create() calls server_create() to start the first server
+	 * thread but a door_server_func_t cannot report a failure. Any
+	 * failure here is fatal as no door call would ever be answered
+	 * without that thread.
+	 */
+	if (server_create_errnum != 0) {
 		(void) door_revoke(fd);
 		return (-1);
 	}
@@ -1310,9 +1336,8 @@ _nscd_setup_server(char *execname, char **argv)
 	/*
 	 * kick off routing socket monitor thread
 	 */
-	if (thr_create(NULL, 0,
-	    (void *(*)(void *))rts_mon, 0, 0, NULL) != 0) {
-		errnum = errno;
+	if ((errnum = thr_create(NULL, 0,
+	    (void *(*)(void *))rts_mon, 0, 0, NULL)) != 0) {
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
 		(me, "thr_create (routing socket monitor): %s\n",
 		    strerror(errnum));
@@ -1353,8 +1378,7 @@ _nscd_setup_child_server(int did)
 
 	/* Re-establish our own server thread pool */
 	(void) door_server_create(server_create);
-	if (thr_keycreate(&server_key, server_destroy) != 0) {
-		errnum = errno;
+	if ((errnum = thr_keycreate(&server_key, server_destroy)) != 0) {
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 		(me, "thr_keycreate failed: %s", strerror(errnum));
 		return (-1);
@@ -1383,12 +1407,16 @@ _nscd_setup_child_server(int did)
 		return (-1);
 	}
 
+	if (server_create_errnum != 0) {
+		(void) door_revoke(fd);
+		return (-1);
+	}
+
 	/*
 	 * kick off routing socket monitor thread
 	 */
-	if (thr_create(NULL, 0,
-	    (void *(*)(void *))rts_mon, 0, 0, NULL) != 0) {
-		errnum = errno;
+	if ((errnum = thr_create(NULL, 0,
+	    (void *(*)(void *))rts_mon, 0, 0, NULL)) != 0) {
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ERROR)
 		(me, "thr_create (routing socket monitor): %s\n",
 		    strerror(errnum));

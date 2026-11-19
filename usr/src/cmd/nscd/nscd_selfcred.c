@@ -612,8 +612,12 @@ _nscd_proc_iamhere(
 		}
 
 		/* monitor the forker nscd */
-		(void) thr_create(NULL, 0, forker_monitor, NULL,
-		    THR_DETACHED, NULL);
+		if ((errnum = thr_create(NULL, 0, forker_monitor, NULL,
+		    THR_DETACHED, NULL)) != 0) {
+			_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_ERROR)
+			(me, "thr_create (forker monitor): %s\n",
+			    strerror(errnum));
+		}
 
 		break;
 
@@ -705,8 +709,13 @@ _nscd_proc_iamhere(
 			(void) mutex_unlock(ch->mutex);
 
 			/* monitor the child nscd */
-			(void) thr_create(NULL, 0, child_monitor,
-			    ch, THR_DETACHED, NULL);
+			if ((errnum = thr_create(NULL, 0, child_monitor,
+			    ch, THR_DETACHED, NULL)) != 0) {
+				_NSCD_LOG(NSCD_LOG_SELF_CRED,
+				    NSCD_LOG_LEVEL_ERROR)
+				(me, "thr_create (child monitor): %s\n",
+				    strerror(errnum));
+			}
 			NSCD_SET_STATUS_SUCCESS(phdr);
 			break;
 		} else {
@@ -1537,9 +1546,8 @@ init_user_proc_monitor(void)
 	 * start a thread to make sure there is at least a process
 	 * running as the PUN user. If not, terminate this PUN.
 	 */
-	if (thr_create(NULL, 0, check_user_process,
-	    NULL, THR_DETACHED, NULL) != 0) {
-		errnum = errno;
+	if ((errnum = thr_create(NULL, 0, check_user_process,
+	    NULL, THR_DETACHED, NULL)) != 0) {
 		_NSCD_LOG(NSCD_LOG_SELF_CRED, NSCD_LOG_LEVEL_ERROR)
 		(me, "thr_create: %s\n", strerror(errnum));
 		return (NSCD_THREAD_CREATE_ERROR);

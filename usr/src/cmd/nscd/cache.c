@@ -23,6 +23,7 @@
  * Copyright 2012 Milan Jurik. All rights reserved.
  * Copyright (c) 2016 by Delphix. All rights reserved.
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 /*
@@ -1160,8 +1161,8 @@ start_threads(nsc_ctx_t *ctx)
 	 *  kick off the revalidate thread (if necessary)
 	 */
 	if (ctx->revalidate_on != nscd_true) {
-		if (thr_create(NULL, 0, revalidate, ctx, 0, NULL) != 0) {
-			errnum = errno;
+		errnum = thr_create(NULL, 0, revalidate, ctx, 0, NULL);
+		if (errnum != 0) {
 			_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_ERROR)
 			(me, "thr_create (revalidate thread for %s): %s\n",
 			    ctx->dbname, strerror(errnum));
@@ -1174,8 +1175,8 @@ start_threads(nsc_ctx_t *ctx)
 	 *  kick off the reaper thread (if necessary)
 	 */
 	if (ctx->reaper_on != nscd_true) {
-		if (thr_create(NULL, 0, reaper, ctx, 0, NULL) != 0) {
-			errnum = errno;
+		errnum = thr_create(NULL, 0, reaper, ctx, 0, NULL);
+		if (errnum != 0) {
 			_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_ERROR)
 			(me, "thr_create (reaper thread for %s): %s\n",
 			    ctx->dbname, strerror(errnum));

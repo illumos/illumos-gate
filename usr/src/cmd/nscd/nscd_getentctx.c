@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <sys/ccompile.h>
@@ -767,9 +768,8 @@ _nscd_init_getent_ctx_monitor()
 	/*
 	 * start a thread to reclaim unused getent contexts
 	 */
-	if (thr_create(NULL, 0, reclaim_getent_ctx,
-	    NULL, THR_DETACHED, NULL) != 0) {
-		errnum = errno;
+	if ((errnum = thr_create(NULL, 0, reclaim_getent_ctx,
+	    NULL, THR_DETACHED, NULL)) != 0) {
 		_NSCD_LOG(NSCD_LOG_GETENT_CTX, NSCD_LOG_LEVEL_ERROR)
 		(me, "thr_create: %s\n", strerror(errnum));
 		return (NSCD_THREAD_CREATE_ERROR);

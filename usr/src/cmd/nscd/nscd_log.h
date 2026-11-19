@@ -21,6 +21,7 @@
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #ifndef	_NSCD_LOG_H
@@ -88,7 +89,7 @@ extern int _nscd_log_level;
 /*
  * prototypes
  */
-void		_nscd_logit(char *funcname, char *format, ...);
+void		_nscd_logit(const char *funcname, const char *format, ...);
 nscd_rc_t	_nscd_set_debug_level(int level);
 nscd_rc_t	_nscd_set_log_file(char *name);
 void		_nscd_get_log_info(char *level, int llen, char *file, int flen);

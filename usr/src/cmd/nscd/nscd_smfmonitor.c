@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  *
  * Copyright 2018 Joyent, Inc.
+ * Copyright 2026 Oxide Computer Company
  */
 
 #include <stdlib.h>
@@ -147,9 +148,8 @@ _nscd_init_smf_monitor(void)
 	/*
 	 * start a thread to check the state of the client services
 	 */
-	if (thr_create(NULL, 0, set_smf_state,
-	    NULL, THR_DETACHED, NULL) != 0) {
-		errnum = errno;
+	if ((errnum = thr_create(NULL, 0, set_smf_state,
+	    NULL, THR_DETACHED, NULL)) != 0) {
 		_NSCD_LOG(NSCD_LOG_SMF_MONITOR, NSCD_LOG_LEVEL_ERROR)
 		(me, "thr_create: %s\n", strerror(errnum));
 		return (NSCD_THREAD_CREATE_ERROR);
