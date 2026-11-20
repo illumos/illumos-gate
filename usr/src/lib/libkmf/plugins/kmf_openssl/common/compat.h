@@ -72,6 +72,7 @@ int RSA_bits(const RSA *r);
 
 RSA *EVP_PKEY_get0_RSA(EVP_PKEY *pkey);
 
+#define	ASN1_STRING_get0_data(s) ((s)->data)
 #define	OCSP_resp_get0_certs(bs) ((bs)->certs)
 #define	PKCS12_SAFEBAG_get0_attr(bag, attr) PKCS12_get_attr(bag, attr)
 #define	PKCS12_SAFEBAG_get_nid(bag) M_PKCS12_bag_type(bag)

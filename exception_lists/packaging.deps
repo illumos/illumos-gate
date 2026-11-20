@@ -23,6 +23,7 @@ pkg:/library/security/openssl-11
 pkg:/library/security/openssl-3
 pkg:/library/security/openssl-3/32
 pkg:/library/security/openssl-30
+pkg:/library/security/openssl-4
 pkg:/library/security/trousers
 pkg:/library/security/trousers/32
 pkg:/library/zlib

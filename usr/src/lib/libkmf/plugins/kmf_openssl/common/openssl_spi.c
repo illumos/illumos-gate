@@ -137,6 +137,21 @@ static uchar_t G[] = { 0x00, 0x62, 0x6d, 0x02, 0x78, 0x39, 0xea, 0x0a,
 #define	SET_SYS_ERROR(h, c) h->lasterr.kstype = -1; h->lasterr.errcode = c;
 
 /*
+ * Qualifiers for objects that OpenSSL accepts as const from version 3.0,
+ * and from version 4.0, respectively.
+ */
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+#define	OSSL3_CONST	const
+#else
+#define	OSSL3_CONST
+#endif
+#if OPENSSL_VERSION_NUMBER >= 0x40000000L
+#define	OSSL4_CONST	const
+#else
+#define	OSSL4_CONST
+#endif
+
+/*
  * Declare some new macros for managing stacks of EVP_PKEYS.
  */
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
@@ -363,7 +378,7 @@ KMF_Plugin_Initialize()
  * Convert an SSL DN to a KMF DN.
  */
 static KMF_RETURN
-get_x509_dn(X509_NAME *sslDN, KMF_X509_NAME *kmfDN)
+get_x509_dn(OSSL3_CONST X509_NAME *sslDN, KMF_X509_NAME *kmfDN)
 {
 	KMF_DATA derdata;
 	KMF_RETURN rv = KMF_OK;
@@ -1389,13 +1404,8 @@ ssl_write_key(KMF_HANDLE *kmfh, KMF_ENCODE_FORMAT format, BIO *out,
     KMF_CREDENTIAL *cred, EVP_PKEY *pkey, boolean_t private)
 {
 	int rv = 0;
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L
-	const RSA *rsa;
-	const DSA *dsa;
-#else
-	RSA *rsa;
-	DSA *dsa;
-#endif
+	OSSL3_CONST RSA *rsa;
+	OSSL3_CONST DSA *dsa;
 
 	if (pkey == NULL || out == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -2005,7 +2015,7 @@ OpenSSL_CertGetPrintable(KMF_HANDLE_T handle, const KMF_DATA *pcert,
 	int ext_index, nid, len;
 	BIO *mem = NULL;
 	STACK_OF(OPENSSL_STRING) *emlst = NULL;
-	X509_EXTENSION *ex;
+	OSSL4_CONST X509_EXTENSION *ex;
 
 	if (pcert == NULL || pcert->Data == NULL || pcert->Length == 0) {
 		return (KMF_ERR_BAD_PARAMETER);
@@ -2072,13 +2082,8 @@ OpenSSL_CertGetPrintable(KMF_HANDLE_T handle, const KMF_DATA *pcert,
 
 	case KMF_CERT_PUBKEY_DATA:
 		{
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L
-			const RSA *rsa;
-			const DSA *dsa;
-#else
-			RSA *rsa;
-			DSA *dsa;
-#endif
+			OSSL3_CONST RSA *rsa;
+			OSSL3_CONST DSA *dsa;
 
 			EVP_PKEY *pkey = X509_get_pubkey(xcert);
 			if (pkey == NULL) {
@@ -2130,7 +2135,8 @@ OpenSSL_CertGetPrintable(KMF_HANDLE_T handle, const KMF_DATA *pcert,
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 				alg = xcert->cert_info->key->algor->algorithm;
 #else
-				X509_PUBKEY *key = X509_get_X509_PUBKEY(xcert);
+				OSSL3_CONST X509_PUBKEY *key =
+				    X509_get_X509_PUBKEY(xcert);
 
 				if (key != NULL)
 					(void) X509_PUBKEY_get0_param(
@@ -2478,7 +2484,8 @@ end:
 static X509 *ocsp_find_signer_sk(STACK_OF(X509) *certs, OCSP_BASICRESP *bs)
 {
 	int i;
-	unsigned char tmphash[SHA_DIGEST_LENGTH], *keyhash;
+	unsigned char tmphash[SHA_DIGEST_LENGTH];
+	const unsigned char *keyhash;
 	const ASN1_OCTET_STRING *pid;
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
@@ -2501,10 +2508,10 @@ static X509 *ocsp_find_signer_sk(STACK_OF(X509) *certs, OCSP_BASICRESP *bs)
 	/* Lookup by key hash */
 
 	/* If key hash isn't SHA1 length then forget it */
-	if (pid->length != SHA_DIGEST_LENGTH)
+	if (ASN1_STRING_length(pid) != SHA_DIGEST_LENGTH)
 		return (NULL);
 
-	keyhash = pid->data;
+	keyhash = ASN1_STRING_get0_data(pid);
 	/* Calculate hash of each key and compare */
 	for (i = 0; i < sk_X509_num(certs); i++) {
 		X509 *x = sk_X509_value(certs, i);
@@ -3056,7 +3063,7 @@ OpenSSL_FindKey(KMF_HANDLE_T handle, int numattr, KMF_ATTRIBUTE *attrlist)
 static int
 add_alias_to_bag(PKCS12_SAFEBAG *bag, X509 *xcert)
 {
-	unsigned char *alias;
+	const unsigned char *alias;
 	int len;
 
 	if (xcert != NULL && (alias = X509_alias_get0(xcert, &len)) != NULL) {
@@ -3879,9 +3886,12 @@ openssl_parse_bag(PKCS12_SAFEBAG *bag, char *pass, int passlen,
 				goto end;
 			}
 			if (keyid != NULL) {
+				const ASN1_OCTET_STRING *kid =
+				    keyid->value.octet_string;
+
 				if (X509_keyid_set1(xcert,
-				    keyid->value.octet_string->data,
-				    keyid->value.octet_string->length) == 0) {
+				    ASN1_STRING_get0_data(kid),
+				    ASN1_STRING_length(kid)) == 0) {
 					ret = KMF_ERR_PKCS12_FORMAT;
 					goto end;
 				}
@@ -4297,14 +4307,15 @@ convertToRawKey(EVP_PKEY *pkey, KMF_RAW_KEY_DATA *key)
 	if ((loc = EVP_PKEY_get_attr_by_NID(pkey,
 	    NID_friendlyName, -1)) != -1 &&
 	    (attr = EVP_PKEY_get_attr(pkey, loc))) {
-		ASN1_TYPE *ty = NULL;
+		const ASN1_TYPE *ty = NULL;
 		int numattr = X509_ATTRIBUTE_count(attr);
 		if (numattr > 0) {
 			ty = X509_ATTRIBUTE_get0_type(attr, 0);
 		}
 		if (ty != NULL) {
-			key->label = OPENSSL_uni2asc(ty->value.bmpstring->data,
-			    ty->value.bmpstring->length);
+			key->label = OPENSSL_uni2asc(
+			    ASN1_STRING_get0_data(ty->value.bmpstring),
+			    ASN1_STRING_length(ty->value.bmpstring));
 		}
 	} else {
 		key->label = NULL;
@@ -4316,17 +4327,18 @@ convertToRawKey(EVP_PKEY *pkey, KMF_RAW_KEY_DATA *key)
 	if ((loc = EVP_PKEY_get_attr_by_NID(pkey,
 	    NID_localKeyID, -1)) != -1 &&
 	    (attr = EVP_PKEY_get_attr(pkey, loc)) != NULL) {
-		ASN1_TYPE *ty = NULL;
+		const ASN1_TYPE *ty = NULL;
 		int numattr = X509_ATTRIBUTE_count(attr);
 		if (numattr > 0)
 			ty = X509_ATTRIBUTE_get0_type(attr, 0);
 		key->id.Data = (uchar_t *)malloc(
-		    ty->value.octet_string->length);
+		    ASN1_STRING_length(ty->value.octet_string));
 		if (key->id.Data == NULL)
 			return (KMF_ERR_MEMORY);
-		(void) memcpy(key->id.Data, ty->value.octet_string->data,
-		    ty->value.octet_string->length);
-		key->id.Length = ty->value.octet_string->length;
+		(void) memcpy(key->id.Data,
+		    ASN1_STRING_get0_data(ty->value.octet_string),
+		    ASN1_STRING_length(ty->value.octet_string));
+		key->id.Length = ASN1_STRING_length(ty->value.octet_string);
 	} else {
 		(void) memset(&key->id, 0, sizeof (KMF_DATA));
 	}

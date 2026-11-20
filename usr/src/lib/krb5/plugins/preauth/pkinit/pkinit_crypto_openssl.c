@@ -48,6 +48,7 @@
 #include <libintl.h>
 #include <assert.h>
 #include <security/pam_appl.h>
+#include <sys/sysmacros.h>
 #include <ctype.h>
 #include "k5-int.h"
 #include <ctype.h>
@@ -64,6 +65,26 @@
 #define SILLYDECRYPT
 
 #include "pkinit_crypto_openssl.h"
+
+/*
+ * Qualifiers for objects that OpenSSL accepts as const from version 1.1,
+ * from version 3.0 and from version 4.0, respectively.
+ */
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+#define	OSSL11_CONST
+#else
+#define	OSSL11_CONST	const
+#endif
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+#define	OSSL3_CONST	const
+#else
+#define	OSSL3_CONST
+#endif
+#if OPENSSL_VERSION_NUMBER >= 0x40000000L
+#define	OSSL4_CONST	const
+#else
+#define	OSSL4_CONST
+#endif
 
 /*
  * Solaris Kerberos:
@@ -1965,7 +1986,7 @@ crypto_retrieve_X509_sans(krb5_context context,
     pkiDebug("%s: looking for SANs in cert = %s\n", __FUNCTION__, buf);
 
     if ((i = X509_get_ext_by_NID(cert, NID_subject_alt_name, -1)) >= 0) {
-	X509_EXTENSION *ext = NULL;
+	OSSL4_CONST X509_EXTENSION *ext = NULL;
 	GENERAL_NAMES *ialt = NULL;
 	GENERAL_NAME *gen = NULL;
 	int ret = 0;
@@ -2010,8 +2031,10 @@ crypto_retrieve_X509_sans(krb5_context context,
 	    gen = sk_GENERAL_NAME_value(ialt, i);
 	    switch (gen->type) {
 	    case GEN_OTHERNAME:
-		name.length = gen->d.otherName->value->value.sequence->length;
-		name.data = (char *)gen->d.otherName->value->value.sequence->data;
+		name.length = ASN1_STRING_length(
+		    gen->d.otherName->value->value.sequence);
+		name.data = __DECONST(char *, ASN1_STRING_get0_data(
+		    gen->d.otherName->value->value.sequence));
 		if (princs != NULL
 		    && OBJ_cmp(plgctx->id_pkinit_san,
 			       gen->d.otherName->type_id) == 0) {
@@ -2047,10 +2070,10 @@ crypto_retrieve_X509_sans(krb5_context context,
 		break;
 	    case GEN_DNS:
 		if (dnss != NULL) {
-		    pkiDebug("%s: found dns name = %s\n",
-			     __FUNCTION__, gen->d.dNSName->data);
-		    dnss[d] = (unsigned char *)
-				    strdup((char *)gen->d.dNSName->data);
+		    pkiDebug("%s: found dns name = %s\n", __FUNCTION__,
+			     ASN1_STRING_get0_data(gen->d.dNSName));
+		    dnss[d] = (unsigned char *)strdup((const char *)
+			ASN1_STRING_get0_data(gen->d.dNSName));
 		    if (dnss[d] == NULL) {
 			pkiDebug("%s: failed to duplicate dns name\n",
 				 __FUNCTION__);
@@ -4542,11 +4565,7 @@ pkinit_find_private_key(pkinit_identity_crypto_context id_cryptoctx,
     CK_ATTRIBUTE attrs[4];
     CK_ULONG count;
     CK_KEY_TYPE keytype;
-#if OPENSSL_VERSION_NUMBER >= 0x30000000L
-    const RSA *rsa;
-#else
-    RSA *rsa;
-#endif
+    OSSL3_CONST RSA *rsa;
     unsigned int nattrs = 0;
     int r;
 #ifdef PKINIT_USE_KEY_USAGE
@@ -5753,7 +5772,7 @@ out:
  * If buf is NULL, returns the length req'd to hold name
  */
 static char *
-X509_NAME_oneline_ex(X509_NAME * a,
+X509_NAME_oneline_ex(OSSL11_CONST X509_NAME * a,
 		     char *buf,
 		     unsigned int *size,
 		     unsigned long flag)
@@ -6241,7 +6260,7 @@ create_identifiers_from_stack(STACK_OF(X509) *sk,
     int i = 0, sk_size = sk_X509_num(sk);
     krb5_external_principal_identifier **krb5_cas = NULL;
     X509 *x = NULL;
-    X509_NAME *xn = NULL;
+    OSSL3_CONST X509_NAME *xn = NULL;
     unsigned char *p = NULL;
     int len = 0;
     PKCS7_ISSUER_AND_SERIAL *is = NULL;
@@ -6446,7 +6465,7 @@ create_krb5_trustedCas(krb5_context context,
     krb5_trusted_ca **krb5_cas = NULL;
     X509 *x = NULL;
     char buf[DN_BUF_LEN];
-    X509_NAME *xn = NULL;
+    OSSL3_CONST X509_NAME *xn = NULL;
     unsigned char *p = NULL;
     PKCS7_ISSUER_AND_SERIAL *is = NULL;
 
@@ -6809,8 +6828,9 @@ pkcs7_dataDecode(krb5_context context,
 	BIO_push(out,etmp);
     etmp=NULL;
 
-    if (data_body->length > 0)
-	bio = BIO_new_mem_buf(data_body->data, data_body->length);
+    if (ASN1_STRING_length(data_body) > 0)
+	bio = BIO_new_mem_buf(ASN1_STRING_get0_data(data_body),
+	    ASN1_STRING_length(data_body));
     else {
 	bio=BIO_new(BIO_s_mem());
 	BIO_set_mem_eof_return(bio,0);
@@ -6845,13 +6865,13 @@ der_decode_data(unsigned char *data, long data_len,
 
     if ((s = d2i_ASN1_BIT_STRING(NULL, &p, data_len)) == NULL)
 	goto cleanup;
-    *out_len = s->length;
+    *out_len = ASN1_STRING_length(s);
     if ((*out = (unsigned char *) malloc((size_t) *out_len + 1)) == NULL) {
 	retval = ENOMEM;
 	goto cleanup;
     }
-    (void) memcpy(*out, s->data, (size_t) s->length);
-    (*out)[s->length] = '\0';
+    (void) memcpy(*out, ASN1_STRING_get0_data(s), (size_t) *out_len);
+    (*out)[*out_len] = '\0';
 
     retval = 0;
   cleanup:

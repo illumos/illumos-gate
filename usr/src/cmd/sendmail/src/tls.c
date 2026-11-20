@@ -31,6 +31,11 @@ static int	tls_verify_cb __P((X509_STORE_CTX *, void *));
 static int x509_verify_cb __P((int, X509_STORE_CTX *));
 
 #  define CONST097 const
+#  if OPENSSL_VERSION_NUMBER >= 0x30000000L
+#   define OSSL3_CONST const
+#  else
+#   define OSSL3_CONST
+#  endif
 static void	apps_ssl_info_cb __P((CONST097 SSL *, int , int));
 static bool	tls_ok_f __P((char *, char *, int));
 static bool	tls_safe_f __P((char *, long, bool));
@@ -1214,7 +1219,7 @@ tls_get_info(ssl, srv, host, mac, certreq)
 	if (cert != NULL)
 	{
 		unsigned int n;
-		X509_NAME *subj, *issuer;
+		OSSL3_CONST X509_NAME *subj, *issuer;
 		unsigned char md[EVP_MAX_MD_SIZE];
 		char buf[MAXNAME];
 
