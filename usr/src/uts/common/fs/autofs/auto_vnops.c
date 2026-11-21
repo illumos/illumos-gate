@@ -21,6 +21,7 @@
 /*
  * Copyright (c) 1992, 2010, Oracle and/or its affiliates. All rights reserved.
  * Copyright (c) 2017 by Delphix. All rights reserved.
+ * Copyright 2026 RackTop Systems Inc.
  */
 
 #include <sys/param.h>
@@ -889,8 +890,30 @@ auto_mkdir(
 			error = VOP_MKDIR(newvp, nm, va, vpp, cred, ct,
 			    flags, vsecp);
 		VN_RELE(newvp);
-	} else
+	} else if (strcmp(nm, ".") == 0 || strcmp(nm, "..") == 0) {
+		error = EEXIST;
+	} else {
+		fnnode_t *dfnp = vntofn(dvp);
+		fnnode_t *fnp = NULL;
+
+		/*
+		 * The pathname walk may have resolved this name already. Use
+		 * the result in memory to avoid triggering a daemon lookup or
+		 * mount just to report that an entry exists.
+		 */
 		error = ENOSYS;
+		rw_enter(&dfnp->fn_rwlock, RW_READER);
+		(void) auto_search(dfnp, nm, &fnp, cred);
+		rw_exit(&dfnp->fn_rwlock);
+		if (fnp != NULL) {
+			mutex_enter(&fnp->fn_lock);
+			if (fnp->fn_error == 0 &&
+			    (fnp->fn_flags & (MF_LOOKUP | MF_INPROG)) == 0)
+				error = EEXIST;
+			mutex_exit(&fnp->fn_lock);
+			VN_RELE(fntovn(fnp));
+		}
+	}
 
 done:
 	AUTOFS_DPRINT((5, "auto_mkdir: error=%d\n", error));
