@@ -16,7 +16,7 @@
 .\"
 .\" Copyright 2026 OmniOS Community Edition (OmniOSce) Association.
 .\"
-.Dd August 8, 2026
+.Dd November 23, 2026
 .Dt GETPFLAGS 2
 .Os
 .Sh NAME
@@ -103,6 +103,21 @@ or 1
 .Pq set .
 Only if this flag is set does the current process have privilege debugging
 enabled.
+Processes can set and unset this flag at will.
+.It Dv PRIV_XPOLICY
+This one bit flag takes the value of 0
+.Pq unset
+or 1
+.Pq set .
+If this flag is set then a privilege check which the process would otherwise
+fail is referred to a privilege policy daemon, if one has been registered for
+the process credentials, for its project or for the system, and the check
+succeeds if that daemon approves it.
+A policy daemon can only approve privileges which the process that registered
+it held in its effective set at the time, and never a privilege outside the
+limit set of the process being checked.
+The flag is set when a policy daemon is registered for the process
+credentials, and unsetting it discards that registration.
 Processes can set and unset this flag at will.
 .It Dv NET_MAC_AWARE , NET_MAC_AWARE_INHERIT
 These flags are available only if the system is configured with Trusted
