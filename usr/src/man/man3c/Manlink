@@ -1204,6 +1204,7 @@ ucred.3c
 	ucred_getsgid.3c
 	ucred_getsuid.3c
 	ucred_getzoneid.3c
+	ucred_iskernel.3c
 	ucred_size.3c
 vfwprintf.3c
 	vswprintf.3c
